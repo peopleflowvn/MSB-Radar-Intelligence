@@ -27,7 +27,7 @@ class RadarResolverTest(unittest.TestCase):
         snapshot = RadarHttpSourceResolver(self.config(), client).resolve(document_id="12", scope_token="opaque-scope")
         self.assertEqual((snapshot.document_id, snapshot.person_id), ("12", "7"))
         url, headers, timeout = client.call
-        self.assertEqual(url, "https://radar.example/api/v1/intelligence/evidence/documents/12/")
+        self.assertEqual(url, "https://radar.example/api/v1/talent/intelligence/evidence/documents/12/")
         self.assertEqual(headers["X-Radar-Scope-Token"], "opaque-scope")
         self.assertEqual(headers["Authorization"], "Bearer service-secret")
         self.assertEqual(timeout, 4)

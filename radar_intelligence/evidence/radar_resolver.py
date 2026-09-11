@@ -54,7 +54,7 @@ class RadarHttpSourceResolver:
         if not document_id.strip() or not scope_token.strip():
             raise EvidenceValidationError("document_id and scope_token are required")
         status, raw = self._client.get(
-            f"{self._base_url}/api/v1/intelligence/evidence/documents/{document_id}/",
+            f"{self._base_url}/api/v1/talent/intelligence/evidence/documents/{document_id}/",
             {
                 "Authorization": f"Bearer {self._service_token}",
                 "X-Radar-Scope-Token": scope_token,
