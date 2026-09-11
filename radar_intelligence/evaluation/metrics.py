@@ -7,9 +7,12 @@ from typing import Sequence
 @dataclass(frozen=True)
 class RetrievalMetrics:
     cases: int
+    retrieval_cases: int
+    no_result_cases: int
     recall_at_k: float
     precision_at_k: float
     mean_reciprocal_rank: float
+    no_result_accuracy: float | None
 
 
 def evaluate_retrieval(
@@ -24,18 +27,23 @@ def evaluate_retrieval(
     precisions = []
     reciprocal_ranks = []
     for expected, actual in expected_and_actual:
-        if not expected:
-            raise ValueError("evaluation truth must contain at least one relevant person")
         top = list(actual[:k])
+        if not expected:
+            continue
         relevant = sum(person_id in expected for person_id in top)
         recalls.append(relevant / len(expected))
-        precisions.append(relevant / k)
+        precisions.append(relevant / len(top) if top else 0.0)
         rank = next((position for position, person_id in enumerate(top, start=1) if person_id in expected), None)
         reciprocal_ranks.append(0.0 if rank is None else 1.0 / rank)
     count = len(expected_and_actual)
+    no_result = [(not actual[:k]) for expected, actual in expected_and_actual if not expected]
+    retrieval_count = len(recalls)
     return RetrievalMetrics(
         cases=count,
-        recall_at_k=sum(recalls) / count,
-        precision_at_k=sum(precisions) / count,
-        mean_reciprocal_rank=sum(reciprocal_ranks) / count,
+        retrieval_cases=retrieval_count,
+        no_result_cases=len(no_result),
+        recall_at_k=sum(recalls) / retrieval_count if retrieval_count else 0.0,
+        precision_at_k=sum(precisions) / retrieval_count if retrieval_count else 0.0,
+        mean_reciprocal_rank=sum(reciprocal_ranks) / retrieval_count if retrieval_count else 0.0,
+        no_result_accuracy=(sum(no_result) / len(no_result) if no_result else None),
     )

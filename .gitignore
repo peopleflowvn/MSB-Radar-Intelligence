@@ -9,4 +9,4 @@ build/
 *.egg-info/
 evaluation/results/*.json
 !evaluation/results/.gitkeep
-
+!evaluation/results/synthetic_retrieval_v2.json

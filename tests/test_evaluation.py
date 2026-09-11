@@ -14,9 +14,10 @@ class EvaluationTest(unittest.TestCase):
         self.assertAlmostEqual(metrics.precision_at_k, 1 / 3)
         self.assertAlmostEqual(metrics.mean_reciprocal_rank, 0.75)
 
-    def test_truth_cannot_be_empty(self):
-        with self.assertRaises(ValueError):
-            evaluate_retrieval([(set(), [])], k=5)
+    def test_no_result_is_measured_separately(self):
+        metrics = evaluate_retrieval([(set(), []), (set(), ["p1"])], k=5)
+        self.assertEqual(metrics.no_result_cases, 2)
+        self.assertEqual(metrics.no_result_accuracy, 0.5)
 
 
 if __name__ == "__main__":
