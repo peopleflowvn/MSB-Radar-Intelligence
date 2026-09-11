@@ -55,13 +55,36 @@ def write_runtime_env(source_path: Path, target_path: Path, *, embedding_model: 
     )
 
 
+def sync_radar_bridge_tokens(runtime_path: Path, radar_env_path: Path) -> None:
+    """Put only the two V2 bridge tokens into Radar's existing env file."""
+    runtime = _read(runtime_path)
+    replacements = {
+        "INTELLIGENCE_SERVICE_TOKEN": runtime["RADAR_SERVICE_TOKEN"],
+        "INTELLIGENCE_INDEX_SCOPE_TOKEN": runtime["RADAR_INDEX_SCOPE_TOKEN"],
+    }
+    lines = radar_env_path.read_text(encoding="utf-8").splitlines()
+    seen = set()
+    for index, line in enumerate(lines):
+        name = line.split("=", 1)[0].strip() if "=" in line else ""
+        if name in replacements:
+            lines[index] = f"{name}={replacements[name]}"
+            seen.add(name)
+    for name, value in replacements.items():
+        if name not in seen:
+            lines.append(f"{name}={value}")
+    radar_env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", required=True, type=Path)
     parser.add_argument("--target", required=True, type=Path)
     parser.add_argument("--embedding-model", default="")
+    parser.add_argument("--sync-radar-env", type=Path)
     args = parser.parse_args()
     write_runtime_env(args.source, args.target, embedding_model=args.embedding_model)
+    if args.sync_radar_env:
+        sync_radar_bridge_tokens(args.target, args.sync_radar_env)
 
 
 if __name__ == "__main__":

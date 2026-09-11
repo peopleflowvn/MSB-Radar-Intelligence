@@ -55,7 +55,8 @@ jobs:
           python3 scripts/provision_runtime_env.py \
             --source /home/ubuntu/msbradar/.env \
             --target /home/ubuntu/msbradar-intelligence/runtime.env \
-            --embedding-model "${embedding_model}"
+            --embedding-model "${embedding_model}" \
+            --sync-radar-env /home/ubuntu/msbradar/.env
           chmod 600 /home/ubuntu/msbradar-intelligence/runtime.env
       - name: Install release and preserve rollback metadata
         shell: bash

@@ -2,7 +2,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.provision_runtime_env import build_runtime_values, write_runtime_env
+from scripts.provision_runtime_env import (
+    build_runtime_values, sync_radar_bridge_tokens, write_runtime_env,
+)
 
 
 class ProvisionRuntimeEnvTest(unittest.TestCase):
@@ -33,6 +35,19 @@ class ProvisionRuntimeEnvTest(unittest.TestCase):
     def test_reviewed_embedding_model_is_applied(self):
         values = build_runtime_values({}, {}, embedding_model="baai/bge-m3")
         self.assertEqual(values["GREENNODE_MODEL_EMBEDDING"], "baai/bge-m3")
+
+    def test_bridge_sync_preserves_radar_env_and_adds_only_bridge_tokens(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Path(directory) / "runtime.env"
+            radar = Path(directory) / "radar.env"
+            runtime.write_text("RADAR_SERVICE_TOKEN=svc\nRADAR_INDEX_SCOPE_TOKEN=idx\n", encoding="utf-8")
+            radar.write_text("# keep comments\nSECRET_KEY='keep'\nPOSTGRES_PASSWORD=keep-too\n", encoding="utf-8")
+            sync_radar_bridge_tokens(runtime, radar)
+            values = radar.read_text(encoding="utf-8")
+        self.assertIn("# keep comments\nSECRET_KEY='keep'", values)
+        self.assertIn("POSTGRES_PASSWORD=keep-too", values)
+        self.assertIn("INTELLIGENCE_SERVICE_TOKEN=svc", values)
+        self.assertIn("INTELLIGENCE_INDEX_SCOPE_TOKEN=idx", values)
 
 
 if __name__ == "__main__":
