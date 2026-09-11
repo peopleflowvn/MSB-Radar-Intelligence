@@ -83,3 +83,62 @@ jobs:
               } if route else None),
           }, sort_keys=True))
           '
+      - name: Verify Radar bridge against production data without exposing PII
+        shell: bash
+        run: |
+          set -euo pipefail
+          scope=$(sudo docker exec msbradar-hub python manage.py shell -c '
+          from django.contrib.auth import get_user_model
+          from accounts import roles
+          from talent.corpus_qa import can_read_cv
+          from talent.intelligence_views import issue_scope_token
+          user = next((u for u in get_user_model().objects.filter(is_active=True).iterator()
+                       if roles.can_access(u, roles.MODULE_TALENT) and can_read_cv(u)), None)
+          assert user is not None, "No active Talent principal available for scope probe"
+          print(issue_scope_token(user))
+          ' | tail -n 1)
+          test -n "$scope"
+          sudo docker exec -e PROBE_SCOPE_TOKEN="$scope" -i msbradar-intelligence python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          base = "http://hub:8000/api/v1/talent/intelligence"
+          service = os.environ["RADAR_SERVICE_TOKEN"]
+          index_scope = os.environ["RADAR_INDEX_SCOPE_TOKEN"]
+
+          def get(path, headers):
+              request = urllib.request.Request(base + path, headers={"Host": "localhost", **headers})
+              try:
+                  with urllib.request.urlopen(request, timeout=20) as response:
+                      return response.status, json.load(response)
+              except urllib.error.HTTPError as exc:
+                  return exc.code, json.load(exc)
+
+          denied, _ = get("/document-feed/?limit=1", {
+              "Authorization": "Bearer wrong", "X-Radar-Scope-Token": index_scope})
+          assert denied == 404
+          feed_status, feed = get("/document-feed/?limit=1", {
+              "Authorization": f"Bearer {service}", "X-Radar-Scope-Token": index_scope})
+          assert feed_status == 200 and feed["events"], "Production feed is empty"
+          event = feed["events"][0]
+          required = {"event_id", "operation", "document_id", "person_id", "version",
+                      "content_hash", "source", "document_type", "text", "updated_at"}
+          assert required <= set(event) and event["text"] and event["source"]
+          status, evidence = get(f"/evidence/documents/{event['document_id']}/", {
+              "Authorization": f"Bearer {service}",
+              "X-Radar-Scope-Token": os.environ["PROBE_SCOPE_TOKEN"]})
+          assert status == 200
+          assert evidence["document_id"] == event["document_id"]
+          assert evidence["person_id"] == event["person_id"]
+          assert evidence["version"] == event["version"]
+          assert evidence["content_hash"] == event["content_hash"]
+          print(json.dumps({
+              "feed_http_status": feed_status,
+              "feed_event_count": len(feed["events"]),
+              "feed_has_more": bool(feed["has_more"]),
+              "wrong_token_rejected": denied == 404,
+              "evidence_matches_feed": True,
+          }, sort_keys=True))
+          PY
