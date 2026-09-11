@@ -45,7 +45,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo install -d -o ubuntu -g ubuntu /home/ubuntu/msbradar-intelligence
-          python scripts/provision_runtime_env.py \
+          python3 scripts/provision_runtime_env.py \
             --source /home/ubuntu/msbradar/.env \
             --target /home/ubuntu/msbradar-intelligence/runtime.env
           chmod 600 /home/ubuntu/msbradar-intelligence/runtime.env
