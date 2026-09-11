@@ -1,8 +1,9 @@
 from .hybrid import CandidateChunk, group_and_fuse
-from .engine import HybridRetriever, RetrievalRecord, RetrievalScope, SemanticRanker, normalize_text
+from .engine import CosineSemanticRanker, HybridRetriever, RetrievalRecord, RetrievalScope, SemanticRanker, normalize_text
 
 __all__ = [
     "CandidateChunk",
+    "CosineSemanticRanker",
     "HybridRetriever",
     "RetrievalRecord",
     "RetrievalScope",

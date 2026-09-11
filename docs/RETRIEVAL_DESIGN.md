@@ -19,7 +19,9 @@ broadening scope.
 - Structured: location, all-required skills, company, education, experience
   range and exclusions, with accent-insensitive Vietnamese normalization.
 - Lexical: deterministic token overlap reference scorer.
-- Semantic: injected ranker protocol; no production embedding model selected.
+- Semantic: cosine ranker over indexed vectors plus an injected query embedder;
+  GreenNode's OpenAI-compatible embedding contract is implemented, but no live
+  production embedding model has been measured.
 - Hybrid: reciprocal-rank fusion followed by Person grouping.
 
 The lexical scorer is a testable baseline, not a claim that token overlap is

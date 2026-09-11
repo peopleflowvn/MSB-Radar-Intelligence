@@ -84,6 +84,40 @@ class GreenNodeTransport:
             raise ProviderError("GreenNode returned a malformed chat completion") from exc
 
 
+class GreenNodeEmbedder:
+    """OpenAI-compatible embedding adapter satisfying the indexing protocol."""
+
+    def __init__(self, config: GreenNodeConfig, model: str, http_client: HttpClient | None = None) -> None:
+        if not model.strip():
+            raise ValueError("embedding model alias must not be empty")
+        self._base_url = config.base_url.rstrip("/")
+        self._api_key = config.api_key
+        self._model = model
+        self._http = http_client or UrllibHttpClient()
+
+    def embed_documents(self, texts):
+        values = [str(text) for text in texts]
+        if not values or any(not value.strip() for value in values):
+            raise ValueError("embedding input must contain non-empty text")
+        raw = self._http.post(
+            self._base_url + "/embeddings",
+            {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
+            json.dumps({"model": self._model, "input": values}, ensure_ascii=False).encode("utf-8"),
+            30.0,
+        )
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+            rows = sorted(payload["data"], key=lambda row: int(row["index"]))
+            if len(rows) != len(values):
+                raise ValueError
+            vectors = [tuple(float(value) for value in row["embedding"]) for row in rows]
+            if any(not vector for vector in vectors):
+                raise ValueError
+            return vectors
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ProviderError("GreenNode returned a malformed embedding response") from exc
+
+
 def _optional_int(value: object) -> int | None:
     if value is None:
         return None

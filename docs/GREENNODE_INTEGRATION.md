@@ -15,3 +15,8 @@ the caller's bounded timeout, and returns sanitized provider errors. Mocked
 contract tests verify the outgoing OpenAI-compatible payload and malformed
 response behavior. No GreenNode environment variables are currently present,
 so live inference is `NOT TESTED` rather than treated as a development blocker.
+
+The embedding adapter uses the OpenAI-compatible `POST /embeddings` contract,
+validates vector count/order/dimensions at its consumers, and implements the
+same injectable interface used by indexing and query embedding. Contract tests
+use mocked HTTP responses; live embedding quality remains `NOT MEASURED`.

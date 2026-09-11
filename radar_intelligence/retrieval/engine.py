@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from math import sqrt
 from dataclasses import dataclass
 from typing import Protocol, Sequence
 
@@ -28,6 +29,7 @@ class RetrievalRecord:
     companies: tuple[str, ...] = ()
     education: tuple[str, ...] = ()
     years_experience: float | None = None
+    embedding: tuple[float, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,33 @@ class SemanticRanker(Protocol):
 class NullSemanticRanker:
     def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]:
         return ()
+
+
+class QueryEmbedder(Protocol):
+    def embed_documents(self, texts: Sequence[str]) -> Sequence[Sequence[float]]: ...
+
+
+class CosineSemanticRanker:
+    def __init__(self, embedder: QueryEmbedder) -> None:
+        self._embedder = embedder
+
+    def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]:
+        query_rows = self._embedder.embed_documents([query])
+        if len(query_rows) != 1 or not query_rows[0]:
+            raise ValueError("query embedder returned an invalid vector")
+        query_vector = tuple(float(value) for value in query_rows[0])
+        scores = []
+        for record in records:
+            if record.embedding is None:
+                continue
+            if len(record.embedding) != len(query_vector):
+                raise ValueError("query and document embedding dimensions differ")
+            denominator = sqrt(sum(value * value for value in query_vector)) * sqrt(
+                sum(value * value for value in record.embedding)
+            )
+            score = 0.0 if denominator == 0 else sum(a * b for a, b in zip(query_vector, record.embedding)) / denominator
+            scores.append((record.chunk.evidence.evidence_id, score))
+        return scores
 
 
 def _structured_match(record: RetrievalRecord, filters: SearchFilters) -> tuple[bool, float]:

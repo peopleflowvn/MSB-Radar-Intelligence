@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from radar_intelligence.contracts import Evidence, PersonRef, SearchFilters, SearchRequest
-from radar_intelligence.retrieval import CandidateChunk, HybridRetriever, RetrievalRecord, RetrievalScope, normalize_text
+from radar_intelligence.retrieval import CandidateChunk, CosineSemanticRanker, HybridRetriever, RetrievalRecord, RetrievalScope, normalize_text
 
 
 def record(person_id, evidence_id, text, **metadata):
@@ -64,6 +64,20 @@ class RetrievalEngineTest(unittest.TestCase):
                 [record("p1", "e1", "risk")],
                 RetrievalScope(frozenset({"p1"})),
             )
+
+    def test_cosine_semantic_ranker_orders_by_query_similarity(self):
+        class Embedder:
+            def embed_documents(self, texts):
+                return [(1.0, 0.0)]
+
+        records = [
+            record("p1", "e1", "unrelated", embedding=(0.0, 1.0)),
+            record("p2", "e2", "also unrelated", embedding=(0.9, 0.1)),
+        ]
+        hits = HybridRetriever(CosineSemanticRanker(Embedder())).search(
+            SearchRequest("leadership", "scope", "u1"), records, RetrievalScope(frozenset({"p1", "p2"}))
+        )
+        self.assertEqual([hit.person.person_id for hit in hits], ["p2", "p1"])
 
 
 if __name__ == "__main__":

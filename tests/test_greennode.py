@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from radar_intelligence.providers import GreenNodeConfig, GreenNodeTransport, ProviderError
+from radar_intelligence.providers import GreenNodeConfig, GreenNodeEmbedder, GreenNodeTransport, ProviderError
 
 
 class FakeHttp:
@@ -42,6 +42,23 @@ class GreenNodeTest(unittest.TestCase):
             GreenNodeConfig("http://green.example/v1", "secret")
         with self.assertRaises(ValueError):
             GreenNodeConfig("https://green.example/v1", "")
+
+    def test_embedding_contract_preserves_input_order(self):
+        client = FakeHttp(json.dumps({"data": [
+            {"index": 1, "embedding": [0.0, 1.0]},
+            {"index": 0, "embedding": [1.0, 0.0]},
+        ]}).encode())
+        embedder = GreenNodeEmbedder(GreenNodeConfig("https://green.example/v1", "secret"), "embed-alias", client)
+        vectors = embedder.embed_documents(["first", "second"])
+        self.assertEqual(vectors, [(1.0, 0.0), (0.0, 1.0)])
+        self.assertEqual(client.call[0], "https://green.example/v1/embeddings")
+        self.assertEqual(client.call[2], {"model": "embed-alias", "input": ["first", "second"]})
+
+    def test_embedding_count_mismatch_fails_closed(self):
+        client = FakeHttp(json.dumps({"data": [{"index": 0, "embedding": [1.0]}]}).encode())
+        embedder = GreenNodeEmbedder(GreenNodeConfig("https://green.example/v1", "secret"), "embed", client)
+        with self.assertRaisesRegex(ProviderError, "malformed embedding"):
+            embedder.embed_documents(["first", "second"])
 
 
 if __name__ == "__main__":
