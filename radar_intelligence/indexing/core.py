@@ -68,6 +68,10 @@ class Embedder(Protocol):
     def embed_documents(self, texts: Sequence[str]) -> Sequence[Sequence[float]]: ...
 
 
+class DocumentIndex(Protocol):
+    def apply(self, change: DocumentChange, chunks: tuple[SearchDocument, ...]) -> IndexApplyResult: ...
+
+
 class DocumentConverter:
     """Convert a Radar document into disposable, traceable search chunks."""
 
@@ -175,7 +179,7 @@ class InMemoryDocumentIndex:
 class IncrementalIndexer:
     def __init__(
         self,
-        store: InMemoryDocumentIndex,
+        store: DocumentIndex,
         converter: DocumentConverter | None = None,
         embedder: Embedder | None = None,
     ) -> None:

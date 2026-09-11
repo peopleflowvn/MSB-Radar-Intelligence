@@ -7,6 +7,7 @@ from .core import (
     IndexApplyResult,
     SearchDocument,
 )
+from .haystack_store import HaystackDocumentIndex
 
 __all__ = [
     "ChangeOperation",
@@ -16,4 +17,5 @@ __all__ = [
     "IncrementalIndexer",
     "IndexApplyResult",
     "SearchDocument",
+    "HaystackDocumentIndex",
 ]

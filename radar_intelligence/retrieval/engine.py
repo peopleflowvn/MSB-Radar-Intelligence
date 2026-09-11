@@ -1,0 +1,132 @@
+from __future__ import annotations
+
+import re
+import unicodedata
+from dataclasses import dataclass
+from typing import Protocol, Sequence
+
+from radar_intelligence.contracts import SearchFilters, SearchHit, SearchRequest
+
+from .hybrid import CandidateChunk, group_and_fuse
+
+
+def normalize_text(value: str) -> str:
+    decomposed = unicodedata.normalize("NFD", value.casefold().replace("đ", "d"))
+    plain = "".join(character for character in decomposed if unicodedata.category(character) != "Mn")
+    return " ".join(re.findall(r"[a-z0-9]+", plain))
+
+
+def _values(values: Sequence[str]) -> set[str]:
+    return {normalize_text(value) for value in values if normalize_text(value)}
+
+
+@dataclass(frozen=True)
+class RetrievalRecord:
+    chunk: CandidateChunk
+    locations: tuple[str, ...] = ()
+    skills: tuple[str, ...] = ()
+    companies: tuple[str, ...] = ()
+    education: tuple[str, ...] = ()
+    years_experience: float | None = None
+
+
+@dataclass(frozen=True)
+class RetrievalScope:
+    allowed_person_ids: frozenset[str]
+
+    def __post_init__(self) -> None:
+        if not self.allowed_person_ids:
+            raise ValueError("retrieval scope must contain at least one authorized person")
+
+
+class SemanticRanker(Protocol):
+    def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]: ...
+
+
+class NullSemanticRanker:
+    def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]:
+        return ()
+
+
+def _structured_match(record: RetrievalRecord, filters: SearchFilters) -> tuple[bool, float]:
+    checks: list[bool] = []
+    if filters.locations:
+        checks.append(bool(_values(record.locations) & _values(filters.locations)))
+    if filters.skills_all:
+        checks.append(_values(filters.skills_all) <= _values(record.skills))
+    if filters.companies:
+        checks.append(bool(_values(record.companies) & _values(filters.companies)))
+    if filters.education:
+        checks.append(bool(_values(record.education) & _values(filters.education)))
+    if filters.min_years_experience is not None:
+        checks.append(record.years_experience is not None and record.years_experience >= filters.min_years_experience)
+    if filters.max_years_experience is not None:
+        checks.append(record.years_experience is not None and record.years_experience <= filters.max_years_experience)
+    searchable = normalize_text(" ".join((record.chunk.evidence.text,) + record.companies))
+    if any(normalize_text(term) in searchable for term in filters.excluded_terms):
+        return False, 0.0
+    if checks and not all(checks):
+        return False, 0.0
+    return True, (sum(checks) / len(checks) if checks else 0.0)
+
+
+def _lexical_scores(query: str, records: Sequence[RetrievalRecord]) -> dict[str, float]:
+    query_tokens = set(normalize_text(query).split())
+    if not query_tokens:
+        return {}
+    scores: dict[str, float] = {}
+    for record in records:
+        text = " ".join((record.chunk.person.display_name or "", record.chunk.evidence.text))
+        tokens = set(normalize_text(text).split())
+        overlap = len(query_tokens & tokens)
+        if overlap:
+            scores[record.chunk.evidence.evidence_id] = overlap / len(query_tokens)
+    return scores
+
+
+def _rank_map(scores: dict[str, float]) -> dict[str, int]:
+    ordered = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
+    return {identifier: rank for rank, (identifier, _) in enumerate(ordered, start=1)}
+
+
+class HybridRetriever:
+    def __init__(self, semantic_ranker: SemanticRanker | None = None) -> None:
+        self._semantic_ranker = semantic_ranker or NullSemanticRanker()
+
+    def search(
+        self,
+        request: SearchRequest,
+        records: Sequence[RetrievalRecord],
+        scope: RetrievalScope,
+    ) -> tuple[SearchHit, ...]:
+        # Scope is enforced before structured, lexical or semantic components.
+        authorized = [record for record in records if record.chunk.person.person_id in scope.allowed_person_ids]
+        filtered: list[tuple[RetrievalRecord, float]] = []
+        for record in authorized:
+            matches, score = _structured_match(record, request.filters)
+            if matches:
+                filtered.append((record, score))
+
+        candidates = [record for record, _ in filtered]
+        lexical_ranks = _rank_map(_lexical_scores(request.query, candidates))
+        semantic_scores = dict(self._semantic_ranker.rank(request.query, tuple(candidates)))
+        allowed_evidence = {record.chunk.evidence.evidence_id for record in candidates}
+        if any(identifier not in allowed_evidence for identifier in semantic_scores):
+            raise ValueError("semantic ranker returned evidence outside its authorized input")
+        semantic_ranks = _rank_map(semantic_scores)
+
+        fused = []
+        for record, structured_score in filtered:
+            evidence_id = record.chunk.evidence.evidence_id
+            lexical_rank = lexical_ranks.get(evidence_id)
+            semantic_rank = semantic_ranks.get(evidence_id)
+            if lexical_rank is None and semantic_rank is None and structured_score == 0:
+                continue
+            fused.append(CandidateChunk(
+                person=record.chunk.person,
+                evidence=record.chunk.evidence,
+                lexical_rank=lexical_rank,
+                semantic_rank=semantic_rank,
+                structured_score=structured_score,
+            ))
+        return group_and_fuse(fused, request.limit)

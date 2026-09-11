@@ -17,6 +17,9 @@ Phase 0/1 foundation:
 - 51-case legacy-derived gold-set seed;
 - incremental document conversion/index lifecycle with idempotent events,
   delete tombstones, Person reassignment and injectable embeddings;
+- Haystack 3.1 indexing adapter verified against its real in-memory store;
+- authorized structured/lexical/semantic-adapter hybrid retrieval and explicit
+  Recall@K, Precision@K and MRR evaluation primitives;
 - runnable health endpoint and tests without external credentials.
 
 Haystack and a production store are deliberately not installed yet. They enter
@@ -24,12 +27,12 @@ after the contracts, gold-set schema, and retrieval baseline are stable.
 
 ## Run locally
 
-Requires Python 3.10+ (the dependency-free core tests still run on the current
-Python 3.9 host; Haystack 3 itself requires Python 3.10+).
+Requires Python 3.10+. Development uses the project-local Python 3.14 virtual
+environment.
 
 ```powershell
-python -m unittest discover -s tests -v
-python -m radar_intelligence.api
+.\.venv\Scripts\python -m unittest discover -s tests -v
+.\.venv\Scripts\python -m radar_intelligence.api
 ```
 
 Then open `http://127.0.0.1:8081/health`.

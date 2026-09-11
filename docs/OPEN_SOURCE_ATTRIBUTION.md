@@ -8,6 +8,7 @@ Haystack is open-source infrastructure, not MSB Radar business IP. The current
 reference index is framework-independent and exists to test lifecycle and
 security semantics before selecting a production document store.
 
-Haystack 3 requires Python 3.10 or newer. The current host only exposes Python
-3.9, so the optional dependency is declared but its live adapter/install is not
-claimed as verified on this host.
+Haystack 3 requires Python 3.10 or newer. Haystack 3.1.1 is installed in the
+project-local Python 3.14 environment and the indexing adapter is integration
+tested against its real in-memory document store. No production store has been
+selected or claimed as verified.

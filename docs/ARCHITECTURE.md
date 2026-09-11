@@ -29,3 +29,9 @@ IDs. `IncrementalIndexer` applies embeddings through an injected capability and
 atomically replaces a document representation. The reference in-memory store
 defines replay, stale-event, delete-tombstone and Person-reassignment behavior;
 a Haystack adapter must preserve these tests before it can replace the store.
+
+The first adapter targets Haystack's `DocumentStore` contract and has verified
+parity for upsert/replay, version replacement, deletion and Person reassignment
+using Haystack 3's real in-memory store. This is an integration reference, not
+a production persistence choice; store durability and transaction behavior
+remain a later benchmark/deployment decision.
