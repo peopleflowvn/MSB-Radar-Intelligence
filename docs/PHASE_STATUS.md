@@ -21,7 +21,7 @@ production evidence explicitly.
 | 12 Model benchmark | NOT STARTED | Capability abstraction only | Live GreenNode configuration |
 | 13 Legacy vs V2 | PARTIAL | Comparable synthetic lexical report | Same real corpus, scope and telemetry |
 | 14 Radar integration | PARTIAL | Legacy endpoint gap documented; proposed evidence endpoint plus tested HTTP client | Product-side endpoint, scope-token format and isolated integration test |
-| 15 Hardening | NOT STARTED | Foundational fail-closed tests only | Production topology and threat model |
+| 15 Hardening | PARTIAL | Fail-closed tests; HTTPS config validation; separate liveness/readiness without secret exposure | Production topology, threat model, load/failure drills and alerting |
 
 ## Current gate decision
 

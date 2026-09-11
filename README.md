@@ -44,7 +44,9 @@ environment.
 .\.venv\Scripts\python -m radar_intelligence.api
 ```
 
-Then open `http://127.0.0.1:8081/health`.
+Then open `http://127.0.0.1:8081/health` for liveness. The `/ready`
+endpoint returns HTTP 503 plus missing configuration names until Radar and
+GreenNode live dependencies are configured; it never returns secret values.
 
 ## Design rules
 

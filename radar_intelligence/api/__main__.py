@@ -4,15 +4,23 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from radar_intelligence import __version__
+from radar_intelligence.config import RuntimeSettings
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
-        if self.path != "/health":
+        if self.path not in {"/health", "/ready"}:
             self.send_error(404)
             return
-        payload = json.dumps({"status": "ok", "service": "msb-radar-intelligence", "version": __version__}).encode()
-        self.send_response(200)
+        if self.path == "/health":
+            body = {"status": "ok", "service": "msb-radar-intelligence", "version": __version__}
+            status = 200
+        else:
+            readiness = RuntimeSettings.from_env().public_status()
+            body = {"status": "ready" if readiness["ready"] else "not_ready", **readiness}
+            status = 200 if readiness["ready"] else 503
+        payload = json.dumps(body).encode()
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
@@ -30,4 +38,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
