@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from radar_intelligence import __version__
@@ -31,8 +32,18 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    server = ThreadingHTTPServer(("127.0.0.1", 8081), Handler)
-    print("MSB Radar Intelligence listening on http://127.0.0.1:8081")
+    host = os.environ.get("INTELLIGENCE_BIND_HOST", "127.0.0.1").strip()
+    raw_port = os.environ.get("INTELLIGENCE_PORT", "8081").strip()
+    if not host:
+        raise ValueError("INTELLIGENCE_BIND_HOST must not be empty")
+    try:
+        port = int(raw_port)
+    except ValueError:
+        raise ValueError("INTELLIGENCE_PORT must be an integer") from None
+    if not 1 <= port <= 65535:
+        raise ValueError("INTELLIGENCE_PORT must be between 1 and 65535")
+    server = ThreadingHTTPServer((host, port), Handler)
+    print(f"MSB Radar Intelligence listening on {host}:{port}")
     server.serve_forever()
 
 

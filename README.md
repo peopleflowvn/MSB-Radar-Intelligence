@@ -16,7 +16,7 @@ Phase 0/1 foundation:
 - OpenAI-compatible GreenNode chat transport with sanitized errors and usage
   accounting (mock-contract verified; live credentials not configured);
 - in-memory person-grouped hybrid retrieval reference implementation;
-- 51-case legacy-derived gold-set seed;
+- 50-case validated legacy-derived gold-set seed;
 - incremental document conversion/index lifecycle with idempotent events,
   delete tombstones, Person reassignment and injectable embeddings;
 - Haystack 3.1 indexing adapter verified against its real in-memory store;

@@ -1,0 +1,74 @@
+name: Deploy Intelligence to Oracle
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_shadow_deploy:
+        description: "Type DEPLOY_SHADOW; this does not switch production traffic"
+        required: true
+
+concurrency:
+  group: deploy-oracle-intelligence
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install and test
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[haystack]"
+          python -W error::ResourceWarning -m unittest discover -s tests -v
+          python -m compileall -q radar_intelligence tests
+
+  deploy-shadow:
+    needs: validate
+    if: inputs.confirm_shadow_deploy == 'DEPLOY_SHADOW'
+    runs-on: self-hosted
+    environment: oracle-production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify production prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f /home/ubuntu/msbradar/.env
+          sudo docker network inspect msbradar_default >/dev/null
+      - name: Install release and preserve rollback metadata
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          release=/home/ubuntu/msbradar-intelligence/releases/${RELEASE_SHA}
+          sudo install -d -o ubuntu -g ubuntu "${release}"
+          tar --exclude=.git --exclude=.venv --exclude='__pycache__' -cf - . | tar -xf - -C "${release}"
+          cd "${release}"
+          INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose -f docker-compose.oracle.yml build
+          INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose -f docker-compose.oracle.yml up -d
+          printf '%s\n' "${RELEASE_SHA}" | sudo tee /home/ubuntu/msbradar-intelligence/current-sha >/dev/null
+      - name: Verify exact release and live container
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(sudo cat /home/ubuntu/msbradar-intelligence/current-sha)" = "${RELEASE_SHA}"
+          for attempt in $(seq 1 18); do
+            health=$(sudo docker inspect msbradar-intelligence --format '{{.State.Health.Status}}' 2>/dev/null || true)
+            echo "attempt=${attempt} health=${health:-missing} sha=${RELEASE_SHA}"
+            if [ "${health}" = healthy ]; then
+              sudo docker exec msbradar-intelligence python -c "import json,urllib.request; data=json.load(urllib.request.urlopen('http://127.0.0.1:8081/health')); assert data['status']=='ok'"
+              sudo docker inspect msbradar-intelligence --format '{{.Config.Image}}' | grep -F "${RELEASE_SHA}"
+              exit 0
+            fi
+            sleep 5
+          done
+          sudo docker logs msbradar-intelligence --tail 100
+          exit 1
