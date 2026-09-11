@@ -67,7 +67,7 @@ class RadarDocumentFeedClient:
             query["cursor"] = cursor
         url = (
             self._config.base_url.rstrip("/")
-            + "/api/v1/intelligence/document-feed/?"
+            + "/api/v1/talent/intelligence/document-feed/?"
             + urllib.parse.urlencode(query)
         )
         status, raw = self._client.get(url, {

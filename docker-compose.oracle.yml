@@ -33,6 +33,33 @@ services:
       retries: 6
       start_period: 10s
 
+  intelligence-indexer:
+    image: msb-radar-intelligence:${INTELLIGENCE_IMAGE_TAG:-local}
+    container_name: msbradar-intelligence-indexer
+    restart: unless-stopped
+    init: true
+    read_only: true
+    command: ["python", "-m", "radar_intelligence.indexing"]
+    env_file:
+      - /home/ubuntu/msbradar-intelligence/runtime.env
+    environment:
+      INTELLIGENCE_INDEX_DB: "/var/lib/radar-intelligence/index.sqlite3"
+      INTELLIGENCE_SYNC_INTERVAL_SECONDS: "30"
+      HAYSTACK_TELEMETRY_ENABLED: "false"
+    volumes:
+      - intelligence_state:/var/lib/radar-intelligence
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    networks:
+      - msbradar
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      intelligence:
+        condition: service_healthy
+
 volumes:
   intelligence_state:
 

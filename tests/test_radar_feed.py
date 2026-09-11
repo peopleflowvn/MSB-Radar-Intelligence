@@ -37,6 +37,7 @@ class RadarFeedTest(unittest.TestCase):
         self.assertEqual(page.events[0].operation, ChangeOperation.UPSERT)
         self.assertEqual(page.events[0].document.person_id, "7")
         self.assertEqual(page.events[0].document.content_hash, "hash-31")
+        self.assertIn("/api/v1/talent/intelligence/document-feed/", client.call[0])
         self.assertIn("cursor=seq%3A100", client.call[0])
         self.assertEqual(client.call[1]["X-Radar-Scope-Token"], "index-scope")
 
