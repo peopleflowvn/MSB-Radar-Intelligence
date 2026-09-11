@@ -86,6 +86,8 @@ class RadarDocumentFeedClient:
             has_more = bool(payload.get("has_more", False))
             if has_more and not next_cursor:
                 raise ValueError
+            if events and not next_cursor:
+                raise ValueError
             return FeedPage(events, next_cursor, has_more)
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             raise FeedError("Radar document feed returned malformed data") from exc

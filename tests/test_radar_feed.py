@@ -43,7 +43,7 @@ class RadarFeedTest(unittest.TestCase):
     def test_delete_event_does_not_require_text(self):
         row = event("delete", None)
         page = RadarDocumentFeedClient(self.config(), FakeClient(200, json.dumps({
-            "events": [row], "next_cursor": None, "has_more": False,
+            "events": [row], "next_cursor": "seq:1", "has_more": False,
         }).encode())).fetch()
         self.assertIsNone(page.events[0].text)
 
@@ -59,6 +59,11 @@ class RadarFeedTest(unittest.TestCase):
             RadarDocumentFeedClient(self.config(), bad_page).fetch()
         with self.assertRaisesRegex(FeedError, "HTTP 503"):
             RadarDocumentFeedClient(self.config(), FakeClient(503, b"")).fetch()
+
+    def test_nonempty_final_page_requires_checkpoint_cursor(self):
+        client = FakeClient(200, json.dumps({"events": [event()], "has_more": False}).encode())
+        with self.assertRaisesRegex(FeedError, "malformed"):
+            RadarDocumentFeedClient(self.config(), client).fetch()
 
 
 if __name__ == "__main__":

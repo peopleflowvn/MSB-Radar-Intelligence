@@ -85,3 +85,10 @@ Person resolution and selected parsed-text versioning.
 
 The new repository includes a strict feed client and event mapper with mocked
 contract tests. The product endpoint and durable change log remain pending.
+
+The sync coordinator now enforces this checkpoint rule and reports pages,
+events, status counts, chunk count, start/end cursor and whether it caught up.
+If an event fails, that page's cursor is not saved. If checkpoint persistence
+fails after indexing, replay is safe because event IDs are idempotent. A
+non-empty page without a next cursor is rejected because it could never be
+acknowledged safely.
