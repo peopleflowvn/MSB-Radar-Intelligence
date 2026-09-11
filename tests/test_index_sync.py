@@ -1,4 +1,6 @@
 import unittest
+import tempfile
+from pathlib import Path
 from datetime import datetime, timezone
 
 from radar_intelligence.contracts import DocumentRef
@@ -10,6 +12,8 @@ from radar_intelligence.indexing import (
     InMemoryDocumentIndex,
     IncrementalIndexer,
     IndexSyncCoordinator,
+    SqliteCursorStore,
+    SyncFailure,
 )
 
 
@@ -60,9 +64,13 @@ class IndexSyncTest(unittest.TestCase):
         feed = ScriptedFeed([FeedPage((event("e1", "d1"), event("e2", "d2")), "c2", False)])
         cursors = InMemoryCursorStore("c0")
         delegate = IncrementalIndexer(InMemoryDocumentIndex())
-        with self.assertRaisesRegex(RuntimeError, "index failed"):
+        with self.assertRaises(SyncFailure) as caught:
             IndexSyncCoordinator(feed, FailingIndexer(delegate, "e2"), cursors).run()
         self.assertEqual(cursors.load(), "c0")
+        self.assertEqual(caught.exception.event_id, "e2")
+        self.assertEqual(caught.exception.document_id, "d2")
+        self.assertEqual(caught.exception.cause_type, "RuntimeError")
+        self.assertNotIn("SQL", str(caught.exception))
 
     def test_retry_after_checkpoint_failure_is_safe(self):
         class FailingCursor(InMemoryCursorStore):
@@ -86,6 +94,14 @@ class IndexSyncTest(unittest.TestCase):
             InMemoryCursorStore(),
         ).run(max_pages=1)
         self.assertFalse(report.caught_up)
+
+    def test_sqlite_cursor_is_durable_and_namespaced(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state" / "cursor.sqlite3"
+            first = SqliteCursorStore(path, "feed-a")
+            first.save("seq:12")
+            self.assertEqual(SqliteCursorStore(path, "feed-a").load(), "seq:12")
+            self.assertIsNone(SqliteCursorStore(path, "feed-b").load())
 
 
 if __name__ == "__main__":

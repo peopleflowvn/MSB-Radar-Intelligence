@@ -9,7 +9,7 @@ from .core import (
 )
 from .haystack_store import HaystackDocumentIndex
 from .radar_feed import FeedError, FeedPage, RadarDocumentFeedClient, RadarFeedConfig
-from .coordinator import InMemoryCursorStore, IndexSyncCoordinator, SyncReport
+from .coordinator import InMemoryCursorStore, IndexSyncCoordinator, SqliteCursorStore, SyncFailure, SyncReport
 
 __all__ = [
     "ChangeOperation",
@@ -26,5 +26,7 @@ __all__ = [
     "RadarFeedConfig",
     "InMemoryCursorStore",
     "IndexSyncCoordinator",
+    "SqliteCursorStore",
+    "SyncFailure",
     "SyncReport",
 ]

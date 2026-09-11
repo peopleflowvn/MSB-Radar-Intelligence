@@ -92,3 +92,10 @@ If an event fails, that page's cursor is not saved. If checkpoint persistence
 fails after indexing, replay is safe because event IDs are idempotent. A
 non-empty page without a next cursor is rejected because it could never be
 acknowledged safely.
+
+A namespaced SQLite cursor store is available for a single-process deployment
+and restart testing. It uses an atomic transaction and persists no document
+text or credentials. Multi-replica production still requires a shared cursor
+store or leader/lease design; local SQLite must not be presented as that
+solution. Sync failures expose event ID, document ID, current cursor and cause
+type without logging CV text, scope tokens or secrets.

@@ -11,7 +11,7 @@ production evidence explicitly.
 | 2 Architecture/contracts | DONE | Framework-independent dataclasses, architecture and API contract | Version HTTP serialization when adapter exists |
 | 3 Gold Set/baseline | PARTIAL | 51 query coverage cases; 21 retrieval cases measured on hashed six-person synthetic fixture | Human-labelled real corpus and V1 run on identical authorized snapshot |
 | 4 GreenNode gateway | PARTIAL | Capability routes, chat/embedding transport and mock contract tests | Live configured FAST/DEEP/VISION/EMBEDDING calls and telemetry |
-| 5 Indexing | PARTIAL | Converter, metadata, replay/delete/reassignment; Haystack tests; strict feed client; page-level checkpoint coordinator and sync report | Product-side durable feed, durable cursor/index store and reindex/delete SLA |
+| 5 Indexing | PARTIAL | Converter, metadata, replay/delete/reassignment; Haystack tests; feed client; checkpoint coordinator; restart-tested SQLite cursor and safe failure details | Product-side durable feed, shared production cursor/index store and reindex/delete SLA |
 | 6 Retrieval | PARTIAL | Structured, token lexical, Haystack BM25, cosine semantic adapter, hybrid fusion and scope-before-retrieval tests | Live embedding benchmark on real labelled corpus |
 | 7 Person reranking | PARTIAL | Person grouping, best-evidence selection, RRF and synthetic MRR measurement | Real-corpus reranking comparison and selected thresholds |
 | 8 Evidence | PARTIAL | First-class evidence plus fail-closed citation, deletion, Person, scope and version/hash resolver contract tests | Authorized live Radar resolver adapter |
