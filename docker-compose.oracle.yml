@@ -8,7 +8,7 @@ services:
     init: true
     read_only: true
     env_file:
-      - /home/ubuntu/msbradar/.env
+      - /home/ubuntu/msbradar-intelligence/runtime.env
     environment:
       INTELLIGENCE_BIND_HOST: "0.0.0.0"
       INTELLIGENCE_PORT: "8081"

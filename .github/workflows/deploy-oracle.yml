@@ -40,6 +40,15 @@ jobs:
           set -euo pipefail
           test -f /home/ubuntu/msbradar/.env
           sudo docker network inspect msbradar_default >/dev/null
+      - name: Provision least-privilege runtime environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo install -d -o ubuntu -g ubuntu /home/ubuntu/msbradar-intelligence
+          python scripts/provision_runtime_env.py \
+            --source /home/ubuntu/msbradar/.env \
+            --target /home/ubuntu/msbradar-intelligence/runtime.env
+          chmod 600 /home/ubuntu/msbradar-intelligence/runtime.env
       - name: Install release and preserve rollback metadata
         shell: bash
         env:

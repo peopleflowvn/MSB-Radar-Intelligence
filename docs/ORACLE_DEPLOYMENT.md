@@ -25,9 +25,13 @@ image tag contains that SHA. It does not edit Caddy or expose a public port.
 
 ## Production prerequisites
 
-The existing `/home/ubuntu/msbradar/.env` must add the V2 names documented in
-`.env.example`. Secrets must be provisioned directly on Oracle or through an
-approved secret store; they must not be copied to GitHub logs or committed.
+The deployment creates `/home/ubuntu/msbradar-intelligence/runtime.env` with an
+explicit allow-list. It may read the existing GreenNode base URL, API key and
+general model from `/home/ubuntu/msbradar/.env`, but never copies database,
+R2, Django or unrelated provider secrets. Integration tokens are generated on
+Oracle, retained across deploys and never printed. The embedding model remains
+blank until its production route is explicitly inspected and tested.
+Secrets must not be copied to GitHub logs or committed.
 The Radar service token must authorize only the document feed and evidence
 resolver contracts, never general admin access.
 
