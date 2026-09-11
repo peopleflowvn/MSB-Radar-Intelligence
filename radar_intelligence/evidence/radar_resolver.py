@@ -54,13 +54,16 @@ class RadarHttpSourceResolver:
     def resolve(self, *, document_id: str, scope_token: str) -> SourceSnapshot | None:
         if not document_id.strip() or not scope_token.strip():
             raise EvidenceValidationError("document_id and scope_token are required")
+        headers = {
+            "Authorization": f"Bearer {self._service_token}",
+            "X-Radar-Scope-Token": scope_token,
+            "Accept": "application/json",
+        }
+        if self._base_url.lower() == "http://hub:8000":
+            headers["Host"] = "localhost"
         status, raw = self._client.get(
             f"{self._base_url}/api/v1/talent/intelligence/evidence/documents/{document_id}/",
-            {
-                "Authorization": f"Bearer {self._service_token}",
-                "X-Radar-Scope-Token": scope_token,
-                "Accept": "application/json",
-            },
+            headers,
             self._timeout,
         )
         if status in {403, 404}:

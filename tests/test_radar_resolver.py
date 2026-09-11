@@ -52,6 +52,13 @@ class RadarResolverTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             RadarResolverConfig("http://radar.example", "secret")
 
+    def test_internal_hub_sets_django_host_header(self):
+        client = FakeClient(404)
+        resolver = RadarHttpSourceResolver(
+            RadarResolverConfig("http://hub:8000", "secret"), client)
+        self.assertIsNone(resolver.resolve(document_id="12", scope_token="scope"))
+        self.assertEqual(client.call[1]["Host"], "localhost")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -48,6 +48,12 @@ class RadarFeedTest(unittest.TestCase):
         }).encode())).fetch()
         self.assertIsNone(page.events[0].text)
 
+    def test_internal_hub_sets_django_host_header(self):
+        client = FakeClient(200, json.dumps({"events": [], "has_more": False}).encode())
+        config = RadarFeedConfig("http://hub:8000", "service", "index-scope")
+        RadarDocumentFeedClient(config, client).fetch()
+        self.assertEqual(client.call[1]["Host"], "localhost")
+
     def test_upsert_without_text_fails_closed(self):
         row = event(text=None)
         client = FakeClient(200, json.dumps({"events": [row], "has_more": False}).encode())

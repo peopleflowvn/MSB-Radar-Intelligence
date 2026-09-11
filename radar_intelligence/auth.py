@@ -51,10 +51,13 @@ class RadarScopeValidator:
     def validate(self, scope_token: str) -> bool:
         if not scope_token.strip():
             return False
+        headers = {"Authorization": f"Bearer {self._token}",
+                   "X-Radar-Scope-Token": scope_token, "Accept": "application/json"}
+        if self._base_url.lower() == "http://hub:8000":
+            headers["Host"] = "localhost"
         status, raw = self._client.post(
             self._base_url + "/api/v1/talent/intelligence/scope/validate/",
-            {"Authorization": f"Bearer {self._token}",
-             "X-Radar-Scope-Token": scope_token, "Accept": "application/json"},
+            headers,
             self._timeout,
         )
         if status in {403, 404}:

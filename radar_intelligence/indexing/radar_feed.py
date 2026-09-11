@@ -71,11 +71,14 @@ class RadarDocumentFeedClient:
             + "/api/v1/talent/intelligence/document-feed/?"
             + urllib.parse.urlencode(query)
         )
-        status, raw = self._client.get(url, {
+        headers = {
             "Authorization": f"Bearer {self._config.service_token}",
             "X-Radar-Scope-Token": self._config.scope_token,
             "Accept": "application/json",
-        }, self._config.timeout_seconds)
+        }
+        if self._config.base_url.rstrip("/").lower() == "http://hub:8000":
+            headers["Host"] = "localhost"
+        status, raw = self._client.get(url, headers, self._config.timeout_seconds)
         if status != 200:
             raise FeedError(f"Radar document feed HTTP {status}")
         try:

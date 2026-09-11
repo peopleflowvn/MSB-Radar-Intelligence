@@ -33,6 +33,12 @@ class ScopeValidatorTest(unittest.TestCase):
         self.assertFalse(RadarScopeValidator(self.config(), FakeClient(
             200, b'{"allowed":true,"scope":"too_broad"}')).validate("scope"))
 
+    def test_internal_hub_sets_django_host_header(self):
+        client = FakeClient(200, b'{"allowed":true,"scope":"all_applicants"}')
+        config = RadarScopeConfig("http://hub:8000", "service")
+        self.assertTrue(RadarScopeValidator(config, client).validate("scope"))
+        self.assertEqual(client.call[1]["Host"], "localhost")
+
     def test_service_failure_is_visible(self):
         with self.assertRaisesRegex(ScopeValidationError, "HTTP 500"):
             RadarScopeValidator(self.config(), FakeClient(500, b"{}")).validate("scope")
