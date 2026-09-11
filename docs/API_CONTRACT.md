@@ -2,8 +2,10 @@
 
 This contract is framework-independent. Public callers never send or receive
 Haystack documents, pipeline objects, concrete model names, or provider SDK
-types. JSON field names use `snake_case`; unknown fields are rejected once the
-HTTP adapter is introduced.
+types. JSON field names use `snake_case`. The framework-independent codec now
+rejects unknown fields, missing required fields, booleans used as numbers, and
+incorrect nested collection types before an HTTP handler invokes application
+logic. Response encoding emits only explicitly versioned contract fields.
 
 ## Request envelope
 

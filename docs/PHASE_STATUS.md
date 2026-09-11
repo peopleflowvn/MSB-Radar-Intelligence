@@ -8,7 +8,7 @@ production evidence explicitly.
 |---|---|---|---|
 | 0 Legacy discovery | DONE | `LEGACY_SYSTEM_MAP.md`; legacy checkout read-only | Refresh map when legacy contracts change |
 | 1 Reuse classification | DONE | `LEGACY_REUSE_MANIFEST.md`; every used legacy fixture is recorded | Record every future reused primitive |
-| 2 Architecture/contracts | DONE | Framework-independent dataclasses, architecture and API contract | Version HTTP serialization when adapter exists |
+| 2 Architecture/contracts | DONE | Framework-independent dataclasses, strict JSON codec, architecture and API contract | HTTP routing remains separate from the stable serialization boundary |
 | 3 Gold Set/baseline | PARTIAL | 51 query coverage cases; 21 retrieval cases measured on hashed six-person synthetic fixture | Human-labelled real corpus and V1 run on identical authorized snapshot |
 | 4 GreenNode gateway | PARTIAL | Capability routes, chat/embedding transport and mock contract tests | Live configured FAST/DEEP/VISION/EMBEDDING calls and telemetry |
 | 5 Indexing | PARTIAL | Converter, metadata, replay/delete/reassignment; Haystack tests; feed client; checkpoint coordinator; restart-tested SQLite cursor and safe failure details | Product-side durable feed, shared production cursor/index store and reindex/delete SLA |
