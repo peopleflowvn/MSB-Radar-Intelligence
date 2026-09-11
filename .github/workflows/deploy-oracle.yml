@@ -59,8 +59,16 @@ jobs:
           sudo install -d -o ubuntu -g ubuntu "${release}"
           tar --exclude=.git --exclude=.venv --exclude='__pycache__' -cf - . | tar -xf - -C "${release}"
           cd "${release}"
-          INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose -f docker-compose.oracle.yml build
-          INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose -f docker-compose.oracle.yml up -d
+          INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose \
+            -p msbradar-intelligence -f docker-compose.oracle.yml build
+          existing_project=$(sudo docker inspect msbradar-intelligence \
+            --format '{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || true)
+          if [ -n "${existing_project}" ] && [ "${existing_project}" != msbradar-intelligence ]; then
+            echo "Migrating shadow container from release-scoped Compose ownership"
+            sudo docker rm -f msbradar-intelligence >/dev/null
+          fi
+          INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose \
+            -p msbradar-intelligence -f docker-compose.oracle.yml up -d
           printf '%s\n' "${RELEASE_SHA}" | sudo tee /home/ubuntu/msbradar-intelligence/current-sha >/dev/null
       - name: Verify exact release and live container
         shell: bash
