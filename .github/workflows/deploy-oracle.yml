@@ -92,9 +92,12 @@ jobs:
             if [ "${health}" = healthy ]; then
               sudo docker exec -e EXPECTED_SHA="${RELEASE_SHA}" msbradar-intelligence python -c "import json,os,urllib.request; data=json.load(urllib.request.urlopen('http://127.0.0.1:8081/health')); assert data['status']=='ok'; assert data['release_sha']==os.environ['EXPECTED_SHA']"
               sudo docker inspect msbradar-intelligence --format '{{.Config.Image}}' | grep -F "${RELEASE_SHA}"
+              test "$(sudo docker inspect msbradar-intelligence-indexer --format '{{.State.Running}}')" = true
+              sudo docker inspect msbradar-intelligence-indexer --format '{{.Config.Image}}' | grep -F "${RELEASE_SHA}"
               exit 0
             fi
             sleep 5
           done
           sudo docker logs msbradar-intelligence --tail 100
+          sudo docker logs msbradar-intelligence-indexer --tail 100 || true
           exit 1

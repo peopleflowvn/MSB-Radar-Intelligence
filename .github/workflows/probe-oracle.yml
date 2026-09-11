@@ -134,11 +134,35 @@ jobs:
           assert evidence["person_id"] == event["person_id"]
           assert evidence["version"] == event["version"]
           assert evidence["content_hash"] == event["content_hash"]
+
+          search_body = json.dumps({
+              "query": "kinh nghiem",
+              "scope_token": os.environ["PROBE_SCOPE_TOKEN"],
+              "principal_id": "production-probe",
+              "limit": 1,
+          }).encode()
+          denied_search = urllib.request.Request(
+              "http://127.0.0.1:8081/v1/search", data=search_body, method="POST",
+              headers={"Authorization": "Bearer wrong", "Content-Type": "application/json"})
+          try:
+              urllib.request.urlopen(denied_search, timeout=30)
+              raise AssertionError("wrong V2 service token was accepted")
+          except urllib.error.HTTPError as exc:
+              assert exc.code == 404
+          search_request = urllib.request.Request(
+              "http://127.0.0.1:8081/v1/search", data=search_body, method="POST",
+              headers={"Authorization": f"Bearer {service}", "Content-Type": "application/json"})
+          with urllib.request.urlopen(search_request, timeout=60) as response:
+              search = json.load(response)
+          assert response.status == 200 and isinstance(search.get("hits"), list)
           print(json.dumps({
               "feed_http_status": feed_status,
               "feed_event_count": len(feed["events"]),
               "feed_has_more": bool(feed["has_more"]),
               "wrong_token_rejected": denied == 404,
               "evidence_matches_feed": True,
+              "search_http_status": response.status,
+              "search_hit_count": len(search["hits"]),
+              "wrong_search_token_rejected": True,
           }, sort_keys=True))
           PY
