@@ -63,3 +63,23 @@ jobs:
           assert response.status == 200 and body.get("ok") is True
           print(json.dumps({"radar_internal_health": "ok"}))
           PY
+          sudo docker exec msbradar-hub python manage.py shell -c '
+          import json
+          from ai.models import TaskModelRoute
+          from talent.models import EmbeddingConfig
+          cfg = EmbeddingConfig.objects.filter(pk=1).first()
+          route = TaskModelRoute.objects.filter(task="talent_embedding", enabled=True).first()
+          print(json.dumps({
+              "embedding_config": ({
+                  "mode": cfg.mode,
+                  "selfhost_model": cfg.selfhost_model,
+                  "greennode_model": cfg.greennode_model,
+                  "gemini_model": cfg.gemini_model,
+                  "dimensions": cfg.dimensions,
+              } if cfg else None),
+              "embedding_route": ({
+                  "provider": route.provider,
+                  "model": route.model,
+              } if route else None),
+          }, sort_keys=True))
+          '
