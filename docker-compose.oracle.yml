@@ -45,6 +45,7 @@ services:
     environment:
       INTELLIGENCE_INDEX_DB: "/var/lib/radar-intelligence/index.sqlite3"
       INTELLIGENCE_SYNC_INTERVAL_SECONDS: "30"
+      INTELLIGENCE_FEED_PAGE_SIZE: "1"
       HAYSTACK_TELEMETRY_ENABLED: "false"
     volumes:
       - intelligence_state:/var/lib/radar-intelligence

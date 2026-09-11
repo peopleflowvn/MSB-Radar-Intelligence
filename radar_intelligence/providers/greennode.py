@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+import time
 from dataclasses import dataclass
 from typing import Mapping, Protocol
 
@@ -19,15 +20,25 @@ class HttpClient(Protocol):
 
 class UrllibHttpClient:
     def post(self, url: str, headers: Mapping[str, str], body: bytes, timeout_seconds: float) -> bytes:
-        request = urllib.request.Request(url, data=body, headers=dict(headers), method="POST")
-        try:
-            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-                return response.read()
-        except urllib.error.HTTPError as exc:
-            raise ProviderError(f"GreenNode HTTP {exc.code}") from exc
-        except (urllib.error.URLError, TimeoutError) as exc:
-            reason = "timeout" if "timed out" in str(exc).lower() else "transport unavailable"
-            raise ProviderError(f"GreenNode {reason}") from exc
+        for attempt in range(4):
+            request = urllib.request.Request(url, data=body, headers=dict(headers), method="POST")
+            try:
+                with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+                    return response.read()
+            except urllib.error.HTTPError as exc:
+                if exc.code == 429 and attempt < 3:
+                    raw_delay = exc.headers.get("Retry-After", "")
+                    try:
+                        delay = min(10.0, max(1.0, float(raw_delay)))
+                    except ValueError:
+                        delay = float(2 ** attempt)
+                    time.sleep(delay)
+                    continue
+                raise ProviderError(f"GreenNode HTTP {exc.code}") from exc
+            except (urllib.error.URLError, TimeoutError) as exc:
+                reason = "timeout" if "timed out" in str(exc).lower() else "transport unavailable"
+                raise ProviderError(f"GreenNode {reason}") from exc
+        raise ProviderError("GreenNode retry limit reached")
 
 
 @dataclass(frozen=True)
