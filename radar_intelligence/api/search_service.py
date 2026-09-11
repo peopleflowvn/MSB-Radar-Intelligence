@@ -54,6 +54,9 @@ class SearchService:
         hits = self._retriever.search(request, records, RetrievalScope(person_ids))
         return [encode_search_hit(hit) for hit in hits]
 
+    def index_status(self):
+        return self._index.statistics()
+
     def answer(self, request):
         if not self._scope.validate(request.scope_token):
             return None

@@ -105,3 +105,14 @@ class SqliteDocumentIndex:
             embedding=tuple(json.loads(row[2])) if row[2] is not None else None,
             metadata=json.loads(row[3]),
         ) for row in rows)
+
+    def statistics(self) -> dict[str, int]:
+        """Return non-sensitive lifecycle counts for production observability."""
+        with closing(self._connect()) as connection:
+            events = int(connection.execute("SELECT COUNT(*) FROM index_event").fetchone()[0])
+            documents = int(connection.execute(
+                "SELECT COUNT(*) FROM document_marker WHERE operation != 'delete'").fetchone()[0])
+            deleted = int(connection.execute(
+                "SELECT COUNT(*) FROM document_marker WHERE operation = 'delete'").fetchone()[0])
+            chunks = int(connection.execute("SELECT COUNT(*) FROM search_chunk").fetchone()[0])
+        return {"events": events, "documents": documents, "deleted": deleted, "chunks": chunks}

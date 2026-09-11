@@ -53,6 +53,9 @@ class ApiHealthTest(unittest.TestCase):
                 return {"answer": "grounded", "people": [], "evidence": [],
                         "cited_evidence_ids": [], "interpreted_query": {}, "trace": []}
 
+            def index_status(self):
+                return {"events": 3, "documents": 2, "deleted": 1, "chunks": 5}
+
         service = FakeSearch()
         Handler.search_service = service
         payload = json.dumps({
@@ -86,6 +89,13 @@ class ApiHealthTest(unittest.TestCase):
                 answer = json.loads(response.read())
         self.assertEqual(answer["answer"], "grounded")
         self.assertEqual(service.request.question, "Ai phù hợp?")
+
+        status_request = urllib.request.Request(
+            self.base + "/index-status", headers={"Authorization": "Bearer shared-secret"})
+        with patch.dict("os.environ", {"RADAR_SERVICE_TOKEN": "shared-secret"}, clear=True):
+            with urllib.request.urlopen(status_request) as response:
+                index_status = json.loads(response.read())
+        self.assertEqual(index_status["documents"], 2)
 
 
 if __name__ == "__main__":

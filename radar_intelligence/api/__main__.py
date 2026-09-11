@@ -17,6 +17,12 @@ class Handler(BaseHTTPRequestHandler):
     search_service = None
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.path == "/index-status":
+            if not self._service_authorized() or self.search_service is None:
+                self._json(404, {"detail": "Not found."})
+            else:
+                self._json(200, self.search_service.index_status())
+            return
         if self.path not in {"/health", "/ready"}:
             self.send_error(404)
             return
@@ -43,10 +49,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path not in {"/v1/search", "/v1/answer"}:
             self.send_error(404)
             return
-        expected = os.environ.get("RADAR_SERVICE_TOKEN", "")
-        supplied = self.headers.get("Authorization", "")
-        supplied = supplied[7:] if supplied.startswith("Bearer ") else ""
-        if not expected or not hmac.compare_digest(expected, supplied):
+        if not self._service_authorized():
             self._json(404, {"detail": "Not found."})
             return
         try:
@@ -69,6 +72,12 @@ class Handler(BaseHTTPRequestHandler):
             self._json(400, {"detail": str(exc)})
         except Exception:
             self._json(503, {"detail": "Search temporarily unavailable."})
+
+    def _service_authorized(self) -> bool:
+        expected = os.environ.get("RADAR_SERVICE_TOKEN", "")
+        supplied = self.headers.get("Authorization", "")
+        supplied = supplied[7:] if supplied.startswith("Bearer ") else ""
+        return bool(expected) and hmac.compare_digest(expected, supplied)
 
     def _json(self, status: int, body: dict) -> None:
         payload = json.dumps(body, ensure_ascii=False).encode()

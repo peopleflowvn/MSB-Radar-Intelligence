@@ -38,6 +38,9 @@ class SqliteDocumentIndexTest(unittest.TestCase):
 
             final = SqliteDocumentIndex(path)
             self.assertEqual(final.documents("doc-1"), ())
+            self.assertEqual(final.statistics(), {
+                "events": 2, "documents": 0, "deleted": 1, "chunks": 0,
+            })
             self.assertEqual(IncrementalIndexer(final).apply(change("late")).status, "stale")
 
     def test_reused_event_id_with_changed_payload_fails_after_restart(self):
