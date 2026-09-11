@@ -1,9 +1,14 @@
 # Evaluation
 
-`radar_gold_v1.jsonl` currently contains 51 legacy-derived query candidates and
+`radar_gold_v1.jsonl` currently contains 50 legacy-derived query candidates and
 execution-path expectations. It is a coverage seed, not a scored gold dataset:
 the rows do not yet include reviewed relevant Person IDs or an immutable corpus
 fingerprint.
+
+The checked-in JSONL loader records the exact file SHA-256, rejects duplicate
+IDs, malformed or unknown fields, and distinguishes an unlabelled case from an
+explicitly reviewed no-result case (`relevant_person_ids: []`). This prevents
+coverage rows from being silently counted as scored truth.
 
 The evaluation module computes Recall@K, Precision@K and MRR only from explicit
 truth. It rejects cases without relevant Person IDs rather than manufacturing a
