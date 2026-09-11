@@ -33,8 +33,9 @@ class RadarResolverConfig:
     timeout_seconds: float = 5.0
 
     def __post_init__(self) -> None:
-        if not self.base_url.lower().startswith("https://"):
-            raise ValueError("Radar base_url must use HTTPS")
+        normalized = self.base_url.rstrip("/").lower()
+        if not (normalized.startswith("https://") or normalized == "http://hub:8000"):
+            raise ValueError("Radar base_url must use HTTPS or the fixed Docker-internal Hub URL")
         if not self.service_token.strip():
             raise ValueError("Radar service_token must not be empty")
         if self.timeout_seconds <= 0:

@@ -39,6 +39,11 @@ class RuntimeSettingsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "RADAR_BASE_URL"):
             RuntimeSettings.from_env(values)
 
+    def test_fixed_docker_internal_hub_url_is_allowed(self):
+        values = complete()
+        values["RADAR_BASE_URL"] = "http://hub:8000"
+        self.assertTrue(RuntimeSettings.from_env(values).ready)
+
 
 if __name__ == "__main__":
     unittest.main()

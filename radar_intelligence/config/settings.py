@@ -31,10 +31,14 @@ class RuntimeSettings:
         return settings
 
     def _validate(self) -> None:
-        for name in ("RADAR_BASE_URL", "GREENNODE_BASE_URL"):
-            value = self.values.get(name, "")
-            if value and not value.lower().startswith("https://"):
-                raise ValueError(f"{name} must use HTTPS")
+        radar_url = self.values.get("RADAR_BASE_URL", "").rstrip("/").lower()
+        if radar_url and not (
+            radar_url.startswith("https://") or radar_url == "http://hub:8000"
+        ):
+            raise ValueError("RADAR_BASE_URL must use HTTPS or the fixed Docker-internal Hub URL")
+        green_url = self.values.get("GREENNODE_BASE_URL", "")
+        if green_url and not green_url.lower().startswith("https://"):
+            raise ValueError("GREENNODE_BASE_URL must use HTTPS")
 
     @property
     def missing(self) -> tuple[str, ...]:

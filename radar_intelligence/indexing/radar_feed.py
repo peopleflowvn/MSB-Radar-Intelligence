@@ -39,8 +39,9 @@ class RadarFeedConfig:
     page_size: int = 100
 
     def __post_init__(self) -> None:
-        if not self.base_url.lower().startswith("https://"):
-            raise ValueError("Radar base_url must use HTTPS")
+        normalized = self.base_url.rstrip("/").lower()
+        if not (normalized.startswith("https://") or normalized == "http://hub:8000"):
+            raise ValueError("Radar base_url must use HTTPS or the fixed Docker-internal Hub URL")
         if not self.service_token.strip() or not self.scope_token.strip():
             raise ValueError("service_token and scope_token are required")
         if self.timeout_seconds <= 0 or not 1 <= self.page_size <= 1000:

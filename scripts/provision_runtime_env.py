@@ -29,7 +29,9 @@ def build_runtime_values(
     index_token = current.get("RADAR_INDEX_SCOPE_TOKEN") or secrets.token_urlsafe(48)
     general_model = source.get("MSB_AI_GREENNODE_MODEL", "")
     return {
-        "RADAR_BASE_URL": current.get("RADAR_BASE_URL") or "https://dev-radar.tunghr.io.vn",
+        # V2 and Hub share the private Docker network in production. Avoid a
+        # public DNS/Cloudflare round-trip for every scope and evidence check.
+        "RADAR_BASE_URL": "http://hub:8000",
         "RADAR_SERVICE_TOKEN": token,
         "RADAR_INDEX_SCOPE_TOKEN": index_token,
         "GREENNODE_BASE_URL": source.get("MSB_AI_GREENNODE_BASE_URL", ""),
