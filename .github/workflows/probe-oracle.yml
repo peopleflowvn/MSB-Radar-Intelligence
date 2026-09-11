@@ -152,10 +152,6 @@ jobs:
           search_request = urllib.request.Request(
               "http://127.0.0.1:8081/v1/search", data=search_body, method="POST",
               headers={"Authorization": f"Bearer {service}", "Content-Type": "application/json"})
-          with urllib.request.urlopen(search_request, timeout=60) as response:
-              search = json.load(response)
-          assert response.status == 200 and isinstance(search.get("hits"), list)
-
           status_request = urllib.request.Request(
               "http://127.0.0.1:8081/index-status",
               headers={"Authorization": f"Bearer {service}"},
@@ -163,7 +159,19 @@ jobs:
           with urllib.request.urlopen(status_request, timeout=30) as response:
               index_status = json.load(response)
           assert response.status == 200
-          assert {"documents", "chunks", "last_successful_sync_at"} <= set(index_status)
+          assert {"events", "documents", "deleted", "chunks"} == set(index_status)
+          print(json.dumps({"index_status": index_status}, sort_keys=True))
+
+          try:
+              with urllib.request.urlopen(search_request, timeout=60) as response:
+                  search = json.load(response)
+          except urllib.error.HTTPError as exc:
+              with exc:
+                  detail = json.load(exc).get("detail")
+              raise AssertionError(
+                  f"production search failed safely: HTTP {exc.code}, detail={detail!r}"
+              ) from None
+          assert response.status == 200 and isinstance(search.get("hits"), list)
           print(json.dumps({
               "feed_http_status": feed_status,
               "feed_event_count": len(feed["events"]),
@@ -173,6 +181,9 @@ jobs:
               "search_http_status": response.status,
               "search_hit_count": len(search["hits"]),
               "wrong_search_token_rejected": True,
-              "index_status": index_status,
           }, sort_keys=True))
           PY
+      - name: Show non-PII indexer lifecycle log
+        if: always()
+        shell: bash
+        run: sudo docker logs --tail 20 msbradar-intelligence-indexer 2>&1
