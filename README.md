@@ -26,8 +26,13 @@ Phase 0/1 foundation:
   synthetic MRR over token overlap;
 - runnable health endpoint and tests without external credentials.
 
-Haystack and a production store are deliberately not installed yet. They enter
-after the contracts, gold-set schema, and retrieval baseline are stable.
+Haystack 3.1.1 is installed in the project-local environment and exercised by
+integration tests. A durable production store is deliberately not selected
+until the Radar feed, deletion SLA and real-corpus benchmarks are agreed.
+
+Current phase and gate evidence is tracked in `docs/PHASE_STATUS.md`. Grounded
+answering and agents are intentionally not started while real semantic
+retrieval and authorized source-resolution gates remain unmeasured.
 
 ## Run locally
 
