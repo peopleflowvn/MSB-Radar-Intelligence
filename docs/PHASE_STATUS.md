@@ -14,7 +14,7 @@ production evidence explicitly.
 | 5 Indexing | PARTIAL | Converter, metadata, embeddings, replay/delete/reassignment; Haystack 3.1.1 integration tests | Durable production store, Radar feed and reindex/delete SLA |
 | 6 Retrieval | PARTIAL | Structured, token lexical, Haystack BM25, cosine semantic adapter, hybrid fusion and scope-before-retrieval tests | Live embedding benchmark on real labelled corpus |
 | 7 Person reranking | PARTIAL | Person grouping, best-evidence selection, RRF and synthetic MRR measurement | Real-corpus reranking comparison and selected thresholds |
-| 8 Evidence | PARTIAL | First-class evidence contract and deterministic citation/deletion/Person checks | Authorized live source resolver and stale-version verification |
+| 8 Evidence | PARTIAL | First-class evidence plus fail-closed citation, deletion, Person, scope and version/hash resolver contract tests | Authorized live Radar resolver adapter |
 | 9 Grounded RAG | BLOCKED BY GATE | Not implemented | Phases 3, 6, 7 and 8 live gates |
 | 10 Conversation state | NOT STARTED | Contract only | Grounded Q&A gate |
 | 11 Agent | NOT STARTED | Action contract only | Demonstrated multi-step need and RAG comparison |

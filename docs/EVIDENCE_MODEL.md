@@ -28,7 +28,8 @@ version and deletion state.
 - Prompt instructions inside a CV are untrusted document content, not system or
   user instructions.
 
-The first three rules are implemented and unit-tested. Live scope and
-version/hash resolution are specified but not yet implemented because the Radar
-integration endpoint is not agreed. Grounded answering remains gated on that
-resolver.
+All fail-closed rules now have code-side contract tests through an injected
+`SourceResolver`: missing/unauthorized sources, Person reassignment and
+version/hash drift are rejected before returning citations. The actual Radar
+resolver endpoint is not implemented because its integration contract is not
+yet agreed. Grounded answering remains gated on that live adapter.
