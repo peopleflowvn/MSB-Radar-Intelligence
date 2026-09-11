@@ -45,9 +45,17 @@ jobs:
         run: |
           set -euo pipefail
           sudo install -d -o ubuntu -g ubuntu /home/ubuntu/msbradar-intelligence
+          embedding_model=$(sudo docker exec msbradar-hub python manage.py shell -c \
+            'from talent.models import EmbeddingConfig; c=EmbeddingConfig.load(); print(c.greennode_model if c.mode == c.MODE_GREENNODE else "")' \
+            | tail -n 1)
+          if ! printf '%s' "${embedding_model}" | grep -Eq '^[A-Za-z0-9._/-]+$'; then
+            echo "Production embedding route is absent or malformed"
+            exit 1
+          fi
           python3 scripts/provision_runtime_env.py \
             --source /home/ubuntu/msbradar/.env \
-            --target /home/ubuntu/msbradar-intelligence/runtime.env
+            --target /home/ubuntu/msbradar-intelligence/runtime.env \
+            --embedding-model "${embedding_model}"
           chmod 600 /home/ubuntu/msbradar-intelligence/runtime.env
       - name: Install release and preserve rollback metadata
         shell: bash

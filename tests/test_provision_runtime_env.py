@@ -30,6 +30,10 @@ class ProvisionRuntimeEnvTest(unittest.TestCase):
         values = build_runtime_values({"MSB_AI_GREENNODE_MODEL": "chat"}, {})
         self.assertEqual(values["GREENNODE_MODEL_EMBEDDING"], "")
 
+    def test_reviewed_embedding_model_is_applied(self):
+        values = build_runtime_values({}, {}, embedding_model="baai/bge-m3")
+        self.assertEqual(values["GREENNODE_MODEL_EMBEDDING"], "baai/bge-m3")
+
 
 if __name__ == "__main__":
     unittest.main()
