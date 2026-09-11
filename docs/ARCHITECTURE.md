@@ -21,3 +21,11 @@ the business source of truth; an index is disposable and rebuildable.
 Safety failures (scope escape, wrong-person evidence, deleted evidence, prompt
 injection obedience, or unapproved action) have zero tolerance.
 
+## Current indexing boundary
+
+`DocumentChange` is the versioned input from Radar. `DocumentConverter` creates
+search-only chunks whose metadata always maps back to Radar Person and Document
+IDs. `IncrementalIndexer` applies embeddings through an injected capability and
+atomically replaces a document representation. The reference in-memory store
+defines replay, stale-event, delete-tombstone and Person-reassignment behavior;
+a Haystack adapter must preserve these tests before it can replace the store.

@@ -6,8 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "msb-radar-intelligence"
 version = "0.1.0"
 description = "Clean-room evidence-backed intelligence service for MSB Radar"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = []
+
+[project.optional-dependencies]
+haystack = ["haystack-ai>=3.1,<4"]
 
 [tool.setuptools.packages.find]
 include = ["radar_intelligence*"]

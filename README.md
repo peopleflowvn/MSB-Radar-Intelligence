@@ -14,7 +14,9 @@ Phase 0/1 foundation:
 - deterministic evidence validation;
 - GreenNode capability gateway with injectable transport;
 - in-memory person-grouped hybrid retrieval reference implementation;
-- 50-case legacy-derived gold-set seed;
+- 51-case legacy-derived gold-set seed;
+- incremental document conversion/index lifecycle with idempotent events,
+  delete tombstones, Person reassignment and injectable embeddings;
 - runnable health endpoint and tests without external credentials.
 
 Haystack and a production store are deliberately not installed yet. They enter
@@ -22,7 +24,8 @@ after the contracts, gold-set schema, and retrieval baseline are stable.
 
 ## Run locally
 
-Requires Python 3.9+.
+Requires Python 3.10+ (the dependency-free core tests still run on the current
+Python 3.9 host; Haystack 3 itself requires Python 3.10+).
 
 ```powershell
 python -m unittest discover -s tests -v
