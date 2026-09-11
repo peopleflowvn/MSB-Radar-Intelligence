@@ -8,7 +8,7 @@ from pathlib import Path
 
 from radar_intelligence.contracts import Evidence, PersonRef, SearchRequest
 from radar_intelligence.evaluation import evaluate_retrieval
-from radar_intelligence.retrieval import CandidateChunk, HybridRetriever, RetrievalRecord, RetrievalScope
+from radar_intelligence.retrieval import CandidateChunk, HaystackBM25Ranker, HybridRetriever, RetrievalRecord, RetrievalScope
 
 
 def _record(person: dict) -> RetrievalRecord:
@@ -24,12 +24,14 @@ def _record(person: dict) -> RetrievalRecord:
     ))
 
 
-def run(fixture_path: Path, k: int = 10, legacy_report_path: Path | None = None) -> dict:
+def run(fixture_path: Path, k: int = 10, legacy_report_path: Path | None = None, lexical: str = "token") -> dict:
     raw = fixture_path.read_bytes()
     fixture = json.loads(raw.decode("utf-8"))
     records = tuple(_record(person) for person in fixture["people"])
     scope = RetrievalScope(frozenset(record.chunk.person.person_id for record in records))
-    retriever = HybridRetriever()
+    if lexical not in {"token", "haystack-bm25"}:
+        raise ValueError("unsupported lexical ranker")
+    retriever = HybridRetriever(lexical_ranker=HaystackBM25Ranker() if lexical == "haystack-bm25" else None)
     rows = []
     pairs = []
     for case in fixture["cases"]:
@@ -53,7 +55,7 @@ def run(fixture_path: Path, k: int = 10, legacy_report_path: Path | None = None)
         return latencies[round((len(latencies) - 1) * fraction)]
 
     report = {
-        "suite": "legacy_synthetic_fixture_v2_lexical_baseline",
+        "suite": f"legacy_synthetic_fixture_v2_{lexical}",
         "fixture_sha256": hashlib.sha256(raw).hexdigest(),
         "fixture_truth_kind": fixture.get("truth_kind"),
         "k": k,
@@ -85,8 +87,9 @@ def main() -> None:
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--k", type=int, default=10)
     parser.add_argument("--legacy-report", type=Path)
+    parser.add_argument("--lexical", choices=("token", "haystack-bm25"), default="token")
     args = parser.parse_args()
-    report = run(args.fixture, args.k, args.legacy_report)
+    report = run(args.fixture, args.k, args.legacy_report, args.lexical)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({key: value for key, value in report.items() if key != "cases"}, ensure_ascii=False))

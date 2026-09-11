@@ -18,7 +18,10 @@ broadening scope.
 
 - Structured: location, all-required skills, company, education, experience
   range and exclusions, with accent-insensitive Vietnamese normalization.
-- Lexical: deterministic token overlap reference scorer.
+- Lexical: deterministic token-overlap baseline plus a request-local Haystack
+  BM25 adapter that receives only already-authorized records. A deterministic
+  token-presence gate removes BM25L's positive floor for nonmatching documents
+  before ranking; this behavior is benchmarked rather than assumed.
 - Semantic: cosine ranker over indexed vectors plus an injected query embedder;
   GreenNode's OpenAI-compatible embedding contract is implemented, but no live
   production embedding model has been measured.

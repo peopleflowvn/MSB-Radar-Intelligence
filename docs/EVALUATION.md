@@ -47,3 +47,16 @@ job by finding potentially relevant evidence; a later deterministic constraint
 and evidence-verification layer must reject the unsupported 40-year claim.
 Semantic retrieval and production acceptance remain `NOT MEASURED`, so this
 result does not unlock grounded answering or agent work.
+
+### Haystack BM25 comparison
+
+The request-local Haystack BM25 adapter initially returned nonmatching records
+because BM25L assigns them a positive score floor. That measured configuration
+was rejected. With a deterministic token-presence gate before BM25 ranking, the
+recorded result is Recall@10 `1.0`, Precision@10 `0.672807`, MRR `0.973684`,
+no-result accuracy `0.5`, P50 `0.662 ms`, and P95 `0.880 ms`.
+
+Compared with token overlap, BM25 preserves recall and precision and improves
+MRR from `0.912281` to `0.973684`, at higher but still small synthetic latency.
+This makes BM25 the preferred lexical candidate for the next real-corpus
+benchmark, not yet a production selection.

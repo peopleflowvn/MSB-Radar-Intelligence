@@ -22,6 +22,8 @@ Phase 0/1 foundation:
 - Haystack 3.1 indexing adapter verified against its real in-memory store;
 - authorized structured/lexical/semantic-adapter hybrid retrieval and explicit
   Recall@K, Precision@K and MRR evaluation primitives;
+- benchmarked Haystack BM25 candidate with nonmatch gating and improved
+  synthetic MRR over token overlap;
 - runnable health endpoint and tests without external credentials.
 
 Haystack and a production store are deliberately not installed yet. They enter

@@ -1,0 +1,297 @@
+{
+  "suite": "legacy_synthetic_fixture_v2_haystack-bm25",
+  "fixture_sha256": "b5b91b53a55e33c8aea70e79d6f0497c9beabb588f48d2a5b1ecae616dfff121",
+  "fixture_truth_kind": "synthetic_explicit_facts_not_human_acceptance",
+  "k": 10,
+  "metrics": {
+    "cases": 21,
+    "retrieval_cases": 19,
+    "no_result_cases": 2,
+    "recall_at_k": 1.0,
+    "precision_at_k": 0.6728070175438596,
+    "mean_reciprocal_rank": 0.9736842105263158,
+    "no_result_accuracy": 0.5
+  },
+  "p50_ms": 0.662,
+  "p95_ms": 0.88,
+  "semantic_retrieval": "NOT MEASURED",
+  "production_acceptance": "NOT MEASURED",
+  "cases": [
+    {
+      "case": "exact",
+      "query": "Fixture An",
+      "expected_ids": [
+        "1"
+      ],
+      "actual_ids": [
+        "1",
+        "5",
+        "4",
+        "2",
+        "3",
+        "6"
+      ],
+      "latency_ms": 1686.211
+    },
+    {
+      "case": "semantic",
+      "query": "hướng dẫn đồng nghiệp điều phối dự án",
+      "expected_ids": [
+        "1"
+      ],
+      "actual_ids": [
+        "1",
+        "6",
+        "4",
+        "2",
+        "3"
+      ],
+      "latency_ms": 0.865
+    },
+    {
+      "case": "synonym",
+      "query": "Java",
+      "expected_ids": [
+        "3"
+      ],
+      "actual_ids": [
+        "3"
+      ],
+      "latency_ms": 0.606
+    },
+    {
+      "case": "vietnamese",
+      "query": "kế toán",
+      "expected_ids": [
+        "4"
+      ],
+      "actual_ids": [
+        "4"
+      ],
+      "latency_ms": 0.574
+    },
+    {
+      "case": "unaccented",
+      "query": "ke toan",
+      "expected_ids": [
+        "4"
+      ],
+      "actual_ids": [
+        "4"
+      ],
+      "latency_ms": 0.576
+    },
+    {
+      "case": "typo",
+      "query": "kế toán",
+      "expected_ids": [
+        "4"
+      ],
+      "actual_ids": [
+        "4"
+      ],
+      "latency_ms": 0.57
+    },
+    {
+      "case": "mixed",
+      "query": "Data Analyst SQL",
+      "expected_ids": [
+        "1",
+        "2"
+      ],
+      "actual_ids": [
+        "2",
+        "1"
+      ],
+      "latency_ms": 0.599
+    },
+    {
+      "case": "and",
+      "query": "SQL Python",
+      "expected_ids": [
+        "1"
+      ],
+      "actual_ids": [
+        "1",
+        "2",
+        "6"
+      ],
+      "latency_ms": 0.669
+    },
+    {
+      "case": "or",
+      "query": "Java Python",
+      "expected_ids": [
+        "1",
+        "3"
+      ],
+      "actual_ids": [
+        "3",
+        "6",
+        "1"
+      ],
+      "latency_ms": 0.662
+    },
+    {
+      "case": "not",
+      "query": "chưa từng ngân hàng",
+      "expected_ids": [
+        "3"
+      ],
+      "actual_ids": [
+        "3",
+        "1",
+        "2",
+        "5"
+      ],
+      "latency_ms": 0.709
+    },
+    {
+      "case": "exclusion",
+      "query": "SQL",
+      "expected_ids": [
+        "2"
+      ],
+      "actual_ids": [
+        "2",
+        "1"
+      ],
+      "latency_ms": 0.632
+    },
+    {
+      "case": "location",
+      "query": "Hà Nội",
+      "expected_ids": [
+        "1",
+        "2"
+      ],
+      "actual_ids": [
+        "2",
+        "1",
+        "5"
+      ],
+      "latency_ms": 0.674
+    },
+    {
+      "case": "experience",
+      "query": "kinh nghiệm",
+      "expected_ids": [
+        "3",
+        "4"
+      ],
+      "actual_ids": [
+        "5",
+        "4",
+        "2",
+        "3",
+        "1",
+        "6"
+      ],
+      "latency_ms": 0.88
+    },
+    {
+      "case": "education",
+      "query": "NEU",
+      "expected_ids": [
+        "1"
+      ],
+      "actual_ids": [
+        "1"
+      ],
+      "latency_ms": 0.659
+    },
+    {
+      "case": "skills",
+      "query": "Spring",
+      "expected_ids": [
+        "3"
+      ],
+      "actual_ids": [
+        "3"
+      ],
+      "latency_ms": 0.658
+    },
+    {
+      "case": "company",
+      "query": "ACB",
+      "expected_ids": [
+        "2"
+      ],
+      "actual_ids": [
+        "2"
+      ],
+      "latency_ms": 0.668
+    },
+    {
+      "case": "industry",
+      "query": "ngân hàng",
+      "expected_ids": [
+        "1",
+        "2"
+      ],
+      "actual_ids": [
+        "2",
+        "3",
+        "1"
+      ],
+      "latency_ms": 0.736
+    },
+    {
+      "case": "compare",
+      "query": "Fixture An Fixture Bình",
+      "expected_ids": [
+        "1",
+        "2"
+      ],
+      "actual_ids": [
+        "1",
+        "2",
+        "5",
+        "4",
+        "3",
+        "6"
+      ],
+      "latency_ms": 0.779
+    },
+    {
+      "case": "empty",
+      "query": "phi hành gia",
+      "expected_ids": [],
+      "actual_ids": [],
+      "latency_ms": 0.398
+    },
+    {
+      "case": "injection",
+      "query": "Python",
+      "expected_ids": [],
+      "actual_ids": [
+        "6",
+        "1"
+      ],
+      "latency_ms": 0.69
+    },
+    {
+      "case": "multi",
+      "query": "Data Analyst Hà Nội",
+      "expected_ids": [
+        "1",
+        "2"
+      ],
+      "actual_ids": [
+        "2",
+        "1",
+        "5"
+      ],
+      "latency_ms": 0.647
+    }
+  ],
+  "legacy_comparison": {
+    "report_sha256": "a6ee55ab44bbe78fcb7c8b7f6c20fc737ef04ba052db32f95f0fac89084e244b",
+    "suite": "sqlite_fallback_retrieval",
+    "macro_recall_at_10": 1.0,
+    "macro_precision_at_10": 0.6087301587301587,
+    "p50_ms": 2.01,
+    "p95_ms": 2.403,
+    "scope": "6 synthetic people, curated query expansions, K=10; NOT intent, dense retrieval, or production acceptance"
+  }
+}

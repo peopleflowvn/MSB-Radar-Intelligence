@@ -45,6 +45,10 @@ class SemanticRanker(Protocol):
     def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]: ...
 
 
+class LexicalRanker(Protocol):
+    def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]: ...
+
+
 class NullSemanticRanker:
     def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]:
         return ()
@@ -113,14 +117,24 @@ def _lexical_scores(query: str, records: Sequence[RetrievalRecord]) -> dict[str,
     return scores
 
 
+class TokenOverlapRanker:
+    def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]:
+        return tuple(_lexical_scores(query, records).items())
+
+
 def _rank_map(scores: dict[str, float]) -> dict[str, int]:
     ordered = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
     return {identifier: rank for rank, (identifier, _) in enumerate(ordered, start=1)}
 
 
 class HybridRetriever:
-    def __init__(self, semantic_ranker: SemanticRanker | None = None) -> None:
+    def __init__(
+        self,
+        semantic_ranker: SemanticRanker | None = None,
+        lexical_ranker: LexicalRanker | None = None,
+    ) -> None:
         self._semantic_ranker = semantic_ranker or NullSemanticRanker()
+        self._lexical_ranker = lexical_ranker or TokenOverlapRanker()
 
     def search(
         self,
@@ -137,9 +151,12 @@ class HybridRetriever:
                 filtered.append((record, score))
 
         candidates = [record for record, _ in filtered]
-        lexical_ranks = _rank_map(_lexical_scores(request.query, candidates))
-        semantic_scores = dict(self._semantic_ranker.rank(request.query, tuple(candidates)))
+        lexical_scores = dict(self._lexical_ranker.rank(request.query, tuple(candidates)))
         allowed_evidence = {record.chunk.evidence.evidence_id for record in candidates}
+        if any(identifier not in allowed_evidence for identifier in lexical_scores):
+            raise ValueError("lexical ranker returned evidence outside its authorized input")
+        lexical_ranks = _rank_map(lexical_scores)
+        semantic_scores = dict(self._semantic_ranker.rank(request.query, tuple(candidates)))
         if any(identifier not in allowed_evidence for identifier in semantic_scores):
             raise ValueError("semantic ranker returned evidence outside its authorized input")
         semantic_ranks = _rank_map(semantic_scores)

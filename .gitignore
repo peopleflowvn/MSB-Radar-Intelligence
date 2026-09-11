@@ -10,3 +10,4 @@ build/
 evaluation/results/*.json
 !evaluation/results/.gitkeep
 !evaluation/results/synthetic_retrieval_v2.json
+!evaluation/results/synthetic_retrieval_bm25_v2.json
