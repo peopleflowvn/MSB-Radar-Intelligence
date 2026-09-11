@@ -1,0 +1,47 @@
+name: Probe Oracle Intelligence
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: [self-hosted, oracle, intelligence]
+    steps:
+      - name: Verify live services without exposing secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          health=$(sudo docker inspect msbradar-intelligence --format '{{.State.Health.Status}}')
+          test "${health}" = healthy
+          sudo docker exec -i msbradar-intelligence python - <<'PY'
+          import json
+          import urllib.error
+          import urllib.request
+
+          def fetch(url):
+              try:
+                  with urllib.request.urlopen(url, timeout=10) as response:
+                      return response.status, json.load(response)
+              except urllib.error.HTTPError as exc:
+                  with exc:
+                      return exc.code, json.load(exc)
+
+          health_status, health = fetch("http://127.0.0.1:8081/health")
+          ready_status, ready = fetch("http://127.0.0.1:8081/ready")
+          assert health_status == 200 and health["status"] == "ok"
+          allowed_ready_keys = {"status", "ready", "missing", "radar_configured", "greennode_configured"}
+          assert set(ready) == allowed_ready_keys
+          print(json.dumps({
+              "health": health,
+              "ready_http_status": ready_status,
+              "ready": ready,
+          }, sort_keys=True))
+          PY
+          sudo docker exec -i msbradar-intelligence python - <<'PY'
+          import json
+          import urllib.request
+          with urllib.request.urlopen("http://hub:8000/api/v1/health/", timeout=10) as response:
+              body = json.load(response)
+          assert response.status == 200 and body.get("ok") is True
+          print(json.dumps({"radar_internal_health": "ok"}))
+          PY
