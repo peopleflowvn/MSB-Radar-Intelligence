@@ -22,10 +22,12 @@ class ApiHealthTest(unittest.TestCase):
         self.thread.join(timeout=2)
 
     def test_liveness_is_independent_of_external_configuration(self):
-        with urllib.request.urlopen(self.base + "/health") as response:
-            body = json.loads(response.read())
+        with patch.dict("os.environ", {"INTELLIGENCE_RELEASE_SHA": "abc123"}):
+            with urllib.request.urlopen(self.base + "/health") as response:
+                body = json.loads(response.read())
         self.assertEqual(response.status, 200)
         self.assertEqual(body["status"], "ok")
+        self.assertEqual(body["release_sha"], "abc123")
 
     def test_readiness_reports_missing_names_without_values(self):
         with patch.dict("os.environ", {}, clear=True):

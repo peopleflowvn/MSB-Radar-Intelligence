@@ -12,6 +12,7 @@ services:
     environment:
       INTELLIGENCE_BIND_HOST: "0.0.0.0"
       INTELLIGENCE_PORT: "8081"
+      INTELLIGENCE_RELEASE_SHA: ${INTELLIGENCE_IMAGE_TAG:-local}
       HAYSTACK_TELEMETRY_ENABLED: "false"
     volumes:
       - intelligence_state:/var/lib/radar-intelligence

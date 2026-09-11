@@ -14,7 +14,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         if self.path == "/health":
-            body = {"status": "ok", "service": "msb-radar-intelligence", "version": __version__}
+            body = {
+                "status": "ok",
+                "service": "msb-radar-intelligence",
+                "version": __version__,
+                "release_sha": os.environ.get("INTELLIGENCE_RELEASE_SHA", "").strip() or None,
+            }
             status = 200
         else:
             readiness = RuntimeSettings.from_env().public_status()
