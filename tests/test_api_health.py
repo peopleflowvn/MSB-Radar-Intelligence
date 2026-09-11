@@ -48,6 +48,11 @@ class ApiHealthTest(unittest.TestCase):
                 self.request = request
                 return []
 
+            def answer(self, request):
+                self.request = request
+                return {"answer": "grounded", "people": [], "evidence": [],
+                        "cited_evidence_ids": [], "interpreted_query": {}, "trace": []}
+
         service = FakeSearch()
         Handler.search_service = service
         payload = json.dumps({
@@ -69,6 +74,18 @@ class ApiHealthTest(unittest.TestCase):
                 body = json.loads(response.read())
         self.assertEqual(body, {"hits": []})
         self.assertEqual(service.request.scope_token, "signed")
+
+        answer_payload = json.dumps({
+            "question": "Ai phù hợp?", "scope_token": "signed", "principal_id": "7",
+        }).encode()
+        answer_request = urllib.request.Request(
+            self.base + "/v1/answer", data=answer_payload, method="POST",
+            headers={"Authorization": "Bearer shared-secret", "Content-Type": "application/json"})
+        with patch.dict("os.environ", {"RADAR_SERVICE_TOKEN": "shared-secret"}, clear=True):
+            with urllib.request.urlopen(answer_request) as response:
+                answer = json.loads(response.read())
+        self.assertEqual(answer["answer"], "grounded")
+        self.assertEqual(service.request.question, "Ai phù hợp?")
 
 
 if __name__ == "__main__":

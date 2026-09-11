@@ -7,7 +7,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from radar_intelligence import __version__
 from radar_intelligence.config import RuntimeSettings
-from radar_intelligence.api.codec import ApiContractError, decode_search_request
+from radar_intelligence.api.codec import (
+    ApiContractError, decode_answer_request, decode_search_request,
+)
 from radar_intelligence.api.search_service import SearchService
 
 
@@ -38,7 +40,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path != "/v1/search":
+        if self.path not in {"/v1/search", "/v1/answer"}:
             self.send_error(404)
             return
         expected = os.environ.get("RADAR_SERVICE_TOKEN", "")
@@ -51,15 +53,18 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
             if not 1 <= length <= 64 * 1024:
                 raise ApiContractError("request body size is invalid")
-            request = decode_search_request(json.loads(self.rfile.read(length)))
+            payload = json.loads(self.rfile.read(length))
+            request = (decode_search_request(payload) if self.path == "/v1/search"
+                       else decode_answer_request(payload))
             service = self.search_service
             if service is None:
                 raise RuntimeError("search service is unavailable")
-            hits = service.search(request)
-            if hits is None:
+            result = (service.search(request) if self.path == "/v1/search"
+                      else service.answer(request))
+            if result is None:
                 self._json(404, {"detail": "Not found."})
             else:
-                self._json(200, {"hits": hits})
+                self._json(200, {"hits": result} if self.path == "/v1/search" else result)
         except (ApiContractError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             self._json(400, {"detail": str(exc)})
         except Exception:
