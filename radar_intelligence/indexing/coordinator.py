@@ -80,9 +80,13 @@ class SyncFailure(RuntimeError):
         self.document_id = document_id
         self.cursor = cursor
         self.cause_type = type(cause).__name__
+        safe_provider_detail = str(cause) if (
+            self.cause_type == "ProviderError" and str(cause).startswith("GreenNode ")
+        ) else ""
         super().__init__(
             f"index event failed: event_id={event_id} document_id={document_id} "
             f"cursor={cursor or '<start>'} cause={self.cause_type}"
+            + (f" provider={safe_provider_detail}" if safe_provider_detail else "")
         )
 
 

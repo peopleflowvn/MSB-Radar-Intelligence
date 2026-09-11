@@ -72,6 +72,15 @@ class IndexSyncTest(unittest.TestCase):
         self.assertEqual(caught.exception.cause_type, "RuntimeError")
         self.assertNotIn("SQL", str(caught.exception))
 
+    def test_provider_failure_exposes_only_bounded_provider_status(self):
+        from radar_intelligence.providers import ProviderError
+
+        failure = SyncFailure(
+            event_id="e1", document_id="d1", cursor=None,
+            cause=ProviderError("GreenNode HTTP 400"),
+        )
+        self.assertIn("provider=GreenNode HTTP 400", str(failure))
+
     def test_retry_after_checkpoint_failure_is_safe(self):
         class FailingCursor(InMemoryCursorStore):
             def save(self, cursor):
