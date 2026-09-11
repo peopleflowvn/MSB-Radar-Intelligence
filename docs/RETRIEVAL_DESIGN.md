@@ -38,3 +38,11 @@ Precision@K and MRR. The existing 51 query seed lacks verified Person truth and
 therefore cannot produce honest retrieval metrics yet. Metrics remain `NOT
 MEASURED` until a stable authorized corpus snapshot is paired with reviewed
 expected Person IDs.
+## Index projection
+
+The index-to-retrieval projection requires Radar-owned Person ID, document ID,
+source, content hash, version, chunk ID and chunk position. It rejects malformed
+metadata and chunk-ID drift rather than producing untraceable evidence. Scope is
+then applied before structured, lexical or semantic ranking. An automated
+end-to-end test covers indexing two people, excluding the unauthorized Person,
+retrieving the authorized one and re-resolving its current source snapshot.
