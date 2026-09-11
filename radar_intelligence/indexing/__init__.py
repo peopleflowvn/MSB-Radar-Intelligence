@@ -8,6 +8,7 @@ from .core import (
     SearchDocument,
 )
 from .haystack_store import HaystackDocumentIndex
+from .radar_feed import FeedError, FeedPage, RadarDocumentFeedClient, RadarFeedConfig
 
 __all__ = [
     "ChangeOperation",
@@ -18,4 +19,8 @@ __all__ = [
     "IndexApplyResult",
     "SearchDocument",
     "HaystackDocumentIndex",
+    "FeedError",
+    "FeedPage",
+    "RadarDocumentFeedClient",
+    "RadarFeedConfig",
 ]

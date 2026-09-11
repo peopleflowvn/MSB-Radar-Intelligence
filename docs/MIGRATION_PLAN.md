@@ -63,3 +63,25 @@ needs current authorization and provenance.
 
 No product endpoint, production data or legacy source was changed in this
 phase.
+
+## Required document feed
+
+Proposed endpoint:
+
+`GET /api/v1/intelligence/document-feed/?cursor=<opaque>&limit=<1..1000>`
+
+It uses the same service authentication and a dedicated index scope token. The
+response contains ordered events plus `next_cursor` and `has_more`. Every event
+contains `event_id`, operation (`upsert`, `delete`, `person_reassigned`), Radar
+Person/Document IDs, selected parsed-text version and hash, source provenance,
+timestamp and text for non-delete operations.
+
+The cursor represents a durable Radar-side sequence, not an `updated_at` scan;
+timestamps alone can miss same-time writes and cannot provide stable replay.
+Intelligence commits the cursor only after all events in the page are applied.
+Existing Edge `entity_key + content_hash` semantics inform idempotency, but the
+Edge outbox is not reused as the Intelligence feed because it precedes final
+Person resolution and selected parsed-text versioning.
+
+The new repository includes a strict feed client and event mapper with mocked
+contract tests. The product endpoint and durable change log remain pending.
