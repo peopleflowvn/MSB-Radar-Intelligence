@@ -13,6 +13,8 @@ Phase 0/1 foundation:
 - framework-independent public contracts;
 - deterministic evidence validation;
 - GreenNode capability gateway with injectable transport;
+- OpenAI-compatible GreenNode chat transport with sanitized errors and usage
+  accounting (mock-contract verified; live credentials not configured);
 - in-memory person-grouped hybrid retrieval reference implementation;
 - 51-case legacy-derived gold-set seed;
 - incremental document conversion/index lifecycle with idempotent events,
