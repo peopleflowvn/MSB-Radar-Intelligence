@@ -22,10 +22,14 @@ small retrieved passage. Before returning a citation, code checks that the
 document still exists, is visible in the request scope, and matches the indexed
 version/hash. Radar decides whether contact details or raw CV files may be shown.
 
+Legacy inspection confirms the existing Talent document-text endpoint does not
+return enough provenance for this check. The proposed resolver endpoint and its
+service/scope headers are specified in `MIGRATION_PLAN.md`; an HTTP client with
+fail-closed contract tests now exists in Intelligence.
+
 ## Action proposal
 
 P1 tools return a proposal with arguments, evidence and risk. Consequential
 actions remain `proposed` until Radar records an authenticated human approval;
 Radar revalidates DNC, permissions, quota and current workflow state at execute
 time.
-
