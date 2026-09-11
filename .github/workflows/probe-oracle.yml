@@ -39,8 +39,26 @@ jobs:
           PY
           sudo docker exec -i msbradar-intelligence python - <<'PY'
           import json
+          import os
+          names = (
+              "MSB_AI_GREENNODE_BASE_URL",
+              "MSB_AI_GREENNODE_API_KEY",
+              "MSB_AI_GREENNODE_MODEL",
+              "MSB_AI_MODEL_EMBEDDING",
+              "INTELLIGENCE_SERVICE_TOKEN",
+              "INTELLIGENCE_INDEX_SCOPE_TOKEN",
+          )
+          print(json.dumps({"legacy_or_integration_setting_present": {
+              name: bool(os.environ.get(name, "").strip()) for name in names
+          }}, sort_keys=True))
+          PY
+          sudo docker exec -i msbradar-intelligence python - <<'PY'
+          import json
           import urllib.request
-          with urllib.request.urlopen("http://hub:8000/api/v1/health/", timeout=10) as response:
+          request = urllib.request.Request(
+              "http://hub:8000/api/v1/health/", headers={"Host": "localhost"}
+          )
+          with urllib.request.urlopen(request, timeout=10) as response:
               body = json.load(response)
           assert response.status == 200 and body.get("ok") is True
           print(json.dumps({"radar_internal_health": "ok"}))
