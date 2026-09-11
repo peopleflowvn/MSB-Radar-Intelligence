@@ -182,17 +182,27 @@ class IncrementalIndexer:
         store: DocumentIndex,
         converter: DocumentConverter | None = None,
         embedder: Embedder | None = None,
+        embedding_batch_size: int = 32,
     ) -> None:
+        if embedding_batch_size <= 0:
+            raise ValueError("embedding_batch_size must be positive")
         self._store = store
         self._converter = converter or DocumentConverter()
         self._embedder = embedder
+        self._embedding_batch_size = embedding_batch_size
 
     def apply(self, change: DocumentChange) -> IndexApplyResult:
         chunks = self._converter.convert(change)
         if chunks and self._embedder is not None:
-            vectors = tuple(tuple(float(value) for value in row) for row in self._embedder.embed_documents(
-                [chunk.content for chunk in chunks]
-            ))
+            vectors = []
+            for start in range(0, len(chunks), self._embedding_batch_size):
+                batch = chunks[start:start + self._embedding_batch_size]
+                rows = self._embedder.embed_documents([chunk.content for chunk in batch])
+                converted = [tuple(float(value) for value in row) for row in rows]
+                if len(converted) != len(batch) or any(not vector for vector in converted):
+                    raise ValueError("embedder returned an invalid vector batch")
+                vectors.extend(converted)
+            vectors = tuple(vectors)
             if len(vectors) != len(chunks) or any(not vector for vector in vectors):
                 raise ValueError("embedder returned an invalid vector batch")
             chunks = tuple(replace(chunk, embedding=vector) for chunk, vector in zip(chunks, vectors))

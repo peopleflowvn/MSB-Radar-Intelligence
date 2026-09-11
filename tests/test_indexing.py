@@ -93,6 +93,23 @@ class IndexingTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             bad.apply(change("bad"))
 
+    def test_large_document_embeddings_are_bounded_batches(self) -> None:
+        class RecordingEmbedder:
+            def __init__(self):
+                self.sizes = []
+
+            def embed_documents(self, texts):
+                self.sizes.append(len(texts))
+                return [[1.0] for _ in texts]
+
+        embedder = RecordingEmbedder()
+        indexer = IncrementalIndexer(
+            self.store, converter=DocumentConverter(max_chars=100),
+            embedder=embedder, embedding_batch_size=2,
+        )
+        indexer.apply(change("large", text="\n".join(["x" * 100] * 5)))
+        self.assertEqual(embedder.sizes, [2, 2, 1])
+
 
 if __name__ == "__main__":
     unittest.main()
