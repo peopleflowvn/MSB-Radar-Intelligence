@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="vi" prefix="og: https://ogp.me/ns#">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
+    <!-- radar:meta:start -->
+    <!-- Khối này do máy chủ SINH RA từ CSDL (accounts/branding.py). Bản tĩnh
+         dưới đây chỉ là dự phòng cho lúc chạy dev không qua Django; đừng sửa
+         tay để đổi ảnh xem trước — vào /settings. -->
+    <title>MSB Radar Hub | Hệ Thống Tìm Kiếm Nhân Tài &amp; Tăng Trưởng Khách Hàng</title>
+
+    <!-- SEO & Metadata Tiêu Chuẩn -->
+    <meta name="title" content="MSB Radar Hub | Hệ Thống Tìm Kiếm Nhân Tài &amp; Tăng Trưởng Khách Hàng" />
+    <meta name="description" content="MSB Radar Hub - Hệ thống tìm kiếm và quản trị dữ liệu tập trung, hỗ trợ AI Sourcing, săn nhân tài chuyên sâu (Talent Radar) và phát triển khách hàng tiềm năng (Growth Radar) cho MSB." />
+    <meta name="keywords" content="MSB Radar, Radar Hub, Talent Radar, Growth Radar, Tìm kiếm nhân tài, Săn nhân tài, Tuyển dụng MSB, Quản trị nhân sự số, AI Sourcing, Ngân hàng Hàng Hải" />
+    <meta name="author" content="MSB Technology &amp; Talent Intelligence" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#FF8A33" />
+    <meta name="msapplication-TileColor" content="#0F172A" />
+
+    <!-- Open Graph / Zalo, Facebook, LinkedIn, Telegram, Messenger -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MSB Radar Hub" />
+    <meta property="og:title" content="MSB Radar Hub | Hệ Thống Tìm Kiếm Nhân Tài &amp; Tăng Trưởng Khách Hàng" />
+    <meta property="og:description" content="Hệ thống tìm kiếm và quản trị dữ liệu tập trung, hỗ trợ AI Sourcing, săn nhân tài chuyên sâu (Talent Radar) và phát triển khách hàng tiềm năng (Growth Radar) cho MSB." />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:secure_url" content="/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="MSB Radar Hub - Hệ Thống Tìm Kiếm Nhân Tài &amp; Tăng Trưởng" />
+    <meta property="og:locale" content="vi_VN" />
+
+    <!-- Twitter / X Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MSB Radar Hub | Hệ Thống Tìm Kiếm Nhân Tài &amp; Tăng Trưởng Khách Hàng" />
+    <meta name="twitter:description" content="Hệ thống tìm kiếm và quản trị dữ liệu tập trung, hỗ trợ AI Sourcing, săn nhân tài chuyên sâu (Talent Radar) và phát triển khách hàng tiềm năng (Growth Radar) cho MSB." />
+    <meta name="twitter:image" content="/og-image.png" />
+    <meta name="twitter:image:alt" content="MSB Radar Hub Banner" />
+    <!-- radar:meta:end -->
+
+    <!-- Favicons & App Icons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Mobile Web App Optimization -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MSB Radar" />
+    <style>
+      #root-loader {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at 50% 45%, #0d1730 0%, #060a16 55%, #020409 100%);
+        color: #F8FAFC;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        z-index: 99999;
+      }
+      .pre-scanner {
+        position: relative;
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 24px;
+        background: radial-gradient(circle, rgba(15, 23, 42, 0.6) 0%, rgba(3, 7, 18, 0.9) 100%);
+        box-shadow: 0 0 50px rgba(0, 0, 0, 0.8), inset 0 0 30px rgba(0, 0, 0, 0.5);
+      }
+      .pre-pulse-aura {
+        position: absolute;
+        inset: -20px;
+        border-radius: 50%;
+        border: 1.5px solid rgba(255, 138, 51, 0.35);
+        animation: prePulseAnim 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+        pointer-events: none;
+      }
+      @keyframes prePulseAnim {
+        0% { transform: scale(0.7); opacity: 0.8; }
+        100% { transform: scale(1.3); opacity: 0; }
+      }
+      .pre-ring {
+        position: absolute;
+        border-radius: 50%;
+        box-sizing: border-box;
+      }
+      .pre-ring-1 { width: 65px; height: 65px; border: 1px solid rgba(255, 255, 255, 0.18); }
+      .pre-ring-2 { width: 130px; height: 130px; border: 1px dashed rgba(255, 255, 255, 0.15); }
+      .pre-ring-3 { width: 220px; height: 220px; border: 1.5px solid #FF8A33; box-shadow: 0 0 20px rgba(255, 138, 51, 0.25), inset 0 0 20px rgba(255, 138, 51, 0.15); }
+      .pre-sweep {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: conic-gradient(from 0deg, transparent 0deg, transparent 270deg, rgba(255, 138, 51, 0.08) 320deg, #FF8A33 360deg);
+        animation: preRadarSweep 2.4s linear infinite;
+      }
+      @keyframes preRadarSweep {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .pre-core {
+        position: relative;
+        z-index: 5;
+        width: 54px;
+        height: 54px;
+        border-radius: 16px;
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1.5px solid #FF8A33;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 26px;
+        box-shadow: 0 0 25px rgba(255, 138, 51, 0.45);
+      }
+      .pre-tag-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 14px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        color: #94A3B8;
+        margin-bottom: 12px;
+      }
+      .pre-pulse-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #FF8A33;
+        box-shadow: 0 0 8px #FF8A33;
+      }
+      .pre-title {
+        font-size: 24px;
+        font-weight: 800;
+        margin: 0 0 6px;
+        letter-spacing: -0.02em;
+      }
+      .pre-title span {
+        background: linear-gradient(135deg, #FF8A33 0%, #FFFFFF 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .pre-sub {
+        font-size: 13.5px;
+        color: #94A3B8;
+        margin: 0 0 20px;
+      }
+      .pre-bar {
+        width: 200px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        overflow: hidden;
+        position: relative;
+        margin-bottom: 12px;
+      }
+      .pre-bar-fill {
+        position: absolute;
+        height: 100%;
+        width: 40%;
+        background: linear-gradient(90deg, transparent, #FF8A33, #FFFFFF);
+        border-radius: 4px;
+        animation: preBarShimmer 1.8s ease-in-out infinite;
+      }
+      @keyframes preBarShimmer {
+        0% { left: -40%; }
+        100% { left: 100%; }
+      }
+      .pre-status {
+        font-size: 12.5px;
+        color: #64748B;
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div id="root-loader">
+        <div class="pre-scanner">
+          <div class="pre-pulse-aura"></div>
+          <div class="pre-ring pre-ring-1"></div>
+          <div class="pre-ring pre-ring-2"></div>
+          <div class="pre-ring pre-ring-3"></div>
+          <div class="pre-sweep"></div>
+          <div class="pre-core">⚡</div>
+        </div>
+        <div class="pre-tag-pill">
+          <span class="pre-pulse-dot"></span>
+          HỆ THỐNG RADAR ĐANG KHỞI TẠO
+        </div>
+        <div class="pre-title">Welcome to <span>MSB Radar</span></div>
+        <div class="pre-sub">Hệ Thống Tìm Kiếm Nhân Tài &amp; Tăng Trưởng Khách Hàng</div>
+        <div class="pre-bar"><div class="pre-bar-fill"></div></div>
+        <div class="pre-status">Đang kết nối &amp; đồng bộ dữ liệu thời gian thực…</div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

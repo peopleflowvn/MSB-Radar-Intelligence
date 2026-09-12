@@ -1,0 +1,30 @@
+# Django 4.2 LTS: bản cuối cùng còn hỗ trợ Python 3.9, vốn là runtime của Edge.
+# Nâng lên Django 5.x đồng nghĩa nâng Python cả hai phía — làm sau Hackathon.
+Django==4.2.23
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+django-environ==0.11.2
+psycopg2-binary==2.9.9
+pgvector==0.3.6
+whitenoise==6.6.0
+gunicorn==21.2.0
+# ASGI worker cho gunicorn (Master Plan §3.2): SSE luồng Thinking cần async.
+# [standard] kéo theo httptools/websockets; uvloop bị bỏ qua trên Windows dev.
+uvicorn[standard]==0.30.6
+pypdf==6.5.0
+openpyxl==3.1.2
+python-docx==1.2.0
+# Render PDF scan thành ảnh để AI vision OCR; Pillow nén ảnh trước khi gửi provider.
+PyMuPDF==1.26.3
+Pillow==11.3.0
+# ai/crypto.py mã hoá khoá API nhà cung cấp AI trước khi lưu CSDL — thiếu ở
+# đây trước giờ mà không ai phát hiện vì máy dev tình cờ đã có sẵn gói này.
+cryptography==50.0.1
+# Sinh tài liệu API tương tác (OpenAPI/Swagger) từ chính serializer/view đã có —
+# để một doanh nghiệp khác tích hợp Edge hoặc hệ thống của họ mà không phải đọc
+# mã nguồn (Master Plan mục 44, "khả năng đưa vào pilot").
+drf-spectacular==0.26.5
+# FILE_STORAGE_BACKEND=r2 (docs/STORAGE.md): dùng thật ở lần triển khai lên VPS
+# Oracle Core — máy đó dùng chung với dịch vụ khác, không muốn CV người khác
+# thêm gánh nặng sao lưu ổ đĩa cho ai không sở hữu riêng máy đó.
+boto3==1.42.97

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="msbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="50%" stop-color="#FF8A33" />
+      <stop offset="100%" stop-color="#E65C00" />
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#0A0E1A" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <!-- Background Squircle -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bgGrad)" stroke="#334155" stroke-width="2"/>
+  <!-- Glowing radar ring -->
+  <circle cx="64" cy="64" r="48" fill="none" stroke="#FF8A33" stroke-width="1.5" stroke-opacity="0.25" stroke-dasharray="4 3"/>
+  <circle cx="64" cy="64" r="34" fill="none" stroke="#FF8A33" stroke-width="1.5" stroke-opacity="0.4"/>
+  <!-- Central ⚡ icon -->
+  <g filter="url(#glow)">
+    <text x="50%" y="54%" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif" font-size="70" fill="url(#msbGrad)">⚡</text>
+  </g>
+</svg>

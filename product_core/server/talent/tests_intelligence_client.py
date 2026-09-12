@@ -1,0 +1,50 @@
+import io
+import json
+
+from django.contrib.auth.models import User
+from django.test import TestCase, override_settings
+
+from people.models import Person
+
+from .intelligence_client import answer
+
+
+class Response(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+
+@override_settings(
+    INTELLIGENCE_BASE_URL="http://intelligence:8081",
+    INTELLIGENCE_SERVICE_TOKEN="shared",
+    INTELLIGENCE_REQUEST_TIMEOUT_SECONDS=9,
+)
+class IntelligenceClientTest(TestCase):
+    def test_v2_answer_is_adapted_to_unchanged_frontend_shape(self):
+        user = User.objects.create_user("recruiter")
+        person = Person.objects.create(display_name="Nguyen Van A")
+        captured = {}
+
+        def opener(request, timeout):
+            captured["request"], captured["timeout"] = request, timeout
+            return Response(json.dumps({
+                "answer": "Phu hop [1]", "people": [{"person_id": str(person.pk),
+                                                       "display_name": None}],
+                "evidence": [{"person_id": str(person.pk), "document_id": "12",
+                              "location": "chunk 0", "text": "Python banking"}],
+                "trace": [{"provider": "greennode", "model_alias": "deep"}],
+                "interpreted_query": {"grounded": True},
+            }).encode())
+
+        result = answer(user, "Ai phu hop?", conversation_id="thread-1", opener=opener)
+        request_body = json.loads(captured["request"].data)
+        self.assertEqual(captured["request"].full_url, "http://intelligence:8081/v1/answer")
+        self.assertEqual(captured["request"].headers["Authorization"], "Bearer shared")
+        self.assertEqual(captured["timeout"], 9)
+        self.assertTrue(request_body["scope_token"])
+        self.assertEqual(result.people[0]["name"], "Nguyen Van A")
+        self.assertEqual(result.sources[0]["ordinal"], 1)
+        self.assertEqual(result.trace["engine"], "intelligence-v2")

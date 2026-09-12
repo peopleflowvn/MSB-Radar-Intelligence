@@ -1,0 +1,292 @@
+# MSB Radar Hub — triển khai trên VPS Oracle "Core", CÙNG với TalentFlow.
+#
+# Khác với docker-compose.yml (mặc định — Caddy riêng giữ cổng 80/443): VPS
+# này đã có TalentFlow chiếm 80/443 bằng container `caddy-gateway` của nó rồi.
+# Radar không tranh cổng — chỉ một container (`web`, tên trên mạng Docker là
+# `msbradar-web`) tham gia THÊM vào network Docker sẵn có của TalentFlow
+# (`talentflow-core_default`) để Caddy của họ reverse_proxy sang. Không sửa,
+# không restart bất kỳ container nào của TalentFlow — network Docker cho phép
+# nhiều container cùng tham gia mà không đụng nhau.
+#
+# `hub` và `db` KHÔNG tham gia network đó — chỉ `web` (Caddy nội bộ của Radar,
+# đã phục vụ /api, /admin, file tĩnh — xem ./Caddyfile) đứng giữa, đúng như
+# vai trò của nó trong docker-compose.yml gốc, chỉ khác là không mở cổng
+# 80/443 ra host nữa.
+#
+# Chạy:  docker compose -f docker-compose.oracle-core.yml up -d --build
+#
+# Sau khi ACTIVE, thêm một site block vào ~/talentflow-core/Caddyfile CỦA HỌ:
+#     radar.tunghr.io.vn {
+#         reverse_proxy msbradar-web:80
+#     }
+# rồi nạp lại (KHÔNG restart container, không rớt kết nối site khác):
+#     docker exec caddy-gateway caddy reload --config /etc/caddy/Caddyfile
+
+services:
+  db:
+    # Cần image có extension pgvector cho PersonSearchDocument/CVChunk.
+    # Volume pgdata giữ nguyên nên đây không tạo lại hay xoá dữ liệu PostgreSQL cũ.
+    image: pgvector/pgvector:pg16
+    container_name: msbradar-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-msbradar}
+      POSTGRES_USER: ${POSTGRES_USER:-msbradar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?can dat POSTGRES_PASSWORD trong .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-msbradar} -d ${POSTGRES_DB:-msbradar}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  hub:
+    build:
+      context: ./server
+    container_name: msbradar-hub
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # Nạp toàn bộ .env (bí mật + khoá đều đã liệt kê tường minh dưới `environment`,
+    # nên trùng khoá không đổi hành vi). Nhờ vậy biến mới như MSB_AI_MODEL_<TÁC_VỤ>
+    # không phải thêm từng dòng vào compose. `environment` vẫn thắng khi trùng.
+    env_file:
+      - .env
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: ${SECRET_KEY:?can dat SECRET_KEY trong .env}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-radar.tunghr.io.vn}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-https://radar.tunghr.io.vn}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://radar.tunghr.io.vn}
+      DATABASE_URL: postgres://${POSTGRES_USER:-msbradar}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-msbradar}
+      INTELLIGENCE_SERVICE_TOKEN: ${INTELLIGENCE_SERVICE_TOKEN:-}
+      INTELLIGENCE_INDEX_SCOPE_TOKEN: ${INTELLIGENCE_INDEX_SCOPE_TOKEN:-}
+      INTELLIGENCE_BASE_URL: ${INTELLIGENCE_BASE_URL:-http://intelligence:8081}
+      # Caddy chung của TalentFlow đã lo TLS ở vòng ngoài.
+      SECURE_SSL_REDIRECT: "False"
+      # Ổ đĩa cục bộ trên VPS dùng chung không phải chỗ để CV — dùng R2.
+      FILE_STORAGE_BACKEND: r2
+      R2_BUCKET: ${R2_BUCKET:?can dat R2_BUCKET trong .env}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?can dat R2_ACCOUNT_ID trong .env}
+      R2_ACCESS_KEY: ${R2_ACCESS_KEY:?can dat R2_ACCESS_KEY trong .env}
+      R2_SECRET_KEY: ${R2_SECRET_KEY:?can dat R2_SECRET_KEY trong .env}
+      R2_ENDPOINT: ${R2_ENDPOINT:?can dat R2_ENDPOINT trong .env}
+      MSB_AI_GREENNODE_API_KEY: ${MSB_AI_GREENNODE_API_KEY:-}
+      MSB_AI_GREENNODE_MODEL: ${MSB_AI_GREENNODE_MODEL:-}
+      MSB_AI_GREENNODE_BASE_URL: ${MSB_AI_GREENNODE_BASE_URL:-}
+      MSB_AI_GEMINI_API_KEY: ${MSB_AI_GEMINI_API_KEY:-}
+      MSB_AI_PROVIDER_DEFAULT: ${MSB_AI_PROVIDER_DEFAULT:-}
+      MSB_AI_PROVIDER_FALLBACK: ${MSB_AI_PROVIDER_FALLBACK:-}
+      # Pin provider theo tác vụ (thắng cả cấu hình CSDL) — vd ép Gemini cho tác
+      # vụ tìm người nặng khi GreenNode chậm: gemini,greennode
+      MSB_AI_PROVIDER_TALENT_SEARCH: ${MSB_AI_PROVIDER_TALENT_SEARCH:-}
+      MSB_AI_PROVIDER_TALENT_EXPLAIN: ${MSB_AI_PROVIDER_TALENT_EXPLAIN:-}
+      MSB_AI_PROVIDER_ASSISTANT_CONVERSATION: ${MSB_AI_PROVIDER_ASSISTANT_CONVERSATION:-}
+      MSB_AI_PROVIDER_ASSISTANT_WEB: ${MSB_AI_PROVIDER_ASSISTANT_WEB:-}
+      MSB_AI_PROVIDER_ASSISTANT_AGENT: ${MSB_AI_PROVIDER_ASSISTANT_AGENT:-}
+      MSB_AI_PROVIDER_ASSISTANT_INTENT: ${MSB_AI_PROVIDER_ASSISTANT_INTENT:-}
+      # Radar assistant — intent router bật sẵn. Web search BẬT mặc định (chủ dự
+      # án yêu cầu 05/09: câu "Tổng giám đốc MSB là ai", "thời tiết…" phải tra
+      # Google rồi trả lời đúng, không trả rỗng). Câu có PII (email/điện
+      # thoại/số định danh) VẪN bị `web_answer` chặn khỏi nhánh này. Backend
+      # gemini_grounding chạy sẵn nhờ MSB_AI_GEMINI_API_KEY (đang dùng cho
+      # embedding). Tắt lại bằng ASSISTANT_WEB_SEARCH=0 trong .env nếu cần.
+      ASSISTANT_INTENT_ROUTER: ${ASSISTANT_INTENT_ROUTER:-1}
+      ASSISTANT_WEB_SEARCH: ${ASSISTANT_WEB_SEARCH:-1}
+      ASSISTANT_WEBSEARCH_BACKENDS: ${ASSISTANT_WEBSEARCH_BACKENDS:-}
+      MSB_AI_WEBSEARCH_MODEL: ${MSB_AI_WEBSEARCH_MODEL:-}
+      # Backend tự chủ (không khoá): duckduckgo bật sẵn; searxng nếu tự dựng
+      # (service dưới, `--profile searxng`), trỏ SEARXNG_URL vào đó.
+      ASSISTANT_WEBSEARCH_DDG: ${ASSISTANT_WEBSEARCH_DDG:-1}
+      SEARXNG_URL: ${SEARXNG_URL:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
+      GOOGLE_CSE_KEY: ${GOOGLE_CSE_KEY:-}
+      GOOGLE_CSE_CX: ${GOOGLE_CSE_CX:-}
+      # Tool-calling (kỹ năng) — TẮT mặc định, tool đều chỉ-đọc/đề-xuất + lọc RBAC.
+      ASSISTANT_TOOLS: ${ASSISTANT_TOOLS:-0}
+      ANSWER_RUNNER_MAX_WORKERS: ${ANSWER_RUNNER_MAX_WORKERS:-8}
+      ASSISTANT_TOOL_MAX_STEPS: ${ASSISTANT_TOOL_MAX_STEPS:-4}
+      # Tier 3 (draft_outreach, enrich_company_from_web) — cờ riêng, không gửi gì.
+      ASSISTANT_TOOLS_TIER3: ${ASSISTANT_TOOLS_TIER3:-0}
+      # Agent core dạng đồ thị (ai/graph.py tự viết). Mặc định dùng vòng lặp tay.
+      ASSISTANT_GRAPH: ${ASSISTANT_GRAPH:-0}
+      # Tìm người: truy hồi mềm (AI xếp hạng + giải thích, không lọc cứng SQL).
+      TALENT_SOFT_RETRIEVAL: ${TALENT_SOFT_RETRIEVAL:-1}
+      # Mọi Person mới phân giải xong (bất kể qua đường nào — Edge sync, nhập
+      # tay, import lô — đều đi qua CÙNG MỘT điểm: people/ingest.py::resolve_record)
+      # tự xếp hàng bóc trường có nhãn (intel/extraction.py). BẬT mặc định từ
+      # 05/09: bước AI đã sửa xong (thiếu reasoning_effort="none" khiến nó
+      # 40s/lượt và JSON hỏng ~50%; nay 6,7s/lượt, ổn định). Worker riêng
+      # (`extraction-worker` dưới) rút hàng đợi liên tục — bật cờ này mà không
+      # có worker thì job chỉ nằm chờ trong CSDL, không ai xử lý.
+      INTEL_AUTO_ENQUEUE_EXTRACTION: ${INTEL_AUTO_ENQUEUE_EXTRACTION:-1}
+      # Prospect Agent đã deploy trên GreenNode AgentBase (mục 2) — Hub uỷ
+      # quyền bóc tách câu hỏi tự nhiên sang đó thay vì tự làm.
+      MSB_AGENT_ENDPOINT: ${MSB_AGENT_ENDPOINT:-}
+      MSB_AGENT_TIMEOUT: ${MSB_AGENT_TIMEOUT:-20}
+      # Hub đọc `index.html` đã build để chèn thẻ meta từ CSDL — crawler mạng xã
+      # hội không chạy JavaScript nên ảnh xem trước phải nằm sẵn trong HTML.
+      WEB_DIST_DIR: /srv/web
+      # `og:image` phải là URL tuyệt đối; đường dẫn tương đối bị crawler bỏ qua
+      # âm thầm.
+      #
+      # KHÔNG đặt mặc định cứng ở đây. Trước đây mặc định là
+      # `https://radar.tunghr.io.vn` — tên miền đó KHÔNG tồn tại trong DNS công
+      # cộng (chỉ `dev-radar.tunghr.io.vn` phân giải được), nên og:image trỏ vào
+      # một host crawler không tới được và ảnh xem trước không bao giờ hiện.
+      #
+      # Bỏ trống thì `spa_views._base_url` lấy chính host của request — theo định
+      # nghĩa là host người dùng vừa truy cập được, nên luôn đúng. Chỉ đặt giá
+      # trị ở .env khi muốn ép một host chính tắc khác.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      INTAKE_STAGING_ROOT: /app/intake-staging
+    volumes:
+      - staticfiles:/app/staticfiles
+      - intake_staging:/app/intake-staging
+      # Cùng thư mục Caddy đang phục vụ, chỉ-đọc. Caddy vẫn trả thẳng assets;
+      # hub chỉ đọc mỗi index.html.
+      - ./web/dist:/srv/web:ro
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/api/v1/health/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # Rút hàng đợi ExtractionJob liên tục — không có service này thì
+  # INTEL_AUTO_ENQUEUE_EXTRACTION chỉ chất job vào CSDL, không ai xử lý.
+  # Cùng image với `hub` (không build lại), chỉ đổi lệnh chạy. Không cần R2 vì
+  # extraction đọc TEXT ĐÃ BÓC (Document.best_text), không đọc lại file gốc.
+  # Không có HTTP nên phải tắt HEALTHCHECK kế thừa từ Dockerfile (nó curl cổng
+  # 8000 — container này không mở cổng đó, healthcheck sẽ luôn "unhealthy" mà
+  # không phản ánh gì thật).
+  # Khởi động sau khi hub đã healthy (tức hub đã chạy xong migration CSDL).
+  extraction-worker:
+    build:
+      context: ./server
+    container_name: msbradar-extraction-worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      hub:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: ${SECRET_KEY:?can dat SECRET_KEY trong .env}
+      DATABASE_URL: postgres://${POSTGRES_USER:-msbradar}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-msbradar}
+      MSB_AI_GREENNODE_API_KEY: ${MSB_AI_GREENNODE_API_KEY:-}
+      MSB_AI_GREENNODE_MODEL: ${MSB_AI_GREENNODE_MODEL:-}
+      MSB_AI_GREENNODE_BASE_URL: ${MSB_AI_GREENNODE_BASE_URL:-}
+      MSB_AI_GEMINI_API_KEY: ${MSB_AI_GEMINI_API_KEY:-}
+      MSB_AI_PROVIDER_DEFAULT: ${MSB_AI_PROVIDER_DEFAULT:-}
+      MSB_AI_PROVIDER_FALLBACK: ${MSB_AI_PROVIDER_FALLBACK:-}
+    command: ["python", "manage.py", "run_extraction_worker", "--batch", "5"]
+    healthcheck:
+      disable: true
+
+  # Tính vector ngoài request và tự tiếp tục sau restart. Khi provider lỗi,
+  # command dừng để restart policy backoff thay vì quay vòng gọi API vô hạn.
+  embedding-worker:
+    build:
+      context: ./server
+    container_name: msbradar-embedding-worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      hub:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: ${SECRET_KEY:?can dat SECRET_KEY trong .env}
+      DATABASE_URL: postgres://${POSTGRES_USER:-msbradar}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-msbradar}
+      MSB_AI_GREENNODE_API_KEY: ${MSB_AI_GREENNODE_API_KEY:-}
+      MSB_AI_GREENNODE_BASE_URL: ${MSB_AI_GREENNODE_BASE_URL:-}
+      MSB_AI_GEMINI_API_KEY: ${MSB_AI_GEMINI_API_KEY:-}
+    command: ["python", "manage.py", "embed_talent_index", "--loop", "--limit", "0", "--batch-size", "25", "--sleep", "2"]
+    healthcheck:
+      disable: true
+
+  web:
+    image: caddy:2-alpine
+    container_name: msbradar-web
+    restart: unless-stopped
+    depends_on:
+      - hub
+    environment:
+      SITE_ADDRESS: ":80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./web/dist:/srv/web:ro
+      - staticfiles:/srv/static:ro
+      - web_caddy_data:/data
+      - web_caddy_config:/config
+    networks:
+      - default
+      - talentflow-core_default
+
+  # Metasearch tự dựng — KHÔNG khởi động ở deploy thường (profile "searxng").
+  # Bật khi cần web search hoàn toàn tự chủ:
+  #   SEARXNG_SECRET=$(openssl rand -hex 32)   # vào .env
+  #   docker compose -f docker-compose.oracle-core.yml --profile searxng up -d searxng
+  #   SEARXNG_URL=http://searxng:8080          # vào .env, rồi recreate hub
+  # (compose 1.29.2 trên VPS nội suy biến cho MỌI service kể cả service bị profile
+  #  loại — nên KHÔNG dùng cú pháp ${VAR:?...} bắt buộc ở đây.)
+  searxng:
+    image: searxng/searxng:latest
+    container_name: msbradar-searxng
+    restart: unless-stopped
+    profiles: ["searxng"]
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-changeme-set-in-env}
+      SEARXNG_SEARCH_FORMATS: "html,json"
+    volumes:
+      - searxng_data:/etc/searxng
+    expose:
+      - "8080"
+
+  # Embedding TỰ HOST cho dense retrieval kho CV — TUỲ CHỌN, mặc định KHÔNG chạy.
+  # Prod hiện dùng Gemini API (chọn trong /settings → panel "Nguồn embedding"):
+  # nhanh, đa ngữ tốt, không tải CPU. Ollama chỉ đáng bật khi cần CV không rời
+  # máy chủ VÀ có box đủ khoẻ (>=2 nhân). Bật:
+  #   docker compose -f docker-compose.oracle-core.yml --profile selfhost-embed up -d ollama
+  #   docker exec msbradar-ollama ollama pull nomic-embed-text   # nhẹ, 768d
+  # rồi /settings → chọn "Tự host", endpoint http://ollama:11434/v1.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: msbradar-ollama
+    profiles: ["selfhost-embed"]
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: "5m"
+      OLLAMA_CONTEXT_LENGTH: "1024"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - ollama_models:/root/.ollama
+    expose:
+      - "11434"
+
+volumes:
+  pgdata:
+  staticfiles:
+  intake_staging:
+  web_caddy_data:
+  web_caddy_config:
+  searxng_data:
+  ollama_models:
+
+networks:
+  talentflow-core_default:
+    external: true

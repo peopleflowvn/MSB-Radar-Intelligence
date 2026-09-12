@@ -1,0 +1,22 @@
+[
+  {
+    "question": "Kho mình có những ai từng làm ở ngân hàng?",
+    "expect_any": ["ngân hàng", "bank"],
+    "min_citations": 1
+  },
+  {
+    "question": "CV nào nói đến kinh nghiệm quản lý đội nhóm?",
+    "expect_any": ["quản lý", "team", "đội", "leader", "trưởng nhóm"],
+    "min_citations": 1
+  },
+  {
+    "question": "Tổng hợp các kỹ năng phân tích dữ liệu xuất hiện trong kho.",
+    "expect_any": ["SQL", "Python", "Power BI", "Excel", "phân tích"],
+    "min_citations": 1
+  },
+  {
+    "question": "Có ai biết cả Python lẫn tiếng Nhật không?",
+    "expect_any": ["Python", "Nhật", "không có", "chưa thấy", "không đủ"],
+    "min_citations": 0
+  }
+]

@@ -1,6 +1,6 @@
 # Legacy Reuse Manifest
 
-No legacy implementation has been copied in this milestone. Items marked
+No legacy implementation was copied in the initial clean-room milestone. Items marked
 "candidate" require source-level review and dedicated equivalence tests before
 reuse.
 
@@ -30,6 +30,31 @@ reuse.
 
 **PURPOSE:** Exercise V2 retrieval against the same fictional people and
 explicit expected IDs used by the legacy benchmark.
+
+## Production ownership transition (2026-09-12)
+
+**SOURCE:** MSB-Radar commit `a318ece41fef7b4f1b081b6a8736d8f892e1e9fd`.
+
+**PURPOSE:** Preserve the existing React UI, Django authentication, RBAC,
+settings, admin and business/data contracts while making this repository the
+only production release source on Oracle.
+
+**WHY REUSE:** The user explicitly requires the existing product surface and
+data to remain unchanged, but no production checkout or deployment workflow may
+depend on the legacy repository.
+
+**DEPENDENCIES:** Existing PostgreSQL/R2 volumes and environment-owned secrets.
+
+**RISK:** Product Core is a large compatibility snapshot. Legacy AI modules may
+remain present but production routing must force Intelligence V2; future Product
+Core changes must be made and tested here.
+
+**MODIFICATION:** Tracked `server/`, `web/`, `.env.example` and Oracle compose
+sources are stored under `product_core/`. No secret or runtime file is copied.
+
+**TEST:** Run the original Django/React checks from `product_core/`, the
+Intelligence suite, exact-SHA deployment checks, live auth/health, scope,
+indexing, search and grounded-answer probes before removing legacy runtime files.
 
 **WHY REUSE:** It is a verified test contract, contains no production PII, and
 supports an apples-to-apples deterministic baseline.

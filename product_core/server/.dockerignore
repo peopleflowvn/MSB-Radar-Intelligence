@@ -1,0 +1,9 @@
+# Bỏ qua các file tạm, cache và database sqlite local khi build image Docker
+*.sqlite3*
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.env*
+staticfiles/
