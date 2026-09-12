@@ -1,14 +1,14 @@
-name: Deploy Intelligence to Oracle
+name: Deploy MSB Radar Platform to Oracle
 
 on:
   workflow_dispatch:
     inputs:
-      confirm_shadow_deploy:
-        description: "Type DEPLOY_SHADOW; this does not switch production traffic"
+      confirm_production_deploy:
+        description: "Type DEPLOY_PRODUCTION to deploy Product Core and Intelligence"
         required: true
 
 concurrency:
-  group: deploy-oracle-intelligence
+  group: deploy-oracle-production
   cancel-in-progress: false
 
 jobs:
@@ -18,86 +18,159 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: "3.11"
           cache: pip
-      - name: Install and test
+      - name: Validate Intelligence
         run: |
           python -m pip install --upgrade pip
           python -m pip install ".[haystack]"
           python -W error::ResourceWarning -m unittest discover -s tests -v
           python -m compileall -q radar_intelligence tests
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: product_core/web/package-lock.json
+      - name: Validate unchanged Product Core frontend
+        working-directory: product_core/web
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+      - name: Validate Product Core backend configuration
+        working-directory: product_core/server
+        env:
+          SECRET_KEY: ci-only-not-a-production-secret
+          DEBUG: "True"
+        run: |
+          python -m pip install -r requirements.txt
+          python manage.py check
+          python manage.py test talent.tests_intelligence talent.tests_intelligence_client --verbosity 2
 
-  deploy-shadow:
+  deploy-production:
     needs: validate
-    if: inputs.confirm_shadow_deploy == 'DEPLOY_SHADOW'
+    if: inputs.confirm_production_deploy == 'DEPLOY_PRODUCTION'
     runs-on: self-hosted
     environment: oracle-production
     steps:
       - uses: actions/checkout@v4
-      - name: Verify production prerequisites
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: product_core/web/package-lock.json
+      - name: Build production frontend
+        working-directory: product_core/web
+        run: |
+          npm ci
+          npm run build
+      - name: Prepare platform-owned release and runtime configuration
         shell: bash
+        env:
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          test -f /home/ubuntu/msbradar/.env
-          sudo docker network inspect msbradar_default >/dev/null
-      - name: Provision least-privilege runtime environment
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo install -d -o ubuntu -g ubuntu /home/ubuntu/msbradar-intelligence
+          platform=/home/ubuntu/msb-radar-platform
+          release="${platform}/releases/${RELEASE_SHA}"
+          sudo install -d -o ubuntu -g ubuntu "${platform}/releases" "${platform}/runtime" "${platform}/backups" "${release}"
+          if [ ! -f "${platform}/runtime/product.env" ]; then
+            test -f /home/ubuntu/msbradar/.env
+            sudo cp /home/ubuntu/msbradar/.env "${platform}/runtime/product.env"
+            sudo chown ubuntu:ubuntu "${platform}/runtime/product.env"
+            chmod 600 "${platform}/runtime/product.env"
+          fi
+          tar --exclude=.git --exclude=.venv --exclude=.tmp-msb-radar-bootstrap --exclude=node_modules --exclude='__pycache__' -cf - . | tar -xf - -C "${release}"
+          ln -sfn "${platform}/runtime/product.env" "${release}/product_core/.env"
+
           embedding_model=$(sudo docker exec msbradar-hub python manage.py shell -c \
-            'from talent.models import EmbeddingConfig; c=EmbeddingConfig.load(); print(c.greennode_model if c.mode == c.MODE_GREENNODE else "")' \
-            | tail -n 1)
-          if ! printf '%s' "${embedding_model}" | grep -Eq '^[A-Za-z0-9._/-]+$'; then
-            echo "Production embedding route is absent or malformed"
-            exit 1
-          fi
-          python3 scripts/provision_runtime_env.py \
-            --source /home/ubuntu/msbradar/.env \
-            --target /home/ubuntu/msbradar-intelligence/runtime.env \
+            'from talent.models import EmbeddingConfig; c=EmbeddingConfig.load(); print(c.greennode_model if c.mode == c.MODE_GREENNODE else "")' | tail -n 1)
+          printf '%s' "${embedding_model}" | grep -Eq '^[A-Za-z0-9._/-]+$'
+          python3 "${release}/scripts/provision_runtime_env.py" \
+            --source "${platform}/runtime/product.env" \
+            --target "${platform}/runtime/intelligence.env" \
             --embedding-model "${embedding_model}" \
-            --sync-radar-env /home/ubuntu/msbradar/.env
-          chmod 600 /home/ubuntu/msbradar-intelligence/runtime.env
-      - name: Install release and preserve rollback metadata
+            --sync-radar-env "${platform}/runtime/product.env"
+          chmod 600 "${platform}/runtime/intelligence.env"
+          sudo install -d -o ubuntu -g ubuntu /home/ubuntu/msbradar-intelligence
+          ln -sfn "${platform}/runtime/intelligence.env" /home/ubuntu/msbradar-intelligence/runtime.env
+
+          python3 - "${platform}/runtime/product.env" <<'PY'
+          import pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          updates = {"INTELLIGENCE_BASE_URL": "http://intelligence:8081", "INTELLIGENCE_V2_PRIMARY": "1"}
+          lines = path.read_text(encoding="utf-8").splitlines()
+          seen, output = set(), []
+          for line in lines:
+              key = line.split("=", 1)[0].strip() if "=" in line and not line.lstrip().startswith("#") else ""
+              if key in updates:
+                  output.append(f"{key}={updates[key]}")
+                  seen.add(key)
+              else:
+                  output.append(line)
+          output.extend(f"{key}={value}" for key, value in updates.items() if key not in seen)
+          path.write_text("\n".join(output) + "\n", encoding="utf-8")
+          PY
+      - name: Back up the existing production database
         shell: bash
         env:
           RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          release=/home/ubuntu/msbradar-intelligence/releases/${RELEASE_SHA}
-          sudo install -d -o ubuntu -g ubuntu "${release}"
-          tar --exclude=.git --exclude=.venv --exclude='__pycache__' -cf - . | tar -xf - -C "${release}"
+          test "$(sudo docker inspect msbradar-db --format '{{.State.Running}}')" = true
+          sudo docker exec msbradar-db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
+            | gzip > "/home/ubuntu/msb-radar-platform/backups/pre-${RELEASE_SHA}.dump.gz"
+          test -s "/home/ubuntu/msb-radar-platform/backups/pre-${RELEASE_SHA}.dump.gz"
+      - name: Deploy both services from this repository
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          release="/home/ubuntu/msb-radar-platform/releases/${RELEASE_SHA}"
+          cd "${release}/product_core"
+          sudo docker compose -p msbradar -f docker-compose.oracle-core.yml build hub extraction-worker embedding-worker
+          sudo docker compose -p msbradar -f docker-compose.oracle-core.yml up -d db hub extraction-worker embedding-worker web
           cd "${release}"
-          INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose \
-            -p msbradar-intelligence -f docker-compose.oracle.yml build
-          existing_project=$(sudo docker inspect msbradar-intelligence \
-            --format '{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || true)
-          if [ -n "${existing_project}" ] && [ "${existing_project}" != msbradar-intelligence ]; then
-            echo "Migrating shadow container from release-scoped Compose ownership"
-            sudo docker rm -f msbradar-intelligence >/dev/null
-          fi
-          INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose \
-            -p msbradar-intelligence -f docker-compose.oracle.yml up -d
-          printf '%s\n' "${RELEASE_SHA}" | sudo tee /home/ubuntu/msbradar-intelligence/current-sha >/dev/null
-      - name: Verify exact release and live container
+          INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose -p msbradar-intelligence -f docker-compose.oracle.yml build
+          INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose -p msbradar-intelligence -f docker-compose.oracle.yml up -d
+          ln -sfn "${release}" /home/ubuntu/msb-radar-platform/current
+          printf '%s\n' "${RELEASE_SHA}" | sudo tee /home/ubuntu/msb-radar-platform/current-sha >/dev/null
+      - name: Verify exact release and live production
         shell: bash
         env:
           RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          test "$(sudo cat /home/ubuntu/msbradar-intelligence/current-sha)" = "${RELEASE_SHA}"
-          for attempt in $(seq 1 18); do
-            health=$(sudo docker inspect msbradar-intelligence --format '{{.State.Health.Status}}' 2>/dev/null || true)
-            echo "attempt=${attempt} health=${health:-missing} sha=${RELEASE_SHA}"
-            if [ "${health}" = healthy ]; then
+          test "$(sudo cat /home/ubuntu/msb-radar-platform/current-sha)" = "${RELEASE_SHA}"
+          for attempt in $(seq 1 30); do
+            hub_health=$(sudo docker inspect msbradar-hub --format '{{.State.Health.Status}}' 2>/dev/null || true)
+            intelligence_health=$(sudo docker inspect msbradar-intelligence --format '{{.State.Health.Status}}' 2>/dev/null || true)
+            echo "attempt=${attempt} hub=${hub_health:-missing} intelligence=${intelligence_health:-missing} sha=${RELEASE_SHA}"
+            if [ "${hub_health}" = healthy ] && [ "${intelligence_health}" = healthy ]; then
+              sudo docker exec msbradar-hub python -c "import json,urllib.request; data=json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/')); assert data.get('status') in ('ok','healthy')"
               sudo docker exec -e EXPECTED_SHA="${RELEASE_SHA}" msbradar-intelligence python -c "import json,os,urllib.request; data=json.load(urllib.request.urlopen('http://127.0.0.1:8081/health')); assert data['status']=='ok'; assert data['release_sha']==os.environ['EXPECTED_SHA']"
-              sudo docker inspect msbradar-intelligence --format '{{.Config.Image}}' | grep -F "${RELEASE_SHA}"
               test "$(sudo docker inspect msbradar-intelligence-indexer --format '{{.State.Running}}')" = true
-              sudo docker inspect msbradar-intelligence-indexer --format '{{.Config.Image}}' | grep -F "${RELEASE_SHA}"
+              sudo docker inspect msbradar-intelligence --format '{{.Config.Image}}' | grep -F "${RELEASE_SHA}"
+              curl -fsS https://radar.tntalent.vn/api/v1/health/ >/dev/null
               exit 0
             fi
             sleep 5
           done
-          sudo docker logs msbradar-intelligence --tail 100
+          sudo docker logs msbradar-hub --tail 100 || true
+          sudo docker logs msbradar-intelligence --tail 100 || true
           sudo docker logs msbradar-intelligence-indexer --tail 100 || true
           exit 1
+      - name: Retire the old checkout after successful verification
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          old=/home/ubuntu/msbradar
+          archived="/home/ubuntu/msbradar-local-only-before-${RELEASE_SHA}"
+          if [ -d "${old}" ] && [ ! -L "${old}" ]; then
+            sudo mv "${old}" "${archived}"
+          fi
+          sudo ln -sfn /home/ubuntu/msb-radar-platform/current/product_core "${old}"
+          test "$(readlink -f "${old}")" = "/home/ubuntu/msb-radar-platform/releases/${RELEASE_SHA}/product_core"

@@ -1,0 +1,38 @@
+# Caddy serves the existing React UI and proxies API/admin traffic to Django.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy hub:8000
+	}
+	handle /admin/* {
+		reverse_proxy hub:8000
+	}
+	handle /static/* {
+		root * /srv
+		file_server
+	}
+	handle /site.webmanifest {
+		reverse_proxy hub:8000
+	}
+	handle {
+		root * /srv/web
+		@existing_file file {path}
+		handle @existing_file {
+			file_server
+		}
+		handle {
+			reverse_proxy hub:8000
+		}
+	}
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	log {
+		output stdout
+		format console
+	}
+}

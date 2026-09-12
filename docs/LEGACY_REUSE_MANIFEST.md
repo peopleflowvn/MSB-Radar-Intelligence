@@ -31,6 +31,21 @@ reuse.
 **PURPOSE:** Exercise V2 retrieval against the same fictional people and
 explicit expected IDs used by the legacy benchmark.
 
+**WHY REUSE:** It is a verified test contract, contains no production PII, and
+supports an apples-to-apples deterministic baseline.
+
+**DEPENDENCIES:** New V2 evaluation runner and retrieval contracts only.
+
+**RISK:** Six synthetic people cannot establish production retrieval quality or
+human acceptance.
+
+**MODIFICATION:** The fixture is not copied or changed. V2 reads it by path and
+records its SHA-256. Legacy query expansions are used as benchmark input.
+
+**TEST:** The report records case-level expected/actual IDs, Recall@K,
+Precision@K, MRR, no-result accuracy and latency. Semantic and production
+quality remain `NOT MEASURED`.
+
 ## Production ownership transition (2026-09-12)
 
 **SOURCE:** MSB-Radar commit `a318ece41fef7b4f1b081b6a8736d8f892e1e9fd`.
@@ -49,27 +64,13 @@ depend on the legacy repository.
 remain present but production routing must force Intelligence V2; future Product
 Core changes must be made and tested here.
 
-**MODIFICATION:** Tracked `server/`, `web/`, `.env.example` and Oracle compose
-sources are stored under `product_core/`. No secret or runtime file is copied.
+**MODIFICATION:** Tracked `server/`, `web/`, `.env.example`, `Caddyfile` and
+Oracle compose sources are stored under `product_core/`. No secret or runtime
+file is copied.
 
 **TEST:** Run the original Django/React checks from `product_core/`, the
 Intelligence suite, exact-SHA deployment checks, live auth/health, scope,
 indexing, search and grounded-answer probes before removing legacy runtime files.
-
-**WHY REUSE:** It is a verified test contract, contains no production PII, and
-supports an apples-to-apples deterministic baseline.
-
-**DEPENDENCIES:** New V2 evaluation runner and retrieval contracts only.
-
-**RISK:** Six synthetic people cannot establish production retrieval quality or
-human acceptance.
-
-**MODIFICATION:** The fixture is not copied or changed. V2 reads it by path and
-records its SHA-256. Legacy query expansions are used as benchmark input.
-
-**TEST:** The report records case-level expected/actual IDs, Recall@K,
-Precision@K, MRR, no-result accuracy and latency. Semantic and production
-quality remain `NOT MEASURED`.
 
 ## Required record for any future copied primitive
 

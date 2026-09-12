@@ -3,10 +3,13 @@ __pycache__/
 .pytest_cache/
 .coverage
 .venv/
+node_modules/
+*.tsbuildinfo
 .env
 dist/
 build/
 *.egg-info/
+.tmp-msb-radar-bootstrap/
 evaluation/results/*.json
 !evaluation/results/.gitkeep
 !evaluation/results/synthetic_retrieval_v2.json
