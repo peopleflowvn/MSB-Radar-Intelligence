@@ -134,7 +134,7 @@ jobs:
           cd "${release}"
           INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose -p msbradar-intelligence -f docker-compose.oracle.yml build
           INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose -p msbradar-intelligence -f docker-compose.oracle.yml up -d
-          ln -sfn "${release}" /home/ubuntu/msb-radar-platform/current
+          sudo ln -sfn "${release}" /home/ubuntu/msb-radar-platform/current
           printf '%s\n' "${RELEASE_SHA}" | sudo tee /home/ubuntu/msb-radar-platform/current-sha >/dev/null
       - name: Verify exact release and live production
         shell: bash
