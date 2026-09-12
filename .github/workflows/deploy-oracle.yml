@@ -148,11 +148,11 @@ jobs:
             intelligence_health=$(sudo docker inspect msbradar-intelligence --format '{{.State.Health.Status}}' 2>/dev/null || true)
             echo "attempt=${attempt} hub=${hub_health:-missing} intelligence=${intelligence_health:-missing} sha=${RELEASE_SHA}"
             if [ "${hub_health}" = healthy ] && [ "${intelligence_health}" = healthy ]; then
-              sudo docker exec msbradar-hub python -c "import json,urllib.request; data=json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/')); assert data.get('status') in ('ok','healthy')"
+              sudo docker exec msbradar-hub python -c "import json,urllib.request; data=json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/')); assert data.get('ok') is True; assert data.get('service') == 'msb-radar-hub'"
               sudo docker exec -e EXPECTED_SHA="${RELEASE_SHA}" msbradar-intelligence python -c "import json,os,urllib.request; data=json.load(urllib.request.urlopen('http://127.0.0.1:8081/health')); assert data['status']=='ok'; assert data['release_sha']==os.environ['EXPECTED_SHA']"
               test "$(sudo docker inspect msbradar-intelligence-indexer --format '{{.State.Running}}')" = true
               sudo docker inspect msbradar-intelligence --format '{{.Config.Image}}' | grep -F "${RELEASE_SHA}"
-              curl -fsS https://radar.tntalent.vn/api/v1/health/ >/dev/null
+              curl -fsS https://dev-radar.tunghr.io.vn/api/v1/health/ >/dev/null
               exit 0
             fi
             sleep 5
