@@ -1,0 +1,19 @@
+name: Inventory Oracle Runtime
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inventory:
+    runs-on: [self-hosted, oracle, intelligence]
+    steps:
+      - name: Report non-secret runtime ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo directories
+          find /home/ubuntu -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | sort
+          echo containers
+          sudo docker ps --format '{{.Names}}|{{.Image}}|{{.Status}}' | sort
+          echo compose-projects
+          sudo docker ps --format '{{.Label "com.docker.compose.project"}}' | sort -u
