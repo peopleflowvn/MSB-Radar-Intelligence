@@ -131,11 +131,35 @@ jobs:
         run: |
           set -euo pipefail
           release="/home/ubuntu/msb-radar-platform/releases/${RELEASE_SHA}"
+          previous=$(sudo cat /home/ubuntu/msb-radar-platform/current-sha 2>/dev/null || true)
+          build_product_core=1
+          parent=$(git rev-parse "${RELEASE_SHA}^")
+          reuse_intelligence_parent=
+          if git diff --quiet "${parent}" "${RELEASE_SHA}" -- Dockerfile pyproject.toml README.md radar_intelligence \
+            && sudo docker image inspect "msb-radar-intelligence:${parent}" >/dev/null 2>&1; then
+            reuse_intelligence_parent="${parent}"
+          fi
+          if [ -n "${previous}" ] \
+            && git cat-file -e "${previous}^{commit}" 2>/dev/null \
+            && git diff --quiet "${previous}" "${RELEASE_SHA}" -- product_core; then
+            build_product_core=0
+            echo "Product Core unchanged since ${previous}; reusing running images"
+          fi
           cd "${release}/product_core"
-          sudo docker compose -p msbradar -f docker-compose.oracle-core.yml build hub extraction-worker embedding-worker
+          if [ "${build_product_core}" = 1 ]; then
+            sudo docker compose -p msbradar -f docker-compose.oracle-core.yml build hub extraction-worker embedding-worker
+          fi
           sudo docker compose -p msbradar -f docker-compose.oracle-core.yml up -d db hub extraction-worker embedding-worker web
           cd "${release}"
-          INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose -p msbradar-intelligence -f docker-compose.oracle.yml build
+          if [ -n "${reuse_intelligence_parent}" ]; then
+            sudo docker tag "msb-radar-intelligence:${reuse_intelligence_parent}" "msb-radar-intelligence:${RELEASE_SHA}"
+            echo "Tagged unchanged Intelligence image from ${reuse_intelligence_parent}"
+          fi
+          if ! sudo docker image inspect "msb-radar-intelligence:${RELEASE_SHA}" >/dev/null 2>&1; then
+            INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose -p msbradar-intelligence -f docker-compose.oracle.yml build
+          else
+            echo "Reusing completed Intelligence image ${RELEASE_SHA}"
+          fi
           INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose -p msbradar-intelligence -f docker-compose.oracle.yml up -d
           sudo ln -sfn "${release}" /home/ubuntu/msb-radar-platform/current
           printf '%s\n' "${RELEASE_SHA}" | sudo tee /home/ubuntu/msb-radar-platform/current-sha >/dev/null
