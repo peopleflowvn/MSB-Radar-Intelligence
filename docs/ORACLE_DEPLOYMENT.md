@@ -17,29 +17,33 @@ The deployment has two distinct stages:
    private feed/evidence authorization and index reconciliation before release
    retirement is considered complete.
 
-The first workflow is intentionally manual and accepts only
-`DEPLOY_SHADOW`. It records the exact SHA in
-`/home/ubuntu/msbradar-intelligence/current-sha` and verifies that the running
-image tag contains that SHA. It does not edit Caddy or expose a public port.
+The workflow is intentionally manual and accepts only `DEPLOY_PRODUCTION`. It
+records the exact SHA in
+`/home/ubuntu/msb-radar-platform/current-sha`, verifies the running image tag,
+and retains the prior release for an application-only rollback. Product Core
+continues to serve through the existing Caddy route; no legacy checkout or
+legacy deployment workflow participates in production.
 
 ## Production prerequisites
 
-The deployment creates `/home/ubuntu/msbradar-intelligence/runtime.env` with an
-explicit allow-list. It may read the existing GreenNode base URL, API key and
-general model from `/home/ubuntu/msbradar/.env`, but never copies database,
-R2, Django or unrelated provider secrets. Integration tokens are generated on
-Oracle, retained across deploys and never printed. The embedding model remains
-blank until its production route is explicitly inspected and tested.
+The deployment keeps runtime files under
+`/home/ubuntu/msb-radar-platform/runtime/` with an explicit allow-list. It
+preserves the existing Product Core database and R2 configuration without
+committing or printing either. Integration tokens are generated on Oracle,
+retained across deploys and never printed. The embedding model must use its
+reviewed production route; missing or failed provider capacity is reported as
+an operational state, not silently replaced by a chat model.
 Secrets must not be copied to GitHub logs or committed.
 The Radar service token must authorize only the document feed and evidence
 resolver contracts, never general admin access.
 
 ## Rollback
 
-Before cutover, retain the last healthy image tag and adapter flag value.
-Rollback means restoring `INTELLIGENCE_ENGINE=v1` and verifying Radar health;
-it must not restore a database backup because the shadow service does not own
-Radar business data. Image cleanup happens only after the observation window.
+Retain the last healthy release. Rollback means switching the `current`
+release symlink, recreating Product Core and Intelligence from that release,
+and verifying public health. It must not restore PostgreSQL during a normal
+application rollback: database restore is a separate approved data-recovery
+operation. Release cleanup happens only after the observation window.
 
 ## Required production evidence
 
@@ -49,5 +53,8 @@ Radar business data. Image cleanup happens only after the observation window.
 - `/ready` passes without printing secret values;
 - unauthorized Person never enters retrieval or model context;
 - feed replay, delete, stale-document and evidence-resolution probes pass;
-- V1/V2 benchmark uses the same authorized corpus snapshot;
-- rollback flag has been exercised before public traffic is switched.
+- the non-PII reconciliation reports `eligible_minus_indexed: 0` before the
+  derived index is considered caught up;
+- a scoped search returns only authorized evidence; if embedding capacity is
+  unavailable, the documented Haystack BM25 degradation path remains bounded
+  and observable.
