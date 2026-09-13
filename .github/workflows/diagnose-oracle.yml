@@ -1,0 +1,19 @@
+name: Diagnose Oracle Services
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: [self-hosted, oracle, intelligence]
+    steps:
+      - name: Show non-secret process and health metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo docker ps -a --filter 'name=msbradar-intelligence' --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+          sudo docker inspect msbradar-intelligence --format 'status={{.State.Status}} running={{.State.Running}} restarting={{.State.Restarting}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} error={{json .State.Error}} health={{.State.Health.Status}}'
+          sudo docker inspect msbradar-intelligence --format '{{range .State.Health.Log}}health_exit={{.ExitCode}} started={{.Start}} ended={{.End}}{{println}}{{end}}'
+          sudo docker top msbradar-intelligence -eo pid,ppid,user,stat,comm,args || true
+          sudo docker inspect msbradar-hub --format 'hub_status={{.State.Status}} hub_health={{.State.Health.Status}}'
+          sudo docker inspect msbradar-db --format 'db_status={{.State.Status}} db_health={{.State.Health.Status}}'
