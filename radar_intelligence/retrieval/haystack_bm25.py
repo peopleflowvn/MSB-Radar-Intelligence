@@ -7,7 +7,12 @@ from .engine import RetrievalRecord, normalize_text
 
 
 class HaystackBM25Ranker:
-    """Request-local BM25 reference adapter over already-authorized records."""
+    """Haystack BM25 over a bounded, already-authorized lexical candidate set."""
+
+    def __init__(self, candidate_limit: int = 1_000) -> None:
+        if candidate_limit < 1:
+            raise ValueError("candidate_limit must be positive")
+        self._candidate_limit = candidate_limit
 
     def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]:
         if not records or not normalize_text(query):
@@ -24,10 +29,17 @@ class HaystackBM25Ranker:
         eligible = []
         for record in records:
             content = normalize_text(" ".join((record.chunk.person.display_name or "", record.chunk.evidence.text)))
-            if query_tokens & set(content.split()):
-                eligible.append((record, content))
+            overlap = len(query_tokens & set(content.split()))
+            if overlap:
+                eligible.append((overlap, record, content))
         if not eligible:
             return ()
+
+        # Building an in-memory Haystack store for every authorized chunk makes
+        # a common query unbounded. This deterministic preselection preserves
+        # scope and lexical relevance, then delegates final ordering to BM25.
+        eligible.sort(key=lambda row: (-row[0], row[1].chunk.evidence.evidence_id))
+        eligible = eligible[:self._candidate_limit]
 
         store = InMemoryDocumentStore(shared=False)
         store.write_documents([
@@ -35,7 +47,7 @@ class HaystackBM25Ranker:
                 id=record.chunk.evidence.evidence_id,
                 content=content,
             )
-            for record, content in eligible
+            for _, record, content in eligible
         ])
         result = InMemoryBM25Retriever(store, top_k=len(eligible), scale_score=False).run(
             query=normalize_text(query)

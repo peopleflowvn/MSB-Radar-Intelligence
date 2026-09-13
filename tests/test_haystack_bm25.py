@@ -23,6 +23,10 @@ def record(person_id, evidence_id, text):
 
 @unittest.skipIf(haystack is None, "Haystack optional dependency is not installed")
 class HaystackBM25Test(unittest.TestCase):
+    def test_candidate_limit_must_be_positive(self):
+        with self.assertRaisesRegex(ValueError, "candidate_limit"):
+            HaystackBM25Ranker(0)
+
     def test_bm25_ranks_accent_insensitive_content(self):
         scores = HaystackBM25Ranker().rank("kế toán", [
             record("p1", "e1", "Chuyên viên kế toán tại Đà Nẵng"),
