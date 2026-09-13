@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from radar_intelligence.providers import GreenNodeConfig, GreenNodeEmbedder, GreenNodeTransport, ProviderError
+from radar_intelligence.providers import GreenNodeConfig, GreenNodeEmbedder, GreenNodeTransport, ProviderError, UrllibHttpClient
 
 
 class FakeHttp:
@@ -15,6 +15,12 @@ class FakeHttp:
 
 
 class GreenNodeTest(unittest.TestCase):
+    def test_retry_attempts_are_bounded(self):
+        with self.assertRaisesRegex(ValueError, "retry_attempts"):
+            UrllibHttpClient(0)
+        with self.assertRaisesRegex(ValueError, "retry_attempts"):
+            UrllibHttpClient(5)
+
     def test_embedding_timeout_must_be_positive(self):
         config = GreenNodeConfig("https://provider.example", "key")
         with self.assertRaisesRegex(ValueError, "timeout_seconds"):

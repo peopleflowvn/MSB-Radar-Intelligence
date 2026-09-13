@@ -19,14 +19,19 @@ class HttpClient(Protocol):
 
 
 class UrllibHttpClient:
+    def __init__(self, retry_attempts: int = 4) -> None:
+        if not 1 <= retry_attempts <= 4:
+            raise ValueError("retry_attempts must be between 1 and 4")
+        self._retry_attempts = retry_attempts
+
     def post(self, url: str, headers: Mapping[str, str], body: bytes, timeout_seconds: float) -> bytes:
-        for attempt in range(4):
+        for attempt in range(self._retry_attempts):
             request = urllib.request.Request(url, data=body, headers=dict(headers), method="POST")
             try:
                 with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
                     return response.read()
             except urllib.error.HTTPError as exc:
-                if exc.code == 429 and attempt < 3:
+                if exc.code == 429 and attempt < self._retry_attempts - 1:
                     raw_delay = exc.headers.get("Retry-After", "")
                     try:
                         delay = min(10.0, max(1.0, float(raw_delay)))

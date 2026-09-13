@@ -15,7 +15,7 @@ from radar_intelligence.evidence import (
 from radar_intelligence.indexing import SqliteDocumentIndex
 from radar_intelligence.providers import (
     Capability, GatewayRequest, GreenNodeConfig, GreenNodeEmbedder,
-    GreenNodeTransport, ModelGateway, ProviderError,
+    GreenNodeTransport, ModelGateway, ProviderError, UrllibHttpClient,
 )
 from radar_intelligence.retrieval import (
     CosineSemanticRanker, HaystackBM25Ranker, HybridRetriever, RetrievalScope,
@@ -49,7 +49,10 @@ class SearchService:
         provider_config = GreenNodeConfig(
             values["GREENNODE_BASE_URL"], values["GREENNODE_API_KEY"])
         embedder = GreenNodeEmbedder(
-            provider_config, values["GREENNODE_MODEL_EMBEDDING"], timeout_seconds=5.0,
+            provider_config,
+            values["GREENNODE_MODEL_EMBEDDING"],
+            http_client=UrllibHttpClient(retry_attempts=1),
+            timeout_seconds=3.0,
         )
         self._gateway = ModelGateway({
             Capability.FAST: values["GREENNODE_MODEL_FAST"],
