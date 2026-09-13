@@ -98,13 +98,22 @@ class GreenNodeTransport:
 class GreenNodeEmbedder:
     """OpenAI-compatible embedding adapter satisfying the indexing protocol."""
 
-    def __init__(self, config: GreenNodeConfig, model: str, http_client: HttpClient | None = None) -> None:
+    def __init__(
+        self,
+        config: GreenNodeConfig,
+        model: str,
+        http_client: HttpClient | None = None,
+        timeout_seconds: float = 30.0,
+    ) -> None:
         if not model.strip():
             raise ValueError("embedding model alias must not be empty")
+        if timeout_seconds <= 0:
+            raise ValueError("embedding timeout_seconds must be positive")
         self._base_url = config.base_url.rstrip("/")
         self._api_key = config.api_key
         self._model = model
         self._http = http_client or UrllibHttpClient()
+        self._timeout_seconds = timeout_seconds
 
     def embed_documents(self, texts):
         values = [str(text) for text in texts]
@@ -114,7 +123,7 @@ class GreenNodeEmbedder:
             self._base_url + "/embeddings",
             {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
             json.dumps({"model": self._model, "input": values}, ensure_ascii=False).encode("utf-8"),
-            30.0,
+            self._timeout_seconds,
         )
         try:
             payload = json.loads(raw.decode("utf-8"))

@@ -115,6 +115,37 @@ jobs:
             else:
                 raise AssertionError(f"embedding route HTTP {exc.code}") from None
           PY
+      - name: Reconcile non-PII Product Core and RAG-index counts
+        shell: bash
+        run: |
+          set -euo pipefail
+          audit=$(sudo docker exec msbradar-hub python manage.py audit_intelligence_data --json | tail -n 1)
+          status=$(sudo docker exec -i msbradar-intelligence python - <<'PY'
+          import json
+          import os
+          import urllib.request
+          request = urllib.request.Request(
+              "http://127.0.0.1:8081/index-status",
+              headers={"Authorization": "Bearer " + os.environ["RADAR_SERVICE_TOKEN"]},
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              print(json.dumps(json.load(response), sort_keys=True))
+          PY
+          )
+          AUDIT="$audit" STATUS="$status" python3 - <<'PY'
+          import json, os
+          audit = json.loads(os.environ["AUDIT"])
+          status = json.loads(os.environ["STATUS"])
+          expected = audit["documents"]["eligible_for_intelligence"]
+          indexed = status["documents"]
+          assert indexed <= expected, "index contains more active documents than authorized feed"
+          print(json.dumps({
+              "product_core_audit": audit,
+              "rag_index": status,
+              "eligible_minus_indexed": expected - indexed,
+              "reconciled": expected == indexed,
+          }, sort_keys=True))
+          PY
       - name: Verify Radar bridge against production data without exposing PII
         shell: bash
         run: |
@@ -194,15 +225,8 @@ jobs:
           assert {"events", "documents", "deleted", "chunks"} == set(index_status)
           print(json.dumps({"index_status": index_status}, sort_keys=True))
 
-          try:
-              with urllib.request.urlopen(search_request, timeout=60) as response:
-                  search = json.load(response)
-          except urllib.error.HTTPError as exc:
-              with exc:
-                  detail = json.load(exc).get("detail")
-              raise AssertionError(
-                  f"production search failed safely: HTTP {exc.code}, detail={detail!r}"
-              ) from None
+          with urllib.request.urlopen(search_request, timeout=30) as response:
+              search = json.load(response)
           assert response.status == 200 and isinstance(search.get("hits"), list)
           print(json.dumps({
               "feed_http_status": feed_status,
@@ -213,37 +237,6 @@ jobs:
               "search_http_status": response.status,
               "search_hit_count": len(search["hits"]),
               "wrong_search_token_rejected": True,
-          }, sort_keys=True))
-          PY
-      - name: Reconcile non-PII Product Core and RAG-index counts
-        shell: bash
-        run: |
-          set -euo pipefail
-          audit=$(sudo docker exec msbradar-hub python manage.py audit_intelligence_data --json | tail -n 1)
-          status=$(sudo docker exec -i msbradar-intelligence python - <<'PY'
-          import json
-          import os
-          import urllib.request
-          request = urllib.request.Request(
-              "http://127.0.0.1:8081/index-status",
-              headers={"Authorization": "Bearer " + os.environ["RADAR_SERVICE_TOKEN"]},
-          )
-          with urllib.request.urlopen(request, timeout=30) as response:
-              print(json.dumps(json.load(response), sort_keys=True))
-          PY
-          )
-          AUDIT="$audit" STATUS="$status" python3 - <<'PY'
-          import json, os
-          audit = json.loads(os.environ["AUDIT"])
-          status = json.loads(os.environ["STATUS"])
-          expected = audit["documents"]["eligible_for_intelligence"]
-          indexed = status["documents"]
-          assert indexed <= expected, "index contains more active documents than authorized feed"
-          print(json.dumps({
-              "product_core_audit": audit,
-              "rag_index": status,
-              "eligible_minus_indexed": expected - indexed,
-              "reconciled": expected == indexed,
           }, sort_keys=True))
           PY
       - name: Show non-PII indexer lifecycle log

@@ -15,6 +15,11 @@ class FakeHttp:
 
 
 class GreenNodeTest(unittest.TestCase):
+    def test_embedding_timeout_must_be_positive(self):
+        config = GreenNodeConfig("https://provider.example", "key")
+        with self.assertRaisesRegex(ValueError, "timeout_seconds"):
+            GreenNodeEmbedder(config, "embedding", timeout_seconds=0)
+
     def test_openai_compatible_contract_and_usage(self):
         client = FakeHttp(json.dumps({
             "id": "req-1",

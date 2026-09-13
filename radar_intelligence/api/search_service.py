@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import logging
 import time
 
 from radar_intelligence.api.codec import encode_answer_response, encode_search_hit
@@ -14,12 +15,28 @@ from radar_intelligence.evidence import (
 from radar_intelligence.indexing import SqliteDocumentIndex
 from radar_intelligence.providers import (
     Capability, GatewayRequest, GreenNodeConfig, GreenNodeEmbedder,
-    GreenNodeTransport, ModelGateway,
+    GreenNodeTransport, ModelGateway, ProviderError,
 )
 from radar_intelligence.retrieval import (
     CosineSemanticRanker, HaystackBM25Ranker, HybridRetriever, RetrievalScope,
     project_search_documents,
 )
+
+
+class _ProviderResilientSemanticRanker:
+    """Use lexical RAG when only the remote embedding provider is unavailable."""
+
+    def __init__(self, delegate: CosineSemanticRanker) -> None:
+        self._delegate = delegate
+        self._logger = logging.getLogger(__name__)
+
+    def rank(self, query, records):
+        try:
+            return self._delegate.rank(query, records)
+        except ProviderError as exc:
+            # Query text and candidate records can contain PII, so neither is logged.
+            self._logger.warning("semantic retrieval temporarily unavailable: %s", exc)
+            return ()
 
 
 class SearchService:
@@ -32,7 +49,7 @@ class SearchService:
         provider_config = GreenNodeConfig(
             values["GREENNODE_BASE_URL"], values["GREENNODE_API_KEY"])
         embedder = GreenNodeEmbedder(
-            provider_config, values["GREENNODE_MODEL_EMBEDDING"],
+            provider_config, values["GREENNODE_MODEL_EMBEDDING"], timeout_seconds=5.0,
         )
         self._gateway = ModelGateway({
             Capability.FAST: values["GREENNODE_MODEL_FAST"],
@@ -45,7 +62,8 @@ class SearchService:
         # Haystack BM25 is deliberately request-local: authorization and structured
         # filters are applied by HybridRetriever before any candidate is handed to it.
         self._retriever = HybridRetriever(
-            CosineSemanticRanker(embedder), lexical_ranker=HaystackBM25Ranker())
+            _ProviderResilientSemanticRanker(CosineSemanticRanker(embedder)),
+            lexical_ranker=HaystackBM25Ranker())
         self._index = SqliteDocumentIndex(database)
 
     def search(self, request):
