@@ -22,7 +22,14 @@ jobs:
           sudo docker builder prune --all --force
           sudo docker image prune --force || true
           # Failed image exports can leave stale containerd snapshot metadata.
-          # Restarting both daemons repairs that state; compose restart policies
+          # Clear only incomplete content ingests after resolving the exact
+          # containerd path. Images, containers and volumes are outside it.
+          ingest=/var/lib/containerd/io.containerd.content.v1.content/ingest
+          test "$(readlink -f "${ingest}")" = "${ingest}"
+          sudo systemctl stop docker
+          sudo systemctl stop containerd
+          sudo find "${ingest}" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+          # Restarting both daemons repairs mount state; compose restart policies
           # bring the existing production containers back without touching data.
           sudo systemctl restart containerd
           sudo systemctl restart docker
