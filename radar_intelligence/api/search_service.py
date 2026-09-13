@@ -67,12 +67,26 @@ class SearchService:
         self._retriever = HybridRetriever(
             _ProviderResilientSemanticRanker(CosineSemanticRanker(embedder)),
             lexical_ranker=HaystackBM25Ranker())
-        self._index = SqliteDocumentIndex(database)
+        self._database = Path(database)
+        self._index = SqliteDocumentIndex(self._database)
+        self._records_mtime_ns = -1
+        self._records = ()
+        self._reload_records_if_needed()
+
+    def _reload_records_if_needed(self):
+        try:
+            modified = self._database.stat().st_mtime_ns
+        except FileNotFoundError:
+            modified = -1
+        if modified != self._records_mtime_ns:
+            self._records = project_search_documents(self._index.documents())
+            self._records_mtime_ns = modified
+        return self._records
 
     def search(self, request):
         if not self._scope.validate(request.scope_token):
             return None
-        records = project_search_documents(self._index.documents())
+        records = self._reload_records_if_needed()
         person_ids = frozenset(record.chunk.person.person_id for record in records)
         if not person_ids:
             return []
@@ -85,7 +99,7 @@ class SearchService:
     def answer(self, request):
         if not self._scope.validate(request.scope_token):
             return None
-        records = project_search_documents(self._index.documents())
+        records = self._reload_records_if_needed()
         if request.person_ids:
             requested = set(request.person_ids)
             records = tuple(row for row in records if row.chunk.person.person_id in requested)
