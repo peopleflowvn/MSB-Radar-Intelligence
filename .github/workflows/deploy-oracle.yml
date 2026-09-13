@@ -38,6 +38,9 @@ jobs:
           npm run typecheck
           npm test
           npm run build
+          # Development lint tooling is tracked separately; production browser
+          # dependencies must never carry known high-severity advisories.
+          npm audit --omit=dev --audit-level=high
       - name: Validate Product Core backend configuration
         working-directory: product_core/server
         env:

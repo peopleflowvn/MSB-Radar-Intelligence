@@ -1,22 +1,21 @@
 # Oracle production deployment
 
-## Cutover policy
+## Current deployment policy
 
-Intelligence is deployed beside the Radar product core before any traffic is
-switched. Radar remains the owner of authentication, RBAC, Person identity,
-documents and business data. Replacing the entire Radar product with this
-service would remove those required capabilities and is not a valid cutover.
+The new repository deploys both Product Core and Intelligence. Product Core
+remains the owner of authentication, RBAC, Person identity, documents and
+business data; Intelligence owns the derived retrieval representation and
+grounded-answer capability. The legacy repository no longer deploys Oracle.
 
 The deployment has two distinct stages:
 
-1. **Shadow:** build the exact Git commit on the Oracle self-hosted runner,
-   attach `msbradar-intelligence` to `msbradar_default`, verify container health,
-   then exercise the Radar feed, scope and evidence contracts without changing
-   user traffic.
-2. **Cutover:** only after real-corpus retrieval, evidence, security and
-   performance gates pass, configure Radar's AI adapter to call the new service
-   behind a reversible `INTELLIGENCE_ENGINE=v2` flag. The old AI path remains
-   disabled but recoverable for rollback; the Radar product core stays live.
+1. **Validate:** test Intelligence, Product Core bridge and frontend from one
+   exact commit on the Oracle self-hosted runner.
+2. **Deploy:** back up PostgreSQL, retain the release, build both services,
+   preserve the existing `msbradar` volumes, and set `INTELLIGENCE_V2_PRIMARY=1`.
+3. **Verify:** require exact SHA, container health, public Product Core health,
+   private feed/evidence authorization and index reconciliation before release
+   retirement is considered complete.
 
 The first workflow is intentionally manual and accepts only
 `DEPLOY_SHADOW`. It records the exact SHA in

@@ -1,6 +1,9 @@
 import hashlib
+import io
+import json
 
 from django.contrib.auth.models import Group, User
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -170,6 +173,15 @@ class IntelligenceBridgeTest(TestCase):
             reverse("intelligence-scope-validate"), **self.service_headers,
             HTTP_X_RADAR_SCOPE_TOKEN=issue_scope_token(self.user))
         self.assertEqual(response.status_code, 200)
+
+    def test_non_pii_reconciliation_audit_has_expected_counts(self):
+        output = io.StringIO()
+        call_command("audit_intelligence_data", "--json", stdout=output)
+        audit = json.loads(output.getvalue())
+        self.assertEqual(audit["documents"]["eligible_for_intelligence"], 1)
+        self.assertEqual(audit["people"]["active_applicants"], 1)
+        self.assertEqual(audit["users"]["active"], 1)
+        self.assertNotIn("display_name", output.getvalue())
 
     def test_merged_or_non_applicant_document_is_hidden(self):
         self.person.is_applicant = False

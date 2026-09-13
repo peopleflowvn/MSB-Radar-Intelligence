@@ -16,6 +16,24 @@ from .radar_feed import RadarDocumentFeedClient, RadarFeedConfig
 from .sqlite_store import SqliteDocumentIndex
 
 
+class _PacedEmbedder:
+    """Keep the background synchronizer below a provider's sustained rate limit."""
+
+    def __init__(self, delegate, minimum_interval_seconds: float) -> None:
+        self._delegate = delegate
+        self._minimum_interval_seconds = minimum_interval_seconds
+        self._last_call = 0.0
+
+    def embed_documents(self, texts):
+        delay = self._minimum_interval_seconds - (time.monotonic() - self._last_call)
+        if delay > 0:
+            time.sleep(delay)
+        try:
+            return self._delegate.embed_documents(texts)
+        finally:
+            self._last_call = time.monotonic()
+
+
 def _positive_number(name: str, default: str, cast):
     try:
         value = cast(os.environ.get(name, default))
@@ -43,9 +61,17 @@ def build_coordinator(settings: RuntimeSettings) -> IndexSyncCoordinator:
         GreenNodeConfig(values["GREENNODE_BASE_URL"], values["GREENNODE_API_KEY"]),
         values["GREENNODE_MODEL_EMBEDDING"],
     )
+    # The default is intentionally conservative. A value of zero is useful only
+    # for controlled local tests and is rejected in production configuration.
+    minimum_interval = _positive_number(
+        "INTELLIGENCE_EMBEDDING_MIN_INTERVAL_SECONDS", "5", float)
     return IndexSyncCoordinator(
         feed,
-        IncrementalIndexer(SqliteDocumentIndex(database), embedder=embedder),
+        IncrementalIndexer(
+            SqliteDocumentIndex(database),
+            embedder=_PacedEmbedder(embedder, minimum_interval),
+            embedding_batch_size=_positive_number("INTELLIGENCE_EMBEDDING_BATCH_SIZE", "1", int),
+        ),
         SqliteCursorStore(database),
     )
 

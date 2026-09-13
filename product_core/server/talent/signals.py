@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db import transaction
 import hashlib
 
@@ -88,4 +90,16 @@ def person_intelligence_visibility_changed(sender, instance, created, **kwargs):
             _record_tombstone(document)
     else:
         # Reactivation must appear after the tombstone in the ordered feed.
-        Document.objects.filter(pk__in=[row.pk for row in documents]).update(updated_at=timezone.now())
+        # `timezone.now()` can equal the tombstone timestamp on a fast database.
+        # Advance past the newest tombstone deterministically so a cursor that has
+        # consumed the delete cannot skip the reactivated document.
+        document_ids = [row.pk for row in documents]
+        latest_tombstone = (IntelligenceDocumentTombstone.objects
+                            .filter(document_id__in=document_ids)
+                            .order_by("-deleted_at", "-pk")
+                            .values_list("deleted_at", flat=True)
+                            .first())
+        reactivated_at = timezone.now()
+        if latest_tombstone is not None:
+            reactivated_at = max(reactivated_at, latest_tombstone + timedelta(microseconds=1))
+        Document.objects.filter(pk__in=document_ids).update(updated_at=reactivated_at)
