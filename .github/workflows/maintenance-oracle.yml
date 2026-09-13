@@ -1,0 +1,26 @@
+name: Maintain Oracle Docker Storage
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_maintenance:
+        description: "Type PRUNE_UNUSED_DOCKER_CACHE"
+        required: true
+
+jobs:
+  prune-unused-cache:
+    if: ${{ inputs.confirm_maintenance == 'PRUNE_UNUSED_DOCKER_CACHE' }}
+    runs-on: [self-hosted, oracle, intelligence]
+    steps:
+      - name: Reclaim only unused Docker build data
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Disk before maintenance"
+          df -h / /var/lib/docker
+          sudo docker system df
+          sudo docker builder prune --all --force
+          sudo docker image prune --force
+          echo "Disk after maintenance"
+          df -h / /var/lib/docker
+          sudo docker system df
