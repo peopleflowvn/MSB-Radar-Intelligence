@@ -42,11 +42,19 @@ class _ProviderFallbackIndexer:
     def __init__(self, primary, lexical) -> None:
         self._primary = primary
         self._lexical = lexical
+        self._provider_available = True
 
     def apply(self, change):
+        if not self._provider_available:
+            return self._lexical.apply(change)
         try:
             return self._primary.apply(change)
         except ProviderError:
+            # A provider outage or quota limit normally affects the whole sync
+            # batch. Trip the process-local circuit breaker so the remaining
+            # authorized documents become searchable immediately instead of
+            # repeatedly waiting for a remote request that cannot succeed.
+            self._provider_available = False
             return self._lexical.apply(change)
 
 
