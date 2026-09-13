@@ -26,7 +26,7 @@ jobs:
           # containerd path. Images, containers and volumes are outside it.
           ingest=/var/lib/containerd/io.containerd.content.v1.content/ingest
           sudo install -d -m 700 "${ingest}"
-          test "$(readlink -f "${ingest}")" = "${ingest}"
+          test "$(sudo readlink -f "${ingest}")" = "${ingest}"
           sudo systemctl stop docker
           sudo systemctl stop containerd
           sudo find "${ingest}" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
