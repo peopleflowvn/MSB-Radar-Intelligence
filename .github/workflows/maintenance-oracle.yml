@@ -25,6 +25,7 @@ jobs:
           # Clear only incomplete content ingests after resolving the exact
           # containerd path. Images, containers and volumes are outside it.
           ingest=/var/lib/containerd/io.containerd.content.v1.content/ingest
+          sudo install -d -m 700 "${ingest}"
           test "$(readlink -f "${ingest}")" = "${ingest}"
           sudo systemctl stop docker
           sudo systemctl stop containerd
