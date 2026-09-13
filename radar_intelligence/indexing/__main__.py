@@ -8,7 +8,9 @@ import sys
 import time
 
 from radar_intelligence.config import RuntimeSettings
-from radar_intelligence.providers import GreenNodeConfig, GreenNodeEmbedder
+from radar_intelligence.providers import (
+    GreenNodeConfig, GreenNodeEmbedder, ProviderError, UrllibHttpClient,
+)
 
 from .coordinator import IndexSyncCoordinator, SqliteCursorStore
 from .core import IncrementalIndexer
@@ -34,6 +36,20 @@ class _PacedEmbedder:
             self._last_call = time.monotonic()
 
 
+class _ProviderFallbackIndexer:
+    """Persist lexical chunks when the remote embedding service is unavailable."""
+
+    def __init__(self, primary, lexical) -> None:
+        self._primary = primary
+        self._lexical = lexical
+
+    def apply(self, change):
+        try:
+            return self._primary.apply(change)
+        except ProviderError:
+            return self._lexical.apply(change)
+
+
 def _positive_number(name: str, default: str, cast):
     try:
         value = cast(os.environ.get(name, default))
@@ -57,21 +73,28 @@ def build_coordinator(settings: RuntimeSettings) -> IndexSyncCoordinator:
         timeout_seconds=_positive_number("INTELLIGENCE_FEED_TIMEOUT_SECONDS", "30", float),
         page_size=_positive_number("INTELLIGENCE_FEED_PAGE_SIZE", "100", int),
     ))
+    allow_lexical_fallback = os.environ.get(
+        "INTELLIGENCE_ALLOW_LEXICAL_FALLBACK", "1").lower() in {"1", "true", "yes"}
     embedder = GreenNodeEmbedder(
         GreenNodeConfig(values["GREENNODE_BASE_URL"], values["GREENNODE_API_KEY"]),
         values["GREENNODE_MODEL_EMBEDDING"],
+        http_client=UrllibHttpClient(retry_attempts=1 if allow_lexical_fallback else 4),
     )
     # The default is intentionally conservative. A value of zero is useful only
     # for controlled local tests and is rejected in production configuration.
     minimum_interval = _positive_number(
         "INTELLIGENCE_EMBEDDING_MIN_INTERVAL_SECONDS", "5", float)
-    return IndexSyncCoordinator(
-        feed,
-        IncrementalIndexer(
-            SqliteDocumentIndex(database),
+    store = SqliteDocumentIndex(database)
+    primary = IncrementalIndexer(
+            store,
             embedder=_PacedEmbedder(embedder, minimum_interval),
             embedding_batch_size=_positive_number("INTELLIGENCE_EMBEDDING_BATCH_SIZE", "1", int),
-        ),
+        )
+    indexer = (_ProviderFallbackIndexer(primary, IncrementalIndexer(store))
+               if allow_lexical_fallback else primary)
+    return IndexSyncCoordinator(
+        feed,
+        indexer,
         SqliteCursorStore(database),
     )
 
