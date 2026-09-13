@@ -20,7 +20,21 @@ jobs:
           df -h / /var/lib/docker
           sudo docker system df
           sudo docker builder prune --all --force
-          sudo docker image prune --force
+          sudo docker image prune --force || true
+          # Failed image exports can leave stale containerd snapshot metadata.
+          # Restarting both daemons repairs that state; compose restart policies
+          # bring the existing production containers back without touching data.
+          sudo systemctl restart containerd
+          sudo systemctl restart docker
+          for attempt in $(seq 1 30); do
+            if [ "$(sudo docker inspect msbradar-db --format '{{.State.Running}}' 2>/dev/null || true)" = true ] \
+              && [ "$(sudo docker inspect msbradar-hub --format '{{.State.Running}}' 2>/dev/null || true)" = true ]; then
+              break
+            fi
+            sleep 2
+          done
+          test "$(sudo docker inspect msbradar-db --format '{{.State.Running}}')" = true
+          test "$(sudo docker inspect msbradar-hub --format '{{.State.Running}}')" = true
           echo "Disk after maintenance"
           df -h / /var/lib/docker
-          sudo docker system df
+          sudo docker system df || true
