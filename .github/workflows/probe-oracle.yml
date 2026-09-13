@@ -199,7 +199,10 @@ jobs:
           assert evidence["content_hash"] == event["content_hash"]
 
           search_body = json.dumps({
-              "query": "kinh nghiem",
+              # A no-match probe exercises scope validation, provider-degradation
+              # and Haystack retrieval without turning a common CV phrase into a
+              # production-wide benchmark on the live request path.
+              "query": "radar-probe-no-match-token",
               "scope_token": os.environ["PROBE_SCOPE_TOKEN"],
               "principal_id": "production-probe",
               "limit": 1,
