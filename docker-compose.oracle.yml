@@ -30,8 +30,8 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=3).read()"]
       interval: 10s
       timeout: 5s
-      retries: 6
-      start_period: 10s
+      retries: 12
+      start_period: 180s
 
   intelligence-indexer:
     image: msb-radar-intelligence:${INTELLIGENCE_IMAGE_TAG:-local}
@@ -45,7 +45,7 @@ services:
     environment:
       INTELLIGENCE_INDEX_DB: "/var/lib/radar-intelligence/index.sqlite3"
       INTELLIGENCE_SYNC_INTERVAL_SECONDS: "30"
-      INTELLIGENCE_FEED_PAGE_SIZE: "1"
+      INTELLIGENCE_FEED_PAGE_SIZE: "100"
       INTELLIGENCE_EMBEDDING_BATCH_SIZE: "1"
       INTELLIGENCE_EMBEDDING_MIN_INTERVAL_SECONDS: "5"
       INTELLIGENCE_ALLOW_LEXICAL_FALLBACK: "1"
