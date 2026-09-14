@@ -116,6 +116,22 @@ class RetrievalEngineTest(unittest.TestCase):
         scores = CosineSemanticRanker(Embedder(), candidate_limit=1).rank("query", records)
         self.assertEqual([identifier for identifier, _ in scores], ["e1"])
 
+    def test_cosine_semantic_ranker_aggregates_chunks_by_evidence(self):
+        class Embedder:
+            def embed_documents(self, texts):
+                return [(1.0, 0.0)]
+
+        records = [
+            record("p1", "e1", "one", embedding=(1.0, 0.0)),
+            record("p1", "e1", "continued", embedding=(0.0, 1.0)),
+            record("p2", "e2", "two", embedding=(0.0, 1.0)),
+        ]
+        ranker = CosineSemanticRanker(Embedder())
+        ranker.prepare(records)
+        scores = ranker.rank("query", records)
+        self.assertEqual(len(scores), 2)
+        self.assertEqual(scores[0][0], "e1")
+
 
 if __name__ == "__main__":
     unittest.main()

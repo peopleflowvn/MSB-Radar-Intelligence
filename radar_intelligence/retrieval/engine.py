@@ -65,7 +65,21 @@ class CosineSemanticRanker:
         self._embedder = embedder
         self._candidate_limit = candidate_limit
         self._prepared_key: tuple[str, ...] = ()
+        self._prepared_ids: tuple[str, ...] = ()
         self._prepared_matrix = None
+
+    @staticmethod
+    def _document_matrix(records, np):
+        grouped = {}
+        for record in records:
+            if record.embedding is not None:
+                grouped.setdefault(record.chunk.evidence.evidence_id, []).append(record.embedding)
+        identifiers = tuple(grouped)
+        matrix = np.asarray([
+            np.mean(np.asarray(grouped[identifier], dtype=np.float32), axis=0)
+            for identifier in identifiers
+        ], dtype=np.float32)
+        return identifiers, matrix
 
     def prepare(self, records: Sequence[RetrievalRecord]) -> None:
         """Build the immutable production vector matrix once per index revision."""
@@ -81,8 +95,7 @@ class CosineSemanticRanker:
             self._prepared_matrix = None
             return
         self._prepared_key = key
-        self._prepared_matrix = np.asarray(
-            [vector for _, vector in embedded], dtype=np.float32)
+        self._prepared_ids, self._prepared_matrix = self._document_matrix(records, np)
 
     def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]:
         query_rows = self._embedder.embed_documents([query])
@@ -114,6 +127,7 @@ class CosineSemanticRanker:
         if key != self._prepared_key or self._prepared_matrix is None:
             self.prepare(records)
         matrix = self._prepared_matrix
+        identifiers = self._prepared_ids
         query_array = np.asarray(query_vector, dtype=np.float32)
         denominators = np.linalg.norm(matrix, axis=1) * np.linalg.norm(query_array)
         dots = matrix @ query_array
@@ -124,7 +138,7 @@ class CosineSemanticRanker:
         else:
             selected = np.argpartition(values, -limit)[-limit:]
         ordered = selected[np.argsort(values[selected])[::-1]]
-        return tuple((embedded[int(index)][0], float(values[index])) for index in ordered)
+        return tuple((identifiers[int(index)], float(values[index])) for index in ordered)
 
 
 def _structured_match(record: RetrievalRecord, filters: SearchFilters) -> tuple[bool, float]:
