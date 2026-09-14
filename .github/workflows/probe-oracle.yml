@@ -251,3 +251,38 @@ jobs:
         if: always()
         shell: bash
         run: sudo docker logs --tail 20 msbradar-intelligence-indexer 2>&1
+      - name: Verify user-visible Talent agent routes on production
+        shell: bash
+        run: |
+          sudo docker exec msbradar-hub python manage.py shell -c '
+          import json
+          from django.contrib.auth import get_user_model
+          from accounts import roles
+          from talent.answer import engine
+          from talent.corpus_qa import can_read_cv
+
+          user = next((u for u in get_user_model().objects.filter(is_active=True).iterator()
+                       if roles.can_access(u, roles.MODULE_TALENT) and can_read_cv(u)), None)
+          assert user is not None, "No active Talent principal available"
+
+          results = {}
+          for key, question in (("greeting", "xin chào"), ("identity", "bạn là ai?")):
+              result = engine.answer(question, user=user)
+              assert result.text.strip() and result.text != "(không có nội dung)"
+              assert not result.sources, f"{key} incorrectly cited candidate evidence"
+              results[key] = {"nonempty": True, "candidate_citations": 0}
+
+          result = engine.answer(
+              "Tìm Senior Data Analyst ở Hà Nội biết SQL và Python, trên 3 năm kinh nghiệm",
+              user=user)
+          pass1 = result.trace.get("pass1") or {}
+          assert result.text.strip() and result.text != "(không có nội dung)"
+          assert pass1.get("retrieval_engine") == "intelligence-v2-haystack", pass1
+          results["talent_search"] = {
+              "nonempty": True,
+              "people_count": len(result.people),
+              "citation_count": len(result.sources),
+              "retrieval_engine": pass1.get("retrieval_engine"),
+          }
+          print(json.dumps(results, ensure_ascii=False, sort_keys=True))
+          '
