@@ -289,7 +289,7 @@ jobs:
                         task__in=("talent_answer_plan", "talent_answer_judge",
                                   "talent_answer_compose"))}
           assert routes["talent_answer_plan"] == {
-              "provider": "gemini", "model": "gemini-3.5-flash"}, routes
+              "provider": "greennode", "model": "qwen/qwen3.6-flash"}, routes
           assert routes["talent_answer_judge"] == {
               "provider": "gemini", "model": "gemini-3.5-flash"}, routes
 

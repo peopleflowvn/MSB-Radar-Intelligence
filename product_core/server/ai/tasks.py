@@ -197,7 +197,7 @@ _EMBED = ("gemini", "models/gemini-embedding-2")
 
 DEFAULT_ROUTE = {
     # ① và ③ cần nhanh/rẻ; ⑤ là chặng duy nhất người dùng đọc thấy.
-    "talent_answer_plan": _GEMINI_FAST,
+    "talent_answer_plan": _QWEN,
     "talent_answer_judge": _GEMINI_FAST,
     "talent_answer_compose": _VIET_TOT,  # hạn mức 7000 — đủ chỗ cho phần nghĩ
     "talent_corpus_qa": _QWEN,           # hạn mức 900
