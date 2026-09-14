@@ -160,6 +160,12 @@ jobs:
             echo "Tagged unchanged Intelligence image from ${reuse_intelligence_parent}"
           fi
           if ! sudo docker image inspect "msb-radar-intelligence:${RELEASE_SHA}" >/dev/null 2>&1; then
+            # The small Oracle boot disk cannot retain classic-builder cache
+            # from three Product Core images plus a fresh Intelligence image.
+            # Containers/images in use are untouched; only disposable build
+            # cache and dangling intermediate images are reclaimed.
+            sudo docker builder prune --all --force
+            sudo docker image prune --force
             INTELLIGENCE_IMAGE_TAG="${RELEASE_SHA}" sudo -E docker compose -p msbradar-intelligence -f docker-compose.oracle.yml build
           else
             echo "Reusing completed Intelligence image ${RELEASE_SHA}"
