@@ -308,6 +308,7 @@ describe("Answer Engine trên giao diện", () => {
     } }]);
     renderSearch();
     ask("tìm ứng viên");
-    expect(await screen.findByText(/Fallback sau greennode\/deepseek-v4-pro/)).toBeInTheDocument();
+    expect(await screen.findByText("AI chưa hoàn tất đầy đủ")).toBeInTheDocument();
+    expect(screen.queryByText(/greennode\/deepseek-v4-pro/)).not.toBeInTheDocument();
   });
 });

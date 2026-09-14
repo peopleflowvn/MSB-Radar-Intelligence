@@ -543,16 +543,9 @@ export default function AiSearch() {
                     <span className="chat-author">
                       {msg.sender === "user" ? "Bạn" : `${appName} AI`}
                     </span>
-                    {msg.sender === "ai" && (msg.answer?.model
-                      || (msg.answer?.trace?.compose as { deterministic?: boolean; fallback?: boolean } | undefined)?.fallback) && (
+                    {msg.sender === "ai" && (msg.answer?.trace?.compose as { fallback?: boolean } | undefined)?.fallback && (
                       <span className="ai-model-tag">
-                        {(msg.answer?.trace?.compose as { fallback?: boolean } | undefined)?.fallback ? (
-                          <>⚠️ <code>{msg.answer?.model
-                            ? `Fallback sau ${msg.answer?.provider ? `${msg.answer.provider}/` : ""}${msg.answer.model}`
-                            : "Fallback · AI không hoàn tất"}</code></>
-                        ) : msg.answer?.model ? (
-                          <>🤖 <code>{msg.answer.provider ? `${msg.answer.provider}/${msg.answer.model}` : msg.answer.model}</code></>
-                        ) : <>⚠️ <code>AI không hoàn tất</code></>}
+                        <>⚠️ <code>AI chưa hoàn tất đầy đủ</code></>
                       </span>
                     )}
                     <span className="chat-time">{msg.timestamp}</span>

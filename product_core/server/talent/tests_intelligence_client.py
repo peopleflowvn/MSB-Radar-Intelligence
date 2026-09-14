@@ -6,7 +6,8 @@ from django.test import TestCase, override_settings
 
 from people.models import Person
 
-from .intelligence_client import answer
+from .answer.plan import QueryPlan
+from .intelligence_client import answer, retrieve
 
 
 class Response(io.BytesIO):
@@ -48,3 +49,32 @@ class IntelligenceClientTest(TestCase):
         self.assertEqual(result.people[0]["name"], "Nguyen Van A")
         self.assertEqual(result.sources[0]["ordinal"], 1)
         self.assertEqual(result.trace["engine"], "intelligence-v2")
+
+    def test_v2_search_is_adapted_for_existing_judge_pipeline(self):
+        user = User.objects.create_user("searcher")
+        person = Person.objects.create(display_name="Tran Data")
+        captured = {}
+
+        def opener(request, timeout):
+            captured["request"] = request
+            return Response(json.dumps({"hits": [{
+                "person": {"person_id": str(person.pk), "display_name": None},
+                "score": 0.91,
+                "matched_filters": [],
+                "evidence": [{
+                    "person_id": str(person.pk), "document_id": "12",
+                    "location": "chunk 3", "text": "SQL Python, 5 years",
+                    "source": "cv",
+                }],
+            }]}).encode())
+
+        rows = retrieve(user, QueryPlan(
+            information_need="Senior Data Analyst tại Hà Nội",
+            search_queries=["data analyst SQL Python"]), opener=opener)
+
+        body = json.loads(captured["request"].data)
+        self.assertEqual(captured["request"].full_url,
+                         "http://intelligence:8081/v1/search")
+        self.assertEqual(body["query"], "Senior Data Analyst tại Hà Nội")
+        self.assertEqual(rows[0].name, "Tran Data")
+        self.assertEqual(rows[0].passages[0].ordinal, 3)

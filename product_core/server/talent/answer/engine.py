@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from ai.conversation import extract_thinking
 from ai.router import stream as router_stream
 from ai.telemetry import traced_answer, traced_stream
+from django.conf import settings
 
 from . import act as act_stage
 from . import aggregate as aggregate_stage
@@ -363,9 +364,35 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         mark = time.monotonic()
         yield _step("Tìm trong kho")
         queries = [] if pinned_only else None
-        candidates = retrieve_stage.retrieve(
-            active_plan, user=user, pinned_ids=pinned_ids,
-            search_queries=queries)
+        retrieval_engine = "product-core"
+        if getattr(settings, "INTELLIGENCE_V2_PRIMARY", False) and not pinned_only:
+            try:
+                from talent.intelligence_client import retrieve as intelligence_retrieve
+                conversation_id = getattr(getattr(envelope, "thread", None), "thread_id", "")
+                candidates = intelligence_retrieve(
+                    user, active_plan, limit=retrieve_stage.pool_for(active_plan),
+                    conversation_id=conversation_id)
+                retrieval_engine = "intelligence-v2-haystack"
+                # Deterministic pins represent exact names, prior results or
+                # hard structured matches. They must not disappear merely
+                # because approximate retrieval ranked them below its window.
+                missing_pins = [pid for pid in pinned_ids
+                                if pid not in {row.person_id for row in candidates}]
+                if missing_pins:
+                    pinned = retrieve_stage.retrieve(
+                        active_plan, user=user, pinned_ids=missing_pins,
+                        search_queries=[])
+                    candidates = pinned + candidates
+            except Exception as exc:               # noqa: BLE001
+                log.warning("answer: Intelligence retrieval failed; using local fallback: %s", exc)
+                candidates = retrieve_stage.retrieve(
+                    active_plan, user=user, pinned_ids=pinned_ids,
+                    search_queries=queries)
+                retrieval_engine = "product-core-fallback"
+        else:
+            candidates = retrieve_stage.retrieve(
+                active_plan, user=user, pinned_ids=pinned_ids,
+                search_queries=queries)
         if active_plan.shape == "count":
             from people.models import Person
             eligible = set(Person.applicants().filter(
@@ -405,6 +432,7 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         if referenced_ids is not None:
             stats.update(scope=scope_kind, scope_size=len(referenced_ids))
         trace[label] = {"ms_retrieve": retrieved_ms,
+                        "retrieval_engine": retrieval_engine,
                         "ms_total": int((time.monotonic() - mark) * 1000), **stats}
         if pinned_only:
             read_label = f"Đã đọc {stats.get('judged', 0)} hồ sơ được hỏi đích danh"
@@ -476,10 +504,6 @@ def answer(question, *, envelope=None, user=None, history=None, complete_fn=None
 
     clean_q, doc_text = _split_attachment(question)
     from django.conf import settings
-    if not doc_text and getattr(settings, "INTELLIGENCE_V2_PRIMARY", False):
-        from talent.intelligence_client import answer as intelligence_answer
-        conversation_id = getattr(getattr(envelope, "thread", None), "thread_id", "")
-        return intelligence_answer(user, question, conversation_id=conversation_id)
     if doc_text:
         result = AnswerResult()
         for chunk in _stream_assess_doc(clean_q, doc_text, envelope, user, started):
@@ -857,17 +881,6 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
         return
 
     from django.conf import settings
-    if getattr(settings, "INTELLIGENCE_V2_PRIMARY", False):
-        from talent.intelligence_client import answer as intelligence_answer
-        yield _step("Hiểu yêu cầu", "done")
-        yield _step("Đối chiếu bằng chứng")
-        conversation_id = getattr(getattr(envelope, "thread", None), "thread_id", "")
-        result = intelligence_answer(user, question, conversation_id=conversation_id)
-        yield _step("Đối chiếu bằng chứng", "done")
-        yield {"type": "answer", "text": result.text}
-        yield {"type": "done", "result": result}
-        return
-
     # Mệnh lệnh ("soạn thư cho 3 người đầu") rẽ sang nhánh tool. Đi tiếp ②→⑤ là
     # sai từ gốc: ② sẽ tìm lại từ đầu và có thể ra một danh sách KHÁC với danh
     # sách người dùng đang trỏ tới.
