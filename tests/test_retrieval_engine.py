@@ -8,7 +8,8 @@ from radar_intelligence.retrieval import CandidateChunk, CosineSemanticRanker, H
 
 def record(person_id, evidence_id, text, **metadata):
     person = PersonRef(person_id, metadata.pop("display_name", person_id))
-    evidence = Evidence(evidence_id, person_id, "d-" + evidence_id, "cv", text, "page 1", 0.8, "sha", "1")
+    document_id = metadata.pop("document_id", "d-" + evidence_id)
+    evidence = Evidence(evidence_id, person_id, document_id, "cv", text, "page 1", 0.8, "sha", "1")
     return RetrievalRecord(CandidateChunk(person, evidence), **metadata)
 
 
@@ -122,15 +123,15 @@ class RetrievalEngineTest(unittest.TestCase):
                 return [(1.0, 0.0)]
 
         records = [
-            record("p1", "e1", "one", embedding=(1.0, 0.0)),
-            record("p1", "e1", "continued", embedding=(0.0, 1.0)),
+            record("p1", "e1-a", "one", document_id="d1", embedding=(1.0, 0.0)),
+            record("p1", "e1-b", "continued", document_id="d1", embedding=(0.0, 1.0)),
             record("p2", "e2", "two", embedding=(0.0, 1.0)),
         ]
         ranker = CosineSemanticRanker(Embedder())
         ranker.prepare(records)
         scores = ranker.rank("query", records)
         self.assertEqual(len(scores), 2)
-        self.assertEqual(scores[0][0], "e1")
+        self.assertEqual(scores[0][0], "e1-a")
 
 
 if __name__ == "__main__":

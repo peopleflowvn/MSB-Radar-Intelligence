@@ -73,11 +73,12 @@ class CosineSemanticRanker:
         grouped = {}
         for record in records:
             if record.embedding is not None:
-                grouped.setdefault(record.chunk.evidence.evidence_id, []).append(record.embedding)
-        identifiers = tuple(grouped)
+                document_id = record.chunk.evidence.document_id
+                grouped.setdefault(document_id, []).append(record)
+        identifiers = tuple(rows[0].chunk.evidence.evidence_id for rows in grouped.values())
         matrix = np.asarray([
-            np.mean(np.asarray(grouped[identifier], dtype=np.float32), axis=0)
-            for identifier in identifiers
+            np.mean(np.asarray([row.embedding for row in rows], dtype=np.float32), axis=0)
+            for rows in grouped.values()
         ], dtype=np.float32)
         return identifiers, matrix
 
