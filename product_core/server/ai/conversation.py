@@ -12,7 +12,7 @@ from .adapter import ModelRequest, RouterAdapter, get_adapter
 from .persona import STABLE_PROMPT_VERSION, address_for, scope_for, stable_system
 from .prompt_guard import scan as guard_scan
 
-MAX_HISTORY_TURNS = 8
+MAX_HISTORY_TURNS = 16
 
 __all__ = ["address_for", "common_answer", "extract_thinking",
            "answer_if_conversation", "sanitize_history", "ConversationReply",

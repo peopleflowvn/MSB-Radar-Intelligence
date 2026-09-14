@@ -70,6 +70,18 @@ describe("Answer Engine trên giao diện", () => {
     expect("aiSearch" in api).toBe(false);
   });
 
+  it("giữ lại và hiển thị thời gian xử lý sau khi trả lời xong", async () => {
+    fakeAsk([{ event: "done", data: {
+      answer: "Đã phân tích xong.", citations: [], people: [],
+      trace: { ms_total: 2468 }, duration_ms: 2468,
+    } }]);
+    renderSearch();
+
+    ask("phân tích giúp tôi");
+
+    expect(await screen.findByText("Hoàn tất trong 2.5 giây")).toBeInTheDocument();
+  });
+
   it("hiện trạng thái từng chặng trong lúc chưa có chữ nào", async () => {
     fakeAsk([
       { event: "stage", data: { stage: "judge", text: "Đã đọc 30 hồ sơ, 4 hồ sơ phù hợp" } },
@@ -213,6 +225,8 @@ describe("Answer Engine trên giao diện", () => {
         answer: "Câu trả lời đầy đủ đã lấy lại được.",
         citations: [],
         people: [],
+        trace: { ms_total: 1800 },
+        duration_ms: 1800,
       });
     renderSearch();
 
@@ -222,6 +236,7 @@ describe("Answer Engine trên giao diện", () => {
       await screen.findByText(/Câu trả lời đầy đủ đã lấy lại được/, undefined, { timeout: 10000 }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Mất kết nối/)).not.toBeInTheDocument();
+    expect(screen.getByText("Hoàn tất trong 1.8 giây")).toBeInTheDocument();
   }, 15000);
 
   it("giữ nguyên hội thoại khi component bị gỡ rồi dựng lại", async () => {

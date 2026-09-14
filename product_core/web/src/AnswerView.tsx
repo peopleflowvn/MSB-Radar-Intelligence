@@ -38,6 +38,8 @@ export interface AnswerTurn {
   provider?: string;
   model?: string;
   trace?: Record<string, unknown>;
+  /** Thời gian từ khi server nhận câu hỏi đến khi có câu trả lời hoàn chỉnh. */
+  durationMs?: number;
 }
 
 function sourceRef(source: AnswerSource): SourceRef {
@@ -183,7 +185,14 @@ export default function AnswerView({ turn, isPending, question, conversationId }
       )}
 
       {!isPending && turn.text && (
-        <Rating turn={turn} question={question} conversationId={conversationId} />
+        <>
+          {(turn.durationMs ?? Number(turn.trace?.ms_total ?? 0)) > 0 && (
+            <div className="muted small answer-duration">
+              Hoàn tất trong {((turn.durationMs ?? Number(turn.trace?.ms_total)) / 1000).toFixed(1)} giây
+            </div>
+          )}
+          <Rating turn={turn} question={question} conversationId={conversationId} />
+        </>
       )}
     </div>
   );

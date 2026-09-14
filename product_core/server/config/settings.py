@@ -245,8 +245,9 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 # đó dùng được cả ngoài Django (script, worker). Xem docs/AI_PROVIDERS.md.
 
 # --- Trợ lý Radar (Master Plan §10.3, §10.4.5, §21.5) ---
-# Số lượt hội thoại gần nhất đưa thẳng vào context (kẹp 8–12 trong code).
-ASSISTANT_RECENT_TURNS = env.int("ASSISTANT_RECENT_TURNS", default=10)
+# Số lượt hội thoại gần nhất đưa thẳng vào context. Phần cũ hơn được nén thành
+# summary có cấu trúc, nên tăng cửa sổ này không đồng nghĩa gửi toàn bộ lịch sử.
+ASSISTANT_RECENT_TURNS = env.int("ASSISTANT_RECENT_TURNS", default=16)
 # reasoning_trace giữ ngắn hơn message; lệnh prune_reasoning_traces dùng ngưỡng này.
 ASSISTANT_REASONING_RETENTION_DAYS = env.int(
     "ASSISTANT_REASONING_RETENTION_DAYS", default=60)

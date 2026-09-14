@@ -324,6 +324,14 @@ class ComposeTest(TestCase):
         self.chosen = [_j("Lê Văn A", **{"năm sinh": "1999"})]
         self.sources = compose_stage.build_sources(self.chosen)
 
+    def test_history_keeps_twelve_complete_question_answer_turns(self):
+        history = [{"question": f"question {i}", "answer": f"answer {i}"}
+                   for i in range(14)]
+        block = compose_stage._history_block(history)
+        self.assertNotIn("question 0", block)
+        self.assertIn("question 2", block)
+        self.assertIn("answer 13", block)
+
     def test_danh_so_nguon_theo_tung_trich_dan(self):
         self.assertEqual(self.sources[0]["n"], 1)
         self.assertEqual(self.sources[0]["name"], "Lê Văn A")
@@ -1860,7 +1868,7 @@ class AskEndpointTest(TestCase):
                       "document_id": 7, "ordinal": 0, "snippet": "quan hệ khách hàng"}],
             people=[{"person_id": self.person.pk, "name": "Phạm Ứng Viên",
                      "why": "khớp", "attributes": {}, "citations": [1]}],
-            provider="fake", model="m1")
+            provider="fake", model="m1", trace={"ms_total": 1234})
 
     def test_stream_phat_stage_answer_citations_roi_done(self):
         def fake_stream(*args, **kwargs):
@@ -1894,6 +1902,7 @@ class AskEndpointTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(payload["grounded"])
         self.assertEqual(payload["people"][0]["name"], "Phạm Ứng Viên")
+        self.assertEqual(payload["duration_ms"], 1234)
 
     def test_rm_thuan_bi_chan_vi_cau_tra_loi_luon_trich_cv(self):
         from accounts import roles
@@ -2084,7 +2093,8 @@ class RunnerResilienceTest(TestCase):
         conversation_state.record(
             self.user, "talent", "c-res", "câu hỏi", "Đây là câu trả lời đã lưu.",
             mode="conversation", client_turn_id="t-done",
-            metadata={"cv_citations": [{"n": 1, "name": "X"}]},
+            metadata={"cv_citations": [{"n": 1, "name": "X"}],
+                      "trace": {"ms_total": 2345}, "duration_ms": 2345},
             last_result={"items": [{"id": 7, "name": "Người Bảy"}]})
         r = self.client.get("/api/v1/talent/ask/turn/t-done/")
         self.assertEqual(r.status_code, 200)
@@ -2092,6 +2102,8 @@ class RunnerResilienceTest(TestCase):
         self.assertEqual(data["state"], "done")
         self.assertEqual(data["answer"], "Đây là câu trả lời đã lưu.")
         self.assertEqual(data["people"], [{"person_id": 7, "name": "Người Bảy"}])
+        self.assertEqual(data["duration_ms"], 2345)
+        self.assertEqual(data["trace"]["ms_total"], 2345)
 
     def test_resume_does_not_jump_to_another_turns_answer(self):
         from ai.models import AssistantThread, AssistantMessage

@@ -29,6 +29,8 @@ async function recoverTurn(clientTurnId: string, startedAt = Date.now()): Promis
           people: r.people ?? [],
           provider: r.provider,
           model: r.model,
+          trace: r.trace,
+          durationMs: Number(r.duration_ms ?? r.trace?.ms_total ?? 0),
         };
       }
     } catch (err) {
@@ -224,7 +226,7 @@ export default function AiSearch() {
         answer: message.text,
       });
       return turns;
-    }, []).slice(-6);
+    }, []).slice(-12);
 
     // Một khoá cho cả lượt (kể cả lượt sâu nối tiếp) — retry không tạo message trùng.
     const clientTurnId = globalThis.crypto?.randomUUID?.() ?? `turn-${Date.now()}`;
@@ -323,6 +325,8 @@ export default function AiSearch() {
               provider: String(ev.data.provider ?? ""),
               model: String(ev.data.model ?? ""),
               trace: ev.data.trace as Record<string, unknown> | undefined,
+              durationMs: Number(ev.data.duration_ms ??
+                (ev.data.trace as Record<string, unknown> | undefined)?.ms_total ?? 0),
             });
             patchMsg({ isPending: false, text: finalText, answer: { ...turn } });
             setActiveTurn(null);

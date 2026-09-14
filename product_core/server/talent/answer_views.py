@@ -38,7 +38,9 @@ def _stream_response(iterator):
 def _persist(user, conversation_id, client_turn_id, parent_turn_id, question,
              result, *, aborted=False, attachments=None):
     """Ghi lượt vào hội thoại — câu hỏi tiếp mới có ngữ cảnh để bám vào."""
-    metadata = {"answer_engine": True, "trace": result.trace}
+    duration_ms = max(0, int((result.trace or {}).get("ms_total") or 0))
+    metadata = {"answer_engine": True, "trace": result.trace,
+                "duration_ms": duration_ms}
     if result.reasoning:
         metadata["reasoning_trace"] = result.reasoning[:6000]
     if result.sources:
@@ -84,6 +86,7 @@ def _payload(result, conversation_id, client_turn_id):
         "provider": result.provider,
         "model": result.model,
         "trace": result.trace,
+        "duration_ms": max(0, int((result.trace or {}).get("ms_total") or 0)),
         "grounded": bool(result.sources),
     }
 
@@ -249,6 +252,9 @@ def talent_ask_turn(request, client_turn_id):
                            for it in (snap.get("items") or snap.get("people") or [])],
                 "provider": answer_msg.provider,
                 "model": answer_msg.model,
+                "trace": meta.get("trace") or {},
+                "duration_ms": max(0, int(meta.get("duration_ms") or
+                                           (meta.get("trace") or {}).get("ms_total") or 0)),
             })
 
     state = runner.status_of(request.user, client_turn_id)

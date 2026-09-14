@@ -198,11 +198,22 @@ def _context_block(envelope):
         parts.append("NGƯỜI DÙNG ĐÃ DẶN:\n"
                      + "\n".join(f"- {m}" for m in memories))
 
-    turns = list(getattr(projection, "recent_turns", []) or [])[-3:]
+    summary = str(getattr(projection, "summary", "") or "").strip()
+    if summary:
+        parts.append("TÓM TẮT PHẦN HỘI THOẠI CŨ:\n" + summary[:1800])
+
+    criteria = getattr(projection, "active_criteria", None) or {}
+    if criteria:
+        parts.append("TIÊU CHÍ ĐANG CÓ HIỆU LỰC:\n" + str(criteria)[:1200])
+
+    turns = list(getattr(projection, "recent_turns", []) or [])[-12:]
     for turn in turns:
-        question = str(turn.get("question") or "").strip()[:200]
+        question = str(turn.get("question") or "").strip()[:500]
+        answer = str(turn.get("answer") or "").strip()[:700]
         if question:
             parts.append(f"H: {question}")
+        if answer:
+            parts.append(f"Đ: {answer}")
     last = projection.last_result_lines() if hasattr(projection, "last_result_lines") else ""
     if last:
         parts.append(last[:600])

@@ -75,7 +75,7 @@ class Projection:
             rows.append(f"{index}) {name}" + (f" — {why}" if why else ""))
         return "Kết quả tìm kiếm gần nhất: " + " | ".join(rows)
 
-    def context_system(self, max_chars=900):
+    def context_system(self, max_chars=2400):
         """Tầng **context** gộp một message `system`: quyền + memory + summary.
 
         Tách khỏi tầng stable (persona) và tầng volatile (câu hỏi) — §23.1.2.
@@ -97,7 +97,7 @@ class Projection:
             return None
         return {"role": "system", "content": content}
 
-    def turn_messages(self, max_turns=8, max_chars=700, last_turn_chars=1600):
+    def turn_messages(self, max_turns=12, max_chars=1200, last_turn_chars=2400):
         """Các lượt gần nhất, xen kẽ user/assistant (chưa gồm câu hỏi hiện tại).
 
         Lượt GẦN NHẤT được giữ dài hơn (`last_turn_chars`): câu trả lời phân tích
@@ -115,7 +115,7 @@ class Projection:
                 out.append({"role": "assistant", "content": answer[:cap]})
         return out
 
-    def context_messages(self, max_turns=8, max_chars=700):
+    def context_messages(self, max_turns=12, max_chars=1200):
         """Tương thích ngược: context_system + turn_messages."""
         ctx = self.context_system()
         return ([ctx] if ctx else []) + self.turn_messages(max_turns, max_chars)

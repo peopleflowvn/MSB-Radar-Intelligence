@@ -3,7 +3,7 @@
 
 `AssistantMessage` là lớp đọc; `AssistantThread.state` theo schema `ai.thread_state`
 (Master Plan §10.5.1). Số lượt gần nhất giữ trực tiếp lấy từ settings
-`ASSISTANT_RECENT_TURNS` (mặc định 10, kẹp trong 8–12 theo §10.3).
+`ASSISTANT_RECENT_TURNS` (mặc định 16, kẹp trong 8–24).
 """
 import re
 
@@ -22,12 +22,17 @@ def _structured_summary(turns, limit):
     older = list(turns or [])[:-limit]
     if not older:
         return ""
-    topics = [str(item.get("question") or "").strip()[:160] for item in older[-6:]]
+    exchanges = []
+    for item in older[-6:]:
+        question = str(item.get("question") or "").strip()[:160]
+        answer = str(item.get("answer") or "").strip()[:260]
+        if question:
+            exchanges.append(f"H: {question}" + (f" — Đ: {answer}" if answer else ""))
     criteria = next((item.get("criteria") for item in reversed(older)
                      if isinstance(item.get("criteria"), dict) and item.get("criteria")), {})
     patches = [patch for item in older[-8:] for patch in (item.get("constraint_patches") or [])
                if isinstance(patch, dict)][-6:]
-    parts = ["Mục tiêu/trao đổi trước: " + " | ".join(item for item in topics if item)]
+    parts = ["Mục tiêu/kết luận trước: " + " | ".join(exchanges)]
     if criteria:
         parts.append("Tiêu chí đã chốt: " + str(criteria)[:700])
     if patches:
@@ -36,12 +41,12 @@ def _structured_summary(turns, limit):
 
 
 def recent_turns():
-    """Số lượt hội thoại gần nhất đưa thẳng vào context (§10.3: 8–12, mặc định 10)."""
+    """Số lượt gần nhất đưa trực tiếp vào context; phần cũ hơn đi qua summary."""
     try:
-        value = int(getattr(settings, "ASSISTANT_RECENT_TURNS", 10))
+        value = int(getattr(settings, "ASSISTANT_RECENT_TURNS", 16))
     except (TypeError, ValueError):
-        value = 10
-    return max(8, min(12, value))
+        value = 16
+    return max(8, min(24, value))
 
 
 # Giữ tên cũ cho code đang import hằng số này; giá trị theo settings.

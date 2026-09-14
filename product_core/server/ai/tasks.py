@@ -190,14 +190,15 @@ TASKS = {row.name: row for row in _ROWS}
 #: `docs/AI_AGENT_ACCEPTANCE_CRITERIA.md` §4 — câu cụt giữa chừng, lặp ba lần.
 #: `ai/tests_model_param_fit.py` canh không cho tổ hợp này tái diễn.
 _QWEN = ("greennode", "qwen/qwen3.6-flash")        # nhanh, rẻ, có thị giác
+_GEMINI_FAST = ("gemini", "gemini-3.5-flash")      # benchmark 2026-09: plan/judge nhanh hơn 5-6x
 _VIET_TOT = ("greennode", "deepseek/deepseek-v4-pro")   # CHỈ khi hạn mức ≥ 4000
 _VIET_NHANH = ("greennode", "deepseek/deepseek-v4-flash")
 _EMBED = ("gemini", "models/gemini-embedding-2")
 
 DEFAULT_ROUTE = {
     # ① và ③ cần nhanh/rẻ; ⑤ là chặng duy nhất người dùng đọc thấy.
-    "talent_answer_plan": _QWEN,
-    "talent_answer_judge": _QWEN,
+    "talent_answer_plan": _GEMINI_FAST,
+    "talent_answer_judge": _GEMINI_FAST,
     "talent_answer_compose": _VIET_TOT,  # hạn mức 7000 — đủ chỗ cho phần nghĩ
     "talent_corpus_qa": _QWEN,           # hạn mức 900
     "talent_search": _QWEN,

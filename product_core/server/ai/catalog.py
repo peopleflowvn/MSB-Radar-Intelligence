@@ -87,6 +87,9 @@ STATIC = {
            caps=(CAP_CHAT, CAP_VISION)),
     ],
     "gemini": [
+        _m("gemini-3.5-flash", "Gemini 3.5 Flash",
+           "Model chat độ trễ thấp. Benchmark ngay trên pipeline Radar cho thấy "
+           "phù hợp với lập kế hoạch và chấm hồ sơ có cấu trúc."),
         _m("models/gemini-embedding-2", "Gemini Embedding 2",
            "Sinh vector cho hồ sơ và đoạn CV. Đang dùng cho cả kho.",
            caps=(CAP_EMBEDDING,)),

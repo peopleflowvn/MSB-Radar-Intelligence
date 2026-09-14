@@ -278,10 +278,20 @@ jobs:
           from accounts import roles
           from talent.answer import engine
           from talent.corpus_qa import can_read_cv
+          from ai.models import TaskModelRoute
 
           user = next((u for u in get_user_model().objects.filter(is_active=True).iterator()
                        if roles.can_access(u, roles.MODULE_TALENT) and can_read_cv(u)), None)
           assert user is not None, "No active Talent principal available"
+
+          routes = {row.task: {"provider": row.provider, "model": row.model}
+                    for row in TaskModelRoute.objects.filter(
+                        task__in=("talent_answer_plan", "talent_answer_judge",
+                                  "talent_answer_compose"))}
+          assert routes["talent_answer_plan"] == {
+              "provider": "gemini", "model": "gemini-3.5-flash"}, routes
+          assert routes["talent_answer_judge"] == {
+              "provider": "gemini", "model": "gemini-3.5-flash"}, routes
 
           results = {}
           for key, question in (("greeting", "xin chào"), ("identity", "bạn là ai?")):
@@ -302,17 +312,22 @@ jobs:
               "retrieval_engine": pass1.get("retrieval_engine"),
               "compose": result.trace.get("compose"),
               "citation_audit": result.trace.get("citation_audit"),
+              "duration_ms": result.trace.get("ms_total"),
+              "routes": routes,
           }}, ensure_ascii=False, sort_keys=True))
           assert result.text.strip() and result.text != "(không có nội dung)"
           assert pass1.get("retrieval_engine") == "intelligence-v2-haystack", pass1
           assert not (result.trace.get("compose") or {}).get("fallback"), result.trace.get("compose")
           assert result.people and result.sources, "Talent results must include visible people and citations"
+          assert int(result.trace.get("ms_total") or 0) > 0, result.trace
           results["talent_search"] = {
               "nonempty": True,
               "people_count": len(result.people),
               "citation_count": len(result.sources),
               "available_source_count": len(result.all_sources),
               "retrieval_engine": pass1.get("retrieval_engine"),
+              "duration_ms": result.trace.get("ms_total"),
+              "routes": routes,
           }
           print(json.dumps(results, ensure_ascii=False, sort_keys=True))
           '

@@ -1704,6 +1704,8 @@ export interface TalentTurnResult {
   people?: AnswerPerson[];
   provider?: string;
   model?: string;
+  trace?: Record<string, unknown>;
+  duration_ms?: number;
 }
 
 export async function talentAskTurn(clientTurnId: string): Promise<TalentTurnResult> {

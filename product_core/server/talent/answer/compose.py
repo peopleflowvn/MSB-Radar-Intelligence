@@ -67,9 +67,9 @@ TUYỆT ĐỐI:
 CÁCH VIẾT:
 1. Câu đầu trả lời thẳng câu hỏi (có bao nhiêu người, ai đứng đầu, kết luận là
    gì). Không mở bài, không "dựa trên dữ liệu hiện có tôi thấy rằng".
-2. Sau đó trình bày từng người bằng VĂN XUÔI hoặc gạch đầu dòng ngắn: tên, rồi
-   1–2 câu nói vì sao họ hợp với đúng nhu cầu được hỏi, kèm [n]. Nêu điều làm họ
-   khác biệt, đừng lặp lại mô tả chung chung giống nhau ở mọi người.
+2. Sau đó trình bày từng người bằng VĂN XUÔI hoặc gạch đầu dòng rõ: tên, mức độ
+   phù hợp, bằng chứng gắn với từng điều kiện, điểm mạnh khác biệt và khoảng
+   trống/rủi ro cần xác minh, kèm [n]. Không lặp nhận xét chung chung.
 3. Nếu "sap_xep" có giá trị, nói rõ đang xếp theo tiêu chí gì và nêu con số của
    từng người (ví dụ năm sinh) để người đọc kiểm chứng được thứ tự.
 4. Nếu "thieu_du_lieu" > 0, nói thẳng có bao nhiêu người không xác định được
@@ -102,9 +102,11 @@ CÁCH VIẾT:
    đừng hứa sẽ làm. Chỉ trả lời phần việc của bạn rồi dừng — phần kia sẽ được
    nối vào ngay bên dưới.
 
-Giọng: đồng nghiệp giỏi nghề, nói thẳng, tự tin nhưng trung thực về giới hạn dữ
-liệu. Tiếng Việt. Không markdown tiêu đề, không bảng, không emoji. Ngắn: tối đa
-khoảng 60 từ cho mỗi người và 250 từ cho phần chung.""" + "\n\n" + GUARD_RULE
+Giọng: đồng nghiệp giỏi nghề, nói thẳng, có phân tích và thuyết phục nhưng trung
+thực về giới hạn dữ liệu. Hiểu câu hỏi trong mạch hội thoại, không trả lời lại
+từ đầu nếu người dùng đang hỏi tiếp. Tiếng Việt. Không emoji. Ưu tiên cấu trúc
+dễ đọc; tối đa khoảng 100 từ mỗi người và 700 từ toàn bài, trừ khi người dùng
+yêu cầu ngắn hơn.""" + "\n\n" + GUARD_RULE
 
 
 def build_sources(chosen):
@@ -263,14 +265,21 @@ def build_messages(query_plan, chosen, near_misses, stats, sources, *, history=N
 
 
 def _history_block(history):
-    lines = []
-    for turn in [h for h in (history or []) if isinstance(h, dict)][-3:]:
+    lines, used = [], 0
+    # Giữ đủ mạch hội thoại nhưng có ngân sách cứng để history không lấn át CV.
+    for turn in [h for h in (history or []) if isinstance(h, dict)][-12:]:
         question = str(turn.get("question") or "").strip()
         reply = str(turn.get("answer") or "").strip()
         if question:
-            lines.append(f"H: {question[:180]}")
+            chunk = f"H: {question[:600]}"
+            if used + len(chunk) <= 10000:
+                lines.append(chunk)
+                used += len(chunk)
         if reply:
-            lines.append(f"Đ: {reply[:180]}")
+            chunk = f"Đ: {reply[:1200]}"
+            if used + len(chunk) <= 10000:
+                lines.append(chunk)
+                used += len(chunk)
     return "\n".join(lines)
 
 

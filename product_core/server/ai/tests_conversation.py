@@ -22,6 +22,7 @@ class AssistantConversationStateTest(TestCase):
         self.assertEqual(len(history), window)
         # Lượt cũ hơn cửa sổ rơi vào summary, không vào history.
         self.assertIn("question 0", summary)
+        self.assertIn("answer 0", summary)
         self.assertEqual(state["active_criteria"]["location"], f"place {total - 1}")
         self.assertEqual(state["criteria"]["location"], f"place {total - 1}")
         self.assertEqual(state["turn_count"], total)
