@@ -126,11 +126,13 @@ def run_probe(kind, case, caller):
 
 
 class Command(BaseCommand):
-    help = "Live GreenNode task probes on fictional data; no saved route changes."
+    help = "Live cross-provider task probes on fictional data; no saved route changes."
 
     def add_arguments(self, parser):
         parser.add_argument("--out", required=True)
         parser.add_argument("--models", default="")
+        parser.add_argument("--providers", default="greennode",
+                            help="Configured providers to compare, comma-separated.")
         parser.add_argument("--tasks", default="")
         parser.add_argument("--repeats", type=int, default=1)
         parser.add_argument("--workers", type=int, default=2)
@@ -139,14 +141,31 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         from ai.providers import OpenAICompatibleProvider, list_models
         from ai.router import Router
-        prototype = Router(sink=None).get_provider("greennode")
-        if prototype is None:
-            raise CommandError("GreenNode runtime credentials unavailable; benchmark NOT MEASURED.")
-        prototype.timeout = options["timeout"]
-        available = list_models(prototype)
-        models = options["models"].split(",") if options["models"] else available
-        if any(m not in available for m in models):
-            raise CommandError("Requested model not in live GreenNode model listing.")
+        router = Router(sink=None)
+        provider_names = list(dict.fromkeys(
+            value.strip().lower() for value in options["providers"].split(",")
+            if value.strip()))
+        if not provider_names:
+            raise CommandError("At least one provider is required.")
+        targets, discovered = [], {}
+        for provider_name in provider_names:
+            prototype = router.get_provider(provider_name)
+            if prototype is None:
+                discovered[provider_name] = {"configured": False, "models": []}
+                continue
+            prototype.timeout = options["timeout"]
+            if provider_name == "greennode":
+                available = list_models(prototype)
+                models = (options["models"].split(",") if options["models"] else
+                          (available if len(provider_names) == 1 else [prototype.model]))
+                if any(model not in available for model in models):
+                    raise CommandError("Requested model not in live GreenNode model listing.")
+            else:
+                models = [prototype.model]
+            discovered[provider_name] = {"configured": True, "models": models}
+            targets.extend((provider_name, model, prototype) for model in models)
+        if not targets:
+            raise CommandError("No requested provider has runtime credentials; benchmark NOT MEASURED.")
         if not 1 <= options["repeats"] <= 10 or not 1 <= options["workers"] <= 4:
             raise CommandError("Use repeats 1..10, workers 1..4.")
         by_id = {c["id"]: c for c in gold_set()["cases"]}
@@ -161,18 +180,20 @@ class Command(BaseCommand):
             if requested - {kind for kind, _case in cases}:
                 raise CommandError("Unknown task probe.")
             cases = [(kind, case) for kind, case in cases if kind in requested]
-        jobs = [(m, kind, c, rep) for rep in range(options["repeats"])
-                for m in models for kind, c in cases]
+        jobs = [(provider, model, prototype, kind, case, rep)
+                for rep in range(options["repeats"])
+                for provider, model, prototype in targets for kind, case in cases]
         def work(job):
-            model, kind, case, rep = job
-            provider = OpenAICompatibleProvider("greennode", prototype.base_url,
-                prototype.api_key, model, timeout=options["timeout"])
+            provider_name, model, prototype, kind, case, rep = job
+            provider = OpenAICompatibleProvider(provider_name, prototype.base_url,
+                prototype.api_key, model, timeout=options["timeout"],
+                extra_headers=prototype.extra_headers)
             calls = []
             def caller(messages, task="", **kwargs):
                 kwargs.pop("budget_seconds", None)
                 kwargs["timeout"] = options["timeout"]
                 start = time.perf_counter()
-                entry = {"task": task, "provider": "greennode", "model": model,
+                entry = {"task": task, "provider": provider_name, "model": model,
                          "input_tokens": None, "output_tokens": None, "error": ""}
                 try:
                     result = provider.complete(messages, **kwargs)
@@ -192,7 +213,8 @@ class Command(BaseCommand):
                 checks, error = {}, type(exc).__name__
             finally:
                 close_old_connections()
-            return {"model": model, "task_probe": kind, "case": case["id"], "repeat": rep,
+            return {"provider": provider_name, "model": model,
+                    "task_probe": kind, "case": case["id"], "repeat": rep,
                     "checks": checks, "error": error, "calls": calls,
                     "latency_ms": round((time.perf_counter() - started) * 1000, 2)}
         rows = []
@@ -200,7 +222,7 @@ class Command(BaseCommand):
         output.parent.mkdir(parents=True, exist_ok=True)
         report = {"scorer_version": 2,
                   "scope": "Live task probes on synthetic fixture v1; not production/human acceptance. Outreach and vision are isolated template probes.",
-                  "models_discovered": available, "repeats": options["repeats"],
+                  "providers": discovered, "repeats": options["repeats"],
                   "saved_routes_changed": False, "cost": None, "rows": rows}
         with ThreadPoolExecutor(max_workers=options["workers"]) as pool:
             for future in as_completed([pool.submit(work, job) for job in jobs]):
@@ -210,11 +232,13 @@ class Command(BaseCommand):
                 self.stdout.write(f"{len(rows)}/{len(jobs)} {row['model']} {row['task_probe']} {row['error'] or row['checks']}")
                 self.stdout.flush()
         summary = []
-        for model in models:
+        for provider_name, model, _prototype in targets:
             for kind in sorted({k for k, _c in cases}):
-                samples = [r for r in rows if r["model"] == model and r["task_probe"] == kind]
+                samples = [r for r in rows if r["provider"] == provider_name
+                           and r["model"] == model and r["task_probe"] == kind]
                 calls = [c for r in samples for c in r["calls"]]
-                summary.append({"model": model, "task": kind, "n": len(samples), "attempts": len(calls),
+                summary.append({"provider": provider_name, "model": model,
+                    "task": kind, "n": len(samples), "attempts": len(calls),
                     "errors": sum(not c.get("ok") for c in calls),
                     "p50_ms": percentile([r["latency_ms"] for r in samples], .5),
                     "p95_ms": percentile([r["latency_ms"] for r in samples], .95),

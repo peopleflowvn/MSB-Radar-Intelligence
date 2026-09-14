@@ -1,5 +1,6 @@
 import io
 import json
+import urllib.error
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
@@ -53,10 +54,10 @@ class IntelligenceClientTest(TestCase):
     def test_v2_search_is_adapted_for_existing_judge_pipeline(self):
         user = User.objects.create_user("searcher")
         person = Person.objects.create(display_name="Tran Data")
-        captured = {}
+        captured = []
 
         def opener(request, timeout):
-            captured["request"] = request
+            captured.append(request)
             return Response(json.dumps({"hits": [{
                 "person": {"person_id": str(person.pk), "display_name": None},
                 "score": 0.91,
@@ -72,9 +73,54 @@ class IntelligenceClientTest(TestCase):
             information_need="Senior Data Analyst tại Hà Nội",
             search_queries=["data analyst SQL Python"]), opener=opener)
 
-        body = json.loads(captured["request"].data)
-        self.assertEqual(captured["request"].full_url,
-                         "http://intelligence:8081/v1/search")
-        self.assertEqual(body["query"], "Senior Data Analyst tại Hà Nội")
+        bodies = [json.loads(request.data) for request in captured]
+        self.assertEqual(len(captured), 2)
+        self.assertTrue(all(request.full_url == "http://intelligence:8081/v1/search"
+                            for request in captured))
+        self.assertEqual({body["query"] for body in bodies}, {
+            "Senior Data Analyst tại Hà Nội", "data analyst SQL Python"})
         self.assertEqual(rows[0].name, "Tran Data")
         self.assertEqual(rows[0].passages[0].ordinal, 3)
+
+    def test_multi_query_rrf_rewards_people_found_by_multiple_variants(self):
+        user = User.objects.create_user("rrf-searcher")
+        first = Person.objects.create(display_name="One Query")
+        repeated = Person.objects.create(display_name="Repeated")
+
+        def hit(person, text):
+            return {"person": {"person_id": str(person.pk)}, "score": .8,
+                    "matched_filters": [], "evidence": [{
+                        "evidence_id": f"e-{person.pk}-{text}",
+                        "person_id": str(person.pk), "document_id": str(person.pk),
+                        "location": "chunk 0", "text": text, "source": "cv"}]}
+
+        def opener(request, timeout):
+            query = json.loads(request.data)["query"]
+            hits = ([hit(first, "first"), hit(repeated, "common")]
+                    if query == "primary" else [hit(repeated, "second")])
+            return Response(json.dumps({"hits": hits}).encode())
+
+        rows = retrieve(user, QueryPlan(
+            information_need="primary", search_queries=["variant"]), opener=opener)
+        self.assertEqual([row.person_id for row in rows], [repeated.pk, first.pk])
+        self.assertEqual(len(rows[0].passages), 2)
+
+    def test_multi_query_keeps_successful_variant_when_one_fails(self):
+        user = User.objects.create_user("resilient-searcher")
+        person = Person.objects.create(display_name="Resilient")
+
+        def opener(request, timeout):
+            query = json.loads(request.data)["query"]
+            if query == "broken variant":
+                raise urllib.error.URLError("synthetic timeout")
+            return Response(json.dumps({"hits": [{
+                "person": {"person_id": str(person.pk)}, "score": .9,
+                "matched_filters": [], "evidence": [{
+                    "person_id": str(person.pk), "document_id": "1",
+                    "location": "chunk 0", "text": "SQL", "source": "cv"}],
+            }]}).encode())
+
+        rows = retrieve(user, QueryPlan(
+            information_need="working variant",
+            search_queries=["broken variant"]), opener=opener)
+        self.assertEqual([row.person_id for row in rows], [person.pk])

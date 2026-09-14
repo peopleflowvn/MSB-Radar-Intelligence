@@ -1,0 +1,46 @@
+name: Benchmark Production AI Models
+
+on:
+  workflow_dispatch:
+    inputs:
+      providers:
+        description: "Configured providers to compare"
+        required: true
+        default: "greennode,gemini,openai"
+      tasks:
+        description: "Synthetic task probes"
+        required: true
+        default: "plan,judge,compose,conversation,intent,tool_call"
+      repeats:
+        description: "Repeated measurements per case"
+        required: true
+        default: "1"
+
+jobs:
+  benchmark:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify benchmark matches deployed release
+        shell: bash
+        run: test "$(sudo cat /home/ubuntu/msb-radar-platform/current-sha)" = "${GITHUB_SHA}"
+      - name: Run fictional-data provider comparison
+        shell: bash
+        env:
+          PROVIDERS: ${{ inputs.providers }}
+          TASKS: ${{ inputs.tasks }}
+          REPEATS: ${{ inputs.repeats }}
+        run: |
+          set -euo pipefail
+          case "${REPEATS}" in 1|2|3) ;; *) echo "repeats must be 1..3"; exit 2;; esac
+          sudo docker exec msbradar-hub python manage.py brain_model_benchmark \
+            --out /tmp/model-benchmark.json --providers "${PROVIDERS}" \
+            --tasks "${TASKS}" --repeats "${REPEATS}" --workers 2 --timeout 45
+          sudo docker cp msbradar-hub:/tmp/model-benchmark.json ./model-benchmark.json
+          sudo chown "$(id -u):$(id -g)" ./model-benchmark.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: model-benchmark-${{ github.sha }}
+          path: model-benchmark.json
+          if-no-files-found: error
+          retention-days: 14

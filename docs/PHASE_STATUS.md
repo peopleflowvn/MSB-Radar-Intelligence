@@ -15,18 +15,19 @@ production evidence explicitly.
 | 6 Retrieval | PARTIAL | Structured, token lexical, Haystack BM25, cosine semantic adapter, hybrid fusion and scope-before-retrieval tests | Live embedding benchmark on real labelled corpus |
 | 7 Person reranking | PARTIAL | Person grouping, best-evidence selection, RRF and synthetic MRR measurement | Real-corpus reranking comparison and selected thresholds |
 | 8 Evidence | PARTIAL | First-class evidence plus fail-closed citation, deletion, Person, scope and version/hash resolver contract tests | Authorized live Radar resolver adapter |
-| 9 Grounded RAG | BLOCKED BY GATE | Not implemented | Phases 3, 6, 7 and 8 live gates |
+| 9 Grounded RAG | PARTIAL | Production `/v1/answer` runs the LangGraph scope/retrieve/generate/validate graph; live probe verifies the graph marker | Human-labelled faithfulness and multi-hop gates |
 | 10 Conversation state | NOT STARTED | Contract only | Grounded Q&A gate |
 | 11 Agent | NOT STARTED | Action contract only | Demonstrated multi-step need and RAG comparison |
-| 12 Model benchmark | NOT STARTED | Capability abstraction only | Live GreenNode configuration |
+| 12 Model benchmark | PARTIAL | Cross-provider fictional-data benchmark supports configured GreenNode, Gemini and OpenAI without route changes | Repeated production run plus human-labelled document-Q&A cases and cost data |
 | 13 Legacy vs V2 | PARTIAL | Comparable synthetic lexical report | Same real corpus, scope and telemetry |
-| 14 Radar integration | PARTIAL | Legacy endpoint gap documented; proposed evidence endpoint plus tested HTTP client | Product-side endpoint, scope-token format and isolated integration test |
+| 14 Radar integration | DONE | Production document feed, evidence resolver, scope validation, V2 search bridge and Person-level multi-query RRF are tested and live-probed | Continue regression monitoring |
 | 15 Hardening | PARTIAL | Fail-closed tests; HTTPS config validation; separate liveness/readiness; allow-listed operational trace without query, scope token, evidence text or chain-of-thought | Production topology, threat model, load/failure drills, trace sink and alerting |
 
 ## Current gate decision
 
 Haystack BM25 is the preferred next lexical candidate because the synthetic
 fixture preserved Recall@10 `1.0` and Precision@10 `0.672807` while improving
-MRR to `0.973684`. This does not unlock grounded answering: semantic retrieval,
-authorized live evidence resolution and production acceptance remain `NOT
-MEASURED`.
+MRR to `0.973684`. Grounded answering and production connectivity are now live,
+but semantic retrieval and answer quality still require a human-labelled
+real-corpus comparison; production connectivity alone is not a NotebookLM-level
+quality claim.

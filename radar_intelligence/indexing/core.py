@@ -107,15 +107,31 @@ class DocumentConverter:
     def _split(self, text: str) -> tuple[str, ...]:
         paragraphs = [" ".join(part.split()) for part in text.replace("\r\n", "\n").split("\n")]
         paragraphs = [part for part in paragraphs if part]
-        chunks: list[str] = []
+        pieces: list[str] = []
         for paragraph in paragraphs:
             while len(paragraph) > self._max_chars:
                 boundary = paragraph.rfind(" ", 0, self._max_chars + 1)
                 boundary = boundary if boundary > 0 else self._max_chars
-                chunks.append(paragraph[:boundary].strip())
+                pieces.append(paragraph[:boundary].strip())
                 paragraph = paragraph[boundary:].strip()
             if paragraph:
-                chunks.append(paragraph)
+                pieces.append(paragraph)
+
+        # CV extraction commonly emits one short line per field. Indexing each
+        # line separately produced tens of thousands of context-poor chunks.
+        # Pack adjacent paragraphs without crossing the embedding-safe bound;
+        # keep a newline so section/field boundaries remain visible to models.
+        chunks: list[str] = []
+        current = ""
+        for piece in pieces:
+            candidate = f"{current}\n{piece}" if current else piece
+            if current and len(candidate) > self._max_chars:
+                chunks.append(current)
+                current = piece
+            else:
+                current = candidate
+        if current:
+            chunks.append(current)
         return tuple(chunks)
 
 

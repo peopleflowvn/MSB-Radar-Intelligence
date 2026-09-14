@@ -11,6 +11,11 @@ missing evidence, generate, then validate every cited source. Framework state
 does not cross the API boundary. Product Core remains responsible for user
 conversation, RBAC and business actions.
 
+Product Core may send up to four independently phrased planner queries to the
+search API in parallel. Results are fused by Person with reciprocal-rank fusion;
+a failed variant is discarded without discarding successful variants. This
+restores query expansion that previously stopped at the Intelligence bridge.
+
 Langfuse tracing is disabled by default and enabled only when all three
 `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_BASE_URL` values are
 present. Spans contain counts and execution classes only, never questions,
