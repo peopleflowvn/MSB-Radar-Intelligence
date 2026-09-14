@@ -7,7 +7,7 @@ model routing, evaluation, and (only when justified) agent tools.
 
 ## Current milestone
 
-Phase 0/1 foundation:
+Production foundation:
 
 - legacy system map and reuse decision log;
 - framework-independent public contracts;
@@ -24,6 +24,10 @@ Phase 0/1 foundation:
   Recall@K, Precision@K and MRR evaluation primitives;
 - benchmarked Haystack BM25 candidate with nonmatch gating and improved
   synthetic MRR over token overlap;
+- LangGraph orchestration for scope authorization, retrieval, grounded
+  generation, evidence validation and explicit no-evidence completion;
+- opt-in Langfuse tracing with metadata allow-listing;
+- optional offline Ragas evaluation and Docling document conversion adapters;
 - runnable health endpoint and tests without external credentials.
 
 Haystack 3.1.1 is installed in the project-local environment and exercised by
@@ -31,8 +35,9 @@ integration tests. A durable production store is deliberately not selected
 until the Radar feed, deletion SLA and real-corpus benchmarks are agreed.
 
 Current phase and gate evidence is tracked in `docs/PHASE_STATUS.md`. Grounded
-answering and agents are intentionally not started while real semantic
-retrieval and authorized source-resolution gates remain unmeasured.
+answering is active behind the public contract. Product Core still owns
+authentication, authorization, business workflows and conversational UX; the
+graph cannot execute consequential business actions.
 
 ## Run locally
 

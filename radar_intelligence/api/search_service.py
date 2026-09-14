@@ -6,6 +6,7 @@ import logging
 import time
 
 from radar_intelligence.api.codec import encode_answer_response, encode_search_hit
+from radar_intelligence.agent import GroundedAnswerGraph
 from radar_intelligence.auth import RadarScopeConfig, RadarScopeValidator
 from radar_intelligence.config import RuntimeSettings
 from radar_intelligence.contracts import AnswerResponse, ModelTrace, SearchRequest
@@ -13,6 +14,7 @@ from radar_intelligence.evidence import (
     RadarHttpSourceResolver, RadarResolverConfig, resolve_citations,
 )
 from radar_intelligence.indexing import SqliteDocumentIndex
+from radar_intelligence.observability import safe_span
 from radar_intelligence.providers import (
     Capability, GatewayRequest, GreenNodeConfig, GreenNodeEmbedder,
     GreenNodeTransport, ModelGateway, ProviderError, UrllibHttpClient,
@@ -77,6 +79,9 @@ class SearchService:
         self._records_mtime_ns = -1
         self._records = ()
         self._reload_records_if_needed()
+        self._answer_graph = GroundedAnswerGraph(
+            self._agent_prepare, self._agent_retrieve,
+            self._agent_no_evidence, self._agent_generate)
 
     def _reload_records_if_needed(self):
         try:
@@ -104,25 +109,46 @@ class SearchService:
         return self._index.statistics()
 
     def answer(self, request):
-        if not self._scope.validate(request.scope_token):
-            return None
-        records = self._reload_records_if_needed()
+        with safe_span("grounded-answer", {
+                "execution_class": "grounded_answer",
+                "has_thread": bool(request.thread_id),
+                "person_scope_count": len(request.person_ids)}):
+            return self._answer_graph.invoke(request)
+
+    def _agent_prepare(self, state):
+        request = state["request"]
+        with safe_span("authorize-and-scope"):
+            if not self._scope.validate(request.scope_token):
+                return {"authorized": False, "result": None}
+            records = self._reload_records_if_needed()
         if request.person_ids:
             requested = set(request.person_ids)
             records = tuple(row for row in records if row.chunk.person.person_id in requested)
         person_ids = frozenset(row.chunk.person.person_id for row in records)
-        if not person_ids:
-            return encode_answer_response(AnswerResponse(
-                "Không tìm thấy bằng chứng phù hợp trong phạm vi được phép.",
-                (), (), (), {"query": request.question}, ()))
-        hits = self._retriever.search(
-            SearchRequest(request.question, request.scope_token, request.principal_id, limit=10),
-            records, RetrievalScope(person_ids))
+        return {"authorized": True, "records": records, "person_ids": person_ids}
+
+    def _agent_retrieve(self, state):
+        request = state["request"]
+        with safe_span("retrieve-evidence", {
+                "authorized_person_count": len(state["person_ids"])}):
+            hits = tuple(self._retriever.search(
+                SearchRequest(request.question, request.scope_token,
+                              request.principal_id, limit=10),
+                state["records"], RetrievalScope(state["person_ids"])))
         evidence = tuple(item for hit in hits for item in hit.evidence)
-        if not evidence:
-            return encode_answer_response(AnswerResponse(
-                "Không tìm thấy bằng chứng phù hợp trong phạm vi được phép.",
-                (), (), (), {"query": request.question}, ()))
+        return {"hits": hits, "evidence": evidence}
+
+    @staticmethod
+    def _agent_no_evidence(state):
+        request = state["request"]
+        return {"result": encode_answer_response(AnswerResponse(
+            "Không tìm thấy bằng chứng phù hợp trong phạm vi được phép.",
+            (), (), (), {"query": request.question, "grounded": True,
+                         "orchestrator": "langgraph"}, ()))}
+
+    def _agent_generate(self, state):
+        request = state["request"]
+        evidence = state["evidence"]
         context = [{"evidence_id": row.evidence_id, "person_id": row.person_id,
                     "text": row.text} for row in evidence]
         prompt = (
@@ -133,7 +159,10 @@ class SearchService:
             + json.dumps(context, ensure_ascii=False)
         )
         started = time.perf_counter()
-        completion = self._gateway.complete(GatewayRequest(Capability.DEEP, prompt, 60))
+        with safe_span("generate-grounded-answer", {
+                "candidate_count": len(state["hits"]),
+                "evidence_count": len(evidence)}):
+            completion = self._gateway.complete(GatewayRequest(Capability.DEEP, prompt, 60))
         latency = round((time.perf_counter() - started) * 1000)
         try:
             generated = json.loads(completion.output_text)
@@ -145,13 +174,14 @@ class SearchService:
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             raise ValueError("model returned malformed grounded answer") from exc
         validated = resolve_citations(
-            evidence, cited_ids, allowed_person_ids=set(person_ids),
+            evidence, cited_ids, allowed_person_ids=set(state["person_ids"]),
             scope_token=request.scope_token, resolver=self._resolver)
         cited_people = {row.person_id for row in validated}
-        people = tuple(hit.person for hit in hits if hit.person.person_id in cited_people)
+        people = tuple(hit.person for hit in state["hits"] if hit.person.person_id in cited_people)
         trace = (ModelTrace(
             Capability.DEEP.value, completion.provider, completion.model_alias, latency,
             completion.input_tokens, completion.output_tokens, completion.request_id),)
-        return encode_answer_response(AnswerResponse(
+        return {"result": encode_answer_response(AnswerResponse(
             answer.strip(), people, validated, cited_ids,
-            {"query": request.question, "grounded": True}, trace))
+            {"query": request.question, "grounded": True,
+             "orchestrator": "langgraph"}, trace))}

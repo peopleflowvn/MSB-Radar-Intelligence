@@ -9,7 +9,7 @@ WORKDIR /app
 
 COPY pyproject.toml README.md ./
 COPY radar_intelligence ./radar_intelligence
-RUN python -m pip install --no-cache-dir ".[haystack]" \
+RUN python -m pip install --no-cache-dir ".[production]" \
     && adduser --disabled-password --gecos "" --uid 10001 intelligence \
     && mkdir -p /var/lib/radar-intelligence \
     && chown -R intelligence:intelligence /app /var/lib/radar-intelligence

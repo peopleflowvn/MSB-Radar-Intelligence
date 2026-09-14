@@ -7,10 +7,20 @@ name = "msb-radar-intelligence"
 version = "0.1.0"
 description = "Clean-room evidence-backed intelligence service for MSB Radar"
 requires-python = ">=3.10"
-dependencies = ["numpy>=2,<3"]
+dependencies = [
+    "numpy>=2,<3",
+    "langgraph>=1.2,<2",
+]
 
 [project.optional-dependencies]
 haystack = ["haystack-ai>=3.1,<4"]
+observability = ["langfuse>=4.15,<5"]
+evaluation = ["ragas>=0.4,<0.5"]
+documents = ["docling>=2.126,<3"]
+production = [
+    "haystack-ai>=3.1,<4",
+    "langfuse>=4.15,<5",
+]
 
 [tool.setuptools.packages.find]
 include = ["radar_intelligence*"]

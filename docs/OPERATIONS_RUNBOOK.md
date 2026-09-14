@@ -35,6 +35,16 @@ as an authorization or data-loss event. It retains its cursor and retries on a
 later loop. Do not restart repeatedly or increase concurrency while 429s are
 present.
 
+## AI observability
+
+Langfuse is opt-in. Configure all of `LANGFUSE_PUBLIC_KEY`,
+`LANGFUSE_SECRET_KEY`, and `LANGFUSE_BASE_URL` to enable it; otherwise requests
+run normally without remote telemetry. Use a controlled self-hosted endpoint.
+The integration sends only operation names, execution class and aggregate
+counts. It must not receive questions, prompts, CV/evidence content, person
+identifiers, scope tokens or model reasoning. Telemetry errors must never fail
+an answer request.
+
 ## Rebuild and restore
 
 The PostgreSQL/R2 source data must never be rebuilt from the Intelligence

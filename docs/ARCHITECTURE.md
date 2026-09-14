@@ -5,6 +5,17 @@ Intelligence chooses a deterministic fast path or builds a small evidence
 package using person-grouped hybrid retrieval. Models can interpret and
 synthesize, but code validates scope, sources, citations, and actions.
 
+The grounded-answer path is a LangGraph state graph: authorize and constrain
+scope, retrieve with the Haystack-backed hybrid adapter, branch explicitly on
+missing evidence, generate, then validate every cited source. Framework state
+does not cross the API boundary. Product Core remains responsible for user
+conversation, RBAC and business actions.
+
+Langfuse tracing is disabled by default and enabled only when all three
+`LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_BASE_URL` values are
+present. Spans contain counts and execution classes only, never questions,
+candidate data, evidence text, scope tokens, prompts or model reasoning.
+
 The public contracts contain no Haystack or model-specific types. Haystack will
 be an internal adapter behind indexing/retrieval protocols. PostgreSQL remains
 the business source of truth; an index is disposable and rebuildable.

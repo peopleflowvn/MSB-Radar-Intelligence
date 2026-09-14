@@ -23,7 +23,7 @@ jobs:
       - name: Validate Intelligence
         run: |
           python -m pip install --upgrade pip
-          python -m pip install ".[haystack]"
+          python -m pip install ".[production]"
           python -W error::ResourceWarning -m unittest discover -s tests -v
           python -m compileall -q radar_intelligence tests
       - uses: actions/setup-node@v4

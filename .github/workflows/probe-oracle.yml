@@ -235,6 +235,23 @@ jobs:
           search_latency_seconds = round(time.perf_counter() - search_started, 3)
           assert search_latency_seconds <= 120, "production search exceeded the 120-second SLA"
           assert response.status == 200 and isinstance(search.get("hits"), list)
+
+          answer_body = json.dumps({
+              "question": "radar-probe-no-match-token",
+              "scope_token": os.environ["PROBE_SCOPE_TOKEN"],
+              "principal_id": "production-probe",
+              "person_ids": ["radar-probe-missing-person"],
+          }).encode()
+          answer_request = urllib.request.Request(
+              "http://127.0.0.1:8081/v1/answer", data=answer_body, method="POST",
+              headers={"Authorization": f"Bearer {service}",
+                       "Content-Type": "application/json"})
+          with urllib.request.urlopen(answer_request, timeout=120) as response:
+              answer = json.load(response)
+          assert response.status == 200
+          assert answer.get("answer", "").strip()
+          assert answer.get("interpreted_query", {}).get("orchestrator") == "langgraph"
+          assert answer.get("people") == [] and answer.get("evidence") == []
           print(json.dumps({
               "feed_http_status": feed_status,
               "feed_event_count": len(feed["events"]),
@@ -245,6 +262,7 @@ jobs:
               "search_hit_count": len(search["hits"]),
               "search_latency_seconds": search_latency_seconds,
               "wrong_search_token_rejected": True,
+              "answer_orchestrator": answer["interpreted_query"]["orchestrator"],
           }, sort_keys=True))
           PY
       - name: Show non-PII indexer lifecycle log
