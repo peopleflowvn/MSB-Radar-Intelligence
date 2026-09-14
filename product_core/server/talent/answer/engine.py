@@ -330,6 +330,11 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
                       resolve_stage.pinned_for(query_plan, projection, question=question))
     except Exception:                              # noqa: BLE001 - phụ, không hỏng lượt
         pinned_ids = []
+    # Chỉ các hồ sơ người dùng gọi đích danh / tham chiếu từ lượt trước mới là
+    # ``identified``. Structured pins chỉ giúp recall cho điều kiện bắt buộc;
+    # nếu trộn hai loại này, ⑤ sẽ nhận thêm hồ sơ ngoài top-N trong khối
+    # ``nguoi_da_xac_dinh`` và có thể viết 11 người khi người dùng xin 10.
+    identified_ids = set(pinned_ids)
 
     # `must_have` khớp được trường có cấu trúc (skills/industries/years_experience…)
     # → ghim thêm, quét trên TOÀN kho chứ không chỉ pool ngữ nghĩa. "must_have"
@@ -427,8 +432,8 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         if active_plan.shape == "count":
             stats["criteria_unknown"] = sum(any(c["status"] == "UNKNOWN" for c in j.criteria) for j in judgements)
             stats["criteria_contradicted"] = sum(any(c["status"] == "CONTRADICTED" for c in j.criteria) for j in judgements)
-        stats["identified_people"] = [c.name for c in candidates if c.person_id in pinned_ids][:8]
-        stats["identified_judgements"] = [j.as_dict() for j in judgements if j.person_id in pinned_ids][:8]
+        stats["identified_people"] = [c.name for c in candidates if c.person_id in identified_ids][:8]
+        stats["identified_judgements"] = [j.as_dict() for j in judgements if j.person_id in identified_ids][:8]
         if referenced_ids is not None:
             stats.update(scope=scope_kind, scope_size=len(referenced_ids))
         trace[label] = {"ms_retrieve": retrieved_ms,
@@ -460,8 +465,8 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         chosen, near, stats = aggregate_stage.aggregate(query_plan, judgements)
         stats["retrieved"] = retrieved
         stats["read_failed"] = False
-        stats["identified_people"] = [j.name for j in judgements if j.person_id in pinned_ids][:8]
-        stats["identified_judgements"] = [j.as_dict() for j in judgements if j.person_id in pinned_ids][:8]
+        stats["identified_people"] = [j.name for j in judgements if j.person_id in identified_ids][:8]
+        stats["identified_judgements"] = [j.as_dict() for j in judgements if j.person_id in identified_ids][:8]
         if referenced_ids is not None:
             stats.update(scope=scope_kind, scope_size=len(referenced_ids))
         trace["cache"] = "hit"

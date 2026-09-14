@@ -1061,6 +1061,8 @@ class StructuredMustHaveTest(TestCase):
         self.assertIn("structured_pins", trace)
         self.assertGreaterEqual(trace["structured_pins"], 1)
         self.assertIn(p.pk, captured["pinned_ids"])
+        self.assertEqual(_stats["identified_people"], [])
+        self.assertEqual(_stats["identified_judgements"], [])
 
 
 # ------------------------- Radar phải BIẾT nó có dữ liệu gì (ảnh production)
