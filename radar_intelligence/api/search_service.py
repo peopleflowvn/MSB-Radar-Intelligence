@@ -68,9 +68,10 @@ class SearchService:
         # Haystack BM25 is deliberately request-local: authorization and structured
         # filters are applied by HybridRetriever before any candidate is handed to it.
         self._semantic_ranker = _ProviderResilientSemanticRanker(CosineSemanticRanker(embedder))
+        self._lexical_ranker = HaystackBM25Ranker()
         self._retriever = HybridRetriever(
             self._semantic_ranker,
-            lexical_ranker=HaystackBM25Ranker())
+            lexical_ranker=self._lexical_ranker)
         self._database = Path(database)
         self._index = SqliteDocumentIndex(self._database)
         self._records_mtime_ns = -1
@@ -85,6 +86,7 @@ class SearchService:
         if modified != self._records_mtime_ns:
             self._records = project_search_documents(self._index.documents())
             self._semantic_ranker.prepare(self._records)
+            self._lexical_ranker.prepare(self._records)
             self._records_mtime_ns = modified
         return self._records
 

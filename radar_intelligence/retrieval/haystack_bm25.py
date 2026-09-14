@@ -13,6 +13,20 @@ class HaystackBM25Ranker:
         if candidate_limit < 1:
             raise ValueError("candidate_limit must be positive")
         self._candidate_limit = candidate_limit
+        self._prepared_key: tuple[str, ...] = ()
+        self._prepared_records = ()
+
+    def prepare(self, records: Sequence[RetrievalRecord]) -> None:
+        key = tuple(record.chunk.evidence.evidence_id for record in records)
+        if key == self._prepared_key:
+            return
+        self._prepared_key = key
+        prepared = []
+        for record in records:
+            content = normalize_text(" ".join(
+                (record.chunk.person.display_name or "", record.chunk.evidence.text)))
+            prepared.append((record, content, frozenset(content.split())))
+        self._prepared_records = tuple(prepared)
 
     def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]:
         if not records or not normalize_text(query):
@@ -26,10 +40,12 @@ class HaystackBM25Ranker:
             raise RuntimeError("Haystack BM25 requires the 'haystack' optional dependency") from exc
 
         query_tokens = set(normalize_text(query).split())
+        key = tuple(record.chunk.evidence.evidence_id for record in records)
+        if key != self._prepared_key:
+            self.prepare(records)
         eligible = []
-        for record in records:
-            content = normalize_text(" ".join((record.chunk.person.display_name or "", record.chunk.evidence.text)))
-            overlap = len(query_tokens & set(content.split()))
+        for record, content, content_tokens in self._prepared_records:
+            overlap = len(query_tokens & content_tokens)
             if overlap:
                 eligible.append((overlap, record, content))
         if not eligible:

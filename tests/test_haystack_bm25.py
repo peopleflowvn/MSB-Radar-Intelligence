@@ -38,3 +38,11 @@ class HaystackBM25Test(unittest.TestCase):
     def test_bm25_only_returns_ids_from_input(self):
         records = [record("p1", "e1", "SQL banking")]
         self.assertEqual({identifier for identifier, _ in HaystackBM25Ranker().rank("SQL", records)}, {"e1"})
+
+    def test_prepared_lexical_corpus_is_reused(self):
+        records = [record("p1", "e1", "SQL banking")]
+        ranker = HaystackBM25Ranker()
+        ranker.prepare(records)
+        prepared = ranker._prepared_records
+        ranker.rank("SQL", records)
+        self.assertIs(ranker._prepared_records, prepared)
