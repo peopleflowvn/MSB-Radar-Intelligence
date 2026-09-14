@@ -44,6 +44,16 @@ class RetrievalEngineTest(unittest.TestCase):
         hits = HybridRetriever().search(SearchRequest("Data", "scope", "u1", filters), records, RetrievalScope(frozenset({"p1", "p2"})))
         self.assertEqual([hit.person.person_id for hit in hits], ["p1"])
 
+    def test_empty_exclusions_do_not_normalize_every_evidence(self):
+        class UnstringableCompanies(tuple):
+            def __iter__(self):
+                raise AssertionError("companies must not be scanned without exclusions")
+
+        item = record("p1", "e1", "SQL", companies=UnstringableCompanies())
+        hits = HybridRetriever().search(
+            SearchRequest("SQL", "scope", "u1"), [item], RetrievalScope(frozenset({"p1"})))
+        self.assertEqual([hit.person.person_id for hit in hits], ["p1"])
+
     def test_scope_is_applied_before_semantic_ranker(self):
         ranker = RecordingSemanticRanker({"e1": 0.8, "secret": 1.0})
         records = [record("p1", "e1", "risk"), record("p-secret", "secret", "risk")]

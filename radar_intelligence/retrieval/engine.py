@@ -141,9 +141,10 @@ def _structured_match(record: RetrievalRecord, filters: SearchFilters) -> tuple[
         checks.append(record.years_experience is not None and record.years_experience >= filters.min_years_experience)
     if filters.max_years_experience is not None:
         checks.append(record.years_experience is not None and record.years_experience <= filters.max_years_experience)
-    searchable = normalize_text(" ".join((record.chunk.evidence.text,) + record.companies))
-    if any(normalize_text(term) in searchable for term in filters.excluded_terms):
-        return False, 0.0
+    if filters.excluded_terms:
+        searchable = normalize_text(" ".join((record.chunk.evidence.text,) + record.companies))
+        if any(normalize_text(term) in searchable for term in filters.excluded_terms):
+            return False, 0.0
     if checks and not all(checks):
         return False, 0.0
     return True, (sum(checks) / len(checks) if checks else 0.0)
