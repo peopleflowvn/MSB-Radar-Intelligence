@@ -58,6 +58,8 @@ jobs:
     environment: oracle-production
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -133,12 +135,14 @@ jobs:
           release="/home/ubuntu/msb-radar-platform/releases/${RELEASE_SHA}"
           previous=$(sudo cat /home/ubuntu/msb-radar-platform/current-sha 2>/dev/null || true)
           build_product_core=1
-          parent=$(git rev-parse "${RELEASE_SHA}^")
           reuse_intelligence_parent=
-          if git diff --quiet "${parent}" "${RELEASE_SHA}" -- Dockerfile pyproject.toml README.md radar_intelligence \
-            && sudo docker image inspect "msb-radar-intelligence:${parent}" >/dev/null 2>&1; then
-            reuse_intelligence_parent="${parent}"
-          fi
+          while read -r ancestor; do
+            if git diff --quiet "${ancestor}" "${RELEASE_SHA}" -- Dockerfile pyproject.toml README.md radar_intelligence \
+              && sudo docker image inspect "msb-radar-intelligence:${ancestor}" >/dev/null 2>&1; then
+              reuse_intelligence_parent="${ancestor}"
+              break
+            fi
+          done < <(git rev-list "${RELEASE_SHA}^")
           if [ -n "${previous}" ] \
             && git cat-file -e "${previous}^{commit}" 2>/dev/null \
             && git diff --quiet "${previous}" "${RELEASE_SHA}" -- product_core; then
