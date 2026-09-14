@@ -31,7 +31,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
-      start_period: 180s
+      start_period: 420s
 
   intelligence-indexer:
     image: msb-radar-intelligence:${INTELLIGENCE_IMAGE_TAG:-local}

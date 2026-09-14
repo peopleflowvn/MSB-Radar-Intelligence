@@ -38,6 +38,9 @@ class _ProviderResilientSemanticRanker:
             self._logger.warning("semantic retrieval temporarily unavailable: %s", exc)
             return ()
 
+    def prepare(self, records):
+        self._delegate.prepare(records)
+
 
 class SearchService:
     def __init__(self, settings: RuntimeSettings, database: str | Path) -> None:
@@ -64,8 +67,9 @@ class SearchService:
             values["RADAR_BASE_URL"], values["RADAR_SERVICE_TOKEN"]))
         # Haystack BM25 is deliberately request-local: authorization and structured
         # filters are applied by HybridRetriever before any candidate is handed to it.
+        self._semantic_ranker = _ProviderResilientSemanticRanker(CosineSemanticRanker(embedder))
         self._retriever = HybridRetriever(
-            _ProviderResilientSemanticRanker(CosineSemanticRanker(embedder)),
+            self._semantic_ranker,
             lexical_ranker=HaystackBM25Ranker())
         self._database = Path(database)
         self._index = SqliteDocumentIndex(self._database)
@@ -80,6 +84,7 @@ class SearchService:
             modified = -1
         if modified != self._records_mtime_ns:
             self._records = project_search_documents(self._index.documents())
+            self._semantic_ranker.prepare(self._records)
             self._records_mtime_ns = modified
         return self._records
 

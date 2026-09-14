@@ -61,6 +61,25 @@ class QueryEmbedder(Protocol):
 class CosineSemanticRanker:
     def __init__(self, embedder: QueryEmbedder) -> None:
         self._embedder = embedder
+        self._prepared_key: tuple[str, ...] = ()
+        self._prepared_matrix = None
+
+    def prepare(self, records: Sequence[RetrievalRecord]) -> None:
+        """Build the immutable production vector matrix once per index revision."""
+        embedded = [(record.chunk.evidence.evidence_id, record.embedding)
+                    for record in records if record.embedding is not None]
+        key = tuple(identifier for identifier, _ in embedded)
+        if key == self._prepared_key:
+            return
+        try:
+            import numpy as np
+        except ImportError:  # pragma: no cover - minimal installations
+            self._prepared_key = ()
+            self._prepared_matrix = None
+            return
+        self._prepared_key = key
+        self._prepared_matrix = np.asarray(
+            [vector for _, vector in embedded], dtype=np.float32)
 
     def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]:
         query_rows = self._embedder.embed_documents([query])
@@ -88,7 +107,10 @@ class CosineSemanticRanker:
         # Production indexes contain tens of thousands of chunk vectors. NumPy
         # performs the same bounded cosine calculation in native code instead
         # of holding the request thread in millions of Python-level operations.
-        matrix = np.asarray([vector for _, vector in embedded], dtype=np.float32)
+        key = tuple(identifier for identifier, _ in embedded)
+        if key != self._prepared_key or self._prepared_matrix is None:
+            self.prepare(records)
+        matrix = self._prepared_matrix
         query_array = np.asarray(query_vector, dtype=np.float32)
         denominators = np.linalg.norm(matrix, axis=1) * np.linalg.norm(query_array)
         dots = matrix @ query_array

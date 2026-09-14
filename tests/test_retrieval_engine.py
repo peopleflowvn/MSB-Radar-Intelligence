@@ -79,6 +79,21 @@ class RetrievalEngineTest(unittest.TestCase):
         )
         self.assertEqual([hit.person.person_id for hit in hits], ["p2", "p1"])
 
+    def test_cosine_semantic_ranker_reuses_prepared_matrix(self):
+        class Embedder:
+            def embed_documents(self, texts):
+                return [(1.0, 0.0)]
+
+        records = [
+            record("p1", "e1", "one", embedding=(1.0, 0.0)),
+            record("p2", "e2", "two", embedding=(0.0, 1.0)),
+        ]
+        ranker = CosineSemanticRanker(Embedder())
+        ranker.prepare(records)
+        prepared = ranker._prepared_matrix
+        ranker.rank("query", records)
+        self.assertIs(ranker._prepared_matrix, prepared)
+
 
 if __name__ == "__main__":
     unittest.main()
