@@ -94,6 +94,18 @@ class RetrievalEngineTest(unittest.TestCase):
         ranker.rank("query", records)
         self.assertIs(ranker._prepared_matrix, prepared)
 
+    def test_cosine_semantic_ranker_bounds_candidates(self):
+        class Embedder:
+            def embed_documents(self, texts):
+                return [(1.0, 0.0)]
+
+        records = [
+            record("p1", "e1", "one", embedding=(1.0, 0.0)),
+            record("p2", "e2", "two", embedding=(0.5, 0.5)),
+        ]
+        scores = CosineSemanticRanker(Embedder(), candidate_limit=1).rank("query", records)
+        self.assertEqual([identifier for identifier, _ in scores], ["e1"])
+
 
 if __name__ == "__main__":
     unittest.main()

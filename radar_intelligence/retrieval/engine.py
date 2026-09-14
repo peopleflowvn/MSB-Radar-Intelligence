@@ -59,8 +59,11 @@ class QueryEmbedder(Protocol):
 
 
 class CosineSemanticRanker:
-    def __init__(self, embedder: QueryEmbedder) -> None:
+    def __init__(self, embedder: QueryEmbedder, candidate_limit: int = 1_000) -> None:
+        if candidate_limit < 1:
+            raise ValueError("candidate_limit must be positive")
         self._embedder = embedder
+        self._candidate_limit = candidate_limit
         self._prepared_key: tuple[str, ...] = ()
         self._prepared_matrix = None
 
@@ -115,7 +118,13 @@ class CosineSemanticRanker:
         denominators = np.linalg.norm(matrix, axis=1) * np.linalg.norm(query_array)
         dots = matrix @ query_array
         values = np.divide(dots, denominators, out=np.zeros_like(dots), where=denominators != 0)
-        return tuple((embedded[index][0], float(score)) for index, score in enumerate(values))
+        limit = min(self._candidate_limit, len(values))
+        if limit == len(values):
+            selected = np.arange(len(values))
+        else:
+            selected = np.argpartition(values, -limit)[-limit:]
+        ordered = selected[np.argsort(values[selected])[::-1]]
+        return tuple((embedded[int(index)][0], float(values[index])) for index in ordered)
 
 
 def _structured_match(record: RetrievalRecord, filters: SearchFilters) -> tuple[bool, float]:
