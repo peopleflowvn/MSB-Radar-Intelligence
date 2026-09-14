@@ -276,12 +276,24 @@ jobs:
               "Tìm Senior Data Analyst ở Hà Nội biết SQL và Python, trên 3 năm kinh nghiệm",
               user=user)
           pass1 = result.trace.get("pass1") or {}
+          print(json.dumps({"talent_search_diagnostics": {
+              "nonempty": bool(result.text.strip()),
+              "people_count": len(result.people),
+              "citation_count": len(result.sources),
+              "available_source_count": len(result.all_sources),
+              "retrieval_engine": pass1.get("retrieval_engine"),
+              "compose": result.trace.get("compose"),
+              "citation_audit": result.trace.get("citation_audit"),
+          }}, ensure_ascii=False, sort_keys=True))
           assert result.text.strip() and result.text != "(không có nội dung)"
           assert pass1.get("retrieval_engine") == "intelligence-v2-haystack", pass1
+          assert not (result.trace.get("compose") or {}).get("fallback"), result.trace.get("compose")
+          assert result.people and result.sources, "Talent results must include visible people and citations"
           results["talent_search"] = {
               "nonempty": True,
               "people_count": len(result.people),
               "citation_count": len(result.sources),
+              "available_source_count": len(result.all_sources),
               "retrieval_engine": pass1.get("retrieval_engine"),
           }
           print(json.dumps(results, ensure_ascii=False, sort_keys=True))
