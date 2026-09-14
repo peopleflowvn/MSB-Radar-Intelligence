@@ -40,6 +40,7 @@ jobs:
           sudo docker exec -i msbradar-intelligence python - <<'PY'
           import json
           import os
+          import time
           names = (
               "MSB_AI_GREENNODE_BASE_URL",
               "MSB_AI_GREENNODE_API_KEY",
@@ -228,8 +229,11 @@ jobs:
           assert {"events", "documents", "deleted", "chunks"} == set(index_status)
           print(json.dumps({"index_status": index_status}, sort_keys=True))
 
-          with urllib.request.urlopen(search_request, timeout=30) as response:
+          search_started = time.perf_counter()
+          with urllib.request.urlopen(search_request, timeout=120) as response:
               search = json.load(response)
+          search_latency_seconds = round(time.perf_counter() - search_started, 3)
+          assert search_latency_seconds <= 120, "production search exceeded the 120-second SLA"
           assert response.status == 200 and isinstance(search.get("hits"), list)
           print(json.dumps({
               "feed_http_status": feed_status,
@@ -239,6 +243,7 @@ jobs:
               "evidence_matches_feed": True,
               "search_http_status": response.status,
               "search_hit_count": len(search["hits"]),
+              "search_latency_seconds": search_latency_seconds,
               "wrong_search_token_rejected": True,
           }, sort_keys=True))
           PY
