@@ -142,8 +142,9 @@ class IndexSyncCoordinator:
                 events += 1
                 chunks += result.chunk_count if result.status == "indexed" else 0
             # Save only after every event in this page has been applied.
-            if page.next_cursor is not None:
+            if page.next_cursor is not None and page.next_cursor != cursor:
                 self._cursors.save(page.next_cursor)
+            if page.next_cursor is not None:
                 cursor = page.next_cursor
             pages += 1
             if not page.has_more:

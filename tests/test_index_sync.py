@@ -104,6 +104,25 @@ class IndexSyncTest(unittest.TestCase):
         ).run(max_pages=1)
         self.assertFalse(report.caught_up)
 
+    def test_caught_up_poll_does_not_rewrite_unchanged_cursor(self):
+        class RecordingCursor(InMemoryCursorStore):
+            def __init__(self, cursor):
+                super().__init__(cursor)
+                self.saved = []
+
+            def save(self, cursor):
+                self.saved.append(cursor)
+                super().save(cursor)
+
+        cursors = RecordingCursor("c1")
+        report = IndexSyncCoordinator(
+            ScriptedFeed([FeedPage((), "c1", False)]),
+            IncrementalIndexer(InMemoryDocumentIndex()),
+            cursors,
+        ).run()
+        self.assertTrue(report.caught_up)
+        self.assertEqual(cursors.saved, [])
+
     def test_sqlite_cursor_is_durable_and_namespaced(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state" / "cursor.sqlite3"
