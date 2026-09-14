@@ -40,7 +40,6 @@ jobs:
           sudo docker exec -i msbradar-intelligence python - <<'PY'
           import json
           import os
-          import time
           names = (
               "MSB_AI_GREENNODE_BASE_URL",
               "MSB_AI_GREENNODE_API_KEY",
@@ -165,6 +164,7 @@ jobs:
           sudo docker exec -e PROBE_SCOPE_TOKEN="$scope" -i msbradar-intelligence python - <<'PY'
           import json
           import os
+          import time
           import urllib.error
           import urllib.request
 
