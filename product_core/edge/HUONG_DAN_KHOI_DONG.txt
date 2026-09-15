@@ -1,0 +1,19 @@
+MSB RADAR EDGE - HƯỚNG DẪN KHỞI ĐỘNG
+
+Hệ điều hành hỗ trợ: Windows 10 22H2 hoặc Windows 11, bản 64-bit.
+
+1. Máy chỉ cần có Google Chrome và kết nối Internet khi đồng bộ CV.
+2. Giải nén TOÀN BỘ gói ZIP. Không chạy EXE trong ZIP và không sao chép riêng EXE.
+3. Nếu Windows có nút Unblock: chuột phải ZIP > Properties > Unblock, rồi giải nén lại.
+4. Chạy MSBRadarEdge.exe. Màn hình kiểm tra lần đầu sẽ xác nhận từng thành phần.
+
+Gói portable đã chứa Python, WebView2 Fixed Runtime, OCR Tesseract tiếng Việt/Anh,
+LibreOffice headless và toàn bộ thư viện. Không cần tự cài thêm các thành phần này.
+
+Nếu phần mềm không mở:
+- Kiểm tra máy đúng Windows 64-bit thuộc phiên bản hỗ trợ.
+- Đảm bảo đã giải nén đủ và antivirus không cách ly file trong thư mục.
+- Gửi file loi_khoi_dong.log cạnh EXE cho bộ phận hỗ trợ.
+
+Chrome dùng profile riêng của MSB Radar Edge. Lần đầu với mỗi tài khoản, website có thể
+yêu cầu đăng nhập, OTP hoặc captcha trực tiếp trong cửa sổ Chrome.

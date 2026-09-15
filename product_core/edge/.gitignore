@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+
+# Du lieu va cau hinh rieng tren tung may
+*.db
+*.db-shm
+*.db-wal
+*.log
+cauhinh.json
+cauhinh.json.bak
+cauhinh.bi-mat.json
+.coverage
+tiendo.json
+*.khoa.json
+chrome_profile/
+CV/
+
+# Trang chi tiet ung vien luu ve de khao sat DOM - chua PII that, khong commit
+trang-chi-tiet-ung-vien/
+
+# San pham build va tep tam
+build/
+dist/
+*.spec
+*.zip
+.venv/
+venv/
+.pytest_cache/
+.claude/
+.agents/

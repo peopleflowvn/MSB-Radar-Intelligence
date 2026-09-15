@@ -1,0 +1,3126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MSB Radar Edge</title>
+  <link rel="stylesheet" href="styles.css?v=20260814-account-save">
+  <!-- Áp theme ngay từ localStorage để tránh flash màu sáng (FOUC).
+       Mặc định luôn là dark nếu chưa có lựa chọn lưu. -->
+  <script>
+    (function() {
+      try {
+        var t = localStorage.getItem('msb_radar_theme') || localStorage.getItem('theme') || 'dark';
+        if (t === 'light') {
+          document.documentElement.classList.add('light-theme');
+          document.documentElement.classList.remove('dark-theme');
+        } else {
+          document.documentElement.classList.add('dark-theme');
+          document.documentElement.classList.remove('light-theme');
+        }
+      } catch(e) {}
+    })();
+  </script>
+</head>
+<body class="dark-theme">
+  <div id="runtime-readiness-modal" class="modal-overlay hidden">
+    <div class="modal-card runtime-readiness-dialog">
+      <div class="modal-header"><div><h2>Kiểm tra hệ thống</h2><p>Xác nhận Chrome và các thành phần xử lý CV trên máy.</p></div></div>
+      <div class="modal-body"><div id="runtime-readiness-list" class="runtime-readiness-list"></div><div id="runtime-readiness-note" class="runtime-readiness-note"></div></div>
+      <div class="modal-footer"><button id="btn-runtime-recheck" type="button" class="btn btn-secondary">Kiểm tra lại</button><button id="btn-runtime-continue" type="button" class="btn btn-brand">Đóng</button></div>
+    </div>
+  </div>
+  <!-- Ambient Orbs Background -->
+  <div class="ambient-bg"></div>
+  <div class="grid-overlay"></div>
+
+  <!-- Splash Screen Overlay -->
+  <div id="splash-screen" class="splash-overlay">
+    <div class="splash-content">
+      <div class="splash-logo">
+        <svg viewBox="0 0 280 160" class="w-full h-full svg-container-glow">
+          <defs>
+            <linearGradient id="splashGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color: #F59E0B" />
+              <stop offset="45%" style="stop-color: #FF8A33" />
+              <stop offset="100%" style="stop-color: #E65C00" />
+            </linearGradient>
+          </defs>
+          <g transform="translate(15, 15)">
+            <path d="M 50,130 C 15,130 15,65 50,65 C 85,65 95,130 130,130 C 165,130 175,65 210,65 C 245,65 245,130 210,130 C 175,130 165,65 130,65 C 95,65 85,130 50,130 Z" fill="none" stroke="url(#splashGrad)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" />
+          </g>
+        </svg>
+      </div>
+      <h1 class="splash-title">Gen<span class="text-gradient">Sync</span> Radar</h1>
+      <p class="splash-subtitle">Một sản phẩm của MSB AI Hub</p>
+      <div class="splash-loader">
+        <div class="splash-loader-bar"></div>
+      </div>
+      <span class="splash-status" id="splash-status">Đang khởi động hệ thống...</span>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="app-sidebar">
+      <button id="btn-toggle-sidebar" class="sidebar-collapse-btn" type="button"
+        aria-label="Thu gọn thanh menu" aria-expanded="true" title="Thu gọn thanh menu">
+        <span id="sidebar-toggle-icon">‹</span>
+      </button>
+      <div class="brand">
+        <div class="brand-logo-icon" id="sidebar-brand-icon">
+          <svg viewBox="0 0 280 160" width="46" height="28" style="filter: drop-shadow(0 2px 10px rgba(245, 158, 11, 0.4)); display: block;">
+            <defs>
+              <linearGradient id="logoGradSide" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color: var(--tf-orange-light, #F59E0B)" />
+                <stop offset="45%" style="stop-color: var(--tf-orange, #FF8A33)" />
+                <stop offset="100%" style="stop-color: var(--tf-orange-dark, #E65C00)" />
+              </linearGradient>
+            </defs>
+            <g transform="translate(15, 15)">
+              <path d="M 50,130 C 15,130 15,65 50,65 C 85,65 95,130 130,130 C 165,130 175,65 210,65 C 245,65 245,130 210,130 C 175,130 165,65 130,65 C 95,65 85,130 50,130 Z" fill="none" stroke="url(#logoGradSide)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" />
+            </g>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h2 class="brand-name" id="sidebar-brand-name">MSB <span class="text-gradient">Radar</span></h2>
+          <span class="version-badge" id="sidebar-brand-badge">v…</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-btn active" data-tab="tab-download">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Tải CV</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-candidates">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Dữ liệu ứng viên</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-parsing">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h6"/></svg>
+          <span>Parsing CV</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-report">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span>Báo cáo</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-hub">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6m0 8v6M2 12h6m8 0h6"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>Đồng bộ Hub</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-config">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Cấu hình</span>
+        </button>
+        <button class="nav-btn nav-action" id="btn-menu-runtime-check" data-action="runtime-check" type="button">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+          <span>Kiểm tra hệ thống</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-help">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span>Hướng dẫn</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-version">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>Phiên bản & Tác giả</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="db-status-card">
+          <div class="db-status-title">Tổng hồ sơ trong CSDL</div>
+          <div class="db-status-val" id="sidebar-db-count">0 hồ sơ</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- TAB 1: TẢI CV -->
+      <section id="tab-download" class="tab-pane active">
+        <div class="page-header">
+          <div>
+            <h1>Tải & Đồng Bộ CV</h1>
+            <p class="subtitle">Đồng bộ hồ sơ ứng viên từ các kênh tuyển dụng vào kho dữ liệu MSB Radar</p>
+          </div>
+          <div class="header-status-pill">
+            <span class="pulse-dot"></span>
+            <span id="tab-download-status-text">Hệ thống sẵn sàng</span>
+          </div>
+        </div>
+
+        <!-- SYNC COMMAND CENTER CARD -->
+        <div class="action-bar-card glass-card sync-command-card">
+          <!-- Cụm Tài khoản vận hành -->
+          <div class="provider-selector-section">
+            <div class="provider-selector-header">
+              <div class="provider-header-left">
+                <span class="provider-header-icon">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                </span>
+                <label for="download-provider-select" class="provider-selector-label">TÀI KHOẢN VẬN HÀNH</label>
+                <span id="active-account-badge" class="provider-badge topcv">TopCV</span>
+              </div>
+              <button type="button" class="btn-manage-accounts" onclick="window.app.switchTab('tab-config')" title="Quản lý hoặc thêm tài khoản trong Cấu hình">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <span>Quản lý tài khoản</span>
+              </button>
+            </div>
+            
+            <div class="provider-select-wrapper">
+              <select id="download-provider-select" class="custom-select provider-select-hero">
+                <!-- Options loaded dynamically -->
+              </select>
+            </div>
+          </div>
+
+          <!-- Cụm Nút Bấm Hành Động -->
+          <div class="download-btn-group">
+            <!-- Nút chính: Đồng bộ CV mới -->
+            <button id="btn-download-new" class="btn btn-brand btn-sync-primary" title="Chế độ quét thông minh: Chỉ tải các CV mới nhất và dừng khi gặp hồ sơ cũ">
+              <svg class="btn-icon-sync" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+              </svg>
+              <div class="btn-sync-labels">
+                <span class="btn-sync-title">ĐỒNG BỘ CV</span>
+                <span class="btn-sync-hint">⚡ Chỉ tải CV mới</span>
+              </div>
+            </button>
+
+            <!-- Nút thử lại lỗi -->
+            <button id="btn-retry-failed" class="btn btn-warning-soft" title="Tải lại các hồ sơ ứng viên từng bị lỗi mạng hoặc timeout">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+              </svg>
+              <span>Thử lại CV lỗi</span>
+            </button>
+
+            <!-- Nút mở rộng nâng cao -->
+            <button id="btn-toggle-page-options" class="btn btn-secondary btn-expandable" aria-expanded="false" aria-controls="page-options-card" title="Mở bảng điều khiển nâng cao, bộ nhớ checkpoint và backup">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line>
+                <line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line>
+                <line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line>
+              </svg>
+              <span>Nâng cao & Backup</span>
+              <svg class="chevron-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+
+            <!-- Nút dừng tải -->
+            <button id="btn-stop-download" class="btn btn-danger btn-stop-active hidden" title="Dừng tiến trình đồng bộ ngay lập tức">
+              <svg class="stop-icon-pulse" width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+              </svg>
+              <span>Dừng tải</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Advanced Page Options & Checkpoint Card -->
+        <div id="page-options-card" class="glass-card page-options-card hidden">
+          <div class="advanced-card-header">
+            <div class="card-title-sm">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <span>Tùy Chọn Tải Nâng Cao & Bộ Nhớ Checkpoint</span>
+            </div>
+            <span class="advanced-badge">Expert Mode</span>
+          </div>
+
+          <div class="advanced-sections-grid">
+            <!-- 1. Full Backup Card -->
+            <div class="advanced-subcard history-backup-subcard">
+              <div class="subcard-info">
+                <div class="subcard-title">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <strong>Backup toàn bộ lịch sử</strong>
+                </div>
+                <p>Rà soát toàn bộ các tin tuyển dụng và hồ sơ từ trước đến nay. Tự động bỏ qua CV đã có trong cơ sở dữ liệu.</p>
+              </div>
+              <button id="btn-download-all" class="btn btn-secondary btn-full-backup">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Chạy Backup Lịch Sử</span>
+              </button>
+            </div>
+
+            <!-- 2. Smart Checkpoint Card -->
+            <div class="advanced-subcard checkpoint-subcard">
+              <div class="checkpoint-banner" id="checkpoint-banner">
+                <div id="checkpoint-info" class="checkpoint-info-content">
+                  <span class="checkpoint-empty-text">Chưa có thông tin checkpoint vị trí cũ.</span>
+                </div>
+                <div class="checkpoint-actions">
+                  <button id="btn-refresh-checkpoint" class="btn btn-sm btn-secondary hidden">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                    <span>Kiểm tra lại</span>
+                  </button>
+                  <button id="btn-resume-checkpoint" class="btn btn-sm btn-brand hidden">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <span>Tiếp tục từ trang <strong id="checkpoint-page-num">0</strong></span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Custom Page Range -->
+            <div class="advanced-subcard custom-range-subcard">
+              <div class="subcard-title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <strong>Tải theo khoảng trang tùy chọn</strong>
+              </div>
+              <div class="page-options-grid mt-2">
+                <div class="opt-group">
+                  <label for="input-start-page">Từ trang:</label>
+                  <input type="number" id="input-start-page" class="custom-input" min="1" value="1">
+                </div>
+                <div class="opt-group">
+                  <label for="input-end-page">Đến trang (trống = hết):</label>
+                  <input type="number" id="input-end-page" class="custom-input" min="1" placeholder="Trang cuối">
+                </div>
+                <div class="opt-group checkbox-opt">
+                  <label class="checkbox-container">
+                    <input type="checkbox" id="chk-reverse-order">
+                    <span class="checkmark"></span>
+                    <span>Tải ngược từ trang cuối lên</span>
+                  </label>
+                </div>
+                <div class="opt-actions">
+                  <button id="btn-start-custom-download" class="btn btn-brand btn-custom-start">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <span>Bắt Đầu Quét</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress Card & Live Sync Metrics -->
+        <div class="glass-card progress-card">
+          <div class="progress-header">
+            <div class="progress-status-wrap">
+              <span class="progress-indicator-dot"></span>
+              <span class="progress-phase" id="progress-phase">Sẵn sàng</span>
+            </div>
+            <span class="progress-percent" id="progress-percent">0%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progress-bar-fill" style="width: 0%;"></div>
+          </div>
+          <div class="progress-stats-grid">
+            <div class="stat-card">
+              <div class="stat-card-icon stat-icon-blue">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              </div>
+              <div class="stat-card-content">
+                <span class="stat-card-label">ĐÃ XỬ LÝ</span>
+                <div class="stat-card-value"><strong id="prog-done">0</strong> <span class="stat-total-sep">/</span> <span id="prog-total" class="stat-total-val">0</span></div>
+              </div>
+            </div>
+            
+            <div class="stat-card stat-card-success">
+              <div class="stat-card-icon stat-icon-green">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              </div>
+              <div class="stat-card-content">
+                <span class="stat-card-label">MỚI TẢI VỀ</span>
+                <div class="stat-card-value text-success"><strong id="prog-new">0</strong></div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-card-icon stat-icon-slate">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              </div>
+              <div class="stat-card-content">
+                <span class="stat-card-label">ĐÃ CÓ (BỎ QUA)</span>
+                <div class="stat-card-value text-muted"><strong id="prog-skipped">0</strong></div>
+              </div>
+            </div>
+
+            <div class="stat-card stat-card-danger">
+              <div class="stat-card-icon stat-icon-red">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              </div>
+              <div class="stat-card-content">
+                <span class="stat-card-label">LỖI TẢI</span>
+                <div class="stat-card-value text-danger"><strong id="prog-failed">0</strong></div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-card-icon stat-icon-orange">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div class="stat-card-content">
+                <span class="stat-card-label">ƯỚC TÍNH CÒN</span>
+                <div class="stat-card-value"><strong id="prog-eta">--:--</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Terminal Log Console -->
+        <div class="glass-card log-card">
+          <div class="log-header">
+            <div class="log-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              <span>Nhật ký đồng bộ real-time</span>
+              <span class="log-live-badge"><span class="log-live-dot"></span> REAL-TIME</span>
+            </div>
+            <div class="log-actions">
+              <button id="btn-copy-log" class="btn btn-sm btn-secondary me-2" title="Sao chép toàn bộ nhật ký vào bộ nhớ tạm">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Sao chép</span>
+              </button>
+              <button id="btn-open-log-history" class="btn btn-sm btn-secondary me-2">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                <span>Lịch Sử Nhật Ký</span>
+              </button>
+              <button id="btn-clear-log" class="btn-text">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                <span>Xóa màn hình</span>
+              </button>
+            </div>
+          </div>
+          <div class="log-console" id="log-console">
+            <div class="log-line text-muted">Hệ thống MSB Radar Edge sẵn sàng...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: DỮ LIỆU ỨNG VIÊN -->
+      <section id="tab-candidates" class="tab-pane">
+        <div class="page-header">
+          <div>
+            <h1>Dữ Liệu Ứng Viên</h1>
+            <p class="subtitle">Kho tra cứu, truy vấn và trích xuất hồ sơ ứng viên tập trung</p>
+          </div>
+          <div class="header-actions">
+            <button id="btn-toggle-columns" class="btn btn-secondary">⚙️ Ẩn/Hiện Cột</button>
+            <button id="btn-export-excel" class="btn btn-success">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span>Xuất Excel</span>
+            </button>
+            <button id="btn-export-csv" class="btn btn-secondary">Xuất CSV</button>
+            <button id="btn-export-zip" class="btn btn-secondary">Xuất ZIP (gồm file CV)</button>
+          </div>
+        </div>
+
+        <!-- Tìm kiếm nhanh + điều kiện lọc chi tiết -->
+        <div class="glass-card filter-card">
+          <div class="quick-search-row">
+            <div class="filter-group quick-search-field">
+              <label>Tìm kiếm nhanh trên tất cả trường dữ liệu:</label>
+              <div class="quick-search-control">
+                <input type="search" id="filter-search" class="custom-input"
+                  placeholder='Tên, email, vị trí... · hỗ trợ AND, OR, NOT và "cụm từ"'>
+                <button id="btn-quick-search" class="btn btn-brand">🔎 Tìm kiếm</button>
+              </div>
+              <small class="filter-hint">Boolean Search: <b>Java AND Senior</b> · <b>Java OR Python</b> · <b>Java NOT Intern</b> · <b>"Project Manager"</b></small>
+            </div>
+          </div>
+          <div class="filter-detail-heading">Điều kiện lọc chi tiết</div>
+          <div class="filter-grid filter-detail-grid">
+            <div class="filter-group">
+              <label>Nguồn:</label>
+              <div class="multi-check-filter" data-select-id="filter-source">
+                <button type="button" class="multi-check-trigger" aria-expanded="false"><span>Tất cả nguồn</span><span aria-hidden="true">⌄</span></button>
+                <div class="multi-check-menu hidden"><div class="multi-check-menu-head"><strong>Chọn nguồn</strong><button type="button" class="multi-check-clear">Bỏ chọn</button></div><div class="multi-check-options"></div></div>
+              </div>
+              <select id="filter-source" class="multi-filter-select" multiple hidden>
+                <option value="topcv">TopCV</option>
+                <option value="vietnamworks">VietnamWorks</option>
+                <option value="careerviet">CareerViet</option>
+                <option value="vieclam24h">Việc Làm 24h</option>
+                <option value="itviec">ITViec</option><option value="joboko">Joboko</option><option value="jobsgo">JobsGO</option>
+              </select>
+              <small class="filter-hint">Có thể tích chọn nhiều nguồn</small>
+            </div>
+            <div class="filter-group">
+              <label>Tài khoản (Email):</label>
+              <div class="multi-check-filter" data-select-id="filter-account">
+                <button type="button" class="multi-check-trigger" aria-expanded="false"><span>Tất cả tài khoản</span><span aria-hidden="true">⌄</span></button>
+                <div class="multi-check-menu hidden"><div class="multi-check-menu-head"><strong>Chọn tài khoản</strong><button type="button" class="multi-check-clear">Bỏ chọn</button></div><div class="multi-check-options"></div></div>
+              </div>
+              <select id="filter-account" class="multi-filter-select" multiple hidden></select>
+              <small class="filter-hint">Có thể tích chọn nhiều tài khoản</small>
+            </div>
+            <div class="filter-group">
+              <label>Tình trạng tải:</label>
+              <select id="filter-status" class="custom-select">
+                <option value="">-- Tất cả --</option>
+                <option value="done">Đã tải xong</option>
+                <option value="failed">Lỗi tải</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>Thời gian ứng tuyển:</label>
+              <select id="filter-quick-date" class="custom-select">
+                <option value="">-- Tất cả thời gian --</option>
+                <option value="today">Hôm nay</option>
+                <option value="7days">7 ngày qua</option>
+                <option value="30days">30 ngày qua</option>
+                <option value="this_month">Tháng này</option>
+                <option value="custom">Tùy chọn dải ngày...</option>
+              </select>
+            </div>
+            <div id="date-range-inputs" class="filter-group date-range-group hidden">
+              <label>Từ ngày - Đến ngày:</label>
+              <div class="date-inputs-wrapper">
+                <input type="date" id="filter-date-from" class="custom-input date-input">
+                <span class="date-sep">-</span>
+                <input type="date" id="filter-date-to" class="custom-input date-input">
+              </div>
+            </div>
+            <div class="filter-actions">
+              <button id="btn-apply-filter" class="btn btn-brand">Lọc Dữ Liệu</button>
+              <button id="btn-reset-filter" class="btn btn-text">Đặt lại</button>
+            </div>
+          </div>
+        </div>
+        <div id="candidate-filter-summary" class="filter-result-summary" aria-live="polite">
+          Chưa áp dụng điều kiện lọc.
+        </div>
+
+        <!-- Candidates Table Card -->
+        <div class="glass-card table-card">
+          <div id="candidate-selection-bar" class="candidate-selection-bar hidden" aria-live="polite">
+            <div><strong id="candidate-selected-count">0 ứng viên đã chọn</strong><span>Khi xuất file, chỉ các dòng đã tích sẽ được xuất.</span></div>
+            <button id="btn-clear-candidate-selection" type="button" class="btn btn-sm btn-secondary">Bỏ chọn tất cả</button>
+          </div>
+          <!-- Top Horizontal Scrollbar -->
+          <div id="table-top-scrollbar-wrapper" class="table-top-scrollbar-wrapper">
+            <div id="table-top-scrollbar-inner" class="table-top-scrollbar-inner"></div>
+          </div>
+          <div class="table-container" id="candidates-table-container">
+            <table class="data-table" id="candidates-data-table">
+              <thead>
+                <tr><th>Đang tải dữ liệu...</th></tr>
+              </thead>
+              <tbody id="candidates-tbody">
+                <tr><td colspan="9" class="text-center text-muted">Đang tải dữ liệu...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-pagination">
+            <div class="pagination-left">
+              <span class="pagination-info" id="pagination-info">Hiển thị 0 / 0 bản ghi</span>
+              <div class="page-size-selector">
+                <label for="page-size-select">Hiện:</label>
+                <select id="page-size-select" class="custom-select page-size-dropdown">
+                  <option value="20">20 dòng</option>
+                  <option value="50" selected>50 dòng</option>
+                  <option value="100">100 dòng</option>
+                  <option value="200">200 dòng</option>
+                </select>
+              </div>
+            </div>
+            <div class="pagination-buttons">
+              <button id="btn-first-page" class="btn btn-sm btn-secondary" title="Trang đầu" disabled>⏮️ Đầu</button>
+              <button id="btn-prev-page" class="btn btn-sm btn-secondary" title="Trang trước" disabled>◀️ Trước</button>
+              <div class="page-jump-box">
+                <span>Trang</span>
+                <input type="number" id="page-jump-input" class="custom-input page-jump-input" value="1" min="1">
+                <span>/ <strong id="total-pages-display">1</strong></span>
+                <button id="btn-jump-page" class="btn btn-sm btn-secondary">Đến</button>
+              </div>
+              <button id="btn-next-page" class="btn btn-sm btn-secondary" title="Trang sau" disabled>Sau ▶️</button>
+              <button id="btn-last-page" class="btn btn-sm btn-secondary" title="Trang cuối" disabled>Cuối ⏭️</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: PARSING CV -->
+      <section id="tab-parsing" class="tab-pane">
+        <div class="page-header">
+          <div>
+            <h1>Parsing & Bóc Nội Dung CV</h1>
+            <p class="subtitle">Trích xuất thông tin tự động từ file CV, phân tích cấu trúc PDF/Word và OCR tiếng Việt</p>
+          </div>
+          <div class="header-status-pill">
+            <span class="pulse-dot"></span>
+            <span id="tab-parsing-status-text">Bộ bóc tách sẵn sàng</span>
+          </div>
+        </div>
+
+        <!-- PARSING COMMAND CENTER CARD -->
+        <div class="action-bar-card glass-card parsing-command-card">
+          <div class="parsing-command-header">
+            <div class="command-header-left">
+              <span class="command-header-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+              </span>
+              <div>
+                <strong class="command-title">ĐIỀU KHIỂN TIẾN TRÌNH PARSING</strong>
+                <span class="command-sub">Trích xuất học vấn, kinh nghiệm, kỹ năng & thông tin liên hệ từ CV</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cụm Nút Bấm Hành Động Parsing -->
+          <div class="download-btn-group parsing-btn-group">
+            <!-- Nút chính: Bóc CV cũ chưa parsing -->
+            <button id="btn-parsing-backfill" class="btn btn-brand btn-sync-primary" title="Bắt đầu bóc nội dung cho tất cả hồ sơ CV mới hoặc chưa có dữ liệu parsing">
+              <svg class="btn-icon-sync" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+              </svg>
+              <div class="btn-sync-labels">
+                <span class="btn-sync-title">BÓC TÁCH CV</span>
+                <span class="btn-sync-hint">⚡ Xử lý CV chưa parse</span>
+              </div>
+            </button>
+
+            <!-- Nút tiếp tục hàng đợi -->
+            <button id="btn-parsing-continue" class="btn btn-secondary" title="Tiếp tục xử lý hàng đợi parsing hiện tại">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span>Tiếp tục hàng đợi</span>
+            </button>
+
+            <!-- Nút thử lại CV lỗi -->
+            <button id="btn-parsing-retry" class="btn btn-warning-soft" title="Xếp lại các file CV parsing bị lỗi, file rỗng hoặc cần OCR để xử lý lại">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+              </svg>
+              <span>Thử lại CV lỗi</span>
+            </button>
+
+            <!-- Nút dừng bóc tách -->
+            <button id="btn-parsing-stop" class="btn btn-danger btn-stop-active" title="Dừng tiến trình parsing an toàn sau khi hoàn thành file hiện tại">
+              <svg class="stop-icon-pulse" width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+              </svg>
+              <span>Dừng parsing</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Smart Filter Card for Parsing Priority -->
+        <div class="glass-card report-filter-card parsing-filter-card">
+          <div class="report-filter-heading">
+            <div class="filter-heading-left">
+              <strong>⚡ ƯU TIÊN PHẠM VI HỒ SƠ CẦN BÓC TÁCH</strong>
+              <span>Chỉ các CV khớp điều kiện lọc sẽ được đưa vào hàng đợi ưu tiên xử lý</span>
+            </div>
+            <button id="btn-reset-parsing-filter" type="button" class="btn btn-sm btn-secondary">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+              <span>Đặt lại bộ lọc</span>
+            </button>
+          </div>
+
+          <div class="report-filter-grid">
+            <div class="report-filter-field">
+              <span>Nguồn tuyển dụng:</span>
+              <div class="multi-check-filter" data-select-id="parsing-source">
+                <button type="button" class="multi-check-trigger" aria-expanded="false">
+                  <span>Tất cả nguồn</span><span>⌄</span>
+                </button>
+                <div class="multi-check-menu hidden">
+                  <div class="multi-check-menu-head">
+                    <strong>Chọn nguồn</strong>
+                    <button type="button" class="multi-check-clear">Bỏ chọn</button>
+                  </div>
+                  <div class="multi-check-options"></div>
+                </div>
+              </div>
+              <select id="parsing-source" multiple hidden>
+                <option value="topcv">TopCV</option>
+                <option value="vietnamworks">VietnamWorks</option>
+                <option value="careerviet">CareerViet</option>
+                <option value="vieclam24h">Việc Làm 24h</option>
+                <option value="itviec">ITViec</option><option value="joboko">Joboko</option><option value="jobsgo">JobsGO</option>
+              </select>
+            </div>
+
+            <div class="report-filter-field">
+              <span>Tài khoản:</span>
+              <div class="multi-check-filter" data-select-id="parsing-account">
+                <button type="button" class="multi-check-trigger" aria-expanded="false">
+                  <span>Tất cả tài khoản</span><span>⌄</span>
+                </button>
+                <div class="multi-check-menu hidden">
+                  <div class="multi-check-menu-head">
+                    <strong>Chọn tài khoản</strong>
+                    <button type="button" class="multi-check-clear">Bỏ chọn</button>
+                  </div>
+                  <div class="multi-check-options"></div>
+                </div>
+              </div>
+              <select id="parsing-account" multiple hidden></select>
+            </div>
+
+            <div class="report-filter-field">
+              <span>Vị trí tuyển dụng:</span>
+              <div class="multi-check-filter" data-select-id="parsing-position" data-searchable="true">
+                <button type="button" class="multi-check-trigger" aria-expanded="false">
+                  <span>Tất cả vị trí</span><span>⌄</span>
+                </button>
+                <div class="multi-check-menu hidden">
+                  <input class="custom-input multi-check-search" type="search" placeholder="Tìm vị trí...">
+                  <div class="multi-check-menu-head">
+                    <strong>Chọn vị trí</strong>
+                    <button type="button" class="multi-check-clear">Bỏ chọn</button>
+                  </div>
+                  <div class="multi-check-options"></div>
+                </div>
+              </div>
+              <select id="parsing-position" multiple hidden></select>
+            </div>
+
+            <label class="report-filter-field">
+              <span>Từ ngày ứng tuyển:</span>
+              <input type="date" id="parsing-date-from" class="custom-input date-input">
+            </label>
+            <label class="report-filter-field">
+              <span>Đến ngày ứng tuyển:</span>
+              <input type="date" id="parsing-date-to" class="custom-input date-input">
+            </label>
+          </div>
+          <div id="parsing-filter-summary" class="filter-result-summary">Chưa lọc: lượt parsing sẽ áp dụng cho tất cả CV phù hợp.</div>
+        </div>
+
+        <!-- Metric KPI Cards Grid -->
+        <div class="parsing-kpi-grid">
+          <div class="stat-card parsing-kpi-card">
+            <div class="stat-card-icon stat-icon-green">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            </div>
+            <div class="stat-card-content">
+              <span class="stat-card-label">ĐÃ BÓC NỘI DUNG</span>
+              <div class="stat-card-value"><strong id="parsing-done">—</strong></div>
+              <small id="parsing-coverage" class="stat-card-sub">Độ phủ —</small>
+            </div>
+          </div>
+
+          <div class="stat-card parsing-kpi-card">
+            <div class="stat-card-icon stat-icon-blue">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <div class="stat-card-content">
+              <span class="stat-card-label">ĐANG CHỜ HÀNG ĐỢI</span>
+              <div class="stat-card-value"><strong id="parsing-pending">—</strong></div>
+              <small class="stat-card-sub">Tiếp tục được sau khi dừng</small>
+            </div>
+          </div>
+
+          <div class="stat-card parsing-kpi-card">
+            <div class="stat-card-icon stat-icon-red">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            </div>
+            <div class="stat-card-content">
+              <span class="stat-card-label">CẦN KIỂM TRA</span>
+              <div class="stat-card-value"><strong id="parsing-errors">—</strong></div>
+              <small class="stat-card-sub">File ảnh/scan hoặc rỗng</small>
+            </div>
+          </div>
+
+          <div class="stat-card parsing-kpi-card">
+            <div class="stat-card-icon stat-icon-purple">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            </div>
+            <div class="stat-card-content">
+              <span class="stat-card-label">BỘ NHẬN DIỆN OCR</span>
+              <div class="stat-card-value"><strong id="parsing-ocr">—</strong></div>
+              <small class="stat-card-sub">PDF scan và file ảnh</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Progress & File Monitor -->
+        <div class="glass-card progress-card parsing-progress-card">
+          <div class="progress-header">
+            <div id="parsing-summary" class="health-smart-summary">
+              <span class="health-pulse"></span>
+              <div>
+                <strong>Đang đọc trạng thái…</strong>
+                <small>PDF, Office, văn bản và OCR cho bản scan</small>
+              </div>
+            </div>
+            <div class="parsing-current-badge">
+              <span class="current-label">Đang xử lý:</span>
+              <strong id="parsing-current-file">Chưa có tác vụ</strong>
+            </div>
+          </div>
+
+          <div class="progress-bar-container">
+            <div id="parsing-progress-fill" class="progress-bar-fill" style="width:0%"></div>
+          </div>
+          <div id="parsing-progress-text" class="progress-stats">0 CV trong lượt hiện tại</div>
+        </div>
+
+        <!-- Terminal Log Console for Parsing -->
+        <div class="glass-card log-card parsing-log-card">
+          <div class="log-header">
+            <div class="log-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              <span>Nhật Ký Parsing CV Real-Time</span>
+              <span class="log-live-badge"><span class="log-live-dot"></span> REAL-TIME</span>
+            </div>
+            <div class="log-actions">
+              <button id="btn-copy-parsing-log" class="btn btn-sm btn-secondary me-2" title="Sao chép toàn bộ nội dung nhật ký parsing">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Sao chép</span>
+              </button>
+              <button id="btn-clear-parsing-log" class="btn-text">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                <span>Xóa màn hình</span>
+              </button>
+            </div>
+          </div>
+          <div id="parsing-log-console" class="log-console">
+            <div class="log-line info">Sẵn sàng nhận nhật ký parsing…</div>
+          </div>
+        </div>
+
+        <!-- Parsing Results Explorer Table -->
+        <div class="glass-card parsing-results-card">
+          <div class="parsing-results-header">
+            <div class="results-header-left">
+              <div class="results-title-group">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                <h3>Chi Tiết Kết Quả Bóc Tách Theo Từng Hồ Sơ</h3>
+              </div>
+              <span class="results-subtitle">Ưu tiên hiển thị hồ sơ mới nhất; bấm vào từng dòng để xem nội dung văn bản và thông tin trích xuất</span>
+            </div>
+            <div class="results-header-actions">
+              <div class="parsing-status-filter-pills" id="parsing-status-pills">
+                <button type="button" class="status-pill active" data-status="">Tất cả</button>
+                <button type="button" class="status-pill" data-status="done">✓ Đã xong</button>
+                <button type="button" class="status-pill" data-status="needs_ocr">⚡ Cần OCR</button>
+                <button type="button" class="status-pill" data-status="error">⚠️ Lỗi / Rỗng</button>
+              </div>
+              <div class="parsing-search-box">
+                <input type="search" id="parsing-results-search" class="custom-input" placeholder="Tìm tên, vị trí, file CV...">
+              </div>
+              <button id="btn-refresh-parsing-results" class="btn btn-sm btn-secondary" title="Tải lại danh sách">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                <span>Làm mới</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="parsing-table-container">
+            <table class="data-table parsing-data-table" id="parsing-results-table">
+              <thead>
+                <tr>
+                  <th style="width: 220px;">ỨNG VIÊN</th>
+                  <th style="width: 200px;">VỊ TRÍ & NGUỒN</th>
+                  <th style="width: 140px;">NGÀY ỨNG TUYỂN</th>
+                  <th style="width: 150px;">TRẠNG THÁI BÓC</th>
+                  <th style="width: 130px;">PHƯƠNG THỨC</th>
+                  <th style="width: 110px;">ĐỘ TIN CẬY</th>
+                  <th style="width: 130px; text-align: center;">THAO TÁC</th>
+                </tr>
+              </thead>
+              <tbody id="parsing-results-tbody">
+                <tr>
+                  <td colspan="7" class="text-center" style="padding: 28px; color: var(--tf-slate);">
+                    Đang tải danh sách kết quả bóc tách...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-pagination-footer parsing-pagination-footer">
+            <div class="pagination-info" id="parsing-pagination-info">Hiển thị 0 / 0 hồ sơ</div>
+            <div class="pagination-controls">
+              <button id="btn-prev-parsing-page" class="btn btn-sm btn-secondary" disabled>◀ Trước</button>
+              <span id="parsing-current-page-num" class="current-page-badge">1</span>
+              <button id="btn-next-parsing-page" class="btn btn-sm btn-secondary" disabled>Sau ▶</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: BÁO CÁO & PHÂN TÍCH ĐIỀU HÀNH (MSB RADAR EXECUTIVE ANALYTICS HUB) -->
+      <section id="tab-report" class="tab-pane">
+        <div class="page-header report-hub-header">
+          <div>
+            <div class="report-hub-badge">
+              <span class="hub-pulse"></span>
+              <span>Executive Recruitment Intelligence · MSB Radar Edge</span>
+            </div>
+            <h1>Báo Cáo Phân Tích & Hiệu Quả Tuyển Dụng</h1>
+            <p class="subtitle">Trung tâm phân tích dữ liệu ứng viên, xu hướng tuyển dụng đa kênh và đánh giá chất lượng hồ sơ</p>
+          </div>
+          <div class="header-actions report-header-actions">
+            <button id="btn-refresh-report" class="btn btn-secondary" title="Làm mới dữ liệu báo cáo">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              <span>Làm Mới Số Liệu</span>
+            </button>
+            <button id="btn-export-report-excel" class="btn btn-success" title="Xuất dữ liệu thống kê ra file Excel">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span>Xuất Excel</span>
+            </button>
+            <button id="btn-report-view-candidates" class="btn btn-brand" title="Xem danh sách ứng viên tương ứng">
+              <span>🔍 Xem Danh Sách Ứng Viên</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Smart Filter Card -->
+        <div class="glass-card report-filter-card">
+          <div class="report-filter-heading">
+            <div class="filter-heading-left">
+              <strong>⚡ BỘ LỌC ĐA CHIỀU THỜI GIAN THỰC</strong>
+              <span>Tùy chỉnh phạm vi nguồn, tài khoản, vị trí và khoảng thời gian phân tích</span>
+            </div>
+            <span id="report-filter-status" class="report-filter-status applied">Đang dùng bộ lọc mặc định</span>
+          </div>
+
+          <!-- Quick Date Presets -->
+          <div class="report-date-presets-wrapper">
+            <span class="preset-label">Chọn nhanh:</span>
+            <div class="report-date-presets" id="report-date-presets">
+              <button type="button" class="preset-pill" data-range="today">Hôm nay</button>
+              <button type="button" class="preset-pill" data-range="7d">7 ngày qua</button>
+              <button type="button" class="preset-pill" data-range="30d">30 ngày qua</button>
+              <button type="button" class="preset-pill" data-range="90d">90 ngày qua</button>
+              <button type="button" class="preset-pill" data-range="this_month">Tháng này</button>
+              <button type="button" class="preset-pill" data-range="this_year">Năm nay</button>
+              <button type="button" class="preset-pill active" data-range="all">🌟 Toàn bộ</button>
+              <button type="button" class="preset-pill" data-range="custom">📅 Tùy chọn...</button>
+            </div>
+          </div>
+
+          <div class="report-filter-grid">
+            <div class="report-filter-field">
+              <span>Kênh tuyển dụng:</span>
+              <div class="multi-check-filter" data-select-id="report-source">
+                <button type="button" class="multi-check-trigger" aria-expanded="false">
+                  <span>Tất cả nguồn</span><span>⌄</span>
+                </button>
+                <div class="multi-check-menu hidden">
+                  <div class="multi-check-menu-head"><strong>Chọn nguồn</strong><button type="button" class="multi-check-clear">Bỏ chọn</button></div>
+                  <div class="multi-check-options"></div>
+                </div>
+              </div>
+              <select id="report-source" multiple hidden>
+                <option value="topcv">TopCV</option>
+                <option value="vietnamworks">VietnamWorks</option>
+                <option value="careerviet">CareerViet</option>
+                <option value="vieclam24h">Việc Làm 24h</option>
+                <option value="itviec">ITViec</option><option value="joboko">Joboko</option><option value="jobsgo">JobsGO</option>
+              </select>
+            </div>
+
+            <div class="report-filter-field">
+              <span>Tài khoản (Email):</span>
+              <div class="multi-check-filter" data-select-id="report-account">
+                <button type="button" class="multi-check-trigger" aria-expanded="false">
+                  <span>Tất cả tài khoản</span><span>⌄</span>
+                </button>
+                <div class="multi-check-menu hidden">
+                  <div class="multi-check-menu-head"><strong>Chọn tài khoản</strong><button type="button" class="multi-check-clear">Bỏ chọn</button></div>
+                  <div class="multi-check-options"></div>
+                </div>
+              </div>
+              <select id="report-account" multiple hidden></select>
+            </div>
+
+            <div class="report-filter-field">
+              <span>Vị trí tuyển dụng:</span>
+              <div class="multi-check-filter" data-select-id="report-position" data-searchable="true">
+                <button type="button" class="multi-check-trigger" aria-expanded="false">
+                  <span>Tất cả vị trí</span><span>⌄</span>
+                </button>
+                <div class="multi-check-menu hidden">
+                  <input class="custom-input multi-check-search" type="search" placeholder="Tìm vị trí...">
+                  <div class="multi-check-menu-head"><strong>Chọn nhiều vị trí</strong><button type="button" class="multi-check-clear">Bỏ chọn</button></div>
+                  <div class="multi-check-options"></div>
+                </div>
+              </div>
+              <select id="report-position" multiple hidden></select>
+            </div>
+
+            <label class="report-filter-field">
+              <span>Khoảng thời gian:</span>
+              <select id="report-time-range" class="custom-select">
+                <option value="today">Hôm nay</option>
+                <option value="7d">7 ngày gần nhất</option>
+                <option value="30d">30 ngày gần nhất</option>
+                <option value="90d">90 ngày gần nhất</option>
+                <option value="this_month">Tháng này</option>
+                <option value="this_year">Năm nay</option>
+                <option value="all" selected>Tất cả thời gian</option>
+                <option value="custom">Tùy chọn khoảng ngày</option>
+              </select>
+            </label>
+
+            <div id="report-custom-dates" class="report-filter-field report-date-field hidden">
+              <span>Khoảng ngày tùy chọn:</span>
+              <div class="date-inputs-wrapper">
+                <input type="date" id="report-date-from" class="custom-input date-input" aria-label="Ngày bắt đầu">
+                <span class="date-sep">–</span>
+                <input type="date" id="report-date-to" class="custom-input date-input" aria-label="Ngày kết thúc">
+              </div>
+            </div>
+
+            <div class="report-filter-actions">
+              <button id="btn-reset-report" class="btn btn-secondary">Đặt lại</button>
+              <button id="btn-apply-report" class="btn btn-brand">Áp dụng bộ lọc</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="report-error" class="info-callout hidden"></div>
+        <div class="report-state-row">
+          <span></span>
+          <span id="report-loading" class="report-loading hidden">
+            <i class="report-loading-spinner" aria-hidden="true"></i>
+            <span id="report-loading-text">Đang tổng hợp báo cáo, vui lòng chờ…</span>
+          </span>
+        </div>
+
+        <!-- 5 Executive High-Impact KPI Cards -->
+        <div class="report-kpi-grid">
+          <!-- Card 1: Tổng Lượt Ứng Tuyển -->
+          <div class="glass-card kpi-card kpi-card-hero">
+            <div class="kpi-top-bar">
+              <div class="kpi-icon-pill icon-orange">📑</div>
+              <span id="kpi-change-badge" class="kpi-trend-pill neutral">—</span>
+            </div>
+            <div class="kpi-label">Tổng Lượt Ứng Tuyển</div>
+            <div class="kpi-main-val text-gradient" id="kpi-total">0</div>
+            <div class="kpi-card-footer">
+              <span class="kpi-footer-sub" id="kpi-previous">Toàn bộ thời gian</span>
+            </div>
+          </div>
+
+          <!-- Card 2: CV Đã Tải Về Máy -->
+          <div class="glass-card kpi-card">
+            <div class="kpi-top-bar">
+              <div class="kpi-icon-pill icon-green">💾</div>
+              <span class="kpi-rate-tag success" id="kpi-rate-tag">Đạt <b id="kpi-rate">0%</b></span>
+            </div>
+            <div class="kpi-label">CV Đã Tải Về Máy</div>
+            <div class="kpi-main-val text-success" id="kpi-done">0</div>
+            <div class="kpi-card-footer">
+              <div class="kpi-mini-track">
+                <div class="kpi-mini-fill" id="kpi-success-fill" style="width:0%"></div>
+              </div>
+              <div class="kpi-footer-row">
+                <span class="kpi-footer-sub">Đã lưu kho</span>
+                <span class="kpi-footer-sub text-danger" id="kpi-failed-text">Lỗi: <b id="kpi-failed">0</b></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Ứng Viên Thực Tế -->
+          <div class="glass-card kpi-card">
+            <div class="kpi-top-bar">
+              <div class="kpi-icon-pill icon-blue">👤</div>
+              <span class="kpi-sub-tag" id="kpi-unique-share">Độc nhất: 0%</span>
+            </div>
+            <div class="kpi-label">Ứng Viên Độc Nhất</div>
+            <div class="kpi-main-val text-blue" id="kpi-unique">0</div>
+            <div class="kpi-card-footer">
+              <div class="kpi-footer-row">
+                <span class="kpi-footer-sub text-warning" id="kpi-dup-badge">Trùng lặp: <b id="kpi-duplicates">0</b></span>
+                <span class="kpi-footer-sub">Đã lọc trùng</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 4: Đủ Thông Tin Liên Hệ -->
+          <div class="glass-card kpi-card">
+            <div class="kpi-top-bar">
+              <div class="kpi-icon-pill icon-purple">📱</div>
+              <span class="kpi-quality-tag" id="kpi-contact-rate-tag">Đạt 0%</span>
+            </div>
+            <div class="kpi-label">Đủ Email & Số ĐT</div>
+            <div class="kpi-main-val text-purple" id="kpi-complete-contact">0</div>
+            <div class="kpi-card-footer">
+              <span class="kpi-footer-sub">Sẵn sàng gọi phỏng vấn ngay</span>
+            </div>
+          </div>
+
+          <!-- Card 5: Tốc Độ Ứng Tuyển & Cao Điểm -->
+          <div class="glass-card kpi-card">
+            <div class="kpi-top-bar">
+              <div class="kpi-icon-pill icon-gold">⚡</div>
+              <span class="kpi-peak-pill" id="kpi-peak-pill">Đỉnh: <b id="kpi-peak-count">0</b></span>
+            </div>
+            <div class="kpi-label" id="kpi-average-label">Bình Quân Mỗi Ngày</div>
+            <div class="kpi-main-val text-gold" id="kpi-average">0</div>
+            <div class="kpi-card-footer">
+              <span class="kpi-footer-sub" id="kpi-peak-date">Kỳ cao điểm: —</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Smart Executive Insights Box -->
+        <div class="glass-card report-insights-card">
+          <div class="insights-header">
+            <div class="insights-title">
+              <span class="insights-icon">🧠</span>
+              <h3>ĐÁNH GIÁ & NHẬN ĐỊNH TỰ ĐỘNG (SMART EXECUTIVE INSIGHTS)</h3>
+            </div>
+            <span class="insights-tag">AI-Powered Synthesis</span>
+          </div>
+          <div class="insights-grid">
+            <div class="insight-item">
+              <div class="insight-item-header">
+                <span class="insight-dot source"></span>
+                <strong>Nguồn Tuyển Dụng Dẫn Đầu</strong>
+              </div>
+              <p id="insight-top-source">Đang phân tích dữ liệu nguồn tuyển dụng...</p>
+            </div>
+            <div class="insight-item">
+              <div class="insight-item-header">
+                <span class="insight-dot position"></span>
+                <strong>Vị Trí Hút Hồ Sơ Nhất</strong>
+              </div>
+              <p id="insight-top-position">Đang phân tích vị trí ứng tuyển...</p>
+            </div>
+            <div class="insight-item">
+              <div class="insight-item-header">
+                <span class="insight-dot trend"></span>
+                <strong>Xu Hướng & Mốc Cao Điểm</strong>
+              </div>
+              <p id="insight-trend-summary">Đang tổng hợp diễn biến thời gian...</p>
+            </div>
+            <div class="insight-item">
+              <div class="insight-item-header">
+                <span class="insight-dot recommendation"></span>
+                <strong>Khuyến Nghị Vận Hành</strong>
+              </div>
+              <p id="insight-recommendation">Đang tạo gợi ý tối ưu...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Visual Charts Grid -->
+        <div class="report-charts-container">
+          <!-- Full-Width: Multi-Channel Trend Chart -->
+          <div class="glass-card chart-card trend-chart-card">
+            <div class="chart-card-header justify-between">
+              <div>
+                <h3 id="trend-chart-title">Xu Hướng Ứng Tuyển Toàn Bộ Thời Gian</h3>
+                <span class="chart-subtitle">Diễn biến lượng hồ sơ nộp theo chu kỳ thời gian thực</span>
+              </div>
+              <div class="chart-header-controls">
+                <span id="trend-granularity-badge" class="granularity-badge">Theo Ngày</span>
+              </div>
+            </div>
+            <div id="chart-trend" class="line-chart-wrapper"></div>
+          </div>
+
+          <!-- 2-Column Grid: Positions & Sources -->
+          <div class="report-sub-grid">
+            <!-- Top Positions Card -->
+            <div class="glass-card chart-card position-chart-card">
+              <div class="chart-card-header justify-between">
+                <div>
+                  <h3>🏆 Top Vị Trí Ứng Tuyển Nhiều Nhất</h3>
+                  <span class="chart-subtitle">Bấm vào vị trí để chuyển sang tra cứu danh sách</span>
+                </div>
+              </div>
+              <div id="chart-positions" class="bar-chart-wrapper"></div>
+            </div>
+
+            <!-- Source Performance Card -->
+            <div class="glass-card chart-card source-chart-card">
+              <div class="chart-card-header justify-between">
+                <div>
+                  <h3>🏢 Hiệu Quả Theo Kênh & Tài Khoản</h3>
+                  <span class="chart-subtitle">Tỷ trọng hồ sơ và chất lượng đồng bộ từng nguồn</span>
+                </div>
+              </div>
+              <div id="chart-sources" class="source-chart-wrapper"></div>
+            </div>
+          </div>
+
+          <!-- Data Quality Gauges Card -->
+          <div class="glass-card chart-card quality-chart-card">
+            <div class="chart-card-header">
+              <div>
+                <h3>🎯 Ma Trận Chất Lượng Dữ Liệu Hồ Sơ</h3>
+                <span class="chart-subtitle">Đo lường mức độ hoàn thiện thông tin ứng viên trong cơ sở dữ liệu</span>
+              </div>
+            </div>
+            <div id="chart-quality" class="quality-grid-wrapper"></div>
+          </div>
+
+          <div class="glass-card chart-card parsing-report-card">
+            <div class="chart-card-header justify-between">
+              <div><h3>📄 Độ Phủ & Chất Lượng Parsing CV</h3><span class="chart-subtitle">Thống kê theo đúng bộ lọc báo cáo hiện tại</span></div>
+              <span id="report-parsing-coverage" class="granularity-badge">0% đã parsing</span>
+            </div>
+            <div class="parsing-report-kpis">
+              <div><span>Đã parsing</span><strong id="report-parsing-done">0</strong></div>
+              <div><span>Đang chờ</span><strong id="report-parsing-pending">0</strong></div>
+              <div><span>Chưa xếp hàng</span><strong id="report-parsing-not-queued">0</strong></div>
+              <div><span>Cần kiểm tra</span><strong id="report-parsing-attention">0</strong></div>
+            </div>
+            <div class="parsing-report-grid">
+              <div><h4>Phương thức bóc nội dung</h4><div id="report-parsing-methods" class="parsing-report-list"></div></div>
+              <div><h4>Độ phủ theo nguồn</h4><div id="report-parsing-sources" class="parsing-report-list"></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: ĐỒNG BỘ HUB (Thiết kế lại theo chuẩn UI/UX cao cấp) -->
+      <section id="tab-hub" class="tab-pane">
+        <div class="page-header">
+          <div>
+            <h1>Đồng Bộ Hub Trung Tâm</h1>
+            <p class="subtitle">Đưa hồ sơ ứng viên và file CV đã thu thập lên hệ thống MSB Radar Hub</p>
+          </div>
+          <div class="header-status-pill" id="hub-live-status-pill">
+            <span class="pulse-dot" id="hub-live-status-dot"></span>
+            <span id="hub-live-status-text">Đang kiểm tra kết nối...</span>
+          </div>
+        </div>
+
+        <!-- Setup Required Alert Banner -->
+        <div id="hub-not-configured" class="glass-card setup-alert-banner hidden">
+          <div class="setup-alert-icon">🔌</div>
+          <div class="setup-alert-content">
+            <h3>Chưa Kết Nối Máy Chủ Hub</h3>
+            <p>Vui lòng khai báo <strong>Địa chỉ Hub</strong> và <strong>API Key</strong> bên dưới để mở khóa tính năng đồng bộ dữ liệu. Chưa cấu hình thì dữ liệu hoàn toàn lưu trữ cục bộ trên máy trạm này.</p>
+          </div>
+        </div>
+
+        <!-- HUB COMMAND CENTER CARD -->
+        <div class="action-bar-card glass-card hub-command-card">
+          <div class="command-header-left">
+            <span class="command-header-icon hub-command-badge">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v6m0 8v6M2 12h6m8 0h6"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </span>
+            <div>
+              <strong class="command-title">TRUNG TÂM ĐIỀU KHIỂN ĐỒNG BỘ NGOẠI BIÊN</strong>
+              <span class="command-sub">Truyền tải hồ sơ và tài liệu đính kèm lên máy chủ trung tâm qua kênh HTTPS</span>
+            </div>
+          </div>
+
+          <!-- Cụm Nút Bấm Hành Động Đồng Bộ -->
+          <div class="download-btn-group hub-btn-group">
+            <!-- Nút chính: Đồng bộ ngay -->
+            <button id="btn-hub-sync-now" class="btn btn-brand btn-sync-primary" title="Bắt đầu gửi các hồ sơ và file CV mới trong hàng đợi lên Hub">
+              <svg class="btn-icon-sync" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+              </svg>
+              <div class="btn-sync-labels">
+                <span class="btn-sync-title">ĐỒNG BỘ NGAY</span>
+                <span class="btn-sync-hint">⚡ Gửi dữ liệu mới</span>
+              </div>
+            </button>
+
+            <!-- Nút đồng bộ lại toàn bộ kho -->
+            <button id="btn-hub-sync-full" class="btn btn-secondary" title="Quét lại toàn bộ kho hồ sơ cục bộ, kể cả những hồ sơ đã tải trước đây">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              <span>Đồng bộ toàn bộ kho</span>
+            </button>
+
+            <!-- Nút thử lại bản ghi lỗi -->
+            <button id="btn-hub-retry-failed" class="btn btn-warning-soft" title="Xếp lại những bản ghi bị lỗi mạng hoặc gián đoạn để gửi lại">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+              </svg>
+              <span>Thử lại bản ghi lỗi</span>
+            </button>
+
+            <!-- Nút kiểm tra kết nối -->
+            <button id="btn-hub-test" class="btn btn-secondary" title="Kiểm tra ping và tính hợp lệ của API Key với máy chủ Hub">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+                <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                <line x1="12" y1="20" x2="12.01" y2="20"></line>
+              </svg>
+              <span>Kiểm tra kết nối</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- METRIC KPI CARDS GRID -->
+        <div class="hub-kpi-grid">
+          <div class="stat-card hub-kpi-card">
+            <div class="stat-card-icon stat-icon-amber">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </div>
+            <div class="stat-card-content">
+              <span class="stat-card-label">CHỜ GỬI (PENDING)</span>
+              <div class="stat-card-value"><strong id="hub-q-pending">0</strong></div>
+              <small class="stat-card-sub">Hồ sơ & file trong hàng đợi outbox</small>
+            </div>
+          </div>
+
+          <div class="stat-card hub-kpi-card">
+            <div class="stat-card-icon stat-icon-blue">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 2L11 13"></path>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </div>
+            <div class="stat-card-content">
+              <span class="stat-card-label">ĐANG GỬI (IN-FLIGHT)</span>
+              <div class="stat-card-value"><strong id="hub-q-inflight">0</strong></div>
+              <small class="stat-card-sub">Lô dữ liệu đang truyền qua HTTPS</small>
+            </div>
+          </div>
+
+          <div class="stat-card hub-kpi-card">
+            <div class="stat-card-icon stat-icon-green">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+            <div class="stat-card-content">
+              <span class="stat-card-label">ĐÃ LÊN HUB (SYNCED)</span>
+              <div class="stat-card-value"><strong id="hub-q-synced">0</strong></div>
+              <small class="stat-card-sub">Đã xác nhận lưu trữ trung tâm</small>
+            </div>
+          </div>
+
+          <div class="stat-card hub-kpi-card">
+            <div class="stat-card-icon stat-icon-red">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            </div>
+            <div class="stat-card-content">
+              <span class="stat-card-label">CẦN THỬ LẠI (FAILED)</span>
+              <div class="stat-card-value"><strong id="hub-q-failed">0</strong></div>
+              <small class="stat-card-sub">Bản ghi gián đoạn kết nối</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- LIVE MONITOR & HEALTH CARD -->
+        <div class="glass-card hub-monitor-card">
+          <div class="hub-monitor-header">
+            <div class="hub-monitor-status">
+              <div class="health-smart-summary">
+                <span class="health-pulse"></span>
+                <div>
+                  <strong>NHẬT KÝ & TRẠNG THÁI LƯỢT ĐỒNG BỘ</strong>
+                  <span id="hub-last-run" class="hub-last-run-text">Chưa đồng bộ lần nào.</span>
+                </div>
+              </div>
+            </div>
+            <div id="hub-test-result-wrapper" class="hub-test-result-wrapper">
+              <div id="hub-test-result" class="hub-test-badge">Chưa kiểm tra kết nối</div>
+            </div>
+          </div>
+          <div class="progress-bar-container hub-progress-container">
+            <div id="hub-progress-fill" class="progress-bar-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- CONFIGURATION & DAEMON GRID (2 COLUMNS) -->
+        <div class="hub-sections-grid">
+          <!-- CARD 1: CẤU HÌNH KẾT NỐI VÀ ĐỊNH DANH NODE -->
+          <div class="glass-card config-card hub-config-card">
+            <div class="config-card-header">
+              <div class="config-icon-badge icon-orange">🌐</div>
+              <div>
+                <h3>Kết Nối & Định Danh Trạm</h3>
+                <p class="config-card-sub">Địa chỉ máy chủ Hub trung tâm và khóa API bảo mật</p>
+              </div>
+            </div>
+            <div class="config-card-body">
+              <div class="form-group">
+                <label for="hub-url">Địa chỉ Máy chủ Hub (URL):</label>
+                <div class="input-with-icon-wrapper">
+                  <span class="input-prefix-icon">🔗</span>
+                  <input type="url" id="hub-url" class="custom-input" placeholder="https://radar.msb.com.vn" />
+                </div>
+                <small class="form-hint">Địa chỉ cổng kết nối HTTPS nội bộ hoặc qua VPN của MSB Radar Hub.</small>
+              </div>
+
+              <div class="form-group">
+                <label for="hub-api-key">API Key Của Máy Trạm:</label>
+                <div class="password-input-wrapper">
+                  <input type="password" id="hub-api-key" class="custom-input" placeholder="Dán khóa truy cập do Quản trị viên cấp" />
+                  <button type="button" class="password-toggle-btn" title="Hiện/Ẩn khóa API" aria-label="Hiện/Ẩn khóa API">👁</button>
+                </div>
+                <small class="form-hint">🔒 Khóa được mã hóa bằng DPAPI và lưu an toàn trên máy, không nằm trong file cấu hình json.</small>
+              </div>
+
+              <div class="form-group">
+                <label for="hub-edge-id">Mã Trạm Ngoại Biên (Edge ID):</label>
+                <div class="input-copy-group">
+                  <input type="text" id="hub-edge-id" class="custom-input" readonly placeholder="Đang tạo mã định danh..." />
+                  <button type="button" id="btn-copy-edge-id" class="btn btn-secondary btn-copy" title="Sao chép Edge ID">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    <span>Sao chép</span>
+                  </button>
+                </div>
+                <small class="form-hint">Mã định danh sinh tự động trên máy này. Khi kết nối lần đầu, Hub sẽ tự động nhận diện và khóa quyền (Binding) mã máy này với API Key.</small>
+              </div>
+
+              <div class="hub-card-actions">
+                <button id="btn-hub-save" type="button" class="btn btn-brand">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  <span>Lưu Kết Nối</span>
+                </button>
+                <button id="btn-hub-register" type="button" class="btn btn-secondary" title="Gửi mã trạm lên Hub để yêu cầu kích hoạt">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                  <span>Khai Báo Với Hub</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 2: ĐỒNG BỘ TỰ ĐỘNG THEO PIPELINE -->
+          <div class="glass-card config-card hub-daemon-card">
+            <div class="config-card-header">
+              <div class="config-icon-badge icon-blue">⚙️</div>
+              <div>
+                <h3>Đồng Bộ Tự Động Theo Pipeline</h3>
+                <p class="config-card-sub">Không cần hẹn giờ — hệ thống tự phát hiện và đẩy dữ liệu</p>
+              </div>
+            </div>
+            <div class="config-card-body">
+              <div class="hub-auto-status-box">
+                <div class="auto-status-indicator">
+                  <span class="pulse-dot" id="hub-auto-pulse-dot"></span>
+                  <div>
+                    <span class="auto-status-title">Trạng thái:</span>
+                    <strong id="hub-auto-status" class="auto-status-desc">Sẵn sàng.</strong>
+                  </div>
+                </div>
+              </div>
+              <div class="hub-security-banner">
+                <div class="security-banner-icon">🛡️</div>
+                <div class="security-banner-text">
+                  <strong>Cách hoạt động:</strong>
+                  <span>Đồng bộ tự chạy ngay khi có CV đã tải về và bóc tách xong nhiều hơn số đã đồng bộ, và tự tạm dừng nhường tài nguyên khi đang tải CV hoặc đang parsing. Chỉ cần nhập địa chỉ Hub và API key ở thẻ bên trên.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD: HƯỚNG DẪN THIẾT LẬP & KẾT NỐI HUB 4 BƯỚC -->
+        <div class="glass-card config-card hub-setup-guide-card">
+          <div class="config-card-header">
+            <div class="config-icon-badge icon-orange">📘</div>
+            <div>
+              <h3>Hướng Dẫn Thiết Lập & Kết Nối Hub 4 Bước</h3>
+              <p class="config-card-sub">Quy trình cấp quyền, tự động gắn kết (Binding) và vận hành đồng bộ dữ liệu</p>
+            </div>
+          </div>
+          <div class="config-card-body">
+            <!-- Step Flow Grid -->
+            <div class="hub-steps-grid">
+              <div class="hub-step-item">
+                <div class="hub-step-badge">
+                  <span class="hub-step-num">1</span>
+                  <span class="hub-step-icon">🔑</span>
+                </div>
+                <div class="hub-step-content">
+                  <strong>Nhận API Key Từ Quản Trị Viên</strong>
+                  <p>Quản trị viên tạo trạm trên Hub và cấp <strong>API Key</strong> riêng (Hub không yêu cầu nhập trước mã máy khi tạo khóa).</p>
+                </div>
+              </div>
+
+              <div class="hub-step-item">
+                <div class="hub-step-badge">
+                  <span class="hub-step-num">2</span>
+                  <span class="hub-step-icon">🔗</span>
+                </div>
+                <div class="hub-step-content">
+                  <strong>Nhập Địa Chỉ Hub & Lưu Khóa</strong>
+                  <p>Dán địa chỉ URL Hub và API Key vào ô cấu hình bên trên rồi bấm <code>Lưu Kết Nối</code>.</p>
+                </div>
+              </div>
+
+              <div class="hub-step-item">
+                <div class="hub-step-badge">
+                  <span class="hub-step-num">3</span>
+                  <span class="hub-step-icon">🛡️</span>
+                </div>
+                <div class="hub-step-content">
+                  <strong>Tự Động Gắn Kết (Binding)</strong>
+                  <p>Bấm <code>Kiểm Tra Kết Nối</code>. Máy Edge tự động gửi <strong>Edge ID</strong> lên Hub để tự động xác thực và khóa danh tính máy.</p>
+                </div>
+              </div>
+
+              <div class="hub-step-item">
+                <div class="hub-step-badge">
+                  <span class="hub-step-num">4</span>
+                  <span class="hub-step-icon">🚀</span>
+                </div>
+                <div class="hub-step-content">
+                  <strong>Kích Hoạt Đồng Bộ</strong>
+                  <p>Bấm <code>Đồng Bộ Ngay</code> để gửi hồ sơ hiện có hoặc bật <code>Tự Động Đồng Bộ</code> để hệ thống đẩy ngầm định kỳ.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- FAQ & Troubleshooting Grid -->
+            <div class="hub-faq-section">
+              <h4 class="hub-faq-title">
+                <span>💡 Lưu Ý Quan Trọng & Xử Lý Sự Cố Thường Gặp</span>
+              </h4>
+              <div class="hub-faq-grid">
+                <div class="hub-faq-item">
+                  <span class="faq-q">❓ Vì sao khi tạo API Key trên Hub không cần nhập Mã máy (Edge ID)?</span>
+                  <p class="faq-a">Hub hoạt động theo cơ chế <strong>Trust On First Use (TOFU)</strong>. Quản trị viên chỉ cần tạo key; khi máy Edge kết nối lần đầu, mã Edge ID sẽ được tự động gửi lên và khóa cứng với khóa đó để chống sao chép trái phép.</p>
+                </div>
+                <div class="hub-faq-item">
+                  <span class="faq-q">❓ Mã máy (Edge ID) hiển thị trên Edge dùng để làm gì?</span>
+                  <p class="faq-a">Dùng để nhận diện máy trạm, đối soát log trên Hub, hoặc khi có sự cố xung đột khóa (Lỗi 409 - Khóa bị dùng trên 2 máy) để Quản trị viên biết cần cấp lại khóa cho máy nào.</p>
+                </div>
+                <div class="hub-faq-item">
+                  <span class="faq-q">❓ Báo lỗi "Không kết nối được" hoặc 401 Unauthorized?</span>
+                  <p class="faq-a">Kiểm tra đường truyền VPN/mạng nội bộ ngân hàng đến Hub và đảm bảo API Key còn hiệu lực (chưa bị thu hồi trên Hub).</p>
+                </div>
+                <div class="hub-faq-item">
+                  <span class="faq-q">❓ Đồng bộ có làm chậm quá trình tải hoặc parsing CV?</span>
+                  <p class="faq-a">Không. Tiến trình đồng bộ chạy trên luồng nền độc lập theo cơ chế không khóa độc quyền (Non-blocking Outbox).</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD 3: KIẾN TRÚC AN TOÀN & BẢO MẬT -->
+        <div class="glass-card hub-architecture-card">
+          <div class="card-title-sm">
+            <span class="title-with-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Cơ Chế Bảo Mật & An Toàn Dữ Liệu Ngoại Biên (Edge Sync Architecture)
+            </span>
+          </div>
+          <div class="hub-architecture-grid">
+            <div class="arch-item">
+              <div class="arch-item-icon">📦</div>
+              <div class="arch-item-content">
+                <strong>Offline-First & Độc Lập</strong>
+                <p>Tiến trình tải CV hoạt động trơn tru cả khi mất mạng. Dữ liệu được ghi vào hàng đợi Outbox cục bộ và tự động gửi bù khi có kết nối.</p>
+              </div>
+            </div>
+            <div class="arch-item">
+              <div class="arch-item-icon">⚡</div>
+              <div class="arch-item-content">
+                <strong>Idempotent & Chống Trùng</strong>
+                <p>Mỗi lượt gửi tính toán mã hash thực thể. Việc gửi lại hoặc đồng bộ nhiều lần không làm phát sinh dữ liệu trùng lặp trên Hub.</p>
+              </div>
+            </div>
+            <div class="arch-item">
+              <div class="arch-item-icon">🔒</div>
+              <div class="arch-item-content">
+                <strong>Bảo Mật Kép Chuẩn Ngân Hàng</strong>
+                <p>Khóa API bảo vệ bằng Windows DPAPI. Mọi dữ liệu ứng viên và file CV được truyền qua đường truyền HTTPS mã hóa TLS 1.3.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-config" class="tab-pane">
+        <div class="page-header">
+          <div>
+            <h1>Cấu Hình</h1>
+            <p class="subtitle">Thiết lập tài khoản, lưu trữ, hiệu năng và lịch tải CV tự động</p>
+          </div>
+          <button id="btn-save-config" class="btn btn-brand btn-lg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            <span>Lưu Cấu Hình</span>
+          </button>
+        </div>
+
+        <!-- Setup Required Banner -->
+        <div id="setup-required-alert" class="glass-card setup-alert-banner hidden">
+          <div class="setup-alert-icon">⚠️</div>
+          <div class="setup-alert-content">
+            <h3>Yêu Cầu Cấu Hình Lần Đầu</h3>
+            <p>Vui lòng khai báo <strong>Email</strong> và <strong>Mật khẩu TopCV</strong> bên dưới và bấm <strong>"Lưu Cấu Hình"</strong> để mở khóa các tính năng Tải CV và Quản lý Dữ liệu ứng viên!</p>
+          </div>
+        </div>
+
+        <div class="config-sections-grid">
+          <!-- Section 0: Brand & Theme Appearance -->
+          <div class="glass-card config-card brand-appearance-card">
+            <div class="config-card-header">
+              <div class="config-icon-badge icon-orange">🎨</div>
+              <div>
+                <h3>Nhận Diện Thương Hiệu & Giao Diện</h3>
+                <p class="config-card-sub">Cá nhân hoá tên ứng dụng, biểu tượng/logo, chế độ sáng/tối và bảng màu chủ đạo</p>
+              </div>
+            </div>
+            <div class="config-card-body">
+              <!-- Sub-grid: App Info -->
+              <div class="brand-config-grid">
+                <div class="form-group">
+                  <label for="cfg-app-name">Tên Trạm / Ứng Dụng:</label>
+                  <input type="text" id="cfg-app-name" class="custom-input" placeholder="VD: MSB Radar Edge, HR Station...">
+                </div>
+                <div class="form-group">
+                  <label for="cfg-app-tagline">Khẩu Hiệu (Tagline):</label>
+                  <input type="text" id="cfg-app-tagline" class="custom-input" placeholder="VD: Trạm Thu Thập & Xử Lý CV Ngoại Biên">
+                </div>
+              </div>
+
+              <!-- Biểu tượng & Logo -->
+              <div class="form-group brand-icon-group">
+                <label>Biểu Tượng & Logo:</label>
+                <div class="preset-icon-bar" id="preset-icon-bar">
+                  <button type="button" class="preset-icon-btn active" data-icon="⚡">⚡</button>
+                  <button type="button" class="preset-icon-btn" data-icon="🎯">🎯</button>
+                  <button type="button" class="preset-icon-btn" data-icon="🚀">🚀</button>
+                  <button type="button" class="preset-icon-btn" data-icon="🔮">🔮</button>
+                  <button type="button" class="preset-icon-btn" data-icon="🌐">🌐</button>
+                  <button type="button" class="preset-icon-btn" data-icon="🛡️">🛡️</button>
+                  <button type="button" class="preset-icon-btn" data-icon="💎">💎</button>
+                  <button type="button" class="preset-icon-btn" data-icon="🔥">🔥</button>
+                  <button type="button" class="preset-icon-btn" data-icon="💡">💡</button>
+                  <button type="button" class="preset-icon-btn" data-icon="🌟">🌟</button>
+                  <button type="button" class="preset-icon-btn" data-icon="📊">📊</button>
+                  <button type="button" class="preset-icon-btn" data-icon="👥">👥</button>
+                </div>
+                <div class="logo-upload-box" id="logo-upload-box">
+                  <div class="logo-preview-area" id="logo-preview-area">
+                    <span id="logo-preview-icon" class="logo-preview-emoji">⚡</span>
+                    <img id="logo-preview-img" class="logo-preview-img hidden" alt="Logo preview">
+                  </div>
+                  <div class="logo-upload-controls">
+                    <input type="file" id="cfg-logo-file" accept="image/png,image/jpeg,image/svg+xml,image/x-icon,image/webp" class="hidden">
+                    <button type="button" class="btn btn-sm btn-secondary" id="btn-upload-logo">📁 Tải ảnh Logo / Icon</button>
+                    <button type="button" class="btn btn-sm btn-secondary hidden" id="btn-remove-logo">❌ Xóa ảnh</button>
+                    <span class="upload-hint">PNG, SVG, ICO, JPG, WebP (Tối đa 2MB)</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Chế độ Giao diện (Theme Mode: Dark / Light / Auto) -->
+              <div class="form-group theme-mode-group">
+                <label>Chế Độ Giao Diện (Sáng / Tối):</label>
+                <div class="theme-mode-selector">
+                  <label class="theme-mode-card is-selected" data-mode="dark">
+                    <input type="radio" name="cfg-theme-mode" value="dark" checked>
+                    <div class="theme-card-body">
+                      <span class="theme-mode-icon">🌙</span>
+                      <strong>Giao diện Tối</strong>
+                      <span>Dark Theme (Mặc định MSB)</span>
+                    </div>
+                  </label>
+                  <label class="theme-mode-card" data-mode="light">
+                    <input type="radio" name="cfg-theme-mode" value="light">
+                    <div class="theme-card-body">
+                      <span class="theme-mode-icon">☀️</span>
+                      <strong>Giao diện Sáng</strong>
+                      <span>Light Theme thanh lịch</span>
+                    </div>
+                  </label>
+                  <label class="theme-mode-card" data-mode="auto">
+                    <input type="radio" name="cfg-theme-mode" value="auto">
+                    <div class="theme-card-body">
+                      <span class="theme-mode-icon">💻</span>
+                      <strong>Theo Hệ Thống</strong>
+                      <span>Tự động theo Windows</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Bảng màu chủ đạo (Color Preset & Custom Hex) -->
+              <div class="form-group color-preset-group">
+                <label>Bảng Màu Chủ Đạo (Accent Color):</label>
+                <div class="color-preset-bar" id="color-preset-bar">
+                  <button type="button" class="color-preset-swatch active" data-preset="amber_gold" data-color="#F59E0B" title="Amber Gold (MSB)">
+                    <span class="color-circle" style="background: linear-gradient(135deg, #F59E0B, #E65C00);"></span>
+                    <span class="color-label">Amber Gold</span>
+                  </button>
+                  <button type="button" class="color-preset-swatch" data-preset="ocean_blue" data-color="#0284c7" title="Ocean Blue">
+                    <span class="color-circle" style="background: linear-gradient(135deg, #38bdf8, #0284c7);"></span>
+                    <span class="color-label">Ocean Blue</span>
+                  </button>
+                  <button type="button" class="color-preset-swatch" data-preset="crimson_red" data-color="#dc2626" title="Crimson Red">
+                    <span class="color-circle" style="background: linear-gradient(135deg, #ef4444, #dc2626);"></span>
+                    <span class="color-label">Crimson Red</span>
+                  </button>
+                  <button type="button" class="color-preset-swatch" data-preset="emerald_green" data-color="#059669" title="Emerald Green">
+                    <span class="color-circle" style="background: linear-gradient(135deg, #34d399, #059669);"></span>
+                    <span class="color-label">Emerald Green</span>
+                  </button>
+                  <button type="button" class="color-preset-swatch" data-preset="royal_purple" data-color="#7c3aed" title="Royal Purple">
+                    <span class="color-circle" style="background: linear-gradient(135deg, #a78bfa, #7c3aed);"></span>
+                    <span class="color-label">Royal Purple</span>
+                  </button>
+                  <button type="button" class="color-preset-swatch" data-preset="cyber_cyan" data-color="#0891b2" title="Cyber Cyan">
+                    <span class="color-circle" style="background: linear-gradient(135deg, #22d3ee, #0891b2);"></span>
+                    <span class="color-label">Cyber Cyan</span>
+                  </button>
+                  <div class="custom-color-picker-wrapper">
+                    <input type="color" id="cfg-custom-color-picker" value="#F59E0B" class="custom-color-input">
+                    <button type="button" class="color-preset-swatch" data-preset="custom" title="Màu tuỳ chọn">
+                      <span class="color-circle custom-circle" id="custom-color-indicator"></span>
+                      <span class="color-label">Tuỳ chọn Hex</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mật độ hiển thị bảng (Density) -->
+              <div class="form-group">
+                <label for="cfg-table-density">Mật Độ Hiển Thị Bảng Dữ Liệu:</label>
+                <select id="cfg-table-density" class="custom-select">
+                  <option value="compact">Thu gọn (Compact) — Hiển thị được nhiều dòng nhất</option>
+                  <option value="normal" selected>Vừa vặn (Normal) — Cân đối khoảng cách</option>
+                  <option value="comfortable">Rộng rãi (Comfortable) — Thoáng mắt cho màn hình lớn</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 1: Account -->
+          <div class="glass-card config-card">
+            <div class="config-card-header">
+              <div class="config-icon-badge icon-orange">🔑</div>
+              <div>
+                <h3>Tài Khoản Đăng Nhập Các Nhà Cung Cấp</h3>
+                <p class="config-card-sub">Ủy quyền phiên làm việc tự động qua Chrome Profile cho từng nguồn</p>
+              </div>
+            </div>
+            <div class="config-card-body">
+              <div class="smart-account-manager">
+                <div class="account-manager-toolbar"><div><strong>Danh sách tài khoản vận hành</strong><span>Mỗi tài khoản dùng một Chrome profile riêng và được quét lần lượt.</span></div><button id="btn-add-provider-account" type="button" class="btn btn-brand">＋ Thêm tài khoản</button></div>
+                <div id="provider-account-list" class="smart-account-list"></div>
+                <div id="provider-account-editor" class="smart-account-editor hidden">
+                  <input id="account-editor-id" type="hidden">
+                  <label class="form-group"><span>Nguồn tuyển dụng</span><select id="account-editor-source" class="custom-select"><option value="topcv">TopCV</option><option value="vietnamworks">VietnamWorks</option><option value="careerviet">CareerViet</option><option value="vieclam24h">Việc Làm 24h</option><option value="itviec">ITViec</option><option value="joboko">Joboko</option><option value="jobsgo">JobsGO</option></select></label>
+                  <label class="form-group"><span>Tên gợi nhớ</span><input id="account-editor-label" class="custom-input" placeholder="VD: TopCV miền Bắc"></label>
+                  <label class="form-group"><span>Email đăng nhập</span><input id="account-editor-email" type="email" class="custom-input"></label>
+                  <div class="form-group">
+                    <label for="account-editor-password">Mật khẩu</label>
+                    <div class="password-input-wrapper">
+                      <input id="account-editor-password" type="password" class="custom-input" placeholder="Để trống nếu không đổi">
+                      <button type="button" class="password-toggle-btn" title="Hiện/Ẩn mật khẩu" aria-label="Hiện/Ẩn mật khẩu">👁</button>
+                    </div>
+                  </div>
+                  <label class="account-enabled-check"><input id="account-editor-enabled" type="checkbox" checked><span>Đưa vào hàng đợi tự động</span></label>
+                  <div id="account-editor-error" class="account-editor-error hidden" role="alert" aria-live="polite"></div>
+                  <div class="smart-account-editor-actions"><button id="btn-cancel-provider-account" type="button" class="btn btn-secondary">Hủy</button><button id="btn-save-provider-account" type="button" class="btn btn-brand">Lưu tài khoản</button></div>
+                </div>
+              </div>
+              <div class="providers-account-grid">
+                <!-- TopCV -->
+                <div class="provider-account-card">
+                  <div class="provider-card-header">
+                    <span class="provider-badge topcv">TopCV</span>
+                    <span class="provider-card-title">Tài khoản TopCV</span>
+                  </div>
+                  <div class="provider-card-fields">
+                    <div class="form-group">
+                      <label for="cfg-email">Email:</label>
+                      <input type="email" id="cfg-email" class="custom-input" placeholder="nhansu@company.com">
+                    </div>
+                    <div class="form-group">
+                      <label for="cfg-password">Mật khẩu:</label>
+                      <div class="password-input-wrapper">
+                        <input type="password" id="cfg-password" class="custom-input" placeholder="••••••••">
+                        <button type="button" class="password-toggle-btn">👁</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- VietnamWorks -->
+                <div class="provider-account-card">
+                  <div class="provider-card-header">
+                    <span class="provider-badge vietnamworks">VietnamWorks</span>
+                    <span class="provider-card-title">Tài khoản VietnamWorks</span>
+                  </div>
+                  <div class="provider-card-fields">
+                    <div class="form-group">
+                      <label for="cfg-vietnamworks-email">Email:</label>
+                      <input type="email" id="cfg-vietnamworks-email" class="custom-input" placeholder="nhansu@company.com">
+                    </div>
+                    <div class="form-group">
+                      <label for="cfg-vietnamworks-password">Mật khẩu:</label>
+                      <div class="password-input-wrapper">
+                        <input type="password" id="cfg-vietnamworks-password" class="custom-input" placeholder="••••••••">
+                        <button type="button" class="password-toggle-btn">👁</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- CareerViet -->
+                <div class="provider-account-card">
+                  <div class="provider-card-header">
+                    <span class="provider-badge careerviet">CareerViet</span>
+                    <span class="provider-card-title">Tài khoản CareerViet</span>
+                  </div>
+                  <div class="provider-card-fields">
+                    <div class="form-group">
+                      <label for="cfg-careerviet-email">Email:</label>
+                      <input type="email" id="cfg-careerviet-email" class="custom-input" placeholder="nhansu@company.com">
+                    </div>
+                    <div class="form-group">
+                      <label for="cfg-careerviet-password">Mật khẩu:</label>
+                      <div class="password-input-wrapper">
+                        <input type="password" id="cfg-careerviet-password" class="custom-input" placeholder="••••••••">
+                        <button type="button" class="password-toggle-btn">👁</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Việc Làm 24h -->
+                <div class="provider-account-card">
+                  <div class="provider-card-header">
+                    <span class="provider-badge vieclam24h">Việc Làm 24h</span>
+                    <span class="provider-card-title">Tài khoản Việc Làm 24h</span>
+                  </div>
+                  <div class="provider-card-fields">
+                    <div class="form-group">
+                      <label for="cfg-vieclam24h-email">Email:</label>
+                      <input type="email" id="cfg-vieclam24h-email" class="custom-input" placeholder="nhansu@company.com">
+                    </div>
+                    <div class="form-group">
+                      <label for="cfg-vieclam24h-password">Mật khẩu:</label>
+                      <div class="password-input-wrapper">
+                        <input type="password" id="cfg-vieclam24h-password" class="custom-input" placeholder="••••••••">
+                        <button type="button" class="password-toggle-btn">👁</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ITViec -->
+                <div class="provider-account-card">
+                  <div class="provider-card-header">
+                    <span class="provider-badge itviec">ITViec</span>
+                    <span class="provider-card-title">Tài khoản ITViec</span>
+                  </div>
+                  <div class="provider-card-fields">
+                    <div class="form-group">
+                      <label for="cfg-itviec-email">Email:</label>
+                      <input type="email" id="cfg-itviec-email" class="custom-input" placeholder="nhansu@company.com">
+                    </div>
+                    <div class="form-group">
+                      <label for="cfg-itviec-password">Mật khẩu:</label>
+                      <div class="password-input-wrapper">
+                        <input type="password" id="cfg-itviec-password" class="custom-input" placeholder="••••••••">
+                        <button type="button" class="password-toggle-btn">👁</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Joboko -->
+                <div class="provider-account-card">
+                  <div class="provider-card-header">
+                    <span class="provider-badge joboko">Joboko</span>
+                    <span class="provider-card-title">Tài khoản Joboko</span>
+                  </div>
+                  <div class="provider-card-fields">
+                    <div class="form-group">
+                      <label for="cfg-joboko-email">Email:</label>
+                      <input type="email" id="cfg-joboko-email" class="custom-input" placeholder="nhansu@company.com">
+                    </div>
+                    <div class="form-group">
+                      <label for="cfg-joboko-password">Mật khẩu:</label>
+                      <div class="password-input-wrapper">
+                        <input type="password" id="cfg-joboko-password" class="custom-input" placeholder="••••••••">
+                        <button type="button" class="password-toggle-btn">👁</button>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="checkbox-row">
+                        <input type="checkbox" id="cfg-joboko-headless" checked>
+                        <span>Chạy ẩn cửa sổ Chrome (nhẹ máy) — tự hiện khi cần đăng nhập</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- JobsGO -->
+                <div class="provider-account-card">
+                  <div class="provider-card-header">
+                    <span class="provider-badge jobsgo">JobsGO</span>
+                    <span class="provider-card-title">Tài khoản JobsGO</span>
+                  </div>
+                  <div class="provider-card-fields">
+                    <div class="form-group">
+                      <label for="cfg-jobsgo-email">Email:</label>
+                      <input type="email" id="cfg-jobsgo-email" class="custom-input" placeholder="nhansu@company.com">
+                    </div>
+                    <div class="form-group">
+                      <label for="cfg-jobsgo-password">Mật khẩu:</label>
+                      <div class="password-input-wrapper">
+                        <input type="password" id="cfg-jobsgo-password" class="custom-input" placeholder="••••••••">
+                        <button type="button" class="password-toggle-btn">👁</button>
+                      </div>
+                    </div>
+                    <div class="info-callout">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                      <span>JobsGO chặn Chrome chạy ẩn (Cloudflare) — cửa sổ Chrome sẽ luôn hiện khi tải kênh này.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="provider-browser-toolbar mt-4">
+                <label for="config-browser-provider">Trình duyệt profile:</label>
+                <select id="config-browser-provider" class="custom-select">
+                  <option value="topcv">TopCV</option>
+                  <option value="vietnamworks">VietnamWorks</option>
+                  <option value="careerviet">CareerViet</option>
+                  <option value="vieclam24h">Việc Làm 24h</option>
+                  <option value="itviec">ITViec</option><option value="joboko">Joboko</option><option value="jobsgo">JobsGO</option>
+                </select>
+                <button type="button" id="btn-open-provider-browser" class="btn btn-secondary provider-browser-btn">🌐 Mở trình duyệt</button>
+                <button type="button" id="btn-clear-provider-password" class="btn btn-secondary">Xóa mật khẩu đã lưu</button>
+              </div>
+
+              <div class="info-callout mt-4">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00B4D8" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <span>Nút Mở trình duyệt dùng cấu hình đã lưu. Hãy đóng Chrome profile này trước khi đồng bộ CV để tránh khóa phiên.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="glass-card config-card parsing-card">
+            <div class="config-card-header">
+              <div class="config-icon-badge icon-blue">📄</div>
+              <div><h3>Nội dung CV & tìm kiếm</h3><p class="config-card-sub">Tác vụ riêng, chỉ chạy thủ công và có thể dừng hoặc tiếp tục</p></div>
+            </div>
+            <div class="config-card-body">
+              <div class="form-row"><span>Parsing chỉ chạy khi bạn chủ động bấm trong Trung tâm Parsing CV.</span><label class="account-enabled-check"><input id="cfg-parsing-ocr" type="checkbox"><span>Dùng OCR khi PDF là ảnh/scan</span></label></div>
+              <div class="health-actions"><button type="button" class="btn btn-secondary" onclick="window.app.switchTab('tab-parsing')">Mở trung tâm Parsing CV</button></div>
+              <small>Cấu hình tại đây chỉ điều khiển OCR. Vận hành, tiến độ và nhật ký nằm trong tab Parsing CV.</small>
+            </div>
+          </div>
+
+          <div class="glass-card config-card maintenance-card">
+            <div class="config-card-header">
+              <div class="config-icon-badge icon-blue">🩺</div>
+              <div><h3>Trạng thái dữ liệu</h3><p class="config-card-sub">Tự kiểm tra và chỉ cảnh báo khi cần xử lý</p></div>
+            </div>
+            <div class="config-card-body">
+              <div id="system-health-summary" class="health-smart-summary"><span class="health-pulse"></span><div><strong>Đang kiểm tra…</strong><small>Database, dung lượng, backup và profile</small></div></div>
+              <div class="health-metrics">
+                <div><span>Hồ sơ</span><strong id="health-records">—</strong></div>
+                <div><span>Dung lượng DB</span><strong id="health-db-size">—</strong></div>
+                <div><span>CV lỗi</span><strong id="health-failed">—</strong></div>
+                <div><span>Backup gần nhất</span><strong id="health-backup-age">—</strong></div>
+              </div>
+              <div id="health-actions" class="health-actions hidden"></div>
+              <details class="maintenance-advanced mt-4">
+                <summary>Bảo trì nâng cao</summary>
+                <div class="form-row mt-3"><button id="btn-check-health" class="btn btn-secondary flex-1">Kiểm tra lại</button><button id="btn-backup-db" class="btn btn-secondary flex-1">Sao lưu ngay</button></div>
+                <details class="danger-zone mt-4"><summary>Xóa dữ liệu theo phạm vi</summary>
+                <div class="form-row mt-3">
+                  <select id="delete-data-source" class="custom-select flex-1">
+                    <option value="">Chọn nguồn</option><option value="topcv">TopCV</option>
+                    <option value="vietnamworks">VietnamWorks</option><option value="careerviet">CareerViet</option>
+                    <option value="vieclam24h">Việc Làm 24h</option><option value="itviec">ITViec</option><option value="joboko">Joboko</option><option value="jobsgo">JobsGO</option>
+                  </select>
+                  <input id="delete-data-account" class="custom-input flex-1" placeholder="Tài khoản (không bắt buộc)">
+                </div>
+                <div class="form-row mt-3">
+                  <input type="date" id="delete-data-from" class="custom-input flex-1">
+                  <input type="date" id="delete-data-to" class="custom-input flex-1">
+                </div>
+                <button id="btn-delete-data" class="btn btn-danger mt-3">Xóa bản ghi và file CV trong phạm vi</button></details>
+              </details>
+            </div>
+          </div>
+
+          <!-- Section 2: Storage Paths -->
+          <div class="glass-card config-card">
+            <div class="config-card-header">
+              <div class="config-icon-badge icon-blue">📁</div>
+              <div>
+                <h3>Kho Lưu Trữ Dữ Liệu</h3>
+                <p class="config-card-sub">Đường dẫn chứa file CV và Cơ sở dữ liệu SQLite</p>
+              </div>
+            </div>
+            <div class="config-card-body">
+              <div class="form-group mb-4">
+                <label for="cfg-cv-folder">Thư mục lưu trữ file CV:</label>
+                <div class="input-with-btn">
+                  <input type="text" id="cfg-cv-folder" class="custom-input font-mono" readonly>
+                  <button id="btn-browse-cv-folder" class="btn btn-secondary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    <span>Duyệt</span>
+                  </button>
+                </div>
+              </div>
+              <div class="form-group mb-4">
+                <label for="cfg-db-path">Cơ sở dữ liệu SQLite (.db):</label>
+                <div class="input-with-btn">
+                  <input type="text" id="cfg-db-path" class="custom-input font-mono" readonly>
+                  <button id="btn-browse-db-path" class="btn btn-secondary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    <span>Duyệt</span>
+                  </button>
+                </div>
+              </div>
+              <div class="info-callout">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span>Nếu muốn đồng bộ giữa nhiều máy tính, bạn hãy trỏ 2 đường dẫn này vào thư mục lưu trữ đám mây hoặc mạng chia sẻ đã đồng bộ.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: Mạng công ty (proxy & chứng chỉ) -->
+          <div class="glass-card config-card">
+            <div class="config-card-header">
+              <div class="config-icon-badge icon-blue">🌐</div>
+              <div>
+                <h3>Mạng Công Ty (Proxy &amp; Chứng Chỉ)</h3>
+                <p class="config-card-sub">Chỉ cần khi máy ở mạng nội bộ có tường lửa/proxy chặn</p>
+              </div>
+            </div>
+            <div class="config-card-body">
+              <div class="form-group mb-4">
+                <label for="cfg-proxy-url">Proxy:</label>
+                <input type="text" id="cfg-proxy-url" class="custom-input font-mono"
+                       placeholder="Để trống = tự dò theo Windows · gõ 'off' để đi thẳng · hoặc http://host:port">
+                <small class="form-hint">Áp dụng cho tải CV và đồng bộ Hub. Trình duyệt tự dùng proxy hệ thống; chỉ khi gõ địa chỉ tường minh mới ép cho trình duyệt.</small>
+              </div>
+              <div class="form-group mb-4">
+                <label class="checkbox-row">
+                  <input type="checkbox" id="cfg-ssl-verify" checked>
+                  <span>Kiểm tra chứng chỉ TLS (khuyến nghị bật)</span>
+                </label>
+                <small class="form-hint">Bỏ chọn chỉ khi proxy công ty soi SSL mà chưa nạp được CA nội bộ. Mặc định phần mềm đã tự dùng kho chứng chỉ Windows.</small>
+              </div>
+              <div class="form-group mb-4">
+                <label for="cfg-ssl-ca-bundle">File CA nội bộ (.pem/.crt) — tùy chọn:</label>
+                <div class="input-with-btn">
+                  <input type="text" id="cfg-ssl-ca-bundle" class="custom-input font-mono" placeholder="Để trống nếu không cần">
+                  <button id="btn-browse-ca-bundle" class="btn btn-secondary" type="button"><span>Duyệt</span></button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="cfg-chromedriver-path">Đường dẫn chromedriver có sẵn — tùy chọn:</label>
+                <div class="input-with-btn">
+                  <input type="text" id="cfg-chromedriver-path" class="custom-input font-mono" placeholder="Dùng khi mạng chặn tải driver từ Google">
+                  <button id="btn-browse-chromedriver" class="btn btn-secondary" type="button"><span>Duyệt</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Performance & Rules -->
+          <div class="glass-card config-card">
+            <div class="config-card-header">
+              <div class="config-icon-badge icon-orange">⚡</div>
+              <div>
+                <h3>Tối Ưu Hiệu Năng &amp; Đặt Tên File</h3>
+                <p class="config-card-sub">Tùy chỉnh số luồng song song và định dạng tên file CV</p>
+              </div>
+            </div>
+            <div class="config-card-body">
+              <div class="form-row mb-4">
+                <div class="form-group flex-1">
+                  <label for="cfg-concurrency">Số CV tải song song (1-8):</label>
+                  <input type="number" id="cfg-concurrency" class="custom-input" min="1" max="8" value="4">
+                </div>
+                <div class="form-group flex-1">
+                  <label for="cfg-delay-ms">Độ trễ nghỉ giữa các lượt (ms):</label>
+                  <input type="number" id="cfg-delay-ms" class="custom-input" value="250">
+                </div>
+              </div>
+              <div class="form-group mb-2">
+                <label for="cfg-pattern">Cấu trúc quy tắc đặt tên file CV:</label>
+                <input type="text" id="cfg-pattern" class="custom-input font-mono" value="{id}_{ten}">
+                <div class="pattern-tag-list mt-2">
+                  <span class="pattern-tag" data-tag="{id}">{id} : Mã CV</span>
+                  <span class="pattern-tag" data-tag="{ten}">{ten} : Họ tên</span>
+                  <span class="pattern-tag" data-tag="{vitri}">{vitri} : Vị trí</span>
+                  <span class="pattern-tag" data-tag="{ngay}">{ngay} : Ngày nộp</span>
+                </div>
+              </div>
+              <div class="form-group mb-2">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="cfg-headless">
+                  <span>Chạy ẩn cửa sổ Chrome (nhẹ máy) — áp dụng cho TopCV, CareerViet,
+                  Việc Làm 24h, ITViec. VietnamWorks và JobsGO luôn hiện cửa sổ (site chặn chạy ẩn).
+                  Nếu site đòi captcha/OTP khi đang chạy ẩn, bỏ chọn ô này rồi chạy lại.</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hẹn giờ được lưu và áp dụng cùng toàn bộ cấu hình -->
+        <div class="page-header config-subsection-header mt-6">
+          <div>
+            <h2>Hẹn Giờ Tự Động Quét</h2>
+            <p class="subtitle">Quản lý nhiều lịch độc lập theo kênh, tài khoản và chu kỳ riêng</p>
+          </div>
+        </div>
+
+        <div class="timer-dashboard">
+          <div class="glass-card schedule-manager-card">
+            <div class="account-manager-toolbar"><div><strong>Lịch tự động</strong><span>Tạo nhiều tác vụ độc lập; hệ thống tự xếp hàng để không chạy chồng nhau.</span></div><div class="schedule-toolbar-actions"><label class="brand-switch" title="Bật hoặc tắt toàn bộ bộ hẹn giờ"><input type="checkbox" id="cfg-schedule-enabled"><span class="switch-slider"></span></label><button id="btn-add-schedule-job" type="button" class="btn btn-brand">＋ Thêm lịch</button></div></div>
+            <div id="schedule-smart-status" class="schedule-smart-status is-off"><span class="schedule-status-icon">⏱</span><div><strong>Bộ hẹn giờ đang tắt</strong><small>Bật công tắc để các lịch hoạt động.</small></div><div class="schedule-status-stats"><span><b id="schedule-enabled-count">0</b> lịch bật</span><span>Lần kế tiếp: <b id="schedule-next-run">—</b></span></div></div>
+            <div id="schedule-job-list" class="schedule-job-list"></div>
+            <div id="schedule-job-editor" class="schedule-job-editor hidden">
+              <div class="schedule-editor-heading"><div><strong id="schedule-editor-title">Thêm lịch tự động</strong><small>Thiết lập phạm vi và chu kỳ cho một tác vụ độc lập.</small></div><button id="btn-close-schedule-job" type="button" class="icon-btn" aria-label="Đóng">×</button></div>
+              <input id="schedule-editor-id" type="hidden">
+              <label class="form-group"><span>Tên lịch</span><input id="schedule-editor-name" class="custom-input" placeholder="VD: Kiểm tra CV mới giờ hành chính"></label>
+              <div class="form-group"><span>Kênh tuyển dụng</span><div class="multi-check-filter" data-select-id="schedule-editor-sources"><button type="button" class="multi-check-trigger"><span>Chọn kênh</span><span>⌄</span></button><div class="multi-check-menu hidden"><div class="multi-check-menu-head"><strong>Chọn nhiều kênh</strong><button type="button" class="multi-check-clear">Bỏ chọn</button></div><div class="multi-check-options"></div></div></div><select id="schedule-editor-sources" multiple hidden><option value="topcv">TopCV</option><option value="vietnamworks">VietnamWorks</option><option value="careerviet">CareerViet</option><option value="vieclam24h">Việc Làm 24h</option><option value="itviec">ITViec</option><option value="joboko">Joboko</option><option value="jobsgo">JobsGO</option></select></div>
+              <div class="form-group"><span>Tài khoản áp dụng</span><div class="multi-check-filter" data-select-id="schedule-editor-accounts"><button type="button" class="multi-check-trigger"><span>Tất cả tài khoản phù hợp</span><span>⌄</span></button><div class="multi-check-menu hidden"><div class="multi-check-menu-head"><strong>Giới hạn tài khoản</strong><button type="button" class="multi-check-clear">Dùng tất cả</button></div><div class="multi-check-options"></div></div></div><select id="schedule-editor-accounts" multiple hidden></select><small>Để trống sẽ tự dùng mọi tài khoản đang bật thuộc các kênh đã chọn.</small></div>
+              <label class="form-group"><span>Chế độ</span><select id="schedule-editor-mode" class="custom-select"><option value="moi">Chỉ CV mới — khuyên dùng</option><option value="tatca">Backup toàn bộ lịch sử</option></select></label>
+              <label class="form-group"><span>Chạy lần đầu</span><input id="schedule-editor-start" type="datetime-local" class="custom-input"></label>
+              <label class="form-group"><span>Lặp lại mỗi</span><div class="input-with-suffix"><input id="schedule-editor-interval" type="number" min="15" value="60" class="custom-input"><span class="input-suffix">phút</span></div></label>
+              <div class="schedule-presets"><button type="button" data-minutes="30">30 phút</button><button type="button" data-minutes="60">1 giờ</button><button type="button" data-minutes="180">3 giờ</button><button type="button" data-minutes="1440">Hằng ngày</button></div>
+              <label class="account-enabled-check"><input id="schedule-editor-enabled" type="checkbox" checked><span>Bật lịch này</span></label>
+              <div class="smart-account-editor-actions"><button id="btn-cancel-schedule-job" type="button" class="btn btn-secondary">Hủy</button><button id="btn-save-schedule-job" type="button" class="btn btn-brand">Lưu lịch</button></div>
+            </div>
+            <label class="autostart-check schedule-autostart"><input type="checkbox" id="cfg-autostart-schedule"><span>Tự khởi động các lịch đang bật khi mở phần mềm</span></label>
+          </div>
+          <!-- Active Status Banner -->
+          <div class="glass-card timer-banner" id="timer-banner-card">
+            <div class="timer-banner-icon">
+              <div class="pulse-ring"></div>
+              <span id="timer-status-icon">⏱</span>
+            </div>
+            <div class="timer-banner-info">
+              <h2 id="timer-status-title">Chế độ Hẹn Giờ Đang Tắt</h2>
+              <p id="timer-status-desc" class="text-muted">Kích hoạt nút bật/tắt bên dưới để tự động cào CV mới hằng giờ</p>
+              <label class="autostart-check">
+                <input type="checkbox" id="cfg-autostart-schedule-legacy">
+                <span>Tự động bật hẹn giờ khi mở phần mềm</span>
+              </label>
+            </div>
+            <div class="timer-toggle-control">
+              <label class="brand-switch">
+                <input type="checkbox" id="cfg-schedule-enabled-legacy">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Timer Options Grid -->
+          <div class="timer-options-grid mt-6">
+            <div class="glass-card timer-option-card">
+              <div class="option-card-header">
+                <h3>⏱ Tần Suất Lặp Lại</h3>
+              </div>
+              <div class="form-group mt-3">
+                <label for="cfg-schedule-interval">Thời gian chạy định kỳ (Phút):</label>
+                <div class="input-with-suffix">
+                  <input type="number" id="cfg-schedule-interval" class="custom-input" min="5" value="60">
+                  <span class="input-suffix">Phút</span>
+                </div>
+                <span class="field-help">Khuyên dùng 60 phút/lần để tránh bị chặn đăng nhập từ nguồn tuyển dụng.</span>
+              </div>
+            </div>
+
+            <div class="glass-card timer-option-card">
+              <div class="option-card-header">
+                <h3>🎯 Chế Độ Quét CV</h3>
+              </div>
+              <div class="form-group mt-3">
+                <label for="cfg-schedule-source">Nguồn tuyển dụng:</label>
+                <div class="multi-check-filter mb-4" data-select-id="cfg-schedule-source"><button type="button" class="multi-check-trigger" aria-expanded="false"><span>Tất cả nguồn đã cấu hình</span><span>⌄</span></button><div class="multi-check-menu hidden"><div class="multi-check-menu-head"><strong>Chọn nguồn chạy lịch</strong><button type="button" class="multi-check-clear">Bỏ chọn</button></div><div class="multi-check-options"></div></div></div>
+                <select id="cfg-schedule-source" multiple hidden>
+                  <option value="topcv">TopCV</option>
+                  <option value="vietnamworks">VietnamWorks</option>
+                  <option value="careerviet">CareerViet</option>
+                  <option value="vieclam24h">Việc Làm 24h</option>
+                  <option value="itviec">ITViec</option><option value="joboko">Joboko</option><option value="jobsgo">JobsGO</option>
+                </select>
+                <label for="cfg-schedule-mode">Phương thức cào khi hẹn giờ:</label>
+                <select id="cfg-schedule-mode" class="custom-select">
+                  <option value="moi">⚡ Chỉ tải CV MỚI (Tốc độ cao, khuyên dùng)</option>
+                  <option value="tatca">🔍 Quét lại toàn bộ danh sách</option>
+                </select>
+                <span class="field-help">Chế độ "Chỉ tải CV MỚI" tự phát hiện và dừng ngay khi không còn hồ sơ mới.</span>
+              </div>
+            </div>
+
+            <div class="glass-card timer-option-card">
+              <div class="option-card-header">
+                <h3>🕐 Giờ Chạy Lần Đầu (tuỳ chọn)</h3>
+              </div>
+              <div class="form-group mt-3">
+                <label for="cfg-schedule-start">Bắt đầu lúc:</label>
+                <input type="text" id="cfg-schedule-start" class="custom-input" placeholder="08:00 hoặc 2026-08-10 08:00">
+                <span class="field-help">Để trống = chạy ngay khi bật. Dùng "HH:MM" (mỗi ngày) hoặc "YYYY-MM-DD HH:MM" (một lần cụ thể).</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notification Test Box -->
+          <div class="glass-card notification-test-card mt-6">
+            <div class="test-card-content">
+              <div class="test-icon">🔔</div>
+              <div>
+                <h4>Kiểm Tra Thông Báo Toast Trực Tiếp Trên Windows</h4>
+                <p class="text-muted">Bấm nút chạy thử để xác nhận máy tính của bạn cho phép MSB Radar Edge phát thông báo trên khay Windows.</p>
+              </div>
+            </div>
+            <button id="btn-test-notifier" class="btn btn-secondary">
+              <span>Thử Thông Báo Windows</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: HƯỚNG DẪN & TRUNG TÂM TRỢ GIÚP (MSB RADAR HELP & KNOWLEDGE HUB) -->
+      <section id="tab-help" class="tab-pane">
+        <div class="page-header help-hub-header">
+          <div>
+            <div class="help-hub-badge">
+              <span class="hub-pulse"></span>
+              <span>Enterprise Knowledge Hub · MSB Radar Edge</span>
+            </div>
+            <h1>Trung Tâm Trợ Giúp & Hướng Dẫn Vận Hành</h1>
+            <p class="subtitle">Cẩm nang toàn diện, mẹo tìm kiếm Boolean, chẩn đoán sự cố tương tác và phím tắt thao tác nhanh</p>
+          </div>
+        </div>
+
+        <!-- Smart Search & Category Filter Navigation Bar -->
+        <div class="glass-card help-search-nav-card">
+          <div class="help-search-box">
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="search" id="help-search-input" class="custom-input help-search-input"
+              placeholder="Tìm kiếm hướng dẫn, mẹo Boolean, mã lỗi, phím tắt, kênh tuyển dụng (VD: TopCV, Captcha, AND, ZIP...)...">
+            <button id="btn-help-clear-search" class="help-clear-search-btn hidden" title="Xóa tìm kiếm">✕</button>
+          </div>
+
+          <!-- Category Filter Pills -->
+          <div class="help-filter-pills" id="help-filter-chips">
+            <button class="help-pill active" data-category="all">
+              <span class="pill-icon">🌟</span>
+              <span>Tất cả</span>
+            </button>
+            <button class="help-pill" data-category="roadmap">
+              <span class="pill-icon">🚀</span>
+              <span>Bắt đầu nhanh</span>
+            </button>
+            <button class="help-pill" data-category="sync">
+              <span class="pill-icon">⚡</span>
+              <span>Đồng bộ & Checkpoint</span>
+            </button>
+            <button class="help-pill" data-category="parsing">
+              <span class="pill-icon">🧠</span>
+              <span>Bóc tách CV & OCR</span>
+            </button>
+            <button class="help-pill" data-category="boolean">
+              <span class="pill-icon">🔍</span>
+              <span>Tra cứu & Boolean</span>
+            </button>
+            <button class="help-pill" data-category="providers">
+              <span class="pill-icon">🏢</span>
+              <span>Kênh tuyển dụng</span>
+            </button>
+            <button class="help-pill" data-category="troubleshoot">
+              <span class="pill-icon">🩺</span>
+              <span>Chẩn đoán & Xử lý lỗi</span>
+            </button>
+            <button class="help-pill" data-category="faq">
+              <span class="pill-icon">❓</span>
+              <span>Câu hỏi thường gặp</span>
+            </button>
+            <button class="help-pill" data-category="shortcuts">
+              <span class="pill-icon">⌨️</span>
+              <span>Phím tắt & Mẹo</span>
+            </button>
+          </div>
+          <div id="help-search-results-info" class="help-search-results-info hidden">
+            <span>Tìm thấy <strong id="help-match-count">0</strong> nội dung phù hợp</span>
+            <button id="btn-reset-help-filter" class="btn-text-sm">Đặt lại bộ lọc</button>
+          </div>
+        </div>
+
+        <!-- Quick Action Launcher Bar -->
+        <div class="glass-card help-quick-launcher-card" data-help-section="launcher">
+          <div class="launcher-header">
+            <div class="launcher-title">
+              <span class="launcher-icon">⚡</span>
+              <h3>BẢNG THAO TÁC NHANH TIỆN ÍCH</h3>
+            </div>
+            <span class="launcher-hint">Truy cập tức thì các công cụ và thư mục hệ thống</span>
+          </div>
+          <div class="help-quick-grid">
+            <button class="quick-action-btn" id="btn-help-open-config">
+              <div class="quick-action-icon">⚙️</div>
+              <div class="quick-action-text">
+                <strong>Mở Cấu Hình</strong>
+                <span>Khai báo tài khoản & thư mục</span>
+              </div>
+            </button>
+            <button class="quick-action-btn" id="btn-help-open-parsing">
+              <div class="quick-action-icon">🧠</div>
+              <div class="quick-action-text">
+                <strong>Bóc Tách CV</strong>
+                <span>Trích xuất text, email, SĐT</span>
+              </div>
+            </button>
+            <button class="quick-action-btn" id="btn-help-test-toast">
+              <div class="quick-action-icon">🔔</div>
+              <div class="quick-action-text">
+                <strong>Thử Thông Báo</strong>
+                <span>Kiểm tra toast Windows</span>
+              </div>
+            </button>
+            <button class="quick-action-btn" id="btn-help-open-cv-folder">
+              <div class="quick-action-icon">📁</div>
+              <div class="quick-action-text">
+                <strong>Thư Mục CV</strong>
+                <span>Mở thư mục lưu file trên máy</span>
+              </div>
+            </button>
+            <button class="quick-action-btn" id="btn-help-open-db-folder">
+              <div class="quick-action-icon">💾</div>
+              <div class="quick-action-text">
+                <strong>Thư Mục CSDL</strong>
+                <span>Mở thư mục chứa file .db</span>
+              </div>
+            </button>
+            <button class="quick-action-btn" id="btn-help-open-logs">
+              <div class="quick-action-icon">📜</div>
+              <div class="quick-action-text">
+                <strong>Nhật Ký Hệ Thống</strong>
+                <span>Tra cứu log & lịch sử lỗi</span>
+              </div>
+            </button>
+            <button class="quick-action-btn" id="btn-help-check-runtime">
+              <div class="quick-action-icon">🩺</div>
+              <div class="quick-action-text">
+                <strong>Chẩn Đoán Máy</strong>
+                <span>Kiểm tra Chrome, OCR, quyền ghi</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 1: 5 Bước Bắt Đầu Nhanh -->
+        <div class="glass-card help-section-card" data-help-section="roadmap" data-help-keywords="bắt đầu nhanh thiết lập đồng bộ cấu hình tự động hóa tra cứu bước 1 2 3 4 5 onboarding parsing bóc tách ocr">
+          <div class="section-title-badge">
+            <span class="badge-icon">🚀</span>
+            <h3>LỘ TRÌNH 5 BƯỚC VẬN HÀNH CHUẨN DOANH NGHIỆP</h3>
+          </div>
+          <div class="help-roadmap-grid">
+            <div class="roadmap-step-card">
+              <div class="roadmap-step-header">
+                <span class="step-badge">BƯỚC 01</span>
+                <span class="step-icon">⚙️</span>
+              </div>
+              <h4>Thiết Lập Một Lần Duy Nhất</h4>
+              <p>Mở mục <strong>Cấu hình</strong>, nhập tài khoản của từng nguồn tuyển dụng (TopCV, VietnamWorks, CareerViet...), chọn thư mục lưu CV và file CSDL <code>.db</code>, sau đó bấm <strong>Lưu Cấu Hình</strong>.</p>
+              <div class="step-footer">
+                <button class="btn btn-sm btn-secondary" onclick="window.app.switchTab('tab-config')">👉 Đến Cấu hình ngay</button>
+              </div>
+            </div>
+
+            <div class="roadmap-step-card">
+              <div class="roadmap-step-header">
+                <span class="step-badge">BƯỚC 02</span>
+                <span class="step-icon">⚡</span>
+              </div>
+              <h4>Đồng Bộ & Tải CV Tự Động</h4>
+              <p>Mở mục <strong>Tải CV</strong>, chọn kênh tuyển dụng rồi bấm <strong>ĐỒNG BỘ CV</strong> cho vận hành hằng ngày hoặc thiết lập lịch hẹn giờ tự động chạy ngầm và thông báo khi có CV mới.</p>
+              <div class="step-footer">
+                <button class="btn btn-sm btn-secondary" onclick="window.app.switchTab('tab-download')">👉 Đến Tải CV ngay</button>
+              </div>
+            </div>
+
+            <div class="roadmap-step-card">
+              <div class="roadmap-step-header">
+                <span class="step-badge">BƯỚC 03</span>
+                <span class="step-icon">🧠</span>
+              </div>
+              <h4>Bóc Tách Nội Dung CV (Parsing)</h4>
+              <p>Mở mục <strong>Parsing CV</strong>, bấm <strong>BẮT ĐẦU PARSING</strong> để tự động trích xuất toàn bộ văn bản (PDF, Word, OCR ảnh), tự động điền & gộp liên hệ (Email, SĐT) và nạp chỉ mục tìm kiếm.</p>
+              <div class="step-footer">
+                <button class="btn btn-sm btn-secondary" onclick="window.app.switchTab('tab-parsing')">👉 Đến Parsing CV ngay</button>
+              </div>
+            </div>
+
+            <div class="roadmap-step-card">
+              <div class="roadmap-step-header">
+                <span class="step-badge">BƯỚC 04</span>
+                <span class="step-icon">🔍</span>
+              </div>
+              <h4>Tra Cứu Toàn Văn & Boolean</h4>
+              <p>Mở mục <strong>Dữ liệu ứng viên</strong> để tra cứu tức thì theo kỹ năng, trường đại học, chứng chỉ xuất hiện trong ruột CV bằng <em>Boolean Search</em> (AND, OR, NOT) và xem chi tiết bóc tách.</p>
+              <div class="step-footer">
+                <button class="btn btn-sm btn-secondary" onclick="window.app.switchTab('tab-candidates')">👉 Đến Ứng viên ngay</button>
+              </div>
+            </div>
+
+            <div class="roadmap-step-card">
+              <div class="roadmap-step-header">
+                <span class="step-badge">BƯỚC 05</span>
+                <span class="step-icon">📊</span>
+              </div>
+              <h4>Xuất Báo Cáo & Phân Tích</h4>
+              <p>Mở mục <strong>Báo cáo</strong> để xem biểu đồ KPI, phễu nguồn tuyển dụng, tỷ lệ bóc tách thành công và xuất dữ liệu sang <strong>Excel, CSV hoặc gói ZIP kèm file CV</strong> theo bộ lọc.</p>
+              <div class="step-footer">
+                <button class="btn btn-sm btn-secondary" onclick="window.app.switchTab('tab-report')">👉 Đến Báo cáo ngay</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Cơ Chế Đồng Bộ & Checkpoint Độc Quyền -->
+        <div class="glass-card help-section-card" data-help-section="sync" data-help-keywords="đồng bộ checkpoint tải cv tải ngược smart stop cơ chế song song duplicate chống trùng đám mây cloud sync ổ đĩa chia sẻ">
+          <div class="section-title-badge">
+            <span class="badge-icon">⚡</span>
+            <h3>CƠ CHẾ ĐỒNG BỘ & CHECKPOINT THÔNG MINH ĐỘC QUYỀN</h3>
+          </div>
+          <div class="help-feature-cards-grid">
+            <div class="feature-info-card">
+              <div class="feature-info-icon">⚡</div>
+              <div class="feature-info-content">
+                <h4>Chế Độ "Đồng Bộ CV Mới" (Smart Stop)</h4>
+                <p>Khác với việc cào lại toàn bộ gây lãng phí băng thông và dễ bị khóa tài khoản, chế độ này quét từ trang mới nhất và <strong>tự động dừng ngay khi xác nhận đã đi qua vùng chỉ còn hồ sơ cũ</strong>. Tốc độ kiểm tra chỉ mất vài giây.</p>
+                <div class="feature-tag">Khuyên dùng hằng ngày</div>
+              </div>
+            </div>
+
+            <div class="feature-info-card">
+              <div class="feature-info-icon">📌</div>
+              <div class="feature-info-content">
+                <h4>Bộ Nhớ Checkpoint & Tiếp Tục Thông Minh</h4>
+                <p>Mỗi khi dừng tải giữa chừng hoặc gặp sự cố ngắt mạng, MSB Radar Edge <strong>tự động ghi nhớ trang và vị trí cuối cùng</strong>. Bạn chỉ cần bấm <strong>Tiếp tục</strong> để tải nối tiếp chính xác, tuyệt đối không bị tải trùng lặp.</p>
+                <div class="feature-tag">Phục hồi sự cố tức thì</div>
+              </div>
+            </div>
+
+            <div class="feature-info-card">
+              <div class="feature-info-icon">🔄</div>
+              <div class="feature-info-content">
+                <h4>Tải Ngược (Reverse Pagination)</h4>
+                <p>Khi cần cào dữ liệu lịch sử từ các năm trước mà không muốn lẫn với hồ sơ mới ứng tuyển hôm nay, hãy chọn phạm vi trang và tích <strong>Tải ngược từ trang cuối lên</strong> để ưu tiên xử lý hồ sơ cũ nhất trước.</p>
+                <div class="feature-tag">Backup dữ liệu lịch sử</div>
+              </div>
+            </div>
+
+            <div class="feature-info-card">
+              <div class="feature-info-icon">🛡️</div>
+              <div class="feature-info-content">
+                <h4>Khóa Chống Trùng Đa Chiều (Unique Key)</h4>
+                <p>Hệ thống nhận diện hồ sơ theo cặp khóa <code>(Nguồn, Mã CV)</code>. Một ứng viên nộp vào 2 vị trí khác nhau sẽ có 2 mã ứng tuyển độc lập và đều được ghi nhận đầy đủ, không bị ghi đè thông tin.</p>
+                <div class="feature-tag">Bảo toàn 100% dữ liệu</div>
+              </div>
+            </div>
+
+            <div class="feature-info-card">
+              <div class="feature-info-icon">👥</div>
+              <div class="feature-info-content">
+                <h4>Sử Dụng Chung Trên Nhiều Máy (Ổ Đĩa Đám Mây / Mạng LAN)</h4>
+                <p>Cả nhóm có thể trỏ về cùng file CSDL <code>.db</code> và thư mục CV trên ổ đĩa đám mây (Cloud Sync) hoặc ổ đĩa mạng. <strong>Quy tắc an toàn:</strong> Chỉ một máy thực hiện tải CV tại một thời điểm; các máy còn lại dùng để tra cứu và xuất báo cáo.</p>
+                <div class="feature-tag">Làm việc nhóm tập trung</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Cẩm Nang Bóc Tách Nội Dung CV & OCR Tự Động (AI & Parsing Engine) -->
+        <div class="glass-card help-section-card" data-help-section="parsing" data-help-keywords="bóc tách parsing cv ocr text pdf word docx doc excel scan ảnh trích xuất email sđt tự động điền auto-fill fts5 tìm kiếm toàn văn">
+          <div class="section-title-badge">
+            <span class="badge-icon">🧠</span>
+            <h3>CẨM NANG BÓC TÁCH NỘI DUNG CV & OCR TỰ ĐỘNG (AI & CV PARSING)</h3>
+          </div>
+          <p class="section-desc">MSB Radar Edge tích hợp bộ máy trích xuất nội dung đa định dạng, nhận dạng quang học OCR và tự động làm giàu dữ liệu ứng viên.</p>
+
+          <div class="help-feature-cards-grid">
+            <div class="feature-info-card">
+              <div class="feature-info-icon">📄</div>
+              <div class="feature-info-content">
+                <h4>Đa Định Dạng Hồ Sơ (PDF, Word, OCR, Excel...)</h4>
+                <p>Tự động nhận diện và bóc tách văn bản chuẩn từ <strong>PDF</strong> (Native & OCR Scan), <strong>Microsoft Word</strong> (.docx, .doc), <strong>Hình ảnh</strong> (.png, .jpg), <strong>Bảng tính</strong> (.xlsx) và <strong>Văn bản thô</strong> (.txt, .rtf, .md).</p>
+                <div class="feature-tag">Hỗ trợ 100% định dạng phổ biến</div>
+              </div>
+            </div>
+
+            <div class="feature-info-card">
+              <div class="feature-info-icon">📇</div>
+              <div class="feature-info-content">
+                <h4>Tự Động Điền & Hợp Nhất Đa Liên Hệ (Auto-fill & Merge)</h4>
+                <p>Nếu lúc tải hồ sơ chưa có Email/SĐT, parser sẽ <strong>tự động điền</strong> từ nội dung CV. Nếu phát hiện thêm các email hoặc số điện thoại mới, hệ thống tự động gộp (<code>email1, email2</code>) để không bao giờ bỏ sót đầu mối liên hệ.</p>
+                <div class="feature-tag">Làm giàu dữ liệu tự động</div>
+              </div>
+            </div>
+
+            <div class="feature-info-card">
+              <div class="feature-info-icon">⚡</div>
+              <div class="feature-info-content">
+                <h4>Ưu Tiên Hồ Sơ Mới Nhất Trước (Newest First)</h4>
+                <p>Hàng đợi bóc tách tự động sắp xếp ưu tiên các <strong>ứng viên mới nộp gần đây nhất</strong> (theo ngày nộp hồ sơ giảm dần), giúp HR tiếp cận ngay những CV "nóng" vừa về mà không cần chờ duyệt qua hồ sơ cũ.</p>
+                <div class="feature-tag">Tối ưu quy trình tuyển dụng nóng</div>
+              </div>
+            </div>
+
+            <div class="feature-info-card">
+              <div class="feature-info-icon">🔍</div>
+              <div class="feature-info-content">
+                <h4>Chỉ Mục Tìm Kiếm Toàn Văn FTS5 (Full-Text Search)</h4>
+                <p>Toàn bộ văn bản sau khi bóc tách được lập chỉ mục tìm kiếm tức thì. Bạn có thể gõ bất kỳ từ khóa kỹ năng (<em>Python, Figma</em>), trường đại học, chứng chỉ ngoại ngữ... trong ô tìm kiếm ở tab <strong>Dữ liệu ứng viên</strong> để lọc chính xác.</p>
+                <div class="feature-tag">Tra cứu siêu tốc trong 1ms</div>
+              </div>
+            </div>
+
+            <div class="feature-info-card">
+              <div class="feature-info-icon">👁️</div>
+              <div class="feature-info-content">
+                <h4>Trình Soi Bóc Tách & Bảng Kết Quả Chi Tiết</h4>
+                <p>Bảng điều khiển chi tiết trong tab <strong>Parsing CV</strong> chỉ liệt kê các hồ sơ đã qua xử lý. Bạn có thể bấm <strong>👁️ Soi bóc tách</strong> để xem trực quan định dạng, độ dài, điểm chất lượng và 1-chạm sao chép toàn bộ text.</p>
+                <div class="feature-tag">Kiểm soát chất lượng 1-chạm</div>
+              </div>
+            </div>
+
+            <div class="feature-info-card">
+              <div class="feature-info-icon">🔬</div>
+              <div class="feature-info-content">
+                <h4>Nhận Dạng Quang Học OCR Tesseract Thông Minh</h4>
+                <p>Tự động nhận diện các file PDF dạng scan hoặc file ảnh chụp để chuyển giao cho bộ máy OCR. Bạn có thể bật/tắt OCR, giới hạn số trang tối đa (PDF max pages) và dung lượng file trong tab <strong>Cấu hình</strong>.</p>
+                <div class="feature-tag">Giải mã ảnh scan hoàn hảo</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Cẩm Nang Tra Cứu Boolean Search & Trích Xuất Dữ Liệu -->
+        <div class="glass-card help-section-card" data-help-section="boolean" data-help-keywords="tra cứu tìm kiếm boolean search and or not cụm từ exact trích xuất excel csv zip xuất file bộ lọc filter">
+          <div class="section-title-badge">
+            <span class="badge-icon">🔍</span>
+            <h3>CẨM NANG TRA CỨU BOOLEAN SEARCH & TRÍCH XUẤT DỮ LIỆU</h3>
+          </div>
+          <p class="section-desc">Ô tìm kiếm nhanh tại tab <strong>Dữ liệu ứng viên</strong> hỗ trợ thuật toán tìm kiếm Boolean tiêu chuẩn quốc tế giúp bạn lọc chính xác hồ sơ trong kho hàng chục nghìn ứng viên.</p>
+
+          <div class="boolean-cheatsheet-grid">
+            <div class="boolean-card">
+              <div class="boolean-card-head">
+                <span class="operator-badge and">AND</span>
+                <strong>Tìm hồ sơ thỏa mãn TẤT CẢ các từ khóa</strong>
+              </div>
+              <div class="boolean-example-box">
+                <code>Java AND Senior</code>
+                <button class="btn-copy-syntax" data-query="Java AND Senior" title="Sao chép cú pháp">📋 Sao chép</button>
+              </div>
+              <p class="boolean-desc">Tìm ứng viên có xuất hiện cả từ <em>"Java"</em> VÀ từ <em>"Senior"</em> trong bất kỳ trường dữ liệu nào (tên, kỹ năng, vị trí...).</p>
+              <button class="btn-test-query" data-query="Java AND Senior">👉 Thử nghiệm ngay</button>
+            </div>
+
+            <div class="boolean-card">
+              <div class="boolean-card-head">
+                <span class="operator-badge or">OR</span>
+                <strong>Tìm hồ sơ thỏa mãn MỘT TRONG CÁC từ khóa</strong>
+              </div>
+              <div class="boolean-example-box">
+                <code>Python OR Golang</code>
+                <button class="btn-copy-syntax" data-query="Python OR Golang" title="Sao chép cú pháp">📋 Sao chép</button>
+              </div>
+              <p class="boolean-desc">Tìm ứng viên có kỹ năng hoặc kinh nghiệm về <em>"Python"</em> HOẶC <em>"Golang"</em>.</p>
+              <button class="btn-test-query" data-query="Python OR Golang">👉 Thử nghiệm ngay</button>
+            </div>
+
+            <div class="boolean-card">
+              <div class="boolean-card-head">
+                <span class="operator-badge not">NOT</span>
+                <strong>LOẠI TRỪ các hồ sơ chứa từ khóa không mong muốn</strong>
+              </div>
+              <div class="boolean-example-box">
+                <code>React NOT Intern</code>
+                <button class="btn-copy-syntax" data-query="React NOT Intern" title="Sao chép cú pháp">📋 Sao chép</button>
+              </div>
+              <p class="boolean-desc">Tìm tất cả ứng viên có từ <em>"React"</em> nhưng loại bỏ hoàn toàn các ứng viên có từ <em>"Intern"</em> (thực tập sinh).</p>
+              <button class="btn-test-query" data-query="React NOT Intern">👉 Thử nghiệm ngay</button>
+            </div>
+
+            <div class="boolean-card">
+              <div class="boolean-card-head">
+                <span class="operator-badge quote">"..."</span>
+                <strong>Khớp CHÍNH XÁC NGUYÊN CỤM TỪ theo thứ tự</strong>
+              </div>
+              <div class="boolean-example-box">
+                <code>"Project Manager"</code>
+                <button class="btn-copy-syntax" data-query='"Project Manager"' title="Sao chép cú pháp">📋 Sao chép</button>
+              </div>
+              <p class="boolean-desc">Tìm chính xác cụm từ <em>"Project Manager"</em> liền nhau, không khớp các trường hợp từ đứng rời rạc.</p>
+              <button class="btn-test-query" data-query='"Project Manager"'>👉 Thử nghiệm ngay</button>
+            </div>
+
+            <div class="boolean-card full-width">
+              <div class="boolean-card-head">
+                <span class="operator-badge combo">COMBO</span>
+                <strong>Kết Hợp Phức Tạp Lồng Ghép Nhiều Điều Kiện</strong>
+              </div>
+              <div class="boolean-example-box">
+                <code>("Data Engineer" OR "Data Analyst") AND Python NOT Junior</code>
+                <button class="btn-copy-syntax" data-query='("Data Engineer" OR "Data Analyst") AND Python NOT Junior' title="Sao chép cú pháp">📋 Sao chép</button>
+              </div>
+              <p class="boolean-desc">Tìm ứng viên là Data Engineer hoặc Data Analyst, có kỹ năng Python, và loại trừ cấp độ Junior.</p>
+              <button class="btn-test-query" data-query='("Data Engineer" OR "Data Analyst") AND Python NOT Junior'>👉 Thử nghiệm ngay</button>
+            </div>
+          </div>
+
+          <!-- Exporting Guide Box -->
+          <div class="help-sub-box mt-4">
+            <h4>📦 Hướng Dẫn Trích Xuất & Xuất File (Excel / CSV / ZIP)</h4>
+            <div class="export-guide-grid">
+              <div class="export-guide-item">
+                <div class="export-badge excel">📊 Xuất Excel (.xlsx)</div>
+                <p>Xuất bảng dữ liệu đầy đủ, hỗ trợ tiếng Việt có dấu chuẩn UTF-8, tự động định dạng ngày ứng tuyển và các cột dữ liệu theo đúng bộ lọc đang chọn.</p>
+              </div>
+              <div class="export-guide-item">
+                <div class="export-badge csv">📑 Xuất CSV (.csv)</div>
+                <p>File văn bản nhẹ, tốc độ xuất tức thì, tương thích tối đa để import vào các hệ thống quản trị nhân sự ATS hoặc cơ sở dữ liệu nội bộ khác.</p>
+              </div>
+              <div class="export-guide-item">
+                <div class="export-badge zip">📦 Xuất Gói ZIP Kèm File CV</div>
+                <p>Tự động nén toàn bộ file CV gốc (PDF, DOCX, PNG) của danh sách ứng viên đang lọc kèm theo một file bảng kê Excel chi tiết bên trong gói ZIP.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Cẩm Nang Từng Kênh Tuyển Dụng -->
+        <div class="glass-card help-section-card" data-help-section="providers" data-help-keywords="topcv vietnamworks careerviet việc làm 24h itviec joboko jobsgo nguồn kênh tuyển dụng otp captcha session chrome profile">
+          <div class="section-title-badge">
+            <span class="badge-icon">🏢</span>
+            <h3>CẨM NANG VẬN HÀNH TỪNG KÊNH TUYỂN DỤNG</h3>
+          </div>
+
+          <div class="provider-guides-grid">
+            <div class="provider-guide-card topcv">
+              <div class="provider-card-header">
+                <div class="provider-brand">
+                  <span class="provider-dot topcv"></span>
+                  <h4>TopCV (topcv.vn)</h4>
+                </div>
+                <span class="provider-status-tag ready">Đã sẵn sàng</span>
+              </div>
+              <ul class="provider-tips-list">
+                <li><strong>Chrome Profile riêng:</strong> Lưu phiên đăng nhập và cookie độc lập trong thư mục <code>chrome_profile/topcv</code> trên máy bạn.</li>
+                <li><strong>Xử lý Captcha / Cloudflare:</strong> Khi TopCV yêu cầu xác minh người dùng, cửa sổ Chrome sẽ tự động bật lên phía trước. Bạn chỉ cần tick captcha một lần; MSB Radar Edge sẽ tự động nhận diện và tiếp tục tải.</li>
+                <li><strong>Cấu hình khuyên dùng:</strong> 4 luồng song song, thời gian nghỉ 250ms để vận hành mượt mà và an toàn cho tài khoản.</li>
+              </ul>
+            </div>
+
+            <div class="provider-guide-card vietnamworks">
+              <div class="provider-card-header">
+                <div class="provider-brand">
+                  <span class="provider-dot vietnamworks"></span>
+                  <h4>VietnamWorks (vietnamworks.com)</h4>
+                </div>
+                <span class="provider-status-tag ready">Đã sẵn sàng</span>
+              </div>
+              <ul class="provider-tips-list">
+                <li><strong>Phân loại hồ sơ thông minh:</strong> Tự động tải cả CV đính kèm gốc (PDF/Word) và hồ sơ tạo trực tuyến trên hệ thống VietnamWorks.</li>
+                <li><strong>Xác thực an toàn:</strong> Sử dụng cơ chế phiên làm việc chuẩn, bảo vệ mật khẩu và tự động làm mới token phiên khi cần.</li>
+                <li><strong>Đồng bộ đa chiến dịch:</strong> Tự động quét qua tất cả tin tuyển dụng đang hoạt động của công ty.</li>
+              </ul>
+            </div>
+
+            <div class="provider-guide-card careerviet">
+              <div class="provider-card-header">
+                <div class="provider-brand">
+                  <span class="provider-dot careerviet"></span>
+                  <h4>CareerViet / CareerBuilder (careerviet.vn)</h4>
+                </div>
+                <span class="provider-status-tag ready">Đã sẵn sàng</span>
+              </div>
+              <ul class="provider-tips-list">
+                <li><strong>Kế thừa chuẩn dữ liệu:</strong> Chuẩn hóa mã hồ sơ, họ tên, email, điện thoại và vị trí tương thích 100% với kho dữ liệu chung.</li>
+                <li><strong>Tải file nhanh:</strong> Nhận diện các định dạng file hồ sơ đặc thù và lưu trữ chuẩn xác.</li>
+              </ul>
+            </div>
+
+            <div class="provider-guide-card vieclam24h">
+              <div class="provider-card-header">
+                <div class="provider-brand">
+                  <span class="provider-dot vieclam24h"></span>
+                  <h4>Việc Làm 24h & ITViec</h4>
+                </div>
+                <span class="provider-status-tag expanding">Mở rộng tiếp theo</span>
+              </div>
+              <ul class="provider-tips-list">
+                <li><strong>Kiến trúc Module hóa:</strong> Được thiết kế theo chuẩn Provider Base của MSB Radar Edge. Khi phát hành phiên bản mới, dữ liệu sẽ tự động hòa vào kho chung mà không cần cài đặt lại phần mềm.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 5: Trợ Lý Chẩn Đoán & Xử Lý Sự Cố Thông Minh -->
+        <div class="glass-card help-section-card" data-help-section="troubleshoot" data-help-keywords="xử lý sự cố lỗi sửa lỗi chẩn đoán troubleshoot captcha otp toast thông báo máy khác đang chạy xung đột sqlite không tải được">
+          <div class="section-title-badge">
+            <span class="badge-icon">🩺</span>
+            <h3>TRỢ LÝ CHẨN ĐOÁN & XỬ LÝ SỰ CỐ THÔNG MINH</h3>
+          </div>
+          <p class="section-desc">Khi gặp tình huống bất thường, hãy tra cứu nhanh giải pháp chuẩn hóa bên dưới:</p>
+
+          <div class="troubleshoot-grid">
+            <div class="troubleshoot-card">
+              <div class="troubleshoot-header">
+                <span class="trouble-icon warning">⚠️</span>
+                <h4>1. Cửa Sổ Chrome Bật Lên Yêu Cầu Captcha / OTP</h4>
+              </div>
+              <div class="troubleshoot-body">
+                <p><strong>Nguyên nhân:</strong> Nguồn tuyển dụng kích hoạt cơ chế bảo vệ Cloudflare hoặc yêu cầu xác thực bảo mật 2 bước.</p>
+                <div class="solution-box">
+                  <strong>Cách khắc phục:</strong>
+                  <ol>
+                    <li>Thao tác trực tiếp trên cửa sổ Chrome (tích captcha hoặc nhập OTP từ SMS/Email).</li>
+                    <li>Sau khi hoàn tất đăng nhập, MSB Radar Edge sẽ <strong>tự động phát hiện và tiếp tục quy trình tải</strong> mà bạn không cần khởi động lại.</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+
+            <div class="troubleshoot-card">
+              <div class="troubleshoot-header">
+                <span class="trouble-icon info">ℹ️</span>
+                <h4>2. Đã Đổi Tần Suất Lặp Lại Nhưng Lịch Chưa Chạy Đúng?</h4>
+              </div>
+              <div class="troubleshoot-body">
+                <p><strong>Nguyên nhân:</strong> Các thiết lập hẹn giờ chỉ được áp dụng đồng bộ sau khi bạn lưu cấu hình.</p>
+                <div class="solution-box">
+                  <strong>Cách khắc phục:</strong>
+                  <p>Mở mục <strong>Cấu hình</strong> và bấm nút <strong>Lưu Cấu Hình</strong>. Hệ thống sẽ tự động tính lại mốc thời gian chạy tiếp theo ngay lập tức.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="troubleshoot-card">
+              <div class="troubleshoot-header">
+                <span class="trouble-icon danger">🔔</span>
+                <h4>3. Không Thấy Thông Báo Windows Toast Khi Có CV Mới</h4>
+              </div>
+              <div class="troubleshoot-body">
+                <p><strong>Nguyên nhân:</strong> Windows đang bật chế độ <em>Focus Assist (Do Not Disturb)</em> hoặc chưa cấp quyền phát thông báo cho ứng dụng.</p>
+                <div class="solution-box">
+                  <strong>Cách khắc phục:</strong>
+                  <p>Kiểm tra cài đặt Notifications trên Windows. Bấm nút bên dưới để thử gửi một thông báo test trực tiếp:</p>
+                  <button class="btn btn-sm btn-brand mt-2" onclick="window.app.testWindowsNotifier()">🔔 Gửi thử thông báo Windows ngay</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="troubleshoot-card">
+              <div class="troubleshoot-header">
+                <span class="trouble-icon warning">🔒</span>
+                <h4>4. Cảnh Báo "Máy Khác Đang Cập Nhật CSDL"</h4>
+              </div>
+              <div class="troubleshoot-body">
+                <p><strong>Nguyên nhân:</strong> Một máy tính khác trong nhóm đang mở cùng file CSDL SQLite trên ổ đĩa đám mây hoặc mạng LAN.</p>
+                <div class="solution-box">
+                  <strong>Cách khắc phục:</strong>
+                  <p>Cơ chế Lockfile tự động bảo vệ dữ liệu khỏi bị hỏng do xung đột ghi. Hãy kiểm tra xem có máy nào đang tải dở dang không; chỉ chạy tải trên một máy duy nhất tại một thời điểm.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="troubleshoot-card">
+              <div class="troubleshoot-header">
+                <span class="trouble-icon info">📄</span>
+                <h4>5. Lỗi "Nội dung tải về không phải file CV hợp lệ"</h4>
+              </div>
+              <div class="troubleshoot-body">
+                <p><strong>Nguyên nhân:</strong> Nguồn tuyển dụng đôi khi trả về phản hồi trang lỗi tạm thời thay vì luồng file CV thực sự.</p>
+                <div class="solution-box">
+                  <strong>Cách khắc phục:</strong>
+                  <p>Tại màn hình <strong>Tải CV</strong>, bấm nút <strong>🔄 Thử lại CV lỗi</strong>. MSB Radar Edge sẽ tự động tải lại các hồ sơ này thông qua phiên làm việc an toàn của Chrome.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 6: Câu Hỏi Thường Gặp (FAQ Accordion) -->
+        <div class="glass-card help-section-card" data-help-section="faq" data-help-keywords="faq câu hỏi thường gặp hỏi đáp thắc mắc trùng lặp song song lưu ở đâu bảo mật tài khoản">
+          <div class="section-title-badge justify-between">
+            <div class="d-flex align-center gap-2">
+              <span class="badge-icon">❓</span>
+              <h3>CÂU HỎI THƯỜNG GẶP (FAQ)</h3>
+            </div>
+            <div class="faq-controls">
+              <button id="btn-help-expand-all" class="btn btn-xs btn-secondary">Mở tất cả</button>
+              <button id="btn-help-collapse-all" class="btn btn-xs btn-secondary">Thu gọn</button>
+            </div>
+          </div>
+
+          <div class="faq-accordion-list" id="faq-accordion-container">
+            <div class="faq-item">
+              <button class="faq-question" aria-expanded="false">
+                <span>Chạy tải lại nhiều lần có tạo hồ sơ trùng không?</span>
+                <span class="faq-arrow">▼</span>
+              </button>
+              <div class="faq-answer">
+                <p><strong>Tuyệt đối không.</strong> Mỗi lượt ứng tuyển được định danh duy nhất bằng cặp khóa <code>(Nguồn, Mã CV)</code>. Hồ sơ nào đã tải thành công sẽ được tự động bỏ qua (skipped) trong các lần chạy kế tiếp.</p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" aria-expanded="false">
+                <span>Chế độ “Chỉ tải CV mới” khác “Backup toàn bộ lịch sử” thế nào?</span>
+                <span class="faq-arrow">▼</span>
+              </button>
+              <div class="faq-answer">
+                <p><strong>Backup toàn bộ lịch sử:</strong> Quét qua toàn bộ các trang từ 1 đến hết, phù hợp cho lần đồng bộ đầu tiên khi thiết lập máy mới.<br>
+                <strong>Chỉ tải CV mới (Khuyên dùng hằng ngày):</strong> Bắt đầu từ trang mới nhất và dừng ngay khi gặp vùng chỉ còn hồ sơ cũ, giúp hoàn tất đồng bộ chỉ trong vài giây.</p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" aria-expanded="false">
+                <span>Có nên tăng số luồng tải song song lên mức tối đa (8 luồng) không?</span>
+                <span class="faq-arrow">▼</span>
+              </button>
+              <div class="faq-answer">
+                <p>Mức mặc định <strong>4 luồng</strong> là mức cân bằng hoàn hảo giữa tốc độ và độ ổn định. Tăng quá cao có thể khiến nguồn tuyển dụng nghi ngờ và yêu cầu giải captcha liên tục hoặc hạn chế tốc độ mạng.</p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" aria-expanded="false">
+                <span>Dừng giữa chừng thì tiếp tục như thế nào?</span>
+                <span class="faq-arrow">▼</span>
+              </button>
+              <div class="faq-answer">
+                <p>Bạn chỉ cần mở <strong>Nâng cao / Backup lịch sử</strong> và bấm <strong>Tiếp tục từ trang X</strong>. Hệ thống sẽ tự động lấy checkpoint gần nhất và tiếp tục đúng phạm vi mà không làm mất dữ liệu đã tải trước đó.</p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" aria-expanded="false">
+                <span>File CV và dữ liệu ứng viên được lưu trữ ở đâu trên máy tính?</span>
+                <span class="faq-arrow">▼</span>
+              </button>
+              <div class="faq-answer">
+                <p>File CV được lưu trong thư mục bạn chọn tại tab Cấu hình (VD: thư mục <code>CV</code>). Thông tin ứng viên được lưu trong file SQLite <code>du_lieu_ung_vien.db</code>. Bạn có thể mở trực tiếp các thư mục này bằng các nút ở phần <strong>Bảng thao tác nhanh tiện ích</strong> phía trên.</p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" aria-expanded="false">
+                <span>Phần mềm có tự động gửi dữ liệu ứng viên lên máy chủ bên ngoài không?</span>
+                <span class="faq-arrow">▼</span>
+              </button>
+              <div class="faq-answer">
+                <p><strong>Không.</strong> MSB Radar Edge hoạt động 100% cục bộ trên máy tính của bạn. Dữ liệu chỉ được trao đổi trực tiếp giữa máy bạn và cổng tuyển dụng của TopCV / VietnamWorks / CareerViet thông qua tài khoản của chính bạn. Không có bất kỳ dữ liệu nào bị gửi sang bên thứ ba.</p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" aria-expanded="false">
+                <span>Làm sao để lọc danh sách ứng viên theo khoảng ngày nộp hồ sơ?</span>
+                <span class="faq-arrow">▼</span>
+              </button>
+              <div class="faq-answer">
+                <p>Mở mục <strong>Dữ liệu ứng viên</strong>, tại ô <em>Thời gian ứng tuyển</em>, chọn <strong>Hôm nay</strong>, <strong>7 ngày qua</strong>, <strong>Tháng này</strong>, hoặc chọn <strong>Tùy chọn dải ngày...</strong> rồi nhập ngày bắt đầu và kết thúc, sau đó bấm <strong>Lọc Dữ Liệu</strong>.</p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" aria-expanded="false">
+                <span>Tính năng bóc tách CV (Parsing) hỗ trợ những loại file nào?</span>
+                <span class="faq-arrow">▼</span>
+              </button>
+              <div class="faq-answer">
+                <p>Bộ máy Parser hỗ trợ bóc tách tự động: <strong>PDF</strong> (file PDF văn bản & PDF scan), <strong>Word</strong> (<code>.docx</code>, <code>.doc</code>), <strong>Hình ảnh</strong> (<code>.png</code>, <code>.jpg</code>, <code>.jpeg</code> qua OCR), <strong>Excel</strong> (<code>.xlsx</code>) và các file text thuần (<code>.txt</code>, <code>.rtf</code>, <code>.md</code>). Văn bản trích xuất được làm sạch chuẩn Unicode loại bỏ các ký tự rác.</p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" aria-expanded="false">
+                <span>Cơ chế tự động điền (Auto-fill) và gộp nhiều Email / Số điện thoại hoạt động ra sao?</span>
+                <span class="faq-arrow">▼</span>
+              </button>
+              <div class="faq-answer">
+                <p>Khi bóc tách CV, hệ thống quét regex thông minh để tìm Email và SĐT trong ruột văn bản:<br>
+                - <strong>Trường hợp ứng viên chưa có Email/SĐT:</strong> Tự động cập nhật trực tiếp vào hồ sơ ứng viên.<br>
+                - <strong>Trường hợp phát hiện thêm Email/SĐT mới:</strong> Hệ thống tự động gộp (dạng <code>email1, email2</code> và <code>phone1, phone2</code>), đồng thời cập nhật ngay vào bảng liên hệ và chỉ mục tìm kiếm để bạn có thể tra cứu theo bất kỳ số/email nào.</p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" aria-expanded="false">
+                <span>Làm sao để tìm kiếm ứng viên dựa trên nội dung bên trong file CV?</span>
+                <span class="faq-arrow">▼</span>
+              </button>
+              <div class="faq-answer">
+                <p>Toàn bộ văn bản bóc tách được nạp vào chỉ mục tìm kiếm toàn văn <strong>SQLite FTS5</strong>. Tại tab <strong>Dữ liệu ứng viên</strong>, bạn chỉ cần gõ bất kỳ từ khóa nào xuất hiện trong CV (ví dụ: tên chứng chỉ <em>TOEIC, PMP, AWS</em>; kỹ năng <em>Solidity, Figma, React</em>; tên trường đại học <em>Bách Khoa, Ngoại Thương</em>...) hoặc kết hợp cú pháp <em>Boolean Search</em> (<code>Python AND Django</code>) để tìm ra ngay hồ sơ mong muốn.</p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" aria-expanded="false">
+                <span>Tại sao tiến trình Parsing luôn ưu tiên hồ sơ mới nộp trước?</span>
+                <span class="faq-arrow">▼</span>
+              </button>
+              <div class="faq-answer">
+                <p>Để tối ưu quy trình săn đón ứng viên nóng của HR, hệ thống tự động sắp xếp hàng đợi parsing theo thứ tự <strong>ngày ứng tuyển mới nhất đến cũ nhất</strong> (<code>applied_ts DESC</code>). Những ứng viên vừa nộp hôm nay sẽ được bóc tách và sẵn sàng tra cứu ngay lập tức.</p>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" aria-expanded="false">
+                <span>Khi nào cần bật OCR và cách cấu hình để nhận dạng CV dạng ảnh scan?</span>
+                <span class="faq-arrow">▼</span>
+              </button>
+              <div class="faq-answer">
+                <p>Với các file CV scan từ giấy hoặc ứng viên xuất ảnh thiết kế không chứa văn bản thô (Native Text), hãy mở tab <strong>Cấu hình</strong>, tích <strong>Bật OCR (Tesseract)</strong>. Bạn có thể giới hạn <em>Số trang tối đa bóc tách</em> và <em>Dung lượng file tối đa</em> để tối ưu tốc độ máy.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 7: Bảng Phím Tắt & Mẹo Vận Hành Pro-Tips -->
+        <div class="glass-card help-section-card" data-help-section="shortcuts" data-help-keywords="phím tắt shortcut hotkey enter esc mẹo pro tip thao tác nhanh">
+          <div class="section-title-badge">
+            <span class="badge-icon">⌨️</span>
+            <h3>BẢNG PHÍM TẮT & MẸO VẬN HÀNH DÀNH CHO HR CHUYÊN NGHIỆP</h3>
+          </div>
+
+          <div class="shortcuts-and-tips-grid">
+            <div class="shortcuts-table-box">
+              <div class="sub-table-title">⌨️ Phím Tắt Thao Tác Nhanh</div>
+              <table class="shortcuts-table">
+                <thead>
+                  <tr>
+                    <th>Phím tắt</th>
+                    <th>Chức năng</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><kbd>Enter</kbd> trong ô tìm kiếm</td>
+                    <td>Thực thi tìm kiếm hoặc lọc dữ liệu tức thì</td>
+                  </tr>
+                  <tr>
+                    <td><kbd>Esc</kbd></td>
+                    <td>Đóng toàn bộ Modal (Chi tiết ứng viên, Xem CV, Lịch sử Log, v.v.)</td>
+                  </tr>
+                  <tr>
+                    <td><kbd>Tab</kbd> / <kbd>Shift + Tab</kbd></td>
+                    <td>Di chuyển nhanh giữa các trường nhập liệu trong Cấu hình</td>
+                  </tr>
+                  <tr>
+                    <td><kbd>Double Click</kbd> dòng ứng viên</td>
+                    <td>Mở xem chi tiết hồ sơ và đọc trực tiếp file CV nội bộ</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pro-tips-box">
+              <div class="sub-table-title">💡 Mẹo Hay Cho Chuyên Viên Tuyển Dụng</div>
+              <ul class="pro-tips-list">
+                <li><strong>Ẩn/Hiện Cột Tùy Biến:</strong> Tại tab Ứng viên, bấm <strong>⚙️ Ẩn/Hiện Cột</strong> để bật các trường hữu ích như <em>Số năm kinh nghiệm, Mức lương mong muốn, Học vấn, Công ty gần nhất</em>.</li>
+                <li><strong>Xuất đúng hồ sơ cần chia sẻ:</strong> Bạn có thể tích chọn từng ứng viên bằng checkbox, sau đó bấm <strong>Xuất Excel</strong> hoặc <strong>Xuất ZIP</strong> — phần mềm sẽ chỉ xuất đúng các ứng viên bạn đã tích chọn.</li>
+                <li><strong>Xem nhật ký real-time:</strong> Tại tab Tải CV, bạn có thể theo dõi từng dòng nhatky.log hiển thị trực tiếp với độ trễ 0ms.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: PHIÊN BẢN & TÁC GIẢ -->
+
+      <!-- TAB 6: PHIÊN BẢN & TÁC GIẢ -->
+      <section id="tab-version" class="tab-pane">
+        <div class="page-header">
+          <div>
+            <h1>Thông Tin Phiên Bản & Tác Giả</h1>
+            <p class="subtitle">Thông tin phát hành và tác giả MSB Radar Edge</p>
+          </div>
+        </div>
+
+        <div class="version-grid">
+          <!-- Card 1: Enterprise Header -->
+          <div class="glass-card version-hero-card">
+            <div class="version-hero-logo">
+              <svg viewBox="0 0 280 160" width="80" height="50">
+                <defs>
+                  <linearGradient id="vLogoGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color: #F59E0B" />
+                    <stop offset="45%" style="stop-color: #FF8A33" />
+                    <stop offset="100%" style="stop-color: #E65C00" />
+                  </linearGradient>
+                </defs>
+                <path d="M 50,130 C 15,130 15,65 50,65 C 85,65 95,130 130,130 C 165,130 175,65 210,65 C 245,65 245,130 210,130 C 175,130 165,65 130,65 C 95,65 85,130 50,130 Z" fill="none" stroke="url(#vLogoGrad)" stroke-width="20" stroke-linecap="round" />
+              </svg>
+            </div>
+            <div class="version-hero-info">
+              <h2>MSB <span class="text-gradient">Radar</span></h2>
+              <p class="version-tag-sub">Phiên bản đang tải…</p>
+              <p class="version-desc">Hệ thống trung tâm tự động hóa tải, bóc tách thông minh và quản lý dữ liệu ứng viên tuyển dụng quy mô doanh nghiệp.</p>
+            </div>
+          </div>
+
+          <!-- Card 2: Author -->
+          <div class="version-details-row version-details-single">
+            <div class="glass-card author-card">
+              <div class="config-card-header">
+                <div class="config-icon-badge icon-orange">👤</div>
+                <div>
+                  <h3>Thông Tin Tác Giả & Bản Quyền</h3>
+                  <p class="config-card-sub">Nhóm phát triển & sở hữu trí tuệ</p>
+                </div>
+              </div>
+              <div class="config-card-body author-body">
+                <div class="author-item">
+                  <span class="author-label">Tác giả / Lead Developer:</span>
+                  <strong class="author-val text-gradient" style="font-size:1.05rem;">Lê Hoàng Tùng</strong>
+                </div>
+                <div class="author-item">
+                  <span class="author-label">Email liên hệ:</span>
+                  <a href="mailto:tunglehoang.vn@gmail.com" class="author-val author-link">tunglehoang.vn@gmail.com</a>
+                </div>
+                <div class="author-item">
+                  <span class="author-label">Website / Portfolio:</span>
+                  <a href="#" class="author-val author-link external-link" data-url="https://tunghr.io.vn">https://tunghr.io.vn ↗</a>
+                </div>
+                <div class="author-item">
+                  <span class="author-label">Đơn vị phát triển:</span>
+                  <strong class="author-val">MSB Radar Edge</strong>
+                </div>
+                <div class="author-item">
+                  <span class="author-label">Bản quyền:</span>
+                  <span class="author-val">© 2026 MSB Radar. All rights reserved.</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL 1: TÙY CHỈNH CỘT HIỂN THỊ -->
+  <div id="column-modal" class="modal-overlay hidden">
+    <div class="modal-card column-modal-card">
+      <div class="modal-header">
+        <h3>⚙️ Tùy Chỉnh Cột Dữ Liệu Hiển Thị</h3>
+        <button id="btn-close-column-modal" class="btn-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="subtitle mb-3">Tích chọn các cột thông tin bạn muốn xuất hiện trong bảng dữ liệu ứng viên:</p>
+        <div id="column-checkboxes-grid" class="column-checkboxes-grid">
+          <!-- Dynamically populated checkboxes -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-select-all-columns" class="btn btn-sm btn-secondary">Chọn Tất Cả</button>
+        <button id="btn-reset-columns" class="btn btn-sm btn-secondary">Mặc Định</button>
+        <button id="btn-save-columns" class="btn btn-brand">Áp Dụng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: XEM CV NỘI BỘ ỨNG DỤNG -->
+  <div id="cv-viewer-modal" class="modal-overlay hidden">
+    <div class="modal-card cv-viewer-modal-card">
+      <div class="modal-header cv-viewer-header">
+        <div class="cv-title-group">
+          <span class="cv-badge">📄 CV XEM TRỰC TIẾP</span>
+          <h3 id="cv-viewer-filename">File CV</h3>
+        </div>
+        <div class="cv-viewer-actions">
+          <button id="btn-download-cv-file" class="btn btn-sm btn-brand" type="button">⬇ Tải Về Máy</button>
+          <button id="btn-close-cv-modal" class="btn-close">✕</button>
+        </div>
+      </div>
+      <div class="modal-body cv-viewer-body" id="cv-viewer-body">
+        <iframe id="cv-viewer-iframe" src="" frameborder="0"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: TRA CỨU LỊCH SỬ NHẬT KÝ (SQLITE DB) -->
+  <div id="log-history-modal" class="modal-overlay hidden">
+    <div class="modal-card log-history-modal-card">
+      <div class="modal-header">
+        <div class="cv-title-group">
+          <span class="cv-badge">📜 CSDL NHẬT KÝ</span>
+          <h3>Tra Cứu Lịch Sử Nhật Ký Hệ Thống</h3>
+        </div>
+        <button id="btn-close-log-history-modal" class="btn-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Filter Bar -->
+        <div class="log-history-filter-bar mb-4">
+          <input type="text" id="log-search-input" class="custom-input flex-2" placeholder="Tìm kiếm từ khóa trong nhật ký...">
+          <select id="log-level-select" class="custom-select flex-1">
+            <option value="">-- Tất cả mức độ --</option>
+            <option value="ERROR">❌ Chỉ LỖI (ERROR)</option>
+            <option value="SUCCESS">✅ Thành Công (SUCCESS)</option>
+            <option value="INFO">ℹ️ Thông Tin (INFO)</option>
+          </select>
+          <button id="btn-filter-logs" class="btn btn-brand">Tìm Log</button>
+        </div>
+
+        <!-- Terminal Log Output -->
+        <div class="log-console log-history-console" id="log-history-console">
+          <div class="log-line text-muted">Đang truy vấn dữ liệu nhật ký...</div>
+        </div>
+      </div>
+      <div class="modal-footer justify-between">
+        <span id="log-history-count" class="text-muted" style="font-size:0.85rem;">Hiển thị 0 bản ghi nhật ký</span>
+        <button id="btn-close-log-modal-footer" class="btn btn-secondary">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: XEM CHI TIẾT ỨNG VIÊN -->
+  <div id="candidate-detail-modal" class="modal-overlay hidden">
+    <div class="modal-card candidate-detail-modal-card">
+      <div class="modal-header">
+        <div class="cv-title-group">
+          <span class="cv-badge">👤 CHI TIẾT ỨNG VIÊN</span>
+          <h3 id="detail-candidate-fullname">Họ tên ứng viên</h3>
+        </div>
+        <button id="btn-close-detail-modal" class="btn-close">✕</button>
+      </div>
+      <div class="modal-body" id="detail-candidate-body">
+        <!-- Dynamically populated candidate details -->
+      </div>
+      <div class="modal-footer justify-between">
+        <button id="btn-detail-open-cv" class="btn btn-brand">📄 Mở File CV</button>
+        <button id="btn-close-detail-modal-footer" class="btn btn-secondary">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-toast-stack" class="app-toast-stack" aria-live="polite" aria-atomic="true"></div>
+  <script src="app.js?v=20260814-parsing-hub"></script>
+</body>
+</html>
