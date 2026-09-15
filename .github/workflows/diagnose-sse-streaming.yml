@@ -2,9 +2,10 @@ name: Diagnose SSE Answer Streaming
 
 # Người dùng báo câu trả lời Talent không hiện dần từng chữ như mong đợi, dù
 # code (ai/stream_views.py, talent/answer/engine.py, AiSearch.tsx) đúng là có
-# stream SSE. Việc này gửi MỘT câu hỏi thật qua toàn bộ đường đi thật (Caddy →
-# hub), đo thời điểm từng mẩu dữ liệu tới, để biết stream có bị Caddy/gunicorn
-# gộp lại thành một cục ở cuối hay không — chỉ đọc, không đổi dữ liệu.
+# stream SSE. Việc này gửi cùng một câu hỏi thật qua HAI đường: thẳng vào hub
+# (bỏ qua Caddy) và qua Caddy (web → hub), đo thời điểm từng byte tới ở cả
+# hai, để tách xem nếu bị gộp lại thì là do Caddy (`encode zstd gzip` áp cho
+# cả response SSE) hay do gunicorn/Django. Chỉ đọc, không đổi dữ liệu.
 #
 # Dùng http.client (thư viện chuẩn) thay vì `requests` — image hub không cài
 # `requests`, và http.client cho kiểm soát đọc từng byte chính xác hơn.
@@ -16,7 +17,7 @@ jobs:
   diagnose:
     runs-on: [self-hosted, oracle, intelligence]
     steps:
-      - name: Đo thời điểm từng mẩu SSE tới qua đúng đường đi thật (Caddy → hub)
+      - name: Đo thời điểm từng mẩu SSE tới — thẳng vào hub vs qua Caddy
         shell: bash
         run: |
           set -euo pipefail
@@ -37,55 +38,60 @@ jobs:
           user = next((u for u in User.objects.filter(is_active=True).iterator()
                        if roles.can_access(u, roles.MODULE_TALENT) and can_read_cv(u)), None)
           assert user is not None, "No active Talent principal available for the probe"
-
-          session = SessionStore()
-          session[SESSION_KEY] = str(user.pk)
-          session[BACKEND_SESSION_KEY] = "django.contrib.auth.backends.ModelBackend"
-          session[HASH_SESSION_KEY] = user.get_session_auth_hash()
-          session.create()
-
-          csrf_token = get_token(RequestFactory().get("/"))
           host = (settings.ALLOWED_HOSTS or ["web"])[0]
-          body = json.dumps({
-              "q": "Tìm Senior Data Analyst ở Hà Nội biết SQL và Python, trên 3 năm kinh nghiệm",
-          }).encode("utf-8")
+          question = "Tìm Senior Data Analyst ở Hà Nội biết SQL và Python, trên 3 năm kinh nghiệm"
 
-          conn = http.client.HTTPConnection("web", 80, timeout=180)
-          started = time.perf_counter()
-          conn.request("POST", "/api/v1/talent/ask/", body=body, headers={
-              "Host": host, "Content-Type": "application/json",
-              "Content-Length": str(len(body)),
-              "X-CSRFToken": csrf_token, "Accept": "text/event-stream",
-              "Cookie": f"sessionid={session.session_key}; csrftoken={csrf_token}",
-          })
-          resp = conn.getresponse()
-          assert resp.status == 200, f"HTTP {resp.status}: {resp.read()[:300]}"
+          def probe(label, conn_host, conn_port):
+              session = SessionStore()
+              session[SESSION_KEY] = str(user.pk)
+              session[BACKEND_SESSION_KEY] = "django.contrib.auth.backends.ModelBackend"
+              session[HASH_SESSION_KEY] = user.get_session_auth_hash()
+              session.create()
+              csrf_token = get_token(RequestFactory().get("/"))
+              body = json.dumps({"q": question}).encode("utf-8")
 
-          arrivals = []
-          while True:
-              chunk = resp.read(1)
-              if not chunk:
-                  break
-              arrivals.append(round(time.perf_counter() - started, 3))
-          conn.close()
-          session.delete()
+              conn = http.client.HTTPConnection(conn_host, conn_port, timeout=180)
+              started = time.perf_counter()
+              conn.request("POST", "/api/v1/talent/ask/", body=body, headers={
+                  "Host": host, "Content-Type": "application/json",
+                  "Content-Length": str(len(body)),
+                  "X-CSRFToken": csrf_token, "Accept": "text/event-stream",
+                  "Cookie": f"sessionid={session.session_key}; csrftoken={csrf_token}",
+              })
+              resp = conn.getresponse()
+              status = resp.status
+              arrivals = []
+              if status == 200:
+                  while True:
+                      chunk = resp.read(1)
+                      if not chunk:
+                          break
+                      arrivals.append(round(time.perf_counter() - started, 3))
+              else:
+                  resp.read()
+              conn.close()
+              session.delete()
 
-          if not arrivals:
-              print(json.dumps({"verdict": "NO_DATA", "byte_count": 0}))
-          else:
-              # Gộp các byte tới trong cùng cửa sổ 50ms thành MỘT đợt — TCP rời
-              # rạc hoá byte không có nghĩa server gửi rời rạc; ta quan tâm
-              # server có xả (flush) nhiều đợt CÁCH NHAU THẬT SỰ hay chỉ một cục.
+              if status != 200:
+                  return {"label": label, "http_status": status}
+              if not arrivals:
+                  return {"label": label, "verdict": "NO_DATA", "byte_count": 0}
+              # Gộp byte tới trong cùng cửa sổ 50ms thành MỘT đợt — TCP rời rạc
+              # hoá byte không có nghĩa server gửi rời rạc; quan tâm server có
+              # xả (flush) nhiều đợt CÁCH NHAU THẬT SỰ hay chỉ một cục ở cuối.
               batches = [arrivals[0]]
               for t in arrivals[1:]:
                   if t - batches[-1] > 0.05:
                       batches.append(t)
-              print(json.dumps({
-                  "byte_count": len(arrivals),
-                  "total_seconds": arrivals[-1],
+              return {
+                  "label": label, "http_status": status,
+                  "byte_count": len(arrivals), "total_seconds": arrivals[-1],
                   "distinct_flush_batches": len(batches),
                   "batch_arrival_seconds": batches,
                   "verdict": "STREAMING_END_TO_END" if len(batches) >= 4
-                             else "LIKELY_BUFFERED_BY_PROXY_OR_SERVER",
-              }, sort_keys=True))
+                             else "LIKELY_BUFFERED",
+              }
+
+          print(json.dumps(probe("direct_hub_bypass_caddy", "127.0.0.1", 8000), sort_keys=True))
+          print(json.dumps(probe("via_caddy", "web", 80), sort_keys=True))
           '
