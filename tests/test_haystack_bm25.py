@@ -73,3 +73,16 @@ class HaystackBM25Test(unittest.TestCase):
         second = dict(ranker.rank("phan mem", records))
         self.assertEqual(set(first), {"e1", "e3"})
         self.assertEqual(set(second), {"e2"})
+
+    def test_a_match_beyond_the_old_1000_cap_is_still_found(self):
+        # Regression: candidate_limit used to default to 1_000 and silently
+        # truncated the corpus to an arbitrary (evidence_id-sorted) slice
+        # before indexing — a real production corpus this size (docs describe
+        # "tens of thousands of chunks") made most candidates permanently
+        # unreachable by lexical search regardless of query, since which slice
+        # survives the sort depends only on hash order, not relevance.
+        filler = [record(f"p{i}", f"e{i:05d}", "khong lien quan gi ca") for i in range(1500)]
+        target = record("target", "zzzzz-target", "Chuyen vien ke toan ngan hang doc nhat")
+        ranker = HaystackBM25Ranker()
+        scores = dict(ranker.rank("ke toan", filler + [target]))
+        self.assertIn("zzzzz-target", scores)

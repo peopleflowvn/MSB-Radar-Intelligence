@@ -9,9 +9,21 @@ _EMPTY_PREPARED = ((), (), None, {})
 
 
 class HaystackBM25Ranker:
-    """Haystack BM25 over a bounded, already-authorized lexical candidate set."""
+    """Haystack BM25 over an already-authorized lexical candidate set.
 
-    def __init__(self, candidate_limit: int = 1_000) -> None:
+    `candidate_limit` is a safety CEILING, not a routine truncation: the
+    production corpus is documented to hold tens of thousands of chunks
+    (see retrieval/engine.py), and structured filters are the mechanism for
+    narrowing scope, not this bound. A hard cap of 1000 here previously
+    silently limited real lexical search to an arbitrary ~1000 chunks
+    (sorted by evidence_id, i.e. effectively random) out of the whole
+    authorized corpus for any account whose candidate pool exceeded that —
+    everyone else was permanently invisible to BM25 regardless of query.
+    Default is raised well above any corpus size seen in production so it
+    only bites as an actual circuit breaker, not a day-to-day filter.
+    """
+
+    def __init__(self, candidate_limit: int = 100_000) -> None:
         if candidate_limit < 1:
             raise ValueError("candidate_limit must be positive")
         self._candidate_limit = candidate_limit
