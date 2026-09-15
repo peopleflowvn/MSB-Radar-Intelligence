@@ -72,6 +72,19 @@ class RadarFeedTest(unittest.TestCase):
         with self.assertRaisesRegex(FeedError, "malformed"):
             RadarDocumentFeedClient(self.config(), client).fetch()
 
+    def test_custom_path_targets_a_different_feed(self):
+        client = FakeClient(200, json.dumps({"events": [], "has_more": False}).encode())
+        config = RadarFeedConfig(
+            "https://radar.example", "service", "index-scope",
+            path="/api/v1/talent/intelligence/knowledge-feed/")
+        RadarDocumentFeedClient(config, client).fetch()
+        self.assertIn("/api/v1/talent/intelligence/knowledge-feed/", client.call[0])
+        self.assertNotIn("document-feed", client.call[0])
+
+    def test_path_must_be_absolute(self):
+        with self.assertRaisesRegex(ValueError, "absolute path"):
+            RadarFeedConfig("https://radar.example", "service", "index-scope", path="knowledge-feed/")
+
 
 if __name__ == "__main__":
     unittest.main()

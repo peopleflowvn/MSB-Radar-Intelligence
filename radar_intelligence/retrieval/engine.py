@@ -58,15 +58,31 @@ class QueryEmbedder(Protocol):
     def embed_documents(self, texts: Sequence[str]) -> Sequence[Sequence[float]]: ...
 
 
+_EMPTY_PREPARED_MATRIX = ((), (), None)
+
+
 class CosineSemanticRanker:
     def __init__(self, embedder: QueryEmbedder, candidate_limit: int = 1_000) -> None:
         if candidate_limit < 1:
             raise ValueError("candidate_limit must be positive")
         self._embedder = embedder
         self._candidate_limit = candidate_limit
-        self._prepared_key: tuple[str, ...] = ()
-        self._prepared_ids: tuple[str, ...] = ()
-        self._prepared_matrix = None
+        # (key, ids, matrix) swapped in one assignment so a concurrent rank()
+        # call on another thread never observes an ids/matrix pair rebuilt
+        # from two different index revisions.
+        self._prepared: tuple = _EMPTY_PREPARED_MATRIX
+
+    @property
+    def _prepared_key(self) -> tuple[str, ...]:
+        return self._prepared[0]
+
+    @property
+    def _prepared_ids(self) -> tuple[str, ...]:
+        return self._prepared[1]
+
+    @property
+    def _prepared_matrix(self):
+        return self._prepared[2]
 
     @staticmethod
     def _document_matrix(records, np):
@@ -87,16 +103,15 @@ class CosineSemanticRanker:
         embedded = [(record.chunk.evidence.evidence_id, record.embedding)
                     for record in records if record.embedding is not None]
         key = tuple(identifier for identifier, _ in embedded)
-        if key == self._prepared_key:
+        if key == self._prepared[0]:
             return
         try:
             import numpy as np
         except ImportError:  # pragma: no cover - minimal installations
-            self._prepared_key = ()
-            self._prepared_matrix = None
+            self._prepared = _EMPTY_PREPARED_MATRIX
             return
-        self._prepared_key = key
-        self._prepared_ids, self._prepared_matrix = self._document_matrix(records, np)
+        ids, matrix = self._document_matrix(records, np)
+        self._prepared = (key, ids, matrix)
 
     def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]:
         query_rows = self._embedder.embed_documents([query])
@@ -124,11 +139,13 @@ class CosineSemanticRanker:
         # Production indexes contain tens of thousands of chunk vectors. NumPy
         # performs the same bounded cosine calculation in native code instead
         # of holding the request thread in millions of Python-level operations.
+        prepared = self._prepared
         key = tuple(identifier for identifier, _ in embedded)
-        if key != self._prepared_key or self._prepared_matrix is None:
+        if key != prepared[0] or prepared[2] is None:
             self.prepare(records)
-        matrix = self._prepared_matrix
-        identifiers = self._prepared_ids
+            prepared = self._prepared
+        matrix = prepared[2]
+        identifiers = prepared[1]
         query_array = np.asarray(query_vector, dtype=np.float32)
         denominators = np.linalg.norm(matrix, axis=1) * np.linalg.norm(query_array)
         dots = matrix @ query_array

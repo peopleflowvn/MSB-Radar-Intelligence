@@ -42,3 +42,13 @@ class ScopeValidatorTest(unittest.TestCase):
     def test_service_failure_is_visible(self):
         with self.assertRaisesRegex(ScopeValidationError, "HTTP 500"):
             RadarScopeValidator(self.config(), FakeClient(500, b"{}")).validate("scope")
+
+    def test_additive_response_fields_do_not_break_a_valid_claim(self):
+        client = FakeClient(200, json.dumps({
+            "allowed": True, "scope": "all_applicants", "request_id": "trace-1",
+        }).encode())
+        self.assertTrue(RadarScopeValidator(self.config(), client).validate("scope"))
+
+    def test_non_object_payload_fails_closed(self):
+        client = FakeClient(200, b"[true]")
+        self.assertFalse(RadarScopeValidator(self.config(), client).validate("scope"))

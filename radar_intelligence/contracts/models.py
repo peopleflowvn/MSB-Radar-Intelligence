@@ -66,6 +66,23 @@ class SearchRequest:
     filters: SearchFilters = field(default_factory=SearchFilters)
     limit: int = 10
     thread_id: str | None = None
+    # Empty = search the caller's whole authorized candidate corpus (today's
+    # behavior, unchanged for every existing caller). Non-empty narrows that
+    # corpus to exactly these person_ids for this request.
+    person_ids: tuple[str, ...] = ()
+    # Explicit opt-in allowlist for non-candidate records (person_id starting
+    # with "-", e.g. an internal-knowledge document indexed as its own
+    # negative-id "person"). Unlike `person_ids`, empty here means NONE are
+    # included — a caller must name exactly which ones this request's role is
+    # authorized for. Kept separate from `person_ids` because the two need
+    # opposite empty-set defaults: "no candidate restriction" cannot also mean
+    # "every non-candidate record is open to everyone".
+    knowledge_ids: tuple[str, ...] = ()
+    # Drop candidate records entirely and search only the allowed knowledge_ids.
+    # Needed when the result is injected as context into a general conversation
+    # prompt: a CV that happens to mention "quy trình nghỉ phép" must not be
+    # read back as if it were the company's leave policy.
+    knowledge_only: bool = False
 
     def __post_init__(self) -> None:
         for name in ("query", "scope_token", "principal_id"):
@@ -118,6 +135,8 @@ class AnswerRequest:
     principal_id: str
     thread_id: str | None = None
     person_ids: tuple[str, ...] = ()
+    # See SearchRequest.knowledge_ids: same opt-in-only semantics.
+    knowledge_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         for name in ("question", "scope_token", "principal_id"):

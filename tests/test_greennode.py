@@ -1,5 +1,7 @@
 import json
 import unittest
+import urllib.error
+from unittest.mock import patch
 
 from radar_intelligence.providers import GreenNodeConfig, GreenNodeEmbedder, GreenNodeTransport, ProviderError, UrllibHttpClient
 
@@ -12,6 +14,74 @@ class FakeHttp:
     def post(self, url, headers, body, timeout_seconds):
         self.call = (url, headers, json.loads(body), timeout_seconds)
         return self.response
+
+
+def _http_error(code):
+    return urllib.error.HTTPError("https://provider.example", code, "error", {}, None)
+
+
+class UrllibHttpClientRetryTest(unittest.TestCase):
+    def test_5xx_is_retried_like_429(self):
+        attempts = [_http_error(503), _http_error(503), b"ok"]
+
+        def fake_urlopen(request, timeout):
+            outcome = attempts.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return _Response(outcome)
+
+        with patch("time.sleep"), patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            client = UrllibHttpClient(retry_attempts=3)
+            result = client.post("https://provider.example", {}, b"{}", 5.0)
+        self.assertEqual(result, b"ok")
+        self.assertEqual(attempts, [])
+
+    def test_5xx_exhausting_retries_raises_provider_error(self):
+        with patch("time.sleep"), patch(
+            "urllib.request.urlopen", side_effect=_http_error(500)
+        ):
+            with self.assertRaisesRegex(ProviderError, "GreenNode HTTP 500"):
+                UrllibHttpClient(retry_attempts=2).post("https://provider.example", {}, b"{}", 5.0)
+
+    def test_non_retryable_4xx_raises_on_first_attempt(self):
+        calls = []
+
+        def fake_urlopen(request, timeout):
+            calls.append(1)
+            raise _http_error(400)
+
+        with patch("time.sleep") as sleep_mock, patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            with self.assertRaisesRegex(ProviderError, "GreenNode HTTP 400"):
+                UrllibHttpClient(retry_attempts=3).post("https://provider.example", {}, b"{}", 5.0)
+        self.assertEqual(len(calls), 1)
+        sleep_mock.assert_not_called()
+
+    def test_network_error_is_retried(self):
+        attempts = [urllib.error.URLError("boom"), b"ok"]
+
+        def fake_urlopen(request, timeout):
+            outcome = attempts.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return _Response(outcome)
+
+        with patch("time.sleep"), patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            result = UrllibHttpClient(retry_attempts=2).post("https://provider.example", {}, b"{}", 5.0)
+        self.assertEqual(result, b"ok")
+
+
+class _Response:
+    def __init__(self, body):
+        self._body = body
+
+    def read(self):
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
 
 
 class GreenNodeTest(unittest.TestCase):

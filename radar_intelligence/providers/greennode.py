@@ -25,25 +25,35 @@ class UrllibHttpClient:
         self._retry_attempts = retry_attempts
 
     def post(self, url: str, headers: Mapping[str, str], body: bytes, timeout_seconds: float) -> bytes:
+        # 429 and 5xx are transient (rate limit / provider-side fault) and worth a
+        # bounded retry; every other 4xx means the request itself is wrong and
+        # retrying would just repeat the same rejection.
         for attempt in range(self._retry_attempts):
             request = urllib.request.Request(url, data=body, headers=dict(headers), method="POST")
             try:
                 with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
                     return response.read()
             except urllib.error.HTTPError as exc:
-                if exc.code == 429 and attempt < self._retry_attempts - 1:
-                    raw_delay = exc.headers.get("Retry-After", "")
-                    try:
-                        delay = min(10.0, max(1.0, float(raw_delay)))
-                    except ValueError:
-                        delay = float(2 ** attempt)
-                    time.sleep(delay)
+                retryable = exc.code == 429 or exc.code >= 500
+                if retryable and attempt < self._retry_attempts - 1:
+                    time.sleep(self._retry_delay(attempt, exc))
                     continue
                 raise ProviderError(f"GreenNode HTTP {exc.code}") from exc
             except (urllib.error.URLError, TimeoutError) as exc:
+                if attempt < self._retry_attempts - 1:
+                    time.sleep(float(2 ** attempt))
+                    continue
                 reason = "timeout" if "timed out" in str(exc).lower() else "transport unavailable"
                 raise ProviderError(f"GreenNode {reason}") from exc
         raise ProviderError("GreenNode retry limit reached")
+
+    @staticmethod
+    def _retry_delay(attempt: int, exc: urllib.error.HTTPError) -> float:
+        raw_delay = exc.headers.get("Retry-After", "") if exc.headers else ""
+        try:
+            return min(10.0, max(1.0, float(raw_delay)))
+        except ValueError:
+            return float(2 ** attempt)
 
 
 @dataclass(frozen=True)

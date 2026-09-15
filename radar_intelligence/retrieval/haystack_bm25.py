@@ -5,6 +5,8 @@ from typing import Sequence
 
 from .engine import RetrievalRecord, normalize_text
 
+_EMPTY_PREPARED = ((), (), None, {})
+
 
 class HaystackBM25Ranker:
     """Haystack BM25 over a bounded, already-authorized lexical candidate set."""
@@ -13,24 +15,47 @@ class HaystackBM25Ranker:
         if candidate_limit < 1:
             raise ValueError("candidate_limit must be positive")
         self._candidate_limit = candidate_limit
-        self._prepared_key: tuple[str, ...] = ()
-        self._prepared_records = ()
+        # (key, prepared_records, retriever, tokens_by_id) swapped in one
+        # assignment so a concurrent rank() call on another thread never
+        # observes a retriever built from one candidate set paired with a
+        # mismatched key.
+        self._prepared: tuple = _EMPTY_PREPARED
+
+    @property
+    def _prepared_key(self) -> tuple[str, ...]:
+        return self._prepared[0]
+
+    @property
+    def _prepared_records(self):
+        return self._prepared[1]
 
     def prepare(self, records: Sequence[RetrievalRecord]) -> None:
-        key = tuple(record.chunk.evidence.evidence_id for record in records)
-        if key == self._prepared_key:
+        key = tuple(sorted(record.chunk.evidence.evidence_id for record in records))
+        if key == self._prepared[0]:
             return
-        self._prepared_key = key
-        prepared = []
-        for record in records:
-            content = normalize_text(" ".join(
-                (record.chunk.person.display_name or "", record.chunk.evidence.text)))
-            prepared.append((record, content, frozenset(content.split())))
-        self._prepared_records = tuple(prepared)
+        prepared_records = tuple(
+            (record, content, frozenset(content.split()))
+            for record, content in (
+                (record, normalize_text(" ".join(
+                    (record.chunk.person.display_name or "", record.chunk.evidence.text))))
+                for record in records
+            )
+        )
+        # Bound corpus size independent of the query text: preselecting by
+        # query-token overlap before indexing would make BM25's term-frequency
+        # statistics vary per question instead of reflecting one stable corpus,
+        # which corrupts scores rather than just bounding cost.
+        bounded = tuple(sorted(
+            prepared_records, key=lambda row: row[0].chunk.evidence.evidence_id
+        ))[:self._candidate_limit]
+        retriever = self._build_retriever(bounded)
+        tokens_by_id = {
+            record.chunk.evidence.evidence_id: tokens for record, _, tokens in prepared_records
+        }
+        self._prepared = (key, prepared_records, retriever, tokens_by_id)
 
-    def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]:
-        if not records or not normalize_text(query):
-            return ()
+    @staticmethod
+    def _build_retriever(bounded):
         os.environ.setdefault("HAYSTACK_TELEMETRY_ENABLED", "false")
         try:
             from haystack import Document
@@ -38,34 +63,32 @@ class HaystackBM25Ranker:
             from haystack.document_stores.in_memory import InMemoryDocumentStore
         except ImportError as exc:  # pragma: no cover - optional dependency environment
             raise RuntimeError("Haystack BM25 requires the 'haystack' optional dependency") from exc
-
-        query_tokens = set(normalize_text(query).split())
-        key = tuple(record.chunk.evidence.evidence_id for record in records)
-        if key != self._prepared_key:
-            self.prepare(records)
-        eligible = []
-        for record, content, content_tokens in self._prepared_records:
-            overlap = len(query_tokens & content_tokens)
-            if overlap:
-                eligible.append((overlap, record, content))
-        if not eligible:
-            return ()
-
-        # Building an in-memory Haystack store for every authorized chunk makes
-        # a common query unbounded. This deterministic preselection preserves
-        # scope and lexical relevance, then delegates final ordering to BM25.
-        eligible.sort(key=lambda row: (-row[0], row[1].chunk.evidence.evidence_id))
-        eligible = eligible[:self._candidate_limit]
-
         store = InMemoryDocumentStore(shared=False)
         store.write_documents([
-            Document(
-                id=record.chunk.evidence.evidence_id,
-                content=content,
-            )
-            for _, record, content in eligible
+            Document(id=record.chunk.evidence.evidence_id, content=content)
+            for record, content, _ in bounded
         ])
-        result = InMemoryBM25Retriever(store, top_k=len(eligible), scale_score=False).run(
-            query=normalize_text(query)
-        )["documents"]
-        return tuple((document.id, float(document.score)) for document in result if document.score and document.score > 0)
+        return InMemoryBM25Retriever(store, top_k=len(bounded), scale_score=False)
+
+    def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]:
+        query_tokens = set(normalize_text(query).split())
+        if not records or not query_tokens:
+            return ()
+        prepared = self._prepared
+        key = tuple(sorted(record.chunk.evidence.evidence_id for record in records))
+        if key != prepared[0]:
+            self.prepare(records)
+            prepared = self._prepared
+        retriever = prepared[2]
+        tokens_by_id = prepared[3]
+        result = retriever.run(query=normalize_text(query))["documents"]
+        # Some BM25 variants (Haystack's included) assign length-normalized
+        # documents a small nonzero score even with zero query-term overlap.
+        # The corpus/IDF stats above stay query-independent (the correctness
+        # fix); this only keeps that smoothing noise out of the result set.
+        return tuple(
+            (document.id, float(document.score))
+            for document in result
+            if document.score and document.score > 0
+            and query_tokens & tokens_by_id.get(document.id, frozenset())
+        )

@@ -30,6 +30,9 @@ class UrllibFeedHttpClient:
             raise FeedError("Radar document feed unavailable") from exc
 
 
+_DEFAULT_FEED_PATH = "/api/v1/talent/intelligence/document-feed/"
+
+
 @dataclass(frozen=True)
 class RadarFeedConfig:
     base_url: str
@@ -37,6 +40,10 @@ class RadarFeedConfig:
     scope_token: str
     timeout_seconds: float = 15.0
     page_size: int = 100
+    # Lets one client type poll different feeds (the candidate CV feed, and a
+    # separate internal-knowledge feed) that share the same paging/auth shape
+    # but must stay independent sources with independent cursors.
+    path: str = _DEFAULT_FEED_PATH
 
     def __post_init__(self) -> None:
         normalized = self.base_url.rstrip("/").lower()
@@ -46,6 +53,8 @@ class RadarFeedConfig:
             raise ValueError("service_token and scope_token are required")
         if self.timeout_seconds <= 0 or not 1 <= self.page_size <= 1000:
             raise ValueError("invalid feed timeout or page_size")
+        if not self.path.startswith("/"):
+            raise ValueError("feed path must be an absolute path")
 
 
 @dataclass(frozen=True)
@@ -68,8 +77,8 @@ class RadarDocumentFeedClient:
             query["cursor"] = cursor
         url = (
             self._config.base_url.rstrip("/")
-            + "/api/v1/talent/intelligence/document-feed/?"
-            + urllib.parse.urlencode(query)
+            + self._config.path
+            + "?" + urllib.parse.urlencode(query)
         )
         headers = {
             "Authorization": f"Bearer {self._config.service_token}",

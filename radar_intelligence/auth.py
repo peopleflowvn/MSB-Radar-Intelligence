@@ -66,6 +66,13 @@ class RadarScopeValidator:
             raise ScopeValidationError(f"Radar scope validator HTTP {status}")
         try:
             payload = json.loads(raw.decode("utf-8"))
-            return payload == {"allowed": True, "scope": "all_applicants"}
         except (UnicodeDecodeError, json.JSONDecodeError):
             return False
+        # Check required claims rather than exact dict equality: Hub may add
+        # additive response fields (e.g. for observability) without that being
+        # a scope downgrade. Missing or wrong values still fail closed.
+        return (
+            isinstance(payload, dict)
+            and payload.get("allowed") is True
+            and payload.get("scope") == "all_applicants"
+        )

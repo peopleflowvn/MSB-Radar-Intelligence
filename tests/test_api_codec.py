@@ -31,6 +31,43 @@ class ApiCodecTest(unittest.TestCase):
         with self.assertRaisesRegex(ApiContractError, "locations must be an array"):
             decode_search_request({**base, "filters": {"locations": "all"}})
 
+    def test_search_request_decodes_optional_person_ids_narrowing(self):
+        request = decode_search_request({
+            "query": "q", "scope_token": "s", "principal_id": "u",
+            "person_ids": ["p1", "p2"],
+        })
+        self.assertEqual(request.person_ids, ("p1", "p2"))
+
+    def test_search_request_person_ids_defaults_to_empty(self):
+        request = decode_search_request({"query": "q", "scope_token": "s", "principal_id": "u"})
+        self.assertEqual(request.person_ids, ())
+
+    def test_search_request_rejects_non_string_person_ids(self):
+        base = {"query": "q", "scope_token": "s", "principal_id": "u"}
+        with self.assertRaisesRegex(ApiContractError, "array of strings"):
+            decode_search_request({**base, "person_ids": [1]})
+
+    def test_search_request_decodes_knowledge_ids(self):
+        request = decode_search_request({
+            "query": "q", "scope_token": "s", "principal_id": "u",
+            "knowledge_ids": ["-1", "-2"],
+        })
+        self.assertEqual(request.knowledge_ids, ("-1", "-2"))
+
+    def test_search_request_decodes_knowledge_only_flag(self):
+        base = {"query": "q", "scope_token": "s", "principal_id": "u"}
+        self.assertFalse(decode_search_request(base).knowledge_only)
+        self.assertTrue(decode_search_request({**base, "knowledge_only": True}).knowledge_only)
+        with self.assertRaisesRegex(ApiContractError, "knowledge_only must be a boolean"):
+            decode_search_request({**base, "knowledge_only": "yes"})
+
+    def test_answer_request_decodes_knowledge_ids(self):
+        request = decode_answer_request({
+            "question": "q", "scope_token": "s", "principal_id": "u",
+            "knowledge_ids": ["-1"],
+        })
+        self.assertEqual(request.knowledge_ids, ("-1",))
+
     def test_answer_request_requires_scope_and_string_person_ids(self):
         with self.assertRaisesRegex(ApiContractError, "missing fields: scope_token"):
             decode_answer_request({"question": "q", "principal_id": "u"})

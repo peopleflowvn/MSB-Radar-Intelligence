@@ -46,3 +46,30 @@ class HaystackBM25Test(unittest.TestCase):
         prepared = ranker._prepared_records
         ranker.rank("SQL", records)
         self.assertIs(ranker._prepared_records, prepared)
+
+    def test_retriever_is_reused_across_different_queries_for_the_same_corpus(self):
+        records = [
+            record("p1", "e1", "Chuyen vien ke toan"),
+            record("p2", "e2", "Ky su phan mem"),
+        ]
+        ranker = HaystackBM25Ranker()
+        ranker.rank("ke toan", records)
+        retriever = ranker._prepared[2]
+        ranker.rank("phan mem", records)
+        self.assertIs(ranker._prepared[2], retriever)
+
+    def test_scores_are_stable_across_queries_over_the_same_corpus(self):
+        # A document with zero term overlap with the query must never be
+        # ranked purely because a *different* query previously narrowed the
+        # corpus used to compute term statistics (the corpus must be
+        # query-independent, not just individually bounded).
+        records = [
+            record("p1", "e1", "Chuyen vien ke toan ngan hang"),
+            record("p2", "e2", "Ky su phan mem Java"),
+            record("p3", "e3", "Nhan vien ke toan kho"),
+        ]
+        ranker = HaystackBM25Ranker()
+        first = dict(ranker.rank("ke toan", records))
+        second = dict(ranker.rank("phan mem", records))
+        self.assertEqual(set(first), {"e1", "e3"})
+        self.assertEqual(set(second), {"e2"})

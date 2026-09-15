@@ -50,12 +50,16 @@ def _number(value: Any, path: str) -> float:
 
 def decode_search_request(payload: Any) -> SearchRequest:
     data = _object(payload, "request")
-    allowed = {"query", "scope_token", "principal_id", "filters", "limit", "thread_id"}
+    allowed = {"query", "scope_token", "principal_id", "filters", "limit", "thread_id",
+               "person_ids", "knowledge_ids", "knowledge_only"}
     _fields(data, allowed, {"query", "scope_token", "principal_id"}, "request")
     filters = _decode_filters(data.get("filters", {}))
     limit = data.get("limit", 10)
     if isinstance(limit, bool) or not isinstance(limit, int):
         raise ApiContractError("request.limit must be an integer")
+    knowledge_only = data.get("knowledge_only", False)
+    if not isinstance(knowledge_only, bool):
+        raise ApiContractError("request.knowledge_only must be a boolean")
     try:
         return SearchRequest(
             query=_string(data["query"], "request.query") or "",
@@ -64,6 +68,9 @@ def decode_search_request(payload: Any) -> SearchRequest:
             filters=filters,
             limit=limit,
             thread_id=_string(data.get("thread_id"), "request.thread_id", optional=True),
+            person_ids=_strings(data.get("person_ids", []), "request.person_ids"),
+            knowledge_ids=_strings(data.get("knowledge_ids", []), "request.knowledge_ids"),
+            knowledge_only=knowledge_only,
         )
     except ValueError as exc:
         raise ApiContractError(str(exc)) from None
@@ -97,7 +104,7 @@ def _decode_filters(payload: Any) -> SearchFilters:
 
 def decode_answer_request(payload: Any) -> AnswerRequest:
     data = _object(payload, "request")
-    allowed = {"question", "scope_token", "principal_id", "thread_id", "person_ids"}
+    allowed = {"question", "scope_token", "principal_id", "thread_id", "person_ids", "knowledge_ids"}
     _fields(data, allowed, {"question", "scope_token", "principal_id"}, "request")
     try:
         return AnswerRequest(
@@ -106,6 +113,7 @@ def decode_answer_request(payload: Any) -> AnswerRequest:
             principal_id=_string(data["principal_id"], "request.principal_id") or "",
             thread_id=_string(data.get("thread_id"), "request.thread_id", optional=True),
             person_ids=_strings(data.get("person_ids", []), "request.person_ids"),
+            knowledge_ids=_strings(data.get("knowledge_ids", []), "request.knowledge_ids"),
         )
     except ValueError as exc:
         raise ApiContractError(str(exc)) from None

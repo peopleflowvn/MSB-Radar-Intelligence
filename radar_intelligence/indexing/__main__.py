@@ -68,18 +68,29 @@ def _positive_number(name: str, default: str, cast):
     return value
 
 
-def build_coordinator(settings: RuntimeSettings) -> IndexSyncCoordinator:
+_KNOWLEDGE_FEED_PATH = "/api/v1/talent/intelligence/knowledge-feed/"
+_KNOWLEDGE_CURSOR_NAMESPACE = "radar-knowledge-feed"
+
+
+def build_coordinator(
+    settings: RuntimeSettings,
+    *,
+    feed_path: str | None = None,
+    cursor_namespace: str = "radar-document-feed",
+) -> IndexSyncCoordinator:
     if not settings.ready:
         raise ValueError("runtime settings incomplete: " + ",".join(settings.missing))
     values = settings.values
     database = Path(os.environ.get(
         "INTELLIGENCE_INDEX_DB", "/var/lib/radar-intelligence/index.sqlite3"))
+    feed_config_kwargs = {"path": feed_path} if feed_path else {}
     feed = RadarDocumentFeedClient(RadarFeedConfig(
         base_url=values["RADAR_BASE_URL"],
         service_token=values["RADAR_SERVICE_TOKEN"],
         scope_token=values["RADAR_INDEX_SCOPE_TOKEN"],
         timeout_seconds=_positive_number("INTELLIGENCE_FEED_TIMEOUT_SECONDS", "30", float),
         page_size=_positive_number("INTELLIGENCE_FEED_PAGE_SIZE", "100", int),
+        **feed_config_kwargs,
     ))
     allow_lexical_fallback = os.environ.get(
         "INTELLIGENCE_ALLOW_LEXICAL_FALLBACK", "1").lower() in {"1", "true", "yes"}
@@ -103,12 +114,38 @@ def build_coordinator(settings: RuntimeSettings) -> IndexSyncCoordinator:
     return IndexSyncCoordinator(
         feed,
         indexer,
-        SqliteCursorStore(database),
+        SqliteCursorStore(database, namespace=cursor_namespace),
     )
 
 
+def _run_and_report(coordinator: IndexSyncCoordinator, *, max_pages: int, event: str, one_shot: bool) -> None:
+    try:
+        report = coordinator.run(max_pages=max_pages)
+        print(json.dumps({"event": event, **report.__dict__}, default=str), flush=True)
+    except Exception as exc:
+        # Deliberately log only the error type/message from the bounded
+        # bridge; document text is never included.
+        print(json.dumps({
+            "event": f"{event}_failed", "error_type": type(exc).__name__,
+            "detail": str(exc),
+        }), file=sys.stderr, flush=True)
+        if one_shot:
+            raise
+
+
 def main() -> None:
-    coordinator = build_coordinator(RuntimeSettings.from_env())
+    settings = RuntimeSettings.from_env()
+    coordinator = build_coordinator(settings)
+    # A second, independent feed for internal-knowledge documents (policies,
+    # procedures) — same store, same search index, but its own cursor so an
+    # outage or backlog on one feed never blocks the other. Off by default
+    # requires nothing extra: an empty/absent knowledge-feed response is a
+    # normal empty page, not an error.
+    knowledge_enabled = os.environ.get(
+        "INTELLIGENCE_KNOWLEDGE_FEED_ENABLED", "1").lower() in {"1", "true", "yes"}
+    knowledge_coordinator = build_coordinator(
+        settings, feed_path=_KNOWLEDGE_FEED_PATH, cursor_namespace=_KNOWLEDGE_CURSOR_NAMESPACE,
+    ) if knowledge_enabled else None
     interval = _positive_number("INTELLIGENCE_SYNC_INTERVAL_SECONDS", "30", float)
     max_pages = _positive_number("INTELLIGENCE_SYNC_MAX_PAGES", "100", int)
     one_shot = os.environ.get("INTELLIGENCE_SYNC_ONCE", "").lower() in {"1", "true", "yes"}
@@ -121,18 +158,11 @@ def main() -> None:
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     while not stopping:
-        try:
-            report = coordinator.run(max_pages=max_pages)
-            print(json.dumps({"event": "index_sync", **report.__dict__}, default=str), flush=True)
-        except Exception as exc:
-            # Deliberately log only the error type/message from the bounded
-            # bridge; document text is never included.
-            print(json.dumps({
-                "event": "index_sync_failed", "error_type": type(exc).__name__,
-                "detail": str(exc),
-            }), file=sys.stderr, flush=True)
-            if one_shot:
-                raise
+        _run_and_report(coordinator, max_pages=max_pages, event="index_sync", one_shot=one_shot)
+        if knowledge_coordinator is not None:
+            _run_and_report(
+                knowledge_coordinator, max_pages=max_pages,
+                event="knowledge_index_sync", one_shot=one_shot)
         if one_shot:
             return
         deadline = time.monotonic() + interval
