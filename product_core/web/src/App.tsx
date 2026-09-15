@@ -7,6 +7,7 @@ import { useCustomTheme } from './CustomThemeContext'
 import Dashboard from './Dashboard'
 import Data from './Data'
 import Hunts from './HuntsWorkspace'
+import Knowledge from './Knowledge'
 import Login from './Login'
 import Person360 from './Person360'
 import RadarLoadingScreen from './RadarLoadingScreen'
@@ -91,6 +92,15 @@ function IconSettings() {
   )
 }
 
+function IconKnowledge() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </svg>
+  )
+}
+
 function IconAdmin() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -156,6 +166,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Quản trị & Hệ thống',
     items: [
       { to: '/data', label: 'Đồng bộ Dữ liệu & Edge', module: 'edge_ops', altModules: ['people_intake'], icon: <IconData />, category: 'Quản trị & Hệ thống' },
+      { to: '/knowledge', label: 'Tri thức nội bộ', module: 'knowledge', icon: <IconKnowledge />, category: 'Quản trị & Hệ thống' },
       { to: '/settings', label: 'Cấu hình AI & Trí tuệ', module: 'ai_settings', icon: <IconSettings />, category: 'Quản trị & Hệ thống' },
       { to: '/admin', label: 'Quản trị & Phân quyền', module: 'admin_console', icon: <IconAdmin />, category: 'Quản trị & Hệ thống' },
     ],
@@ -276,6 +287,8 @@ export default function App() {
       currentNav = { to: '/workflows', label: 'Quy trình & Pipeline', module: 'reports', icon: <IconWorkflows />, category: 'Báo cáo & Vận hành' }
     } else if (currentPath.startsWith('/data')) {
       currentNav = { to: '/data', label: 'Đồng bộ Dữ liệu & Edge', module: 'edge_ops', icon: <IconData />, category: 'Quản trị & Hệ thống' }
+    } else if (currentPath.startsWith('/knowledge')) {
+      currentNav = { to: '/knowledge', label: 'Tri thức nội bộ', module: 'knowledge', icon: <IconKnowledge />, category: 'Quản trị & Hệ thống' }
     } else if (currentPath.startsWith('/settings')) {
       currentNav = { to: '/settings', label: 'Cấu hình AI & Trí tuệ', module: 'ai_settings', icon: <IconSettings />, category: 'Quản trị & Hệ thống' }
     } else if (currentPath.startsWith('/admin')) {
@@ -598,6 +611,7 @@ export default function App() {
             <Route path="/dashboard" element={guard('reports', <Dashboard />)} />
             <Route path="/workflows" element={guard('reports', <Workflows />)} />
             <Route path="/data" element={guardAny(['edge_ops', 'people_intake'], <Data />)} />
+            <Route path="/knowledge" element={guard('knowledge', <Knowledge />)} />
             <Route path="/settings" element={guard('ai_settings', <Settings />)} />
             <Route
               path="/admin"

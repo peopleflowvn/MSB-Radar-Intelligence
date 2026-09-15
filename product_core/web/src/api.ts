@@ -2584,7 +2584,70 @@ export const api = {
   },
   accessLogSummary: () =>
     request<AccessLogSummary>("/auth/access-log/summary/"),
+
+  // Tri thức nội bộ (quy trình/quyết định/hướng dẫn) — module `knowledge`.
+  knowledgeList: (category?: string) =>
+    request<KnowledgeListResponse>(
+      `/knowledge/documents/${category ? `?category=${encodeURIComponent(category)}` : ""}`,
+    ),
+  knowledgeGet: (id: number) =>
+    request<KnowledgeDocumentDetail>(`/knowledge/documents/${id}/`),
+  knowledgeCreate: (payload: KnowledgeDocumentWrite) =>
+    request<KnowledgeDocumentDetail>("/knowledge/documents/", {
+      method: "POST", body: JSON.stringify(payload),
+    }),
+  knowledgeUpdate: (id: number, payload: Partial<KnowledgeDocumentWrite>) =>
+    request<KnowledgeDocumentDetail>(`/knowledge/documents/${id}/`, {
+      method: "PATCH", body: JSON.stringify(payload),
+    }),
+  knowledgeDelete: (id: number) =>
+    request<{ deleted: boolean }>(`/knowledge/documents/${id}/`, { method: "DELETE" }),
+  knowledgeUpload: (file: File, fields: { title?: string; category?: string }) => {
+    const form = new FormData();
+    form.append("file", file);
+    if (fields.title) form.append("title", fields.title);
+    if (fields.category) form.append("category", fields.category);
+    return request<KnowledgeDocumentDetail & { warning?: string }>("/knowledge/documents/upload/", {
+      method: "POST", body: form,
+    });
+  },
 };
+
+export type KnowledgeCategory =
+  | "hr_policy" | "recruitment_process" | "leadership_decision" | "guideline" | "other";
+
+export interface KnowledgeDocumentRow {
+  id: number;
+  title: string;
+  category: KnowledgeCategory;
+  category_label: string;
+  filename: string;
+  mime_type: string;
+  file_size: number;
+  parse_status: "pending" | "done" | "failed";
+  parse_status_label: string;
+  is_active: boolean;
+  uploaded_by_name: string;
+  text_length: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeDocumentDetail extends KnowledgeDocumentRow {
+  parsed_text: string;
+}
+
+export interface KnowledgeListResponse {
+  results: KnowledgeDocumentRow[];
+  categories: Array<{ value: KnowledgeCategory; label: string }>;
+}
+
+export interface KnowledgeDocumentWrite {
+  title: string;
+  category?: KnowledgeCategory;
+  parsed_text?: string;
+  is_active?: boolean;
+}
 
 export interface ResendInboxRow {
   id: number; email_id: string; sender: string; recipients: string[]; subject: string;
