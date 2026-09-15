@@ -29,6 +29,30 @@ function IconMenu() {
   )
 }
 
+function IconChevronLeft() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  )
+}
+
+function IconChevronRight() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  )
+}
+
+function IconChevronDown() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  )
+}
+
 function IconHunts() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -66,9 +90,10 @@ function IconRB() {
 function IconDashboard() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="20" x2="18" y2="10" />
-      <line x1="12" y1="20" x2="12" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" />
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
     </svg>
   )
 }
@@ -112,9 +137,9 @@ function IconAdmin() {
 function IconWorkflows() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="6" height="6" rx="1" />
-      <rect x="15" y="3" width="6" height="6" rx="1" />
-      <rect x="9" y="15" width="6" height="6" rx="1" />
+      <rect x="3" y="3" width="6" height="6" rx="1.5" />
+      <rect x="15" y="3" width="6" height="6" rx="1.5" />
+      <rect x="9" y="15" width="6" height="6" rx="1.5" />
       <path d="M6 9v3a1 1 0 0 0 1 1h5m0 0h5a1 1 0 0 0 1-1V9m-6 4v2" />
     </svg>
   )
@@ -126,6 +151,61 @@ function IconLogout() {
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  )
+}
+
+// Submenu micro SVG icons
+function IconSubSearch() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  )
+}
+
+function IconSubFilter() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+    </svg>
+  )
+}
+
+function IconSubTasks() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  )
+}
+
+function IconSubPipeline() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="5" height="18" rx="1" />
+      <rect x="11" y="3" width="5" height="12" rx="1" />
+      <rect x="19" y="3" width="5" height="8" rx="1" />
+    </svg>
+  )
+}
+
+function IconSubFolder() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
+function IconSubTarget() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
     </svg>
   )
 }
@@ -355,18 +435,18 @@ export default function App() {
             {(!collapsed || mobileMenuOpen) && (
               <div className="brand-text">
                 <span className="brand-title">{appName}</span>
-                <span className="brand-tag">HUB</span>
+                <span className="brand-tag">RADAR INTELLIGENCE</span>
               </div>
             )}
           </div>
           <button
             className="sidebar-toggle-btn desktop-only"
             onClick={toggleCollapsed}
-            title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
+            title={collapsed ? 'Mở rộng menu (Ctrl+\\)' : 'Thu gọn menu (Ctrl+\\)'}
             type="button"
             aria-label="Toggle Sidebar"
           >
-            {collapsed ? '›' : '‹'}
+            {collapsed ? <IconChevronRight /> : <IconChevronLeft />}
           </button>
           <button
             className="sidebar-close-btn mobile-only"
@@ -408,7 +488,7 @@ export default function App() {
                         {(!collapsed || mobileMenuOpen) && <span className="nav-item-label">{item.label}</span>}
                         {hasSub && (!collapsed || mobileMenuOpen) && (
                           <span
-                            className="sidebar-submenu-chevron"
+                            className={`sidebar-submenu-chevron ${isExpanded ? 'expanded' : ''}`}
                             onClick={(e) => {
                               e.preventDefault()
                               e.stopPropagation()
@@ -416,7 +496,7 @@ export default function App() {
                             }}
                             title={isExpanded ? 'Thu gọn menu con' : 'Mở rộng menu con'}
                           >
-                            {isExpanded ? '▾' : '▸'}
+                            <IconChevronDown />
                           </span>
                         )}
                       </NavLink>
@@ -430,7 +510,7 @@ export default function App() {
                           className={`sidebar-subitem ${(isItemActive && (!location.search || location.search.includes('tab=talent'))) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
-                          <span className="subitem-icon">🔎</span>
+                          <span className="subitem-icon"><IconSubSearch /></span>
                           <span>Tìm kiếm AI</span>
                         </Link>
                         <Link
@@ -438,7 +518,7 @@ export default function App() {
                           className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=filter')) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
-                          <span className="subitem-icon">⚡</span>
+                          <span className="subitem-icon"><IconSubFilter /></span>
                           <span>Bộ lọc đa chiều</span>
                         </Link>
                         <Link
@@ -446,7 +526,7 @@ export default function App() {
                           className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=tasks')) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
-                          <span className="subitem-icon">📋</span>
+                          <span className="subitem-icon"><IconSubTasks /></span>
                           <span>Nhiệm vụ săn</span>
                         </Link>
                         <Link
@@ -454,7 +534,7 @@ export default function App() {
                           className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=pipeline')) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
-                          <span className="subitem-icon">📊</span>
+                          <span className="subitem-icon"><IconSubPipeline /></span>
                           <span>Pipeline tuyển dụng</span>
                         </Link>
                         <Link
@@ -462,7 +542,7 @@ export default function App() {
                           className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=lists')) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
-                          <span className="subitem-icon">📁</span>
+                          <span className="subitem-icon"><IconSubFolder /></span>
                           <span>Đợt tuyển &amp; Pool</span>
                         </Link>
                       </div>
@@ -476,7 +556,7 @@ export default function App() {
                           className={`sidebar-subitem ${(isItemActive && (!location.search || location.search.includes('tab=today'))) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
-                          <span className="subitem-icon">🎯</span>
+                          <span className="subitem-icon"><IconSubTarget /></span>
                           <span>Cơ hội hôm nay</span>
                         </Link>
                         <Link
@@ -484,7 +564,7 @@ export default function App() {
                           className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=prospects')) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
-                          <span className="subitem-icon">🔎</span>
+                          <span className="subitem-icon"><IconSubSearch /></span>
                           <span>Tìm khách AI</span>
                         </Link>
                         <Link
@@ -492,7 +572,7 @@ export default function App() {
                           className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=filter')) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
-                          <span className="subitem-icon">⚡</span>
+                          <span className="subitem-icon"><IconSubFilter /></span>
                           <span>Bộ lọc khách hàng</span>
                         </Link>
                         <Link
@@ -500,7 +580,7 @@ export default function App() {
                           className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=tasks')) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
-                          <span className="subitem-icon">📋</span>
+                          <span className="subitem-icon"><IconSubTasks /></span>
                           <span>Việc cần xử lý</span>
                         </Link>
                         <Link
@@ -508,7 +588,7 @@ export default function App() {
                           className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=pipeline')) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
-                          <span className="subitem-icon">📊</span>
+                          <span className="subitem-icon"><IconSubPipeline /></span>
                           <span>Pipeline</span>
                         </Link>
                         <Link
@@ -516,7 +596,7 @@ export default function App() {
                           className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=lists')) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
-                          <span className="subitem-icon">📁</span>
+                          <span className="subitem-icon"><IconSubFolder /></span>
                           <span>Nhóm khách hàng</span>
                         </Link>
                       </div>
@@ -538,12 +618,15 @@ export default function App() {
 
         <div className="sidebar-footer">
           <div className="user-profile-badge" title={`${identity.full_name} (${identity.username})`}>
-            <div className="user-avatar">{identity.full_name?.[0] || 'U'}</div>
+            <div className="user-avatar-wrap">
+              <div className="user-avatar">{identity.full_name?.[0]?.toUpperCase() || 'U'}</div>
+              <span className="live-user-dot" title="Đang trực tuyến" />
+            </div>
             {(!collapsed || mobileMenuOpen) && (
               <div className="user-info">
                 <div className="user-name">{identity.full_name}</div>
                 <div className="user-role">
-                  {identity.role_labels.join(', ') || 'Chưa gán vai trò'}
+                  {identity.role_labels.join(', ') || 'Thành viên'}
                 </div>
               </div>
             )}
@@ -553,6 +636,7 @@ export default function App() {
             onClick={() => logout.mutate()}
             title="Đăng xuất khỏi hệ thống"
             type="button"
+            data-tooltip={collapsed && !mobileMenuOpen ? 'Đăng xuất' : undefined}
           >
             <IconLogout />
             {(!collapsed || mobileMenuOpen) && <span>Đăng xuất</span>}

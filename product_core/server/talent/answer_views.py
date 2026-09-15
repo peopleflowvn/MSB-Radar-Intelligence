@@ -7,12 +7,19 @@ trong số đó, và trộn vào file cũ sẽ khiến việc gỡ bỏ tầng c
 
 SSE mặc định vì ①→④ mất vài giây — màn hình phải nói được hệ thống đang làm gì.
 Client không nhận stream được thì gửi `"stream": false` để lấy JSON một lần.
+
+`gen()` bên dưới là generator đồng bộ — đưa thẳng vào `StreamingHttpResponse`
+sẽ KHÔNG stream thật qua ASGI (Django gom hết generator vào một list rồi mới
+gửi một cục, xem `core/asgi_stream.py`). `_stream_response` bọc qua
+`to_async_iter` để mỗi `yield` phía trên tới client ngay khi vừa sẵn sàng.
 """
 import json
 import logging
 
 from django.http import JsonResponse, StreamingHttpResponse
 from django.views.decorators.http import require_POST
+
+from core.asgi_stream import to_async_iter
 
 from ai import conversation_state, events
 from ai import projection as projection_mod
@@ -29,7 +36,7 @@ def _sse(event, data):
 
 
 def _stream_response(iterator):
-    response = StreamingHttpResponse(iterator, content_type="text/event-stream")
+    response = StreamingHttpResponse(to_async_iter(iterator), content_type="text/event-stream")
     response["Cache-Control"] = "no-cache"
     response["X-Accel-Buffering"] = "no"      # proxy không được gom buffer
     return response

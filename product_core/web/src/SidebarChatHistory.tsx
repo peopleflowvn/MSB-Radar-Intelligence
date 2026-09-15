@@ -9,6 +9,79 @@ interface Props {
   allowedModules?: Set<string>;
 }
 
+// Micro SVG Icons for Sidebar Chat History
+function IconChatBubble() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function IconPlus() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function IconSearchMini() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function IconXMini() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function IconPencilMini() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+    </svg>
+  );
+}
+
+function IconTrashMini() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
+
+function IconTalentChat() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function IconGrowthChat() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+      <polyline points="17 6 23 6 23 12" />
+    </svg>
+  );
+}
+
 export default function SidebarChatHistory({ collapsed, onExpand, onNavigate, allowedModules }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -115,14 +188,13 @@ export default function SidebarChatHistory({ collapsed, onExpand, onNavigate, al
           type="button"
           className="sidebar-nav-item sidebar-chat-collapsed-trigger"
           onClick={onExpand}
-          title={`Lịch sử trò chuyện (${totalCount} cuộc hội thoại) — Bấm để mở`}
+          title={`Lịch sử AI Chat (${totalCount} phiên) — Nhấn để mở`}
+          data-tooltip={`Lịch sử AI (${totalCount})`}
         >
           <span className="nav-item-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
+            <IconChatBubble />
           </span>
-          <span className="sidebar-chat-count-pill">{totalCount}</span>
+          {totalCount > 0 && <span className="sidebar-chat-count-pill">{totalCount}</span>}
         </button>
       </div>
     );
@@ -130,14 +202,14 @@ export default function SidebarChatHistory({ collapsed, onExpand, onNavigate, al
 
   // Trạng thái Mở rộng (Expanded Sidebar)
   return (
-    <div className="nav-group sidebar-chat-history-group">
+    <div className="sidebar-chat-history-group">
       {/* Tiêu đề & Nút Tạo mới */}
       <div className="sidebar-chat-header-row">
         <div className="sidebar-chat-title-wrap">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-          <span className="sidebar-chat-header-label">Lịch sử trò chuyện</span>
+          <span className="sidebar-chat-icon-badge">
+            <IconChatBubble />
+          </span>
+          <span className="sidebar-chat-header-label">Lịch sử AI</span>
           <span className="sidebar-chat-badge">{conversations.length}</span>
         </div>
 
@@ -145,9 +217,10 @@ export default function SidebarChatHistory({ collapsed, onExpand, onNavigate, al
           type="button"
           className="sidebar-chat-new-action-btn"
           onClick={handleNew}
-          title="Tạo cuộc trò chuyện mới"
+          title="Tạo phiên trò chuyện mới"
         >
-          ＋ Mới
+          <IconPlus />
+          <span>Mới</span>
         </button>
       </div>
 
@@ -159,14 +232,16 @@ export default function SidebarChatHistory({ collapsed, onExpand, onNavigate, al
             className={`sidebar-chat-tab-pill ${activeTab === "talent" ? "active" : ""}`}
             onClick={() => setActiveTab("talent")}
           >
-            Talent ({aiChat.conversations?.length || 0})
+            <span>Talent</span>
+            <span className="sidebar-chat-tab-count">{aiChat.conversations?.length || 0}</span>
           </button>
           <button
             type="button"
             className={`sidebar-chat-tab-pill ${activeTab === "prospect" ? "active" : ""}`}
             onClick={() => setActiveTab("prospect")}
           >
-            Growth ({prospectChat.conversations?.length || 0})
+            <span>Growth</span>
+            <span className="sidebar-chat-tab-count">{prospectChat.conversations?.length || 0}</span>
           </button>
         </div>
       )}
@@ -174,6 +249,9 @@ export default function SidebarChatHistory({ collapsed, onExpand, onNavigate, al
       {/* Ô tìm kiếm nhanh khi có từ 3 hội thoại trở lên */}
       {conversations.length >= 3 && (
         <div className="sidebar-chat-search-wrap">
+          <span className="sidebar-chat-search-icon">
+            <IconSearchMini />
+          </span>
           <input
             type="text"
             className="sidebar-chat-search-input"
@@ -188,7 +266,7 @@ export default function SidebarChatHistory({ collapsed, onExpand, onNavigate, al
               onClick={() => setSearch("")}
               title="Xóa tìm kiếm"
             >
-              ×
+              <IconXMini />
             </button>
           )}
         </div>
@@ -198,7 +276,7 @@ export default function SidebarChatHistory({ collapsed, onExpand, onNavigate, al
       <div className="sidebar-chat-list">
         {filtered.length === 0 ? (
           <div className="sidebar-chat-empty">
-            {search ? "Không khớp tên hội thoại" : "Chưa có cuộc trò chuyện nào"}
+            {search ? "Không tìm thấy hội thoại" : "Chưa có cuộc trò chuyện"}
           </div>
         ) : (
           filtered.map((c) => {
@@ -213,8 +291,8 @@ export default function SidebarChatHistory({ collapsed, onExpand, onNavigate, al
                 onClick={() => handleSelect(cid)}
                 title={c.title || "Cuộc trò chuyện"}
               >
-                <span className="sidebar-chat-item-icon">
-                  {activeTab === "talent" ? "🎯" : "💼"}
+                <span className={`sidebar-chat-item-icon ${activeTab}`}>
+                  {activeTab === "talent" ? <IconTalentChat /> : <IconGrowthChat />}
                 </span>
 
                 <div className="sidebar-chat-item-info">
@@ -241,19 +319,21 @@ export default function SidebarChatHistory({ collapsed, onExpand, onNavigate, al
                 <div className="sidebar-chat-item-actions">
                   <button
                     type="button"
-                    className="sidebar-chat-action-btn"
+                    className="sidebar-chat-action-btn edit"
                     onClick={(e) => handleStartRename(cid, c.title || "", e)}
                     title="Đổi tên"
+                    aria-label="Đổi tên"
                   >
-                    ✏️
+                    <IconPencilMini />
                   </button>
                   <button
                     type="button"
                     className="sidebar-chat-action-btn delete"
                     onClick={(e) => void handleArchive(cid, e)}
-                    title="Lưu trữ cuộc trò chuyện"
+                    title="Lưu trữ"
+                    aria-label="Lưu trữ"
                   >
-                    🗑️
+                    <IconTrashMini />
                   </button>
                 </div>
               </div>

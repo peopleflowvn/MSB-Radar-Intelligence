@@ -5,6 +5,13 @@ Sync generator + `StreamingHttpResponse`. Dưới ASGI/UvicornWorker, view đồ
 chạy trong threadpool nên một stream dài không chặn event loop (khác WSGI sync
 worker). Reverse proxy phải tắt buffering — ta cũng gửi `X-Accel-Buffering: no`.
 
+Nhưng generator đồng bộ tự nó KHÔNG stream được qua ASGI nếu đưa thẳng vào
+`StreamingHttpResponse`: Django chỉ gửi từng phần khi `streaming_content` có
+`__aiter__`; với generator `def` thường, nó rơi vào nhánh dự phòng gom hết
+generator vào một list rồi mới gửi một cục (xem `core/asgi_stream.py`) — mọi
+`yield` phía trên vẫn đúng, nhưng client không nhận được gì cho tới khi xong
+hết. `_stream_response` bọc qua `to_async_iter` để tránh đúng cái bẫy đó.
+
 Chỉ phục vụ câu hỏi **hội thoại**. Câu hỏi tìm người trả về `event: route` để
 client gọi endpoint search thường (chưa stream rerank ở batch này).
 """
@@ -16,6 +23,8 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.views.decorators.http import require_POST
 
 from django.conf import settings
+
+from core.asgi_stream import to_async_iter
 
 from . import (agent_select, conversation_state, events,
                intent as intent_router, projection as projection_mod, toolset,
@@ -33,7 +42,7 @@ def _sse(event, data):
 
 
 def _stream_response(iterator):
-    resp = StreamingHttpResponse(iterator, content_type="text/event-stream")
+    resp = StreamingHttpResponse(to_async_iter(iterator), content_type="text/event-stream")
     resp["Cache-Control"] = "no-cache"
     resp["X-Accel-Buffering"] = "no"
     return resp
