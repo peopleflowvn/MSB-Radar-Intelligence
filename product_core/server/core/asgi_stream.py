@@ -16,11 +16,27 @@ tiếp: một câu hỏi mất 38s tạo câu trả lời, nhưng toàn bộ byt
 trong đúng MỘT đợt tại giây 38 (workflow `diagnose-sse-streaming.yml`).
 
 `to_async_iter` gọi `next()` của generator gốc TỪNG PHẦN TỬ MỘT qua
-`sync_to_async` (`thread_sensitive=False` — không có gì ở đây đụng ORM nên
-không cần ràng buộc một luồng riêng, và ràng buộc đó sẽ nghẽn CẢ TIẾN TRÌNH
-khi nhiều người dùng stream cùng lúc), nên Django lấy nhánh `async for part in
-self.streaming_content` — gửi ngay mỗi phần tử ra socket khi nó vừa sẵn sàng.
+`sync_to_async`, nên Django lấy nhánh `async for part in self.streaming_content`
+— gửi ngay mỗi phần tử ra socket khi nó vừa sẵn sàng.
+
+`thread_sensitive=True` (mặc định của Django/asgiref) sẽ dồn MỌI stream đang
+chạy cùng lúc trong cả tiến trình qua một luồng chờ duy nhất — một người dùng
+hỏi lâu là mọi người khác bị nghẽn theo. Nhưng `thread_sensitive=False` với
+executor mặc định (dùng chung của asyncio) lại đổi luồng thực thi GIỮA CÁC LẦN
+gọi `next()` — bắt được bằng test thật: sinh câu trả lời (`talent/answer/`) đọc
+ghi CSDL giữa các `yield`, và CSDL test SQLite `:memory:` là RIÊNG CHO TỪNG
+LUỒNG — đổi luồng giữa chừng là sinh generator "mất" luôn dữ liệu nó vừa ghi ở
+lần `next()` trước, generator hỏng giữa chừng và cả bộ test sau đó nhiễu chéo
+(một luồng threadpool bị bỏ dở vẫn chạy nền, ghi telemetry vào scope của test
+khác). Test ở `test_dedicated_thread_...` dưới xác nhận CHÍNH XÁC luồng OS
+được giữ nguyên suốt vòng đời một generator.
+
+Cách đúng: MỘT executor một-luồng RIÊNG cho từng generator (từng response) —
+luồng cố định suốt vòng đời của nó (an toàn với mọi thứ gắn luồng bên trong),
+nhưng KHÔNG chia sẻ giữa các response khác nhau (không nghẽn nhau).
 """
+from concurrent.futures import ThreadPoolExecutor
+
 from asgiref.sync import sync_to_async
 
 _SENTINEL = object()
@@ -28,8 +44,25 @@ _SENTINEL = object()
 
 async def to_async_iter(sync_iterable):
     iterator = iter(sync_iterable)
-    while True:
-        item = await sync_to_async(next, thread_sensitive=False)(iterator, _SENTINEL)
-        if item is _SENTINEL:
-            return
-        yield item
+    executor = ThreadPoolExecutor(max_workers=1)
+    try:
+        while True:
+            item = await sync_to_async(next, thread_sensitive=False, executor=executor)(
+                iterator, _SENTINEL)
+            if item is _SENTINEL:
+                return
+            yield item
+    finally:
+        executor.shutdown(wait=False)
+
+
+def drain_to_bytes(async_iterable):
+    """Chỉ dùng trong test: gom `streaming_content` đã bọc `to_async_iter`
+    thành bytes, thay cho `b"".join(...)` cũ (vỡ vì giờ đó là async generator,
+    không phải iterable đồng bộ nữa)."""
+    from asgiref.sync import async_to_sync
+
+    async def _collect():
+        return b"".join([chunk async for chunk in async_iterable])
+
+    return async_to_sync(_collect)()

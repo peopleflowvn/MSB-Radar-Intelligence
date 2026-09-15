@@ -13,8 +13,10 @@ from unittest import mock
 
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
-from django.test import TestCase, SimpleTestCase, override_settings
+from django.test import TestCase, SimpleTestCase, TransactionTestCase, override_settings
 from people.models import Document, Person
+
+from core.asgi_stream import drain_to_bytes
 
 from .answer import act as act_stage
 from .answer import aggregate as aggregate_stage
@@ -2010,7 +2012,7 @@ class AskEndpointTest(TestCase):
                 "client_turn_id": "turn-a1"}), content_type="application/json")
             # PHẢI đọc hết thân phản hồi khi patch còn hiệu lực: generator của
             # StreamingHttpResponse chạy lười, ra khỏi `with` là nó gọi LLM thật.
-            body = b"".join(response.streaming_content).decode("utf-8")
+            body = drain_to_bytes(response.streaming_content).decode("utf-8")
         self.assertIn("event: step", body)
         self.assertIn("event: answer", body)
         self.assertIn("event: citations", body)

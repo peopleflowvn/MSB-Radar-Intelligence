@@ -21,6 +21,7 @@ import json
 from unittest import mock
 
 from ai.providers import Completion
+from core.asgi_stream import drain_to_bytes
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test import TestCase
@@ -117,7 +118,7 @@ class HeroFlowTest(TestCase):
                 reverse("talent-ask"),
                 data=json.dumps({"q": CAU_HOI, "conversation_id": "hero"}),
                 content_type="application/json")
-            body = b"".join(response.streaming_content).decode("utf-8")
+            body = drain_to_bytes(response.streaming_content).decode("utf-8")
         self.assertEqual(response.status_code, 200)
 
         # --- 2. Câu trả lời phải nêu đúng người và dẫn được nguồn ---

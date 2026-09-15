@@ -18,7 +18,7 @@ jobs:
   # host và chạy nhanh hơn hẳn; `deploy-production` bên dưới vẫn PHẢI self-hosted
   # vì nó gọi thẳng `docker compose` vào container đang sống trên máy đó.
   validate:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

@@ -7,6 +7,7 @@ from django.contrib.auth.models import Group, User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from core.asgi_stream import drain_to_bytes
 from people.models import Document, Person
 from talent import corpus_qa
 from talent.models import CVChunk, TalentProfile
@@ -153,7 +154,7 @@ class StreamIntegrationTest(TestCase):
              sha="a1")
 
     def _body(self, resp):
-        return b"".join(resp.streaming_content).decode("utf-8")
+        return drain_to_bytes(resp.streaming_content).decode("utf-8")
 
     def test_corpus_question_goes_through_answer_engine(self):
         """Bề mặt trợ lý chat dùng CHUNG một engine với `/talent/ask/`.

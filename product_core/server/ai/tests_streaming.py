@@ -9,6 +9,8 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from core.asgi_stream import drain_to_bytes
+
 from . import events, prompt_guard
 from .adapter import ModelError, ModelRequest, ModelResponse, RouterAdapter
 from .models import AssistantMessage, AssistantThread
@@ -184,7 +186,7 @@ class AssistantStreamEndpointTest(TestCase):
         self.user = User.objects.create_user("streamer", password="x")
 
     def _body(self, resp):
-        return b"".join(resp.streaming_content).decode("utf-8")
+        return drain_to_bytes(resp.streaming_content).decode("utf-8")
 
     def test_corpus_bridge_persists_corrected_answer_and_ordered_followup_state(self):
         from ai.intent import IntentResult

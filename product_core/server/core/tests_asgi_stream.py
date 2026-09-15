@@ -14,6 +14,7 @@ lấy nhánh nhanh (`async for part in self.streaming_content`) chứ không rơ
 nhánh dự phòng đó — nhánh dự phòng luôn tự phát `Warning`, nên "không có
 Warning nào" chính là bằng chứng trực tiếp, không phải suy luận gián tiếp.
 """
+import threading
 import time
 import warnings
 from unittest import IsolatedAsyncioTestCase
@@ -83,3 +84,28 @@ class ToAsyncIterTest(IsolatedAsyncioTestCase):
             self.assertLess(received_at[i] - released_at[i], 0.2,
                            f"item {i} tới quá trễ so với lúc được sinh ra — có vẻ lại bị gom")
         self.assertGreater(received_at[-1] - started, 0.1)
+
+    async def test_the_wrapped_generator_stays_on_one_os_thread(self):
+        """Bug thật đã xảy ra: `thread_sensitive=False` với executor DÙNG CHUNG
+        đổi luồng OS giữa các lần `next()`. Với CSDL test SQLite `:memory:`
+        (mỗi luồng một kết nối riêng), đổi luồng giữa chừng generator nghĩa là
+        generator "mất" dữ liệu nó vừa ghi ở lần `next()` trước — vỡ ngay giữa
+        chừng một câu trả lời thật (xem core/tests_hero_flow.py trước khi có
+        executor riêng: sinh câu trả lời xong nhưng rơi vào nhánh lỗi).
+
+        Test này không cần CSDL — chỉ ghi lại `threading.get_ident()` mỗi lần
+        generator gốc được resume, và đòi tất cả PHẢI giống nhau."""
+        thread_ids = []
+
+        def recorder():
+            for _ in range(5):
+                thread_ids.append(threading.get_ident())
+                yield None
+
+        async for _item in to_async_iter(recorder()):
+            pass
+        self.assertEqual(len(set(thread_ids)), 1,
+                         f"generator chạy trên nhiều luồng khác nhau: {thread_ids}")
+        self.assertNotEqual(thread_ids[0], threading.get_ident(),
+                           "generator lẽ ra phải chạy trên luồng nền riêng, không phải "
+                           "luồng đang chờ nó (event loop)")
