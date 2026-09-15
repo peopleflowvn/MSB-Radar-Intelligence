@@ -279,6 +279,7 @@ jobs:
           from talent.answer import engine
           from talent.corpus_qa import can_read_cv
           from ai.models import TaskModelRoute
+          from people.models import Person
 
           user = next((u for u in get_user_model().objects.filter(is_active=True).iterator()
                        if roles.can_access(u, roles.MODULE_TALENT) and can_read_cv(u)), None)
@@ -289,8 +290,10 @@ jobs:
                         task__in=("talent_answer_plan", "talent_answer_judge",
                                   "talent_answer_compose"))}
           assert routes["talent_answer_plan"] == {
-              "provider": "greennode", "model": "qwen/qwen3.6-flash"}, routes
+              "provider": "gemini", "model": "gemini-3.5-flash"}, routes
           assert routes["talent_answer_judge"] == {
+              "provider": "gemini", "model": "gemini-3.5-flash"}, routes
+          assert routes["talent_answer_compose"] == {
               "provider": "gemini", "model": "gemini-3.5-flash"}, routes
 
           results = {}
@@ -318,7 +321,6 @@ jobs:
           assert result.text.strip() and result.text != "(không có nội dung)"
           assert pass1.get("retrieval_engine") == "intelligence-v2-haystack", pass1
           assert not (result.trace.get("compose") or {}).get("fallback"), result.trace.get("compose")
-          assert result.people and result.sources, "Talent results must include visible people and citations"
           assert int(result.trace.get("ms_total") or 0) > 0, result.trace
           results["talent_search"] = {
               "nonempty": True,
@@ -328,6 +330,22 @@ jobs:
               "retrieval_engine": pass1.get("retrieval_engine"),
               "duration_ms": result.trace.get("ms_total"),
               "routes": routes,
+          }
+
+          # Không ép một truy vấn nghiệp vụ bất kỳ phải có kết quả: làm vậy sẽ
+          # khuyến khích agent nới điều kiện/bịa match. Grounding được kiểm bằng
+          # một hồ sơ applicant thật chọn động, nhưng không in tên/PII ra log.
+          known = Person.applicants().exclude(display_name="").order_by("pk").first()
+          assert known is not None, "Production applicant store is empty"
+          grounded = engine.answer(f"Phân tích hồ sơ {known.display_name}", user=user)
+          assert grounded.text.strip() and grounded.people and grounded.sources
+          assert any(int(row.get("person_id") or 0) == known.pk for row in grounded.people)
+          assert (grounded.trace.get("citation_audit") or {}).get("status") == "PASS"
+          results["known_profile_grounding"] = {
+              "nonempty": True,
+              "person_matched": True,
+              "citation_count": len(grounded.sources),
+              "duration_ms": grounded.trace.get("ms_total"),
           }
           print(json.dumps(results, ensure_ascii=False, sort_keys=True))
           '
