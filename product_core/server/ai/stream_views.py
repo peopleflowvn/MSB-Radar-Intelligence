@@ -78,10 +78,13 @@ def assistant_stream(request):
 
     user = request.user
     adapter = get_adapter()
-    # Tài liệu tri thức nội bộ thắng tuyệt đối nhánh web nếu có — cùng nguyên
-    # tắc với talent/answer/chat.py::stream_chat: bộ phân loại ý định không
-    # biết gì về kho tri thức nội bộ nên có thể gắn nhãn "web" cho một câu hỏi
-    # chính sách công ty một cách hợp lý theo góc nhìn của nó.
+    # Câu hỏi có tài liệu tri thức nội bộ khớp thì KHÔNG đi thẳng vào nhánh web
+    # thuần (`do_web`) — cùng nguyên tắc với talent/answer/chat.py::stream_chat:
+    # bộ phân loại ý định không biết gì về kho tri thức nội bộ nên có thể gắn
+    # nhãn "web" cho một câu hỏi chính sách công ty một cách hợp lý theo góc
+    # nhìn của nó. Nhánh hội thoại bên dưới (`else`) vẫn tra Internet song song
+    # khi có `do_web_merge` — xem đó, tài liệu nội bộ không được thắng tuyệt
+    # đối một mình vì nó có thể đã lỗi thời.
     internal_sources = knowledge_sources(question, user)
     do_web = not fixed and intent.is_web and websearch.enabled() and not internal_sources
 
@@ -120,6 +123,12 @@ def assistant_stream(request):
                 and getattr(settings, "ASSISTANT_TOOLS", False)
                 and bool(toolset.agent_toolset_for(surface, user)))
 
+    # Có tài liệu nội bộ NHƯNG câu hỏi vẫn được gắn nhãn "web" (dữ kiện có thể
+    # đổi theo thời gian: nhân sự lãnh đạo, lãi suất…) → nhánh hội thoại bên
+    # dưới tra Internet song song và ghép làm nguồn, thay vì bỏ qua Internet.
+    do_web_merge = (not fixed and not do_web and not do_corpus and not do_agent
+                    and intent.is_web and websearch.enabled() and bool(internal_sources))
+
     def gen(active_usage):
         answer_parts, reasoning_parts = [], []
         provider = model_name = ""
@@ -134,7 +143,7 @@ def assistant_stream(request):
         failed = False
         completed = bool(fixed)
         try:
-            yield _sse("status", {"state": "searching" if do_web else "thinking"})
+            yield _sse("status", {"state": "searching" if (do_web or do_web_merge) else "thinking"})
             if fixed:
                 answer_parts.append(fixed)
                 yield _sse("answer", {"text": fixed})
@@ -225,9 +234,25 @@ def assistant_stream(request):
                     failed = True
                     yield _sse("error", {"text": f"Không tra được web: {exc}"})
             else:
+                sources = list(internal_sources)
+                if do_web_merge:
+                    try:
+                        web_result = websearch.web_answer(
+                            question, system=web_system(surface, user), adapter=adapter)
+                        web_text = str(web_result.text or "").strip()
+                        if web_text:
+                            sources.append(("Kết quả tra Internet vừa thực hiện", web_text))
+                            citations = web_result.citations
+                            web_queries = web_result.queries
+                            if citations:
+                                yield _sse("sources", {"items": citations})
+                    except Exception:                     # noqa: BLE001
+                        # Vẫn còn tài liệu nội bộ để trả lời — bỏ qua lỗi web lặng lẽ,
+                        # không biến một câu trả lời được thành lỗi.
+                        pass
                 request_obj, guard_flags = build_conversation_request(
                     question, surface=surface, user=user, projection=context,
-                    knowledge=internal_sources)
+                    knowledge=sources)
                 if guard_flags:
                     yield _sse("guard", {"flags": guard_flags})
                 for chunk in adapter.stream(request_obj):

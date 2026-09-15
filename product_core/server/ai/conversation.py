@@ -191,8 +191,14 @@ def build_conversation_request(question, surface="talent", user=None, projection
     if sources:
         messages.append({"role": "system", "content": (
             GUARD_RULE + " Khi phần DỮ LIỆU NGUỒN dưới đây trả lời được câu hỏi, "
-            "hãy dựa vào đó và nói rõ tên tài liệu; nếu không liên quan thì bỏ qua "
-            "và trả lời như bình thường.")})
+            "hãy dựa vào đó và nói rõ tên tài liệu/nguồn cho từng phần; nếu không "
+            "liên quan thì bỏ qua và trả lời như bình thường. Có nhiều nguồn cùng "
+            "lúc (ví dụ vừa có tài liệu nội bộ vừa có kết quả tra Internet) thì "
+            "nói rõ TỪNG Ý lấy từ đâu. Tài liệu nội bộ có thể đã LỖI THỜI với "
+            "những dữ kiện đổi theo thời gian (nhân sự lãnh đạo, lãi suất, số "
+            "liệu thị trường…) — khi mâu thuẫn với kết quả tra Internet (mới "
+            "hơn), ưu tiên kết quả tra Internet và nói rõ tài liệu nội bộ có thể "
+            "đã cũ.")})
         for label, text in sources:
             wrapped = wrap_source(text, label)
             if wrapped:
@@ -273,11 +279,15 @@ def answer_if_conversation(question, surface="talent", history=None, complete_fn
     `intent` (ai.intent.IntentResult) nếu có sẽ quyết định thay heuristic; khi
     `intent.kind == "web"` thì tra Google trước, hỏng thì lùi về model thường.
 
-    Tài liệu tri thức nội bộ (nếu có, và user có module `knowledge`) LUÔN được
-    tra trước và thắng nhánh web — kể cả khi `intent.kind == "web"`: bộ phân
-    loại ý định không biết gì về kho tri thức nội bộ, nên một câu hỏi chính
-    sách công ty vẫn có thể bị gắn nhãn "web" một cách hợp lý theo góc nhìn của
-    nó. Xem `talent/answer/chat.py::stream_chat` — cùng nguyên tắc, bề mặt khác.
+    Tài liệu tri thức nội bộ (nếu có, và user có module `knowledge`) luôn được
+    tra trước. Khi `intent.kind == "web"` mà KHÔNG có tài liệu nội bộ, tra
+    Internet và trả thẳng kết quả (như cũ). Có CẢ HAI — bộ phân loại ý định
+    không biết gì về kho tri thức nội bộ nên có thể hợp lý gắn nhãn "web" cho
+    một câu hỏi chính sách công ty — thì tra Internet SONG SONG rồi ghép làm
+    hai nguồn cho hội thoại thường tự đối chiếu: tài liệu nội bộ có thể đã lỗi
+    thời với dữ kiện đổi theo thời gian (nhân sự lãnh đạo, lãi suất…), nên
+    KHÔNG được để nó thắng tuyệt đối một mình. Xem `talent/answer/chat.py::
+    stream_chat` — cùng nguyên tắc, bề mặt khác.
     """
     fixed = common_answer(question, surface=surface, user=user)
     if fixed:
@@ -293,11 +303,19 @@ def answer_if_conversation(question, surface="talent", history=None, complete_fn
     model = adapter or (RouterAdapter(complete_fn) if complete_fn else get_adapter())
     internal_sources = knowledge_sources(question, user)
 
-    if want_web and not internal_sources:
+    web_text, web_citations = "", []
+    if want_web:
         web_reply = _answer_via_web(question, surface, user, projection, adapter=model)
         if web_reply is not None:
-            web_reply.intent = intent
-            return web_reply
+            if not internal_sources:
+                web_reply.intent = intent
+                return web_reply
+            web_text = str(web_reply).strip()
+            web_citations = list(web_reply.citations)
+
+    sources = list(internal_sources)
+    if web_text:
+        sources.append(("Kết quả tra Internet vừa thực hiện", web_text))
 
     scope = scope_for(surface)
     if projection is None:
@@ -311,7 +329,7 @@ def answer_if_conversation(question, surface="talent", history=None, complete_fn
 
     request, guard_flags = build_conversation_request(
         question, surface=surface, user=user, projection=projection,
-        knowledge=internal_sources)
+        knowledge=sources)
     try:
         response = model.complete(request)
     except Exception:                          # noqa: BLE001
@@ -324,7 +342,7 @@ def answer_if_conversation(question, surface="talent", history=None, complete_fn
     return ConversationReply(answer, reasoning=reasoning[:6000], guard_flags=guard_flags,
                              provider=response.provider, model=response.model,
                              request=request, usage=response.usage, projection_version=pv,
-                             intent=intent)
+                             intent=intent, citations=web_citations, web=bool(web_text))
 
 
 def sanitize_history(raw_history):

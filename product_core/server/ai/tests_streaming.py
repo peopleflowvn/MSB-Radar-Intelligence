@@ -392,22 +392,30 @@ class AssistantStreamEndpointTest(TestCase):
     @patch("ai.websearch.enabled", return_value=True)
     @patch("ai.websearch.web_answer")
     @patch("ai.stream_views.get_adapter", return_value=FakeStreamAdapter())
-    def test_internal_knowledge_beats_web_intent(self, _adapter, mock_web, _en, mock_cls, mock_knowledge):
+    def test_internal_knowledge_khong_chan_tra_web_song_song(self, _adapter, mock_web, _en,
+                                                            mock_cls, mock_knowledge):
         """Bộ phân loại ý định không biết gì về kho tri thức nội bộ; một câu
-        hỏi chính sách công ty có thể hợp lý bị gắn nhãn "web" — nhưng nếu kho
-        nội bộ có tài liệu liên quan, nó phải thắng, không phải Google."""
+        hỏi chính sách công ty có thể hợp lý bị gắn nhãn "web". Tài liệu nội bộ
+        có thể đã lỗi thời nên KHÔNG được chặn hẳn đường ra Internet — nhánh
+        hội thoại vẫn tra web song song rồi ghép làm nguồn."""
+        from ai import websearch
         from ai.intent import IntentResult
         mock_cls.return_value = IntentResult(kind="web", confidence=0.9, source="model")
         mock_knowledge.return_value = [("Quy trình nghỉ phép", "Nhân viên được nghỉ 12 ngày phép năm.")]
+        mock_web.return_value = websearch.WebResult(
+            text="Không có thay đổi nào được công bố.",
+            citations=[{"title": "MSB", "url": "https://msb.com.vn/x"}],
+            queries=["quy trình nghỉ phép MSB"], model="gemini-x")
         self.client.force_login(self.user)
         resp = self.client.post(self.URL, {
             "q": "quy trình nghỉ phép của công ty là gì", "conversation_id": "c-kb",
             "client_turn_id": "turn-kb1"}, content_type="application/json")
         body = self._body(resp)
-        mock_web.assert_not_called()
+        mock_web.assert_called_once()
         self.assertIn("event: answer", body)
         self.assertIn("event: done", body)
-        self.assertNotIn("event: sources", body)
+        self.assertIn("event: sources", body)
+        self.assertIn("msb.com.vn", body)
 
     @override_settings(ASSISTANT_TOOLS=True)
     @patch("ai.stream_views.intent_router.classify")

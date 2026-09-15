@@ -761,6 +761,51 @@ class EngineEndToEndTest(TestCase):
                           adapter=FakeAdapter())
         web.assert_not_called()
 
+    def test_cau_hoi_chinh_sach_bi_xep_analyze_van_uu_tien_tai_lieu_noi_bo(self):
+        """"Có quy định giới thiệu ứng viên cho MSB không" nhắc "ứng viên" nên ①
+        (plan.py::mentions_store) không cho phép xếp "general", ra "analyze" —
+        điều đúng cho câu hỏi tổng quan về KHO, nhưng đây là câu hỏi CHÍNH SÁCH
+        công ty. Có tài liệu tri thức nội bộ khớp thì nó phải thắng và trả lời
+        thẳng, không được chạy tiếp ②→⑤ tìm người rồi báo "kho không có dữ
+        liệu quy định" (đúng lỗi báo cáo thật)."""
+        caller = replies({
+            plan_stage.TASK: json.dumps({
+                "shape": "analyze",
+                "search_queries": ["quy định giới thiệu ứng viên cho MSB"]})})
+
+        class FakeAdapter:
+            def stream(self, request):
+                blob = "\n".join(str(m["content"]) for m in request.messages)
+                assert "Quy định giới thiệu ứng viên" in blob
+                yield {"type": "answer", "text": "Theo tài liệu nội bộ, nhân viên "
+                                                  "giới thiệu ứng viên qua form X."}
+                yield {"type": "done", "response": None}
+
+        with mock.patch("ai.conversation.knowledge_sources",
+                        return_value=[("Quy định giới thiệu ứng viên",
+                                      "Nhân viên giới thiệu ứng viên qua form X.")]):
+            result = engine.answer("có quy định giới thiệu ứng viên cho msb khôgn",
+                                   complete_fn=caller, adapter=FakeAdapter())
+
+        self.assertNotIn("pass1", result.trace)
+        self.assertEqual(result.trace["mode"], "chat")
+        self.assertIn("form X", result.text)
+
+    def test_cau_hoi_analyze_that_ve_kho_khong_bi_lac_sang_hoi_thoai(self):
+        """Không có tài liệu nội bộ khớp thì "analyze" vẫn chạy ②→⑤ như cũ —
+        chỉ khi kho tri thức THỰC SỰ có câu trả lời mới đổi nhánh."""
+        caller = replies({
+            plan_stage.TASK: json.dumps({
+                "shape": "analyze",
+                "search_queries": ["tổng quan kho ứng viên"]})})
+
+        with mock.patch("ai.conversation.knowledge_sources", return_value=[]):
+            result = engine.answer("bạn đánh giá tổng quan về kho ứng viên thế nào",
+                                   complete_fn=caller)
+
+        self.assertIn("pass1", result.trace)
+        self.assertNotEqual(result.trace.get("mode"), "chat")
+
     def test_tra_web_hong_thi_lui_ve_hoi_thoai_chu_khong_tra_man_hinh_trang(self):
         caller = replies({
             plan_stage.TASK: json.dumps({"shape": "general", "search_queries": []})})
@@ -1234,8 +1279,10 @@ class _WantsWeb:
 
 class InternalKnowledgeBeatsWebTest(TestCase):
     """Một câu hỏi chính sách công ty có thể hợp lý bị bộ phân loại ý định gắn
-    nhãn "web" (nó không biết gì về kho tri thức nội bộ) — nhưng nếu kho nội
-    bộ có tài liệu liên quan, tài liệu đó phải thắng, không phải Google."""
+    nhãn "web" (nó không biết gì về kho tri thức nội bộ). Tài liệu nội bộ
+    KHÔNG được thắng tuyệt đối một mình — nó có thể đã lỗi thời (ví dụ tên
+    lãnh đạo trong một văn bản cũ) — nên vẫn phải tra Internet song song và
+    ghép làm hai nguồn cho model tự đối chiếu."""
 
     class _FakeAdapter:
         def __init__(self):
@@ -1246,22 +1293,48 @@ class InternalKnowledgeBeatsWebTest(TestCase):
             yield {"type": "answer", "text": "ok"}
             yield {"type": "done", "response": None}
 
-    def test_internal_knowledge_skips_web_even_when_intent_says_web(self):
+    def test_internal_knowledge_khong_chan_tra_web_song_song(self):
+        adapter = self._FakeAdapter()
+        web_result = SimpleNamespace(
+            text="Không có thay đổi nào được công bố.",
+            citations=[{"title": "MSB", "url": "https://msb.com.vn/x"}],
+            provider="tavily", model="", queries=["quy trình nghỉ phép MSB"])
+        with mock.patch(
+                "talent.answer.chat.knowledge_sources",
+                return_value=[("Quy trình nghỉ phép", "Nhân viên được nghỉ 12 ngày phép năm.")]), \
+                mock.patch("talent.answer.chat.websearch.enabled", return_value=True), \
+                mock.patch("talent.answer.chat.websearch.web_answer",
+                          return_value=web_result) as web_answer:
+            chunks = list(chat_stage.stream_chat(
+                "quy trình nghỉ phép của công ty là gì",
+                adapter=adapter, intent=_WantsWeb()))
+        web_answer.assert_called_once()
+        done = next(c for c in chunks if c.get("type") == "done")
+        self.assertEqual(done["payload"]["mode"], "chat")
+        self.assertEqual(done["payload"]["web_sources"], web_result.citations)
+        blob = json.dumps(adapter.sent, ensure_ascii=False)
+        self.assertIn("Nhân viên được nghỉ 12 ngày phép năm", blob)
+        self.assertIn("Quy trình nghỉ phép", blob)
+        self.assertIn("Không có thay đổi nào được công bố", blob)
+
+    def test_web_hong_van_lui_ve_tai_lieu_noi_bo(self):
+        """Web lỗi (backend chết/hết hạn mức) thì vẫn còn tài liệu nội bộ để
+        trả lời — không được để cả lượt hỏng theo."""
         adapter = self._FakeAdapter()
         with mock.patch(
                 "talent.answer.chat.knowledge_sources",
                 return_value=[("Quy trình nghỉ phép", "Nhân viên được nghỉ 12 ngày phép năm.")]), \
                 mock.patch("talent.answer.chat.websearch.enabled", return_value=True), \
-                mock.patch("talent.answer.chat.websearch.web_answer") as web_answer:
+                mock.patch("talent.answer.chat.websearch.web_answer",
+                          side_effect=RuntimeError("backend chết")) as web_answer:
             chunks = list(chat_stage.stream_chat(
                 "quy trình nghỉ phép của công ty là gì",
                 adapter=adapter, intent=_WantsWeb()))
-        web_answer.assert_not_called()
-        self.assertTrue(any(c.get("type") == "done" and c.get("payload", {}).get("mode") == "chat"
-                            for c in chunks))
+        web_answer.assert_called_once()
+        done = next(c for c in chunks if c.get("type") == "done")
+        self.assertEqual(done["payload"]["mode"], "chat")
         blob = json.dumps(adapter.sent, ensure_ascii=False)
         self.assertIn("Nhân viên được nghỉ 12 ngày phép năm", blob)
-        self.assertIn("Quy trình nghỉ phép", blob)
 
     def test_no_internal_knowledge_still_goes_to_web(self):
         """Chốt lại hành vi cũ: câu hỏi không khớp tài liệu nào vẫn tra web như trước."""

@@ -84,17 +84,20 @@ class _FakeAdapter:
     def __init__(self, text="ok"):
         self.text = text
         self.calls = 0
+        self.last_request = None
 
     def complete(self, request):
         self.calls += 1
+        self.last_request = request
         return SimpleNamespace(
             text=self.text, provider="greennode", model="fast", usage=None)
 
 
 class WebVersusKnowledgePriorityTest(TestCase):
     """Bộ phân loại ý định không biết gì về kho tri thức nội bộ — một câu hỏi
-    chính sách công ty có thể hợp lý bị nó gắn nhãn "web". Tài liệu nội bộ vẫn
-    phải thắng khi có, xem talent/answer/chat.py cho bề mặt chat chính."""
+    chính sách công ty có thể hợp lý bị nó gắn nhãn "web". Tài liệu nội bộ
+    KHÔNG được thắng tuyệt đối một mình (nó có thể đã lỗi thời) — cả hai nguồn
+    phải được ghép lại, xem talent/answer/chat.py cho bề mặt chat chính."""
 
     def setUp(self):
         roles.ensure_groups()
@@ -103,16 +106,42 @@ class WebVersusKnowledgePriorityTest(TestCase):
     def _web_intent(self):
         return IntentResult(kind=KIND_WEB, confidence=0.8, reason="test", source="model")
 
-    def test_internal_knowledge_skips_web_even_when_intent_says_web(self):
-        adapter = _FakeAdapter("Theo quy trình, 12 ngày phép năm.")
+    def test_internal_knowledge_khong_chan_tra_web_song_song(self):
+        """Có tài liệu nội bộ VÀ intent="web" → vẫn tra Internet song song
+        (tài liệu nội bộ có thể đã cũ, ví dụ tên lãnh đạo trong văn bản cũ),
+        rồi ghép cả hai nguồn cho model hội thoại tự đối chiếu — không trả
+        thẳng kết quả web (còn tài liệu nội bộ chưa dùng tới) và cũng không bỏ
+        qua Internet."""
+        adapter = _FakeAdapter("Theo tài liệu nội bộ: 12 ngày phép năm. "
+                               "Theo tra Internet (mới hơn): không có gì mâu thuẫn.")
+        fake_web_reply = ConversationReply(
+            "Không có gì mâu thuẫn.", citations=[{"title": "X", "url": "https://x.com"}])
         with patch("ai.conversation.knowledge_sources",
                   return_value=[("Quy trinh nghi phep", "12 ngay phep nam")]), \
-                patch("ai.conversation._answer_via_web") as web_answer:
+                patch("ai.conversation._answer_via_web",
+                      return_value=fake_web_reply) as web_answer:
             reply = answer_if_conversation(
                 "quy trình nghỉ phép của công ty là gì", user=self.admin,
                 adapter=adapter, intent=self._web_intent())
-        web_answer.assert_not_called()
+        web_answer.assert_called_once()
         self.assertEqual(adapter.calls, 1)
+        self.assertIn("12 ngày phép năm", str(reply))
+        self.assertEqual(reply.citations, [{"title": "X", "url": "https://x.com"}])
+        request = adapter.last_request
+        blob = "\n".join(str(m.get("content") or "") for m in request.messages)
+        self.assertIn("Không có gì mâu thuẫn", blob)
+
+    def test_khong_tra_duoc_web_van_dung_duoc_tai_lieu_noi_bo(self):
+        """Web hỏng (backend lỗi/hết hạn mức) thì lùi về CHỈ tài liệu nội bộ —
+        không được để cả lượt hỏng theo."""
+        adapter = _FakeAdapter("Theo quy trình, 12 ngày phép năm.")
+        with patch("ai.conversation.knowledge_sources",
+                  return_value=[("Quy trinh nghi phep", "12 ngay phep nam")]), \
+                patch("ai.conversation._answer_via_web", return_value=None) as web_answer:
+            reply = answer_if_conversation(
+                "quy trình nghỉ phép của công ty là gì", user=self.admin,
+                adapter=adapter, intent=self._web_intent())
+        web_answer.assert_called_once()
         self.assertIn("12 ngày phép năm", str(reply))
 
     def test_no_internal_knowledge_still_goes_to_web(self):

@@ -518,10 +518,18 @@ def answer(question, *, envelope=None, user=None, history=None, complete_fn=None
 
     query_plan = plan_stage.plan(question, envelope=envelope, complete_fn=complete_fn)
     branch = None
+    internal_knowledge = None
+    if query_plan.shape == "analyze" and query_plan.needs_people:
+        from ai.conversation import knowledge_sources
+        internal_knowledge = knowledge_sources(question, user)
+        if internal_knowledge:
+            from dataclasses import replace
+            query_plan = replace(query_plan, shape="general")
     if query_plan.wants_action and act_stage.available(user):
         branch = _stream_action(question, query_plan, envelope, user, history, started)
     elif not query_plan.needs_people:
-        branch = _stream_chat(question, query_plan, envelope, user, started, adapter)
+        branch = _stream_chat(question, query_plan, envelope, user, started, adapter,
+                              knowledge=internal_knowledge)
     if branch is not None:
         result = AnswerResult()
         for chunk in branch:
@@ -815,7 +823,8 @@ def _stream_assess_doc(question, doc_text, envelope, user, started, stream_fn=No
                "ms_total": int((time.monotonic() - started) * 1000)})}
 
 
-def _stream_chat(question, query_plan, envelope, user, started, adapter=None):
+def _stream_chat(question, query_plan, envelope, user, started, adapter=None,
+                 knowledge=None):
     """Câu hỏi phổ thông: câu trả lời có sẵn → tra web → hội thoại thường.
 
     Đưa loại câu hỏi này qua ①→⑤ cho ra câu trả lời sai giọng — ⑤ viết bằng
@@ -823,7 +832,7 @@ def _stream_chat(question, query_plan, envelope, user, started, adapter=None):
     """
     payload = {}
     for chunk in chat_stage.stream_chat(question, envelope=envelope, user=user,
-                                        adapter=adapter):
+                                        adapter=adapter, knowledge=knowledge):
         if chunk.get("type") == "done":
             payload = chunk["payload"]
         else:
@@ -899,11 +908,26 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
                        "Mình thực hiện trên nhóm người đang nói tới. Đang làm…"}
         yield from _stream_action(question, query_plan, envelope, user, history, started)
         return
+    # ① không biết gì về kho tri thức nội bộ (plan.py viết trước khi module đó
+    # tồn tại) và bị buộc không bao giờ chọn "general" khi câu hỏi nhắc tới
+    # "ứng viên"/"hồ sơ"/"kho" — nên một câu chính sách công ty ("quy định giới
+    # thiệu ứng viên cho MSB") vẫn nhắc "ứng viên" và bị xếp "analyze", chạy
+    # thẳng vào ②→⑤ tìm-người rồi báo "kho không có tài liệu quy định". Tài
+    # liệu tri thức nội bộ luôn thắng nếu có — cùng nguyên tắc với
+    # `chat.py::stream_chat` (nội bộ thắng web), chỉ khác chỗ áp dụng.
+    internal_knowledge = None
+    if query_plan.shape == "analyze" and query_plan.needs_people:
+        from ai.conversation import knowledge_sources
+        internal_knowledge = knowledge_sources(question, user)
+        if internal_knowledge:
+            from dataclasses import replace
+            query_plan = replace(query_plan, shape="general")
+
     # Câu hỏi không về Kho con người → nhánh hội thoại (có tra web). Trước đây
     # nó vẫn chạy tiếp xuống ⑤ và nhận một câu trả lời sai giọng.
     if not query_plan.needs_people and not query_plan.wants_action:
         yield from _stream_chat(question, query_plan, envelope, user, started,
-                                adapter)
+                                adapter, knowledge=internal_knowledge)
         return
 
     # "Đã nhận yêu cầu — đây là cách mình định làm." Ngay sau ①, trước ②③ (chỗ

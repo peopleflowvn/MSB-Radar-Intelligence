@@ -53,9 +53,10 @@ def _do_web(question, wants_web):
     sẵn) thì MẶC ĐỊNH tra web khi web bật — model hội thoại chỉ là lưới đỡ.
     `web_answer` tự chặn câu có PII.
 
-    KHÔNG xét tài liệu tri thức nội bộ ở đây — xem `stream_chat`: nội bộ được
-    tra TRƯỚC và thắng tuyệt đối nếu có, hàm này chỉ quyết định khi nội bộ
-    không có gì.
+    Tài liệu tri thức nội bộ KHÔNG làm hàm này trả `False`: nội bộ có thể đã cũ
+    (viết một lần, ít khi cập nhật — ví dụ tên Tổng giám đốc trong một văn bản
+    lâu năm), nên `stream_chat` vẫn tra Internet song song và ghép hai nguồn,
+    thay vì để tài liệu nội bộ chặn hẳn đường ra ngoài.
     """
     if not websearch.enabled():
         return False
@@ -65,21 +66,24 @@ def _do_web(question, wants_web):
     return len(str(question or "").split()) >= 2
 
 
-def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None):
+def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None,
+                knowledge=None):
     """Yield chunk giống `engine.stream_answer`: stage / answer / done.
 
     Chunk `done` mang `payload` để engine đóng gói thành `AnswerResult`.
+
+    `knowledge`: kết quả `knowledge_sources()` nếu bên gọi đã tự tra sẵn (ví dụ
+    `engine.py` để quyết định có đẩy câu hỏi "analyze" vào nhánh này hay không
+    trước khi tới đây) — tránh tra lại lần hai. Bỏ trống thì hàm tự tra.
     """
     model = adapter or get_adapter()
     projection = getattr(envelope, "projection", None)
 
-    # Tài liệu tri thức nội bộ (chính sách/quy trình công ty) được tra TRƯỚC,
-    # và THẮNG TUYỆT ĐỐI nếu có: nó do chính công ty viết, đáng tin hơn một kết
-    # quả web ngẫu nhiên cho cùng câu hỏi, và né được việc đẩy một câu nghe như
-    # hỏi chuyện nội bộ ra một cỗ máy tìm kiếm công khai. Rẻ cho phần lớn tài
-    # khoản: `knowledge_sources` trả `[]` ngay lập tức, không gọi mạng, nếu
-    # user không có module `knowledge` (accounts/roles.py::MODULE_KNOWLEDGE).
-    internal_sources = knowledge_sources(question, user)
+    # Tài liệu tri thức nội bộ (chính sách/quy trình công ty) được tra TRƯỚC.
+    # Rẻ cho phần lớn tài khoản: `knowledge_sources` trả `[]` ngay lập tức,
+    # không gọi mạng, nếu user không có module `knowledge`
+    # (accounts/roles.py::MODULE_KNOWLEDGE).
+    internal_sources = knowledge_sources(question, user) if knowledge is None else knowledge
 
     # Cần dữ liệu ngoài kho → tra web. `intent` do người gọi cấp (đã phân
     #    loại rồi thì không phân loại lại); không có thì tự hỏi.
@@ -92,30 +96,40 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
         except Exception:                          # noqa: BLE001
             wants_web = False
 
-    if not internal_sources and _do_web(question, wants_web):
+    web_text, web_citations = "", []
+    if _do_web(question, wants_web):
         yield {"type": "stage", "stage": "web", "text": "Đang tra trên internet"}
         try:
             result = websearch.web_answer(
                 question, system=web_system("talent", user), adapter=model)
             text = str(getattr(result, "text", "") or "").strip()
             if text:
-                yield {"type": "answer", "text": text}
-                yield {"type": "done", "payload": {
-                    "text": text, "mode": "web",
-                    "web_sources": list(getattr(result, "citations", []) or []),
-                    "provider": getattr(result, "provider", ""),
-                    "model": getattr(result, "model", "")}}
-                return
+                if not internal_sources:
+                    yield {"type": "answer", "text": text}
+                    yield {"type": "done", "payload": {
+                        "text": text, "mode": "web",
+                        "web_sources": list(getattr(result, "citations", []) or []),
+                        "provider": getattr(result, "provider", ""),
+                        "model": getattr(result, "model", "")}}
+                    return
+                # Có CẢ tài liệu nội bộ lẫn kết quả web — không chọn một, ghép
+                # làm hai nguồn để hội thoại thường bên dưới tự đối chiếu và
+                # nói rõ phần nào lấy từ đâu (tài liệu nội bộ có thể đã cũ).
+                web_text = text
+                web_citations = list(getattr(result, "citations", []) or [])
         except Exception as exc:                   # noqa: BLE001
             # Tra web hỏng không được làm hỏng cả lượt — lùi về hội thoại thường
-            # và nói rõ giới hạn, thay vì trả về màn hình trắng.
+            # (vẫn còn tài liệu nội bộ nếu có) thay vì trả về màn hình trắng.
             log.warning("answer.chat: tra web hỏng, lùi về hội thoại: %s", exc)
 
     # 3. Hội thoại thường — persona + quyền + memory, model hội thoại.
     yield {"type": "stage", "stage": "chat", "text": "Đang trả lời"}
+    sources = list(internal_sources)
+    if web_text:
+        sources.append(("Kết quả tra Internet vừa thực hiện", web_text))
     request, guard_flags = build_conversation_request(
         question, surface="talent", user=user, projection=projection,
-        knowledge=internal_sources)
+        knowledge=sources)
 
     # Bơm SỐ LIỆU THẬT về kho vào prompt khi câu hỏi có dính tới dữ liệu.
     #
@@ -179,4 +193,5 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
 
     yield {"type": "done", "payload": {
         "text": text, "mode": "chat", "provider": provider, "model": model_name,
-        "reasoning": "".join(reasoning), "guard_flags": list(guard_flags or [])}}
+        "reasoning": "".join(reasoning), "guard_flags": list(guard_flags or []),
+        "web_sources": web_citations}}
