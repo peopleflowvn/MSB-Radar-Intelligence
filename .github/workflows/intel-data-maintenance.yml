@@ -1,0 +1,71 @@
+name: Intel Data Maintenance
+
+# Đọc số liệu vận hành thật (backlog alias, tình trạng chỉ mục vector, đối
+# soát dữ liệu) và, khi được xác nhận rõ ràng, áp dụng các thay đổi tương ứng.
+# Mặc định (bỏ trống `confirm_apply`) CHỈ ĐỌC — không đổi gì.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_apply:
+        description: "Để trống = chỉ xem báo cáo. Gõ đúng APPLY_INTEL_MAINTENANCE để thực thi (ALTER/CREATE INDEX + nối alias)."
+        required: false
+        default: ""
+
+concurrency:
+  group: intel-data-maintenance
+
+jobs:
+  report:
+    runs-on: [self-hosted, oracle, intelligence]
+    steps:
+      - name: Backlog hàng chờ (alias + review)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo docker exec msbradar-hub python manage.py shell -c '
+          import json
+          from intel.models import CanonicalAlias, ReviewItem
+          from django.db.models import Count
+          print(json.dumps({
+              "proposed_aliases_total": CanonicalAlias.objects.filter(
+                  status=CanonicalAlias.STATUS_PROPOSED).count(),
+              "proposed_aliases_by_namespace": dict(
+                  CanonicalAlias.objects.filter(status=CanonicalAlias.STATUS_PROPOSED)
+                  .values_list("namespace__key").annotate(n=Count("id"))),
+              "open_review_items_by_reason": dict(
+                  ReviewItem.objects.filter(status=ReviewItem.STATUS_OPEN)
+                  .values_list("reason").annotate(n=Count("id"))),
+          }, sort_keys=True))
+          '
+      - name: Mô phỏng auto_resolve_aliases (dry-run, không ghi gì)
+        shell: bash
+        run: sudo docker exec msbradar-hub python manage.py auto_resolve_aliases --json
+      - name: Tình trạng chỉ mục vector (chỉ xem, không đổi)
+        shell: bash
+        run: sudo docker exec msbradar-hub python manage.py pin_vector_dimensions
+      - name: Đối soát dữ liệu Product Core ↔ RAG index
+        shell: bash
+        run: sudo docker exec msbradar-hub python manage.py audit_intelligence_data --json
+
+  apply:
+    if: ${{ inputs.confirm_apply == 'APPLY_INTEL_MAINTENANCE' }}
+    needs: report
+    runs-on: [self-hosted, oracle, intelligence]
+    steps:
+      - name: Dọn nốt backlog alias hiện có (nối vào entry đã có, không tạo entry mới)
+        shell: bash
+        run: sudo docker exec msbradar-hub python manage.py auto_resolve_aliases --apply --json
+      - name: Chốt chiều vector + tạo chỉ mục HNSW (idempotent — CREATE INDEX IF NOT EXISTS)
+        shell: bash
+        run: sudo docker exec msbradar-hub python manage.py pin_vector_dimensions --apply
+      - name: Xác nhận lại sau khi áp dụng
+        shell: bash
+        run: |
+          sudo docker exec msbradar-hub python manage.py pin_vector_dimensions
+          sudo docker exec msbradar-hub python manage.py shell -c '
+          import json
+          from intel.models import CanonicalAlias
+          print(json.dumps({"proposed_aliases_remaining":
+              CanonicalAlias.objects.filter(status=CanonicalAlias.STATUS_PROPOSED).count()}))
+          '

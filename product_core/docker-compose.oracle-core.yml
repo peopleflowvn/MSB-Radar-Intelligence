@@ -217,6 +217,35 @@ services:
     healthcheck:
       disable: true
 
+  # Tự động nối alias 'proposed' (intel/aliasing.py) vào canonical entry ĐÃ CÓ
+  # khi độ khớp đủ cao — thay việc duyệt tay từng alias khi hàng chờ hàng
+  # nghìn dòng. KHÔNG BAO GIỜ tạo entry mới (nguyên tắc bất di bất dịch ở
+  # intel/registry.py); alias không đủ tin cậy vẫn nằm nguyên ở
+  # /intel/aliases/ cho người quản trị. Cùng image với hub, không cần R2/AI
+  # provider vì so khớp là thuật toán tất định (difflib + so từ), không gọi
+  # model.
+  alias-resolver:
+    build:
+      context: ./server
+    container_name: msbradar-alias-resolver
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      hub:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: ${SECRET_KEY:?can dat SECRET_KEY trong .env}
+      DATABASE_URL: postgres://${POSTGRES_USER:-msbradar}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-msbradar}
+    command: ["python", "manage.py", "auto_resolve_aliases", "--apply", "--loop",
+             "--sleep", "${ALIAS_AUTO_RESOLVE_SLEEP:-300}",
+             "--threshold", "${ALIAS_AUTO_RESOLVE_THRESHOLD:-0.90}"]
+    healthcheck:
+      disable: true
+
   web:
     image: caddy:2-alpine
     container_name: msbradar-web

@@ -151,9 +151,9 @@ jobs:
           fi
           cd "${release}/product_core"
           if [ "${build_product_core}" = 1 ]; then
-            sudo docker compose -p msbradar -f docker-compose.oracle-core.yml build hub extraction-worker embedding-worker
+            sudo docker compose -p msbradar -f docker-compose.oracle-core.yml build hub extraction-worker embedding-worker alias-resolver
           fi
-          sudo docker compose -p msbradar -f docker-compose.oracle-core.yml up -d db hub extraction-worker embedding-worker web
+          sudo docker compose -p msbradar -f docker-compose.oracle-core.yml up -d db hub extraction-worker embedding-worker alias-resolver web
           cd "${release}"
           if [ -n "${reuse_intelligence_parent}" ]; then
             sudo docker tag "msb-radar-intelligence:${reuse_intelligence_parent}" "msb-radar-intelligence:${RELEASE_SHA}"
