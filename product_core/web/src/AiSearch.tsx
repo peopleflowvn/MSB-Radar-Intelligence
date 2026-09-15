@@ -556,38 +556,27 @@ export default function AiSearch() {
                   </div>
 
                   <div className={`chat-bubble ${msg.sender}`}>
-                    {/* "Đã nhận yêu cầu — đây là cách mình định làm." Ra ngay
-                        sau khi hiểu câu hỏi; giữ ở trên trong lúc các bước chạy
-                        và câu trả lời thật chảy xuống dưới. */}
+                    {/* "Đã nhận yêu cầu — đây là cách mình định làm." */}
                     {msg.sender === "ai" && msg.answer?.preamble ? (
-                      <div className="radar-preamble">{msg.answer.preamble}</div>
-                    ) : null}
-
-                    {/* Danh sách BƯỚC tick dần — người dùng nói cần thấy đang
-                        làm gì, không cần đổ token suy nghĩ ra. Hiện khi chưa có
-                        chữ; khi chữ bắt đầu chảy thì thu lại thành một dòng gọn. */}
-                    {msg.sender === "ai" && (msg.answer?.steps?.length ?? 0) > 0 &&
-                     (msg.isPending || !msg.text) ? (
-                      <StepTimeline steps={msg.answer!.steps!} compact={!!msg.text} />
-                    ) : null}
-
-                    {msg.sender === "ai" && msg.isPending ? (
-                      <div className="radar-chat-pending-row">
-                        <div className="copilot-typing-indicator">
-                          <span className="dot" />
-                          <span className="dot" />
-                          <span className="dot" />
+                      <div className="radar-preamble">
+                        <div className="radar-preamble-header">
+                          <span className="radar-preamble-icon">🎯</span>
+                          <span className="radar-preamble-title">Kế hoạch tìm kiếm &amp; xử lý</span>
                         </div>
-                        <span className="radar-chat-pending-label">
-                          {msg.answer?.stage || "Radar đang suy nghĩ..."}
-                        </span>
-                        <span className="radar-chat-pending-time" aria-live="polite">
-                          {Math.max(0, Math.floor((now - (msg.startedAt ?? now)) / 1000))} giây
-                        </span>
-                        <span className="radar-chat-pending-hint">
-                          {waitingHint(Math.max(0, Math.floor((now - (msg.startedAt ?? now)) / 1000)))}
-                        </span>
+                        <div className="radar-preamble-text">{msg.answer.preamble}</div>
                       </div>
+                    ) : null}
+
+                    {/* Khối Tiến trình & Các bước thực thi hợp nhất (không lặp lại) */}
+                    {msg.sender === "ai" && (msg.isPending || (msg.answer?.steps?.length ?? 0) > 0) ? (
+                      <StepTimeline
+                        steps={msg.answer?.steps}
+                        stage={msg.answer?.stage}
+                        elapsedSeconds={Math.max(0, Math.floor((now - (msg.startedAt ?? now)) / 1000))}
+                        hint={waitingHint(Math.max(0, Math.floor((now - (msg.startedAt ?? now)) / 1000)))}
+                        isPending={msg.isPending}
+                        compact={!!msg.text}
+                      />
                     ) : null}
 
                     {msg.sender === "ai" && msg.answer ? (

@@ -7,7 +7,7 @@ kết luận; stream chịu được ngắt kết nối.
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.test import TestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 
 from core.asgi_stream import drain_to_bytes
 
@@ -179,7 +179,12 @@ class FakeStreamAdapter:
             raw={"reasoning": "phân tích "})}
 
 
-class AssistantStreamEndpointTest(TestCase):
+class AssistantStreamEndpointTest(TransactionTestCase):
+    """`TransactionTestCase`: đường stream thật (`to_async_iter`,
+    core/asgi_stream.py) chạy generator gốc trên một luồng nền riêng —
+    `TestCase` bọc mỗi test trong một transaction ở luồng chính, luồng nền
+    ghi CSDL (persist) giữa lúc đó sẽ đụng transaction đó."""
+
     URL = "/api/v1/ai/assistant/stream/"
 
     def setUp(self):

@@ -4,7 +4,7 @@ import json
 from unittest import mock
 
 from django.contrib.auth.models import Group, User
-from django.test import TestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
 from core.asgi_stream import drain_to_bytes
@@ -140,7 +140,12 @@ def _people_plan():
 
 
 @override_settings(ASSISTANT_INTENT_ROUTER=False)
-class StreamIntegrationTest(TestCase):
+class StreamIntegrationTest(TransactionTestCase):
+    """`TransactionTestCase`: đường stream thật (`to_async_iter`,
+    core/asgi_stream.py) chạy generator gốc trên một luồng nền riêng —
+    `TestCase` bọc mỗi test trong một transaction ở luồng chính, luồng nền
+    ghi CSDL (persist) giữa lúc đó sẽ đụng transaction đó."""
+
     URL = "/api/v1/ai/assistant/stream/"
 
     def setUp(self):

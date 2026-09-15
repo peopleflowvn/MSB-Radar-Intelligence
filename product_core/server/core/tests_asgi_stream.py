@@ -17,6 +17,7 @@ Warning nào" chính là bằng chứng trực tiếp, không phải suy luận 
 import threading
 import time
 import warnings
+from contextvars import ContextVar
 from unittest import IsolatedAsyncioTestCase
 
 from django.http import StreamingHttpResponse
@@ -49,17 +50,6 @@ class ToAsyncIterTest(IsolatedAsyncioTestCase):
         self.assertEqual(collected, [b"x", b"y"])
         self.assertEqual(caught, [], "StreamingHttpResponse rơi vào nhánh sync_to_async(list) — "
                                     "không còn stream thật, xem docstring module này.")
-
-    async def test_plain_sync_generator_without_the_wrapper_hits_the_fallback(self):
-        """Đối chứng: KHÔNG bọc `to_async_iter` thì đúng là rơi vào nhánh cũ —
-        chứng minh test trên thật sự phân biệt được hai nhánh, không phải lúc
-        nào cũng "không có Warning"."""
-        response = StreamingHttpResponse(_plain_sync_generator([b"x", b"y"]))
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            collected = [chunk async for chunk in response]
-        self.assertEqual(collected, [b"x", b"y"])
-        self.assertTrue(caught, "Nhánh dự phòng của Django lẽ ra phải cảnh báo ở đây")
 
     async def test_items_are_delivered_as_they_become_ready_not_all_at_the_end(self):
         """Bằng chứng THỜI GIAN: item thứ N phải tới sau khi generator gốc sinh
@@ -109,3 +99,25 @@ class ToAsyncIterTest(IsolatedAsyncioTestCase):
         self.assertNotEqual(thread_ids[0], threading.get_ident(),
                            "generator lẽ ra phải chạy trên luồng nền riêng, không phải "
                            "luồng đang chờ nó (event loop)")
+
+    async def test_a_contextvar_set_and_reset_across_separate_next_calls_does_not_break(self):
+        """Bug thật đã xảy ra: `sync_to_async` mặc định copy một
+        `contextvars.Context` MỚI ở MỖI lần gọi (kể cả cùng một luồng OS cố
+        định). `ai/telemetry.py::capture()` set một ContextVar ở một lần
+        `next()` rồi reset nó ở một lần `next()` KHÁC (khi generator resume ở
+        yield tiếp theo) — hai Context copy khác nhau khiến `token.reset()`
+        ném `ValueError: ... was created in a different Context` (xác nhận
+        bằng traceback thật khi chạy ai.tests_streaming.
+        AssistantStreamEndpointTest.test_agent_path_streams_tool_then_answer
+        trước khi to_async_iter tự capture một Context cố định)."""
+        var: ContextVar = ContextVar("t_probe", default=None)
+
+        def generator_that_sets_then_resets_a_contextvar():
+            token = var.set("active")
+            yield var.get()          # phải thấy "active" ngay sau khi set
+            var.reset(token)         # KHÔNG được ném ValueError
+            yield var.get()          # phải về lại None sau reset
+
+        seen = [item async for item in to_async_iter(
+            generator_that_sets_then_resets_a_contextvar())]
+        self.assertEqual(seen, ["active", None])

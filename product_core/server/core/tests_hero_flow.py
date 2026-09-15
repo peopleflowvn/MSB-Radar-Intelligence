@@ -24,7 +24,7 @@ from ai.providers import Completion
 from core.asgi_stream import drain_to_bytes
 from django.contrib.auth.models import User
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
 from hiring.models import Candidacy, HuntCandidate, HuntRequest
 from people.models import Interaction, Person, Relationship
@@ -69,12 +69,19 @@ def fake_complete(messages, **kwargs):
     return _completion(TIEU_CHI)
 
 
-class HeroFlowTest(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        call_command("seed_demo", quiet=True)
+class HeroFlowTest(TransactionTestCase):
+    """`TransactionTestCase`, không phải `TestCase`: bài này lái qua đúng
+    đường SSE thật (`to_async_iter`, core/asgi_stream.py), và đường đó chạy
+    generator trên một luồng nền riêng (bắt buộc để stream thật qua ASGI).
+    `TestCase` bọc mỗi test trong MỘT transaction trên luồng chính — một luồng
+    khác cố ghi CSDL giữa lúc đó sẽ thấy "database table is locked" (SQLite)
+    hoặc không thấy dữ liệu (Postgres, tuỳ isolation level). Không có
+    `setUpTestData` ở đây vì `TransactionTestCase` không hỗ trợ nó (bù lại,
+    seed chạy lại mỗi test — chấp nhận được, đây vốn đã là bài kiểm tích hợp
+    chậm nhất trong kho)."""
 
     def setUp(self):
+        call_command("seed_demo", quiet=True)
         self.hm = User.objects.get(username="tuyendung")
         self.recruiter = User.objects.get(username="tuyendung")
 

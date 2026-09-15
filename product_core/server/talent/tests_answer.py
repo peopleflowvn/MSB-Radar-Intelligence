@@ -1967,7 +1967,13 @@ class ContactRedactionTest(TestCase):
 
 # ---------------------------------------------------------- POST /ask/
 
-class AskEndpointTest(TestCase):
+class AskEndpointTest(TransactionTestCase):
+    """`TransactionTestCase`: đường `/talent/ask/` stream thật qua
+    `to_async_iter` (core/asgi_stream.py), chạy generator gốc trên một luồng
+    nền riêng. `TestCase` bọc mỗi test trong một transaction ở luồng chính —
+    luồng nền ghi CSDL (persist câu trả lời) giữa lúc đó sẽ đụng transaction
+    đó (SQLite: "database table is locked")."""
+
     URL = "/api/v1/talent/ask/"
 
     def setUp(self):

@@ -21,21 +21,33 @@ trong đúng MỘT đợt tại giây 38 (workflow `diagnose-sse-streaming.yml`)
 
 `thread_sensitive=True` (mặc định của Django/asgiref) sẽ dồn MỌI stream đang
 chạy cùng lúc trong cả tiến trình qua một luồng chờ duy nhất — một người dùng
-hỏi lâu là mọi người khác bị nghẽn theo. Nhưng `thread_sensitive=False` với
-executor mặc định (dùng chung của asyncio) lại đổi luồng thực thi GIỮA CÁC LẦN
-gọi `next()` — bắt được bằng test thật: sinh câu trả lời (`talent/answer/`) đọc
-ghi CSDL giữa các `yield`, và CSDL test SQLite `:memory:` là RIÊNG CHO TỪNG
-LUỒNG — đổi luồng giữa chừng là sinh generator "mất" luôn dữ liệu nó vừa ghi ở
-lần `next()` trước, generator hỏng giữa chừng và cả bộ test sau đó nhiễu chéo
-(một luồng threadpool bị bỏ dở vẫn chạy nền, ghi telemetry vào scope của test
-khác). Test ở `test_dedicated_thread_...` dưới xác nhận CHÍNH XÁC luồng OS
-được giữ nguyên suốt vòng đời một generator.
+hỏi lâu là mọi người khác bị nghẽn theo. `thread_sensitive=False` với executor
+riêng tránh được nghẽn đó, nhưng có HAI cái bẫy khác, cả hai đã bắt được bằng
+test thật (không phải suy luận):
 
-Cách đúng: MỘT executor một-luồng RIÊNG cho từng generator (từng response) —
-luồng cố định suốt vòng đời của nó (an toàn với mọi thứ gắn luồng bên trong),
-nhưng KHÔNG chia sẻ giữa các response khác nhau (không nghẽn nhau).
+1. Không cố định executor ⇒ đổi luồng OS GIỮA CÁC LẦN gọi `next()`. Sinh câu
+   trả lời (`talent/answer/`) đọc/ghi CSDL giữa các `yield`; CSDL test SQLite
+   là chia sẻ nhưng vẫn khoá theo luồng — đổi luồng giữa chừng làm generator
+   vỡ giữa chừng ("database table is locked"). Fix: một `ThreadPoolExecutor`
+   MỘT LUỒNG DUY NHẤT, RIÊNG cho từng generator/response (không chia sẻ giữa
+   các response khác nhau — vậy mới không nghẽn nhau).
+
+2. Fix (1) chưa đủ: `sync_to_async(...).__call__` mặc định COPY một
+   `contextvars.Context` MỚI cho MỖI lần gọi (`contextvars.copy_context()`),
+   dù luồng OS có cố định hay không. `ai/telemetry.py::capture()` làm
+   `token = _active.set(...)` ở một lần gọi `next()`, rồi `token.reset()` ở
+   MỘT LẦN GỌI KHÁC (khi generator resume ở yield tiếp theo) — hai lần gọi đó
+   nếu chạy trên hai Context copy KHÁC NHAU, `reset()` ném thẳng
+   `ValueError: ... was created in a different Context` (contextvars buộc
+   token phải reset đúng Context đã tạo ra nó, không liên quan gì tới luồng
+   OS). Generator vỡ giữa chừng vì lỗi này, và giá trị ContextVar bị "kẹt"
+   trong context cũ còn rò sang cả những lần gọi/test SAU đó không liên quan.
+   Fix: tự capture MỘT `contextvars.Context` khi bắt đầu, rồi truyền `context=`
+   tường minh cho MỌI lần gọi `sync_to_async` của generator này — để chúng
+   cùng chạy (và cùng sửa) một Context duy nhất suốt vòng đời generator.
 """
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 
 from asgiref.sync import sync_to_async
 
@@ -45,10 +57,12 @@ _SENTINEL = object()
 async def to_async_iter(sync_iterable):
     iterator = iter(sync_iterable)
     executor = ThreadPoolExecutor(max_workers=1)
+    context = copy_context()
     try:
         while True:
-            item = await sync_to_async(next, thread_sensitive=False, executor=executor)(
-                iterator, _SENTINEL)
+            item = await sync_to_async(
+                next, thread_sensitive=False, executor=executor, context=context,
+            )(iterator, _SENTINEL)
             if item is _SENTINEL:
                 return
             yield item
