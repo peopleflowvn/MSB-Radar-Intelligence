@@ -8,6 +8,7 @@
 import json
 import threading
 import time
+from types import SimpleNamespace
 from unittest import mock
 
 from django.contrib.auth.models import Group, User
@@ -1225,6 +1226,59 @@ class KnowsItsOwnStoreTest(TestCase):
 
 
 # -------------------------------------------------- cache ②③④ (GĐ D)
+
+class _WantsWeb:
+    """Ý định giả: bộ phân loại nói câu này cần tra web."""
+    is_web = True
+
+
+class InternalKnowledgeBeatsWebTest(TestCase):
+    """Một câu hỏi chính sách công ty có thể hợp lý bị bộ phân loại ý định gắn
+    nhãn "web" (nó không biết gì về kho tri thức nội bộ) — nhưng nếu kho nội
+    bộ có tài liệu liên quan, tài liệu đó phải thắng, không phải Google."""
+
+    class _FakeAdapter:
+        def __init__(self):
+            self.sent = None
+
+        def stream(self, request):
+            self.sent = request.messages
+            yield {"type": "answer", "text": "ok"}
+            yield {"type": "done", "response": None}
+
+    def test_internal_knowledge_skips_web_even_when_intent_says_web(self):
+        adapter = self._FakeAdapter()
+        with mock.patch(
+                "talent.answer.chat.knowledge_sources",
+                return_value=[("Quy trình nghỉ phép", "Nhân viên được nghỉ 12 ngày phép năm.")]), \
+                mock.patch("talent.answer.chat.websearch.enabled", return_value=True), \
+                mock.patch("talent.answer.chat.websearch.web_answer") as web_answer:
+            chunks = list(chat_stage.stream_chat(
+                "quy trình nghỉ phép của công ty là gì",
+                adapter=adapter, intent=_WantsWeb()))
+        web_answer.assert_not_called()
+        self.assertTrue(any(c.get("type") == "done" and c.get("payload", {}).get("mode") == "chat"
+                            for c in chunks))
+        blob = json.dumps(adapter.sent, ensure_ascii=False)
+        self.assertIn("Nhân viên được nghỉ 12 ngày phép năm", blob)
+        self.assertIn("Quy trình nghỉ phép", blob)
+
+    def test_no_internal_knowledge_still_goes_to_web(self):
+        """Chốt lại hành vi cũ: câu hỏi không khớp tài liệu nào vẫn tra web như trước."""
+        adapter = self._FakeAdapter()
+        fake_result = SimpleNamespace(
+            text="Trời nắng.", citations=[{"title": "Báo thời tiết", "url": "https://x"}],
+            provider="tavily", model="", queries=["thời tiết hà nội"])
+        with mock.patch("talent.answer.chat.knowledge_sources", return_value=[]), \
+                mock.patch("talent.answer.chat.websearch.enabled", return_value=True), \
+                mock.patch("talent.answer.chat.websearch.web_answer", return_value=fake_result) as web_answer:
+            chunks = list(chat_stage.stream_chat(
+                "thời tiết hà nội hôm nay", adapter=adapter, intent=_WantsWeb()))
+        web_answer.assert_called_once()
+        self.assertTrue(any(c.get("type") == "done" and c.get("payload", {}).get("mode") == "web"
+                            for c in chunks))
+        self.assertIsNone(adapter.sent)  # không rơi xuống nhánh hội thoại thường
+
 
 class PipelineCacheTest(TestCase):
     """Hỏi lại một câu = ~38.700 token nếu không nhớ gì. ③ chiếm 75% trong đó."""

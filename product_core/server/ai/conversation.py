@@ -158,7 +158,8 @@ def knowledge_sources(question, user, *, limit=None):
         return []
 
 
-def build_conversation_request(question, surface="talent", user=None, projection=None):
+def build_conversation_request(question, surface="talent", user=None, projection=None,
+                               knowledge=None):
     """(ModelRequest, guard_flags) cho một lượt hội thoại thường.
 
     Prompt xếp ba tầng (§15 GĐ1, §23.1.2):
@@ -172,6 +173,10 @@ def build_conversation_request(question, surface="talent", user=None, projection
     Tầng NGUỒN là điểm nối DUY NHẤT của kho tri thức nội bộ vào hội thoại: mọi
     bề mặt (stream_views, answer_if_conversation, agent, talent chat) đều dựng
     prompt qua đây, nên không phải thêm nhánh riêng cho từng bề mặt.
+
+    `knowledge`: kết quả `knowledge_sources()` nếu bên gọi đã tự tra sẵn (ví dụ
+    để quyết định có tra web hay không trước khi tới đây) — tránh tra lại lần
+    hai. Bỏ trống thì hàm tự tra.
     """
     guard_flags = guard_scan(question)
 
@@ -182,7 +187,7 @@ def build_conversation_request(question, surface="talent", user=None, projection
             messages.append(ctx)
         messages.extend(projection.turn_messages())
 
-    sources = knowledge_sources(question, user)
+    sources = knowledge_sources(question, user) if knowledge is None else knowledge
     if sources:
         messages.append({"role": "system", "content": (
             GUARD_RULE + " Khi phần DỮ LIỆU NGUỒN dưới đây trả lời được câu hỏi, "
@@ -267,6 +272,12 @@ def answer_if_conversation(question, surface="talent", history=None, complete_fn
 
     `intent` (ai.intent.IntentResult) nếu có sẽ quyết định thay heuristic; khi
     `intent.kind == "web"` thì tra Google trước, hỏng thì lùi về model thường.
+
+    Tài liệu tri thức nội bộ (nếu có, và user có module `knowledge`) LUÔN được
+    tra trước và thắng nhánh web — kể cả khi `intent.kind == "web"`: bộ phân
+    loại ý định không biết gì về kho tri thức nội bộ, nên một câu hỏi chính
+    sách công ty vẫn có thể bị gắn nhãn "web" một cách hợp lý theo góc nhìn của
+    nó. Xem `talent/answer/chat.py::stream_chat` — cùng nguyên tắc, bề mặt khác.
     """
     fixed = common_answer(question, surface=surface, user=user)
     if fixed:
@@ -280,8 +291,9 @@ def answer_if_conversation(question, surface="talent", history=None, complete_fn
         return ""
 
     model = adapter or (RouterAdapter(complete_fn) if complete_fn else get_adapter())
+    internal_sources = knowledge_sources(question, user)
 
-    if want_web:
+    if want_web and not internal_sources:
         web_reply = _answer_via_web(question, surface, user, projection, adapter=model)
         if web_reply is not None:
             web_reply.intent = intent
@@ -298,7 +310,8 @@ def answer_if_conversation(question, surface="talent", history=None, complete_fn
         return agent_reply
 
     request, guard_flags = build_conversation_request(
-        question, surface=surface, user=user, projection=projection)
+        question, surface=surface, user=user, projection=projection,
+        knowledge=internal_sources)
     try:
         response = model.complete(request)
     except Exception:                          # noqa: BLE001

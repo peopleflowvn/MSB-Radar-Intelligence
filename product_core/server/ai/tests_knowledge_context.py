@@ -4,6 +4,7 @@
 Điểm nối là `build_conversation_request` — chokepoint dùng chung của mọi bề
 mặt hội thoại, nên chỉ cần kiểm ở đây là phủ cả stream lẫn non-stream.
 """
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import Group, User
@@ -12,7 +13,10 @@ from django.test import TestCase, override_settings
 from accounts import roles
 from knowledge.models import KnowledgeDocument
 
-from .conversation import build_conversation_request, knowledge_sources
+from .conversation import (
+    ConversationReply, answer_if_conversation, build_conversation_request, knowledge_sources,
+)
+from .intent import IntentResult, KIND_WEB
 from .prompt_guard import _DELIM_OPEN
 
 
@@ -65,3 +69,60 @@ class KnowledgeContextTest(TestCase):
         with patch("ai.conversation.knowledge_sources", return_value=sources):
             _request, flags = build_conversation_request("quy trinh?", user=self.admin)
         self.assertTrue(flags)
+
+    def test_prefetched_knowledge_is_used_without_refetching(self):
+        sources = [("Quy trinh nghi phep", "12 ngay phep nam")]
+        with patch("ai.conversation.knowledge_sources") as spy:
+            request, _flags = build_conversation_request(
+                "nghi phep?", user=self.admin, knowledge=sources)
+        spy.assert_not_called()
+        blob = "\n".join(str(m.get("content") or "") for m in request.messages)
+        self.assertIn("12 ngay phep nam", blob)
+
+
+class _FakeAdapter:
+    def __init__(self, text="ok"):
+        self.text = text
+        self.calls = 0
+
+    def complete(self, request):
+        self.calls += 1
+        return SimpleNamespace(
+            text=self.text, provider="greennode", model="fast", usage=None)
+
+
+class WebVersusKnowledgePriorityTest(TestCase):
+    """Bộ phân loại ý định không biết gì về kho tri thức nội bộ — một câu hỏi
+    chính sách công ty có thể hợp lý bị nó gắn nhãn "web". Tài liệu nội bộ vẫn
+    phải thắng khi có, xem talent/answer/chat.py cho bề mặt chat chính."""
+
+    def setUp(self):
+        roles.ensure_groups()
+        self.admin = User.objects.create_user("kb-admin2", password="x", is_superuser=True)
+
+    def _web_intent(self):
+        return IntentResult(kind=KIND_WEB, confidence=0.8, reason="test", source="model")
+
+    def test_internal_knowledge_skips_web_even_when_intent_says_web(self):
+        adapter = _FakeAdapter("Theo quy trình, 12 ngày phép năm.")
+        with patch("ai.conversation.knowledge_sources",
+                  return_value=[("Quy trinh nghi phep", "12 ngay phep nam")]), \
+                patch("ai.conversation._answer_via_web") as web_answer:
+            reply = answer_if_conversation(
+                "quy trình nghỉ phép của công ty là gì", user=self.admin,
+                adapter=adapter, intent=self._web_intent())
+        web_answer.assert_not_called()
+        self.assertEqual(adapter.calls, 1)
+        self.assertIn("12 ngày phép năm", str(reply))
+
+    def test_no_internal_knowledge_still_goes_to_web(self):
+        adapter = _FakeAdapter("không nên gọi tới")
+        fake_web_reply = ConversationReply("Trời nắng.", web=True)
+        with patch("ai.conversation.knowledge_sources", return_value=[]), \
+                patch("ai.conversation._answer_via_web", return_value=fake_web_reply) as web_answer:
+            reply = answer_if_conversation(
+                "thời tiết hà nội hôm nay", user=self.admin,
+                adapter=adapter, intent=self._web_intent())
+        web_answer.assert_called_once()
+        self.assertEqual(reply, fake_web_reply)
+        self.assertEqual(adapter.calls, 0)

@@ -21,7 +21,7 @@ import logging
 
 from ai import websearch
 from ai.adapter import ModelError, get_adapter
-from ai.conversation import build_conversation_request, web_system
+from ai.conversation import build_conversation_request, knowledge_sources, web_system
 
 from . import corpus
 
@@ -52,6 +52,10 @@ def _do_web(question, wants_web):
     Nguyên tắc: đã tới nhánh này (không phải câu về kho, không phải câu meta có
     sẵn) thì MẶC ĐỊNH tra web khi web bật — model hội thoại chỉ là lưới đỡ.
     `web_answer` tự chặn câu có PII.
+
+    KHÔNG xét tài liệu tri thức nội bộ ở đây — xem `stream_chat`: nội bộ được
+    tra TRƯỚC và thắng tuyệt đối nếu có, hàm này chỉ quyết định khi nội bộ
+    không có gì.
     """
     if not websearch.enabled():
         return False
@@ -69,6 +73,14 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
     model = adapter or get_adapter()
     projection = getattr(envelope, "projection", None)
 
+    # Tài liệu tri thức nội bộ (chính sách/quy trình công ty) được tra TRƯỚC,
+    # và THẮNG TUYỆT ĐỐI nếu có: nó do chính công ty viết, đáng tin hơn một kết
+    # quả web ngẫu nhiên cho cùng câu hỏi, và né được việc đẩy một câu nghe như
+    # hỏi chuyện nội bộ ra một cỗ máy tìm kiếm công khai. Rẻ cho phần lớn tài
+    # khoản: `knowledge_sources` trả `[]` ngay lập tức, không gọi mạng, nếu
+    # user không có module `knowledge` (accounts/roles.py::MODULE_KNOWLEDGE).
+    internal_sources = knowledge_sources(question, user)
+
     # Cần dữ liệu ngoài kho → tra web. `intent` do người gọi cấp (đã phân
     #    loại rồi thì không phân loại lại); không có thì tự hỏi.
     wants_web = getattr(intent, "is_web", None)
@@ -80,7 +92,7 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
         except Exception:                          # noqa: BLE001
             wants_web = False
 
-    if _do_web(question, wants_web):
+    if not internal_sources and _do_web(question, wants_web):
         yield {"type": "stage", "stage": "web", "text": "Đang tra trên internet"}
         try:
             result = websearch.web_answer(
@@ -102,7 +114,8 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
     # 3. Hội thoại thường — persona + quyền + memory, model hội thoại.
     yield {"type": "stage", "stage": "chat", "text": "Đang trả lời"}
     request, guard_flags = build_conversation_request(
-        question, surface="talent", user=user, projection=projection)
+        question, surface="talent", user=user, projection=projection,
+        knowledge=internal_sources)
 
     # Bơm SỐ LIỆU THẬT về kho vào prompt khi câu hỏi có dính tới dữ liệu.
     #

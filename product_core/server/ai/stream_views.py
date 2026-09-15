@@ -23,7 +23,7 @@ from . import (agent_select, conversation_state, events,
 from . import telemetry
 from .adapter import ModelError, get_adapter
 from .conversation import (ConversationReply, web_system, build_conversation_request,
-                           common_answer, sanitize_history)
+                           common_answer, knowledge_sources, sanitize_history)
 
 log = logging.getLogger(__name__)
 
@@ -78,7 +78,12 @@ def assistant_stream(request):
 
     user = request.user
     adapter = get_adapter()
-    do_web = not fixed and intent.is_web and websearch.enabled()
+    # Tài liệu tri thức nội bộ thắng tuyệt đối nhánh web nếu có — cùng nguyên
+    # tắc với talent/answer/chat.py::stream_chat: bộ phân loại ý định không
+    # biết gì về kho tri thức nội bộ nên có thể gắn nhãn "web" cho một câu hỏi
+    # chính sách công ty một cách hợp lý theo góc nhìn của nó.
+    internal_sources = knowledge_sources(question, user)
+    do_web = not fixed and intent.is_web and websearch.enabled() and not internal_sources
 
     # Hỏi đáp có dẫn chứng trên kho CV → Answer Engine.
     #
@@ -221,7 +226,8 @@ def assistant_stream(request):
                     yield _sse("error", {"text": f"Không tra được web: {exc}"})
             else:
                 request_obj, guard_flags = build_conversation_request(
-                    question, surface=surface, user=user, projection=context)
+                    question, surface=surface, user=user, projection=context,
+                    knowledge=internal_sources)
                 if guard_flags:
                     yield _sse("guard", {"flags": guard_flags})
                 for chunk in adapter.stream(request_obj):
