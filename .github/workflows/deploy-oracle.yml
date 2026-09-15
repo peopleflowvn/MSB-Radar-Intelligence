@@ -12,8 +12,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Chỉ đọc/kiểm tra (test, typecheck, build, audit) — không đụng docker/production
+  # nên không cần chạy trên chính con VPS Oracle (runner tự-host duy nhất, dùng
+  # chung CPU với production). Tách sang GitHub-hosted để không chiếm runner tự
+  # host và chạy nhanh hơn hẳn; `deploy-production` bên dưới vẫn PHẢI self-hosted
+  # vì nó gọi thẳng `docker compose` vào container đang sống trên máy đó.
   validate:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
