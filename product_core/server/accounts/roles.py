@@ -42,6 +42,7 @@ MODULE_INTAKE = "people_intake"
 MODULE_AI_SETTINGS = "ai_settings"
 MODULE_REPORTS = "reports"
 MODULE_ADMIN = "admin_console"
+MODULE_KNOWLEDGE = "knowledge"
 
 MODULE_LABELS = {
     MODULE_TALENT: "Talent Radar",
@@ -52,6 +53,7 @@ MODULE_LABELS = {
     MODULE_AI_SETTINGS: "Cài đặt AI",
     MODULE_REPORTS: "Vận hành & Báo cáo",
     MODULE_ADMIN: "Quản trị hệ thống",
+    MODULE_KNOWLEDGE: "Tri thức nội bộ",
 }
 ALL_MODULES = tuple(MODULE_LABELS)
 
@@ -76,9 +78,15 @@ LOCKED_GRANTS = frozenset({(ADMIN, MODULE_ADMIN)})
 # `people_intake` mặc định chỉ cấp cho Admin và Vận hành Edge — giữ đúng hành vi
 # trước khi có tính năng. Muốn cho Recruiter/Manager nhập liệu thì Admin tự bật
 # trong trang Quản trị → Phân quyền Module theo Vai trò.
+#
+# `knowledge` (tài liệu tri thức nội bộ — quy trình/quyết định/hướng dẫn) theo
+# đúng khuôn đó: mặc định chỉ Admin, vì tài liệu loại này thường có nội dung
+# nhạy cảm (lương thưởng, quyết định nhân sự...) mà một module mới không nên
+# tự ý mở rộng phạm vi người xem. Cấp thêm cho Manager/Recruiter/... qua trang
+# Quản trị → Phân quyền Module theo Vai trò, không cần sửa code.
 ROLE_MODULES = {
     ADMIN: {MODULE_TALENT, MODULE_RB, MODULE_SOCIAL, MODULE_EDGE, MODULE_INTAKE,
-           MODULE_AI_SETTINGS, MODULE_REPORTS, MODULE_ADMIN},
+           MODULE_AI_SETTINGS, MODULE_REPORTS, MODULE_ADMIN, MODULE_KNOWLEDGE},
     EDGE_OPERATOR: {MODULE_EDGE, MODULE_INTAKE},
     RECRUITER: {MODULE_TALENT, MODULE_SOCIAL},
     HIRING_MANAGER: {MODULE_TALENT},

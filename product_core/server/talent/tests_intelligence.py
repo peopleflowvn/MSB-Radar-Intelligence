@@ -8,6 +8,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounts import roles
+from knowledge.models import KnowledgeDocument
 from people.models import Document, Person
 
 from .intelligence_views import issue_scope_token
@@ -191,3 +192,122 @@ class IntelligenceBridgeTest(TestCase):
             reverse("intelligence-evidence-document", args=[self.document.pk]),
             **self.service_headers, HTTP_X_RADAR_SCOPE_TOKEN=token)
         self.assertEqual(response.status_code, 404)
+
+
+@override_settings(
+    INTELLIGENCE_SERVICE_TOKEN="service-secret",
+    INTELLIGENCE_INDEX_SCOPE_TOKEN="index-secret",
+    INTELLIGENCE_SCOPE_MAX_AGE_SECONDS=300,
+)
+class KnowledgeIntelligenceBridgeTest(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user("admin1", password="secret", is_superuser=True)
+        self.recruiter = User.objects.create_user("recruiter2", password="secret")
+        Group.objects.get_or_create(name=roles.RECRUITER)[0].user_set.add(self.recruiter)
+        self.doc = KnowledgeDocument.objects.create(
+            title="Quy trinh nghi phep", category=KnowledgeDocument.CATEGORY_HR_POLICY,
+            parsed_text="Nhan vien duoc nghi 12 ngay phep nam.")
+
+    @property
+    def service_headers(self):
+        return {"HTTP_AUTHORIZATION": "Bearer service-secret"}
+
+    def test_knowledge_feed_requires_both_private_tokens(self):
+        url = reverse("intelligence-knowledge-feed")
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertEqual(self.client.get(url, **self.service_headers).status_code, 404)
+
+    def test_knowledge_feed_emits_negative_ids(self):
+        response = self.client.get(
+            reverse("intelligence-knowledge-feed"), **self.service_headers,
+            HTTP_X_RADAR_SCOPE_TOKEN="index-secret")
+        self.assertEqual(response.status_code, 200)
+        event = response.json()["events"][0]
+        self.assertEqual(event["operation"], "upsert")
+        self.assertEqual(event["person_id"], str(-self.doc.pk))
+        self.assertEqual(event["document_id"], str(-self.doc.pk))
+        self.assertEqual(event["source"], "hr_policy")
+        self.assertTrue(event["text"])
+
+    def test_deactivating_emits_delete_and_reactivating_emits_upsert(self):
+        url = reverse("intelligence-knowledge-feed")
+        initial = self.client.get(
+            url, **self.service_headers, HTTP_X_RADAR_SCOPE_TOKEN="index-secret").json()
+        self.doc.is_active = False
+        self.doc.save(update_fields=["is_active", "updated_at"])
+        after_deactivate = self.client.get(
+            url, {"cursor": initial["next_cursor"]}, **self.service_headers,
+            HTTP_X_RADAR_SCOPE_TOKEN="index-secret").json()
+        self.assertEqual(after_deactivate["events"][0]["operation"], "delete")
+        self.assertIsNone(after_deactivate["events"][0]["text"])
+
+        self.doc.is_active = True
+        self.doc.save(update_fields=["is_active", "updated_at"])
+        after_reactivate = self.client.get(
+            url, {"cursor": after_deactivate["next_cursor"]}, **self.service_headers,
+            HTTP_X_RADAR_SCOPE_TOKEN="index-secret").json()
+        self.assertEqual(after_reactivate["events"][0]["operation"], "upsert")
+
+    def test_repeated_edits_in_the_same_clock_tick_are_all_emitted(self):
+        """Con trỏ theo thời gian sẽ bỏ sót trường hợp này; outbox thì không."""
+        url = reverse("intelligence-knowledge-feed")
+        initial = self.client.get(
+            url, **self.service_headers, HTTP_X_RADAR_SCOPE_TOKEN="index-secret").json()
+        # Hai lần sửa liên tiếp, gần như chắc chắn rơi vào cùng một tick đồng hồ.
+        self.doc.is_active = False
+        self.doc.save(update_fields=["is_active", "updated_at"])
+        self.doc.is_active = True
+        self.doc.save(update_fields=["is_active", "updated_at"])
+
+        rest = self.client.get(
+            url, {"cursor": initial["next_cursor"]}, **self.service_headers,
+            HTTP_X_RADAR_SCOPE_TOKEN="index-secret").json()
+        self.assertEqual([event["operation"] for event in rest["events"]],
+                         ["delete", "upsert"])
+
+    def test_hard_delete_still_emits_a_delete_event(self):
+        url = reverse("intelligence-knowledge-feed")
+        initial = self.client.get(
+            url, **self.service_headers, HTTP_X_RADAR_SCOPE_TOKEN="index-secret").json()
+        document_id = initial["events"][0]["document_id"]
+        self.doc.delete()
+
+        after = self.client.get(
+            url, {"cursor": initial["next_cursor"]}, **self.service_headers,
+            HTTP_X_RADAR_SCOPE_TOKEN="index-secret").json()
+        event = after["events"][0]
+        self.assertEqual(event["operation"], "delete")
+        self.assertEqual(event["document_id"], document_id)
+        self.assertIsNone(event["text"])
+
+    def test_evidence_document_requires_knowledge_module_not_talent(self):
+        # Recruiter has MODULE_TALENT but not MODULE_KNOWLEDGE by default.
+        response = self.client.get(
+            reverse("intelligence-evidence-document", args=[-self.doc.pk]),
+            **self.service_headers, HTTP_X_RADAR_SCOPE_TOKEN=issue_scope_token(self.recruiter))
+        self.assertEqual(response.status_code, 404)
+
+        response = self.client.get(
+            reverse("intelligence-evidence-document", args=[-self.doc.pk]),
+            **self.service_headers, HTTP_X_RADAR_SCOPE_TOKEN=issue_scope_token(self.admin))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["person_id"], str(-self.doc.pk))
+
+    def test_evidence_document_hides_inactive_knowledge_documents(self):
+        self.doc.is_active = False
+        self.doc.save(update_fields=["is_active"])
+        response = self.client.get(
+            reverse("intelligence-evidence-document", args=[-self.doc.pk]),
+            **self.service_headers, HTTP_X_RADAR_SCOPE_TOKEN=issue_scope_token(self.admin))
+        self.assertEqual(response.status_code, 404)
+
+    def test_candidate_and_knowledge_ids_never_collide(self):
+        person = Person.objects.create(display_name="Ai do", is_applicant=True)
+        document = Document.objects.create(
+            person=person, document_type="cv", source="topcv", sha256="c" * 64,
+            parsed_text="CV text", text_length=7, parse_status=Document.PARSE_DONE)
+        self.assertNotEqual(str(document.pk), str(-self.doc.pk))
+        response_candidate = self.client.get(
+            reverse("intelligence-evidence-document", args=[document.pk]),
+            **self.service_headers, HTTP_X_RADAR_SCOPE_TOKEN=issue_scope_token(self.admin))
+        self.assertEqual(response_candidate.json()["person_id"], str(person.pk))

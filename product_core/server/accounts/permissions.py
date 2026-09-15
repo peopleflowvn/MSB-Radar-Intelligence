@@ -43,6 +43,7 @@ RequiresPeopleIntake = for_module(roles.MODULE_INTAKE)
 RequiresAiSettings = for_module(roles.MODULE_AI_SETTINGS)
 RequiresReports = for_module(roles.MODULE_REPORTS)
 RequiresAdmin = for_module(roles.MODULE_ADMIN)
+RequiresKnowledge = for_module(roles.MODULE_KNOWLEDGE)
 
 
 class RequiresRecruiting(permissions.BasePermission):

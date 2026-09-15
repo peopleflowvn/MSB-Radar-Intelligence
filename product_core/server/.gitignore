@@ -1,0 +1,9 @@
+# Local Django dev/test artifacts (created by manage.py migrate/test/runserver
+# against the default sqlite/local-storage settings) — never real content.
+__pycache__/
+*.py[cod]
+.venv*/
+*.sqlite3
+/filestore/
+/var/
+/staticfiles/

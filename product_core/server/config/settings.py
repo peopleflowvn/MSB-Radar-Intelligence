@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "people",
     "ai",
     "intel",
+    "knowledge",
     "talent",
     "intake",
     "hiring",
@@ -267,6 +268,12 @@ ASSISTANT_WEB_SEARCH = env.bool("ASSISTANT_WEB_SEARCH", default=False)
 # Thứ tự thử backend web (phân tách bằng dấu phẩy). Rỗng → tavily,brave,
 # google_cse,gemini_grounding. Đặt tên backend không hợp lệ sẽ bị bỏ qua.
 ASSISTANT_WEBSEARCH_BACKENDS = env.str("ASSISTANT_WEBSEARCH_BACKENDS", default="")
+# Tri thức nội bộ: chèn trích đoạn tài liệu nội bộ (knowledge/models.py) liên
+# quan vào prompt hội thoại, để Radar trả lời quy trình/chính sách công ty theo
+# ĐÚNG tài liệu thay vì theo kiến thức chung của model. Chỉ chạy cho người có
+# module `knowledge` và chỉ tìm trong tài liệu nội bộ (không kéo CV vào ngữ
+# cảnh). Bật sẵn vì không có tài liệu nào thì nó tự là no-op.
+ASSISTANT_KNOWLEDGE_CONTEXT = env.bool("ASSISTANT_KNOWLEDGE_CONTEXT", default=True)
 
 # Tool-calling (kỹ năng): cho phép model tự gọi tool server-owned trong lượt hội
 # thoại (ai/toolset.py + ai/tool_handlers.py). Tool đều chỉ-đọc / chỉ-đề-xuất,

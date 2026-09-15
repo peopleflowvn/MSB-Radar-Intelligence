@@ -10,13 +10,13 @@ import unicodedata
 
 from .adapter import ModelRequest, RouterAdapter, get_adapter
 from .persona import STABLE_PROMPT_VERSION, address_for, scope_for, stable_system
-from .prompt_guard import scan as guard_scan
+from .prompt_guard import GUARD_RULE, scan as guard_scan, wrap_source
 
 MAX_HISTORY_TURNS = 16
 
 __all__ = ["address_for", "common_answer", "extract_thinking",
            "answer_if_conversation", "sanitize_history", "ConversationReply",
-           "is_conversational", "build_conversation_request"]
+           "is_conversational", "build_conversation_request", "knowledge_sources"]
 
 
 class ConversationReply(str):
@@ -133,6 +133,31 @@ def is_conversational(question, history=None):
     return looks_conversational and not any(word in text for word in _SEARCH_WORDS)
 
 
+def knowledge_sources(question, user, *, limit=None):
+    """[(nhãn, trích đoạn)] tài liệu tri thức nội bộ liên quan tới câu hỏi.
+
+    Rỗng khi: tính năng tắt, người dùng không có module `knowledge`, chưa có
+    tài liệu nào, hoặc Intelligence không trả lời kịp. Đây là phần LÀM GIÀU
+    ngữ cảnh — hỏng thì lượt hội thoại vẫn phải chạy như trước, không được ném
+    lỗi ra ngoài.
+    """
+    from django.conf import settings
+
+    if not getattr(settings, "ASSISTANT_KNOWLEDGE_CONTEXT", True):
+        return []
+    if user is None or not getattr(user, "is_authenticated", False):
+        return []
+    try:
+        from talent.intelligence_client import KNOWLEDGE_CONTEXT_LIMIT, knowledge_search
+
+        return knowledge_search(user, question, limit=limit or KNOWLEDGE_CONTEXT_LIMIT)
+    except Exception:                          # noqa: BLE001 - không được làm hỏng lượt
+        import logging
+
+        logging.getLogger(__name__).info("knowledge context unavailable", exc_info=True)
+        return []
+
+
 def build_conversation_request(question, surface="talent", user=None, projection=None):
     """(ModelRequest, guard_flags) cho một lượt hội thoại thường.
 
@@ -140,8 +165,13 @@ def build_conversation_request(question, surface="talent", user=None, projection
 
         [system] STABLE   — persona + safety + xưng hô + scope (không đổi giữa lượt)
         [system] CONTEXT  — quyền + memory đã duyệt + summary (từ projection)
+        [user]  NGUỒN     — tài liệu nội bộ liên quan (nếu có), đã bọc prompt_guard
         [user/assistant]  — các lượt gần nhất
         [user]  VOLATILE  — câu hỏi hiện tại
+
+    Tầng NGUỒN là điểm nối DUY NHẤT của kho tri thức nội bộ vào hội thoại: mọi
+    bề mặt (stream_views, answer_if_conversation, agent, talent chat) đều dựng
+    prompt qua đây, nên không phải thêm nhánh riêng cho từng bề mặt.
     """
     guard_flags = guard_scan(question)
 
@@ -151,6 +181,19 @@ def build_conversation_request(question, surface="talent", user=None, projection
         if ctx:
             messages.append(ctx)
         messages.extend(projection.turn_messages())
+
+    sources = knowledge_sources(question, user)
+    if sources:
+        messages.append({"role": "system", "content": (
+            GUARD_RULE + " Khi phần DỮ LIỆU NGUỒN dưới đây trả lời được câu hỏi, "
+            "hãy dựa vào đó và nói rõ tên tài liệu; nếu không liên quan thì bỏ qua "
+            "và trả lời như bình thường.")})
+        for label, text in sources:
+            wrapped = wrap_source(text, label)
+            if wrapped:
+                guard_flags = sorted(set(guard_flags) | set(guard_scan(text)))
+                messages.append({"role": "user", "content": wrapped})
+
     messages.append({"role": "user", "content": str(question)[:1000]})
 
     request = ModelRequest(

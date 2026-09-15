@@ -16,7 +16,12 @@ urlpatterns = [
          name="intelligence-scope-validate"),
     path("intelligence/document-feed/", intelligence_views.document_feed,
          name="intelligence-document-feed"),
-    path("intelligence/evidence/documents/<int:document_id>/",
+    path("intelligence/knowledge-feed/", intelligence_views.knowledge_feed,
+         name="intelligence-knowledge-feed"),
+    # <str:> not <int:>: a knowledge document's id is negative (see
+    # knowledge/models.py::radar_entity_id) and Django's `int` converter regex
+    # ([0-9]+) rejects a leading '-'. The view parses and validates the sign itself.
+    path("intelligence/evidence/documents/<str:document_id>/",
          intelligence_views.evidence_document, name="intelligence-evidence-document"),
     path("search/", views.talent_search, name="talent-search"),
     path("recently-viewed/", views.recently_viewed, name="talent-recently-viewed"),

@@ -31,6 +31,7 @@ urlpatterns = [
     path("api/v1/", include("core.urls")),
     path("api/v1/ai/", include("ai.urls")),
     path("api/v1/intel/", include("intel.urls")),
+    path("api/v1/knowledge/", include("knowledge.urls")),
     path("api/v1/talent/", include("talent.urls")),
     path("api/v1/intake/", include("intake.urls")),
     path("api/v1/hiring/", include("hiring.urls")),

@@ -14,6 +14,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from people.models import Document
+from knowledge.models import KnowledgeDocument, KnowledgeFeedEvent
 from accounts import roles
 
 from .corpus_qa import can_read_cv
@@ -87,6 +88,61 @@ def _document_payload(document):
         "updated_at": document.updated_at.isoformat(),
         "document_date": document.observed_at.isoformat() if document.observed_at else None,
         "application_id": str(source_record.pk) if source_record else None,
+    }
+
+
+def _knowledge_identity(document):
+    """4 trường định danh mà Intelligence dùng để xác minh một trích dẫn.
+
+    Phải khớp từng chữ với phần tương ứng trong `_knowledge_payload`, nếu không
+    `resolve_citations` sẽ coi mọi trích dẫn tài liệu nội bộ là "stale". Vì thế
+    cả hai cùng gọi hàm này thay vì mỗi nơi tự tính.
+    """
+    text = document.best_text if document.is_active else ""
+    content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    entity_id = str(document.radar_entity_id)
+    return {"document_id": entity_id, "person_id": entity_id,
+            "version": content_hash, "content_hash": content_hash}
+
+
+def _knowledge_payload(event):
+    """DocumentChange-shaped event built from a `KnowledgeFeedEvent` outbox row.
+
+    Uses `radar_entity_id` (a negative integer, as a string) for BOTH person_id
+    and document_id: each knowledge document is its own "person" on the
+    Intelligence side, never mixed with a real `people.Person`.
+
+    The payload is derived from the document's CURRENT state, not a snapshot:
+    two events for the same state therefore produce the same `event_id`, which
+    the indexer already treats as a cheap duplicate. A hard-deleted document
+    (`event.document is None`) still emits a delete, which is the reason the
+    outbox exists at all.
+    """
+    document = event.document
+    text = document.best_text if (document and document.is_active) else ""
+    upsert = bool(text) and event.operation == "upsert"
+    entity_id = str(-event.document_pk)
+    identity = _knowledge_identity(document) if document else {
+        "document_id": entity_id, "person_id": entity_id,
+        "version": hashlib.sha256(b"").hexdigest(),
+        "content_hash": hashlib.sha256(b"").hexdigest()}
+    updated_at = document.updated_at if document else event.created_at
+    event_identity = ":".join((
+        "knowledge", str(event.document_pk), str(upsert), updated_at.isoformat(),
+        identity["content_hash"],
+    ))
+    event_id = hashlib.sha256(event_identity.encode("utf-8")).hexdigest()
+    return {
+        "event_id": f"knowledge:{event.document_pk}:{event_id}",
+        "operation": "upsert" if upsert else "delete",
+        **identity,
+        "source_record_id": None,
+        "source": document.category if document else "internal_kb",
+        "document_type": "internal_knowledge",
+        "text": text if upsert else None,
+        "updated_at": updated_at.isoformat(),
+        "document_date": document.created_at.isoformat() if document else None,
+        "application_id": None,
     }
 
 
@@ -204,15 +260,78 @@ def document_feed(request):
 
 
 @require_GET
+def knowledge_feed(request):
+    """Independent feed for `knowledge.models.KnowledgeDocument` — same shape and
+    auth as `document_feed`, but its own stream/cursor so it can be polled on
+    its own schedule without the candidate-CV feed's tombstone-merge complexity
+    (a knowledge document reports its own deactivation as a delete event; see
+    `_knowledge_payload`)."""
+    if not _service_authorized(request) or not _secret_matches(
+            request, "X-Radar-Scope-Token", settings.INTELLIGENCE_INDEX_SCOPE_TOKEN):
+        return _deny()
+    try:
+        limit = int(request.GET.get("limit", "100"))
+        if not 1 <= limit <= _MAX_PAGE_SIZE:
+            raise ValueError
+    except ValueError:
+        return JsonResponse({"detail": "Invalid limit."}, status=400)
+
+    # Con trỏ là khoá tự tăng của outbox — tăng nghiêm ngặt, nên không có khe
+    # hở "sửa lại trong cùng một tick đồng hồ" như con trỏ theo thời gian.
+    events = KnowledgeFeedEvent.objects.select_related("document").order_by("pk")
+    cursor = request.GET.get("cursor")
+    if cursor:
+        try:
+            last_event_pk = int(cursor)
+        except (TypeError, ValueError):
+            return JsonResponse({"detail": "Invalid cursor."}, status=400)
+        events = events.filter(pk__gt=last_event_pk)
+
+    rows = list(events[:limit + 1])
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_cursor = str(rows[-1].pk) if rows else cursor
+    return JsonResponse({
+        "events": [_knowledge_payload(row) for row in rows],
+        "next_cursor": next_cursor,
+        "has_more": has_more,
+    })
+
+
+@require_GET
 def evidence_document(request, document_id):
+    """`document_id` is a plain integer string. Negative = a KnowledgeDocument's
+    `radar_entity_id`, positive = a real `people.Document` pk — the two spaces
+    never collide because Django pks are always positive. Gated by the module
+    that actually governs that content: MODULE_KNOWLEDGE for the former,
+    MODULE_TALENT + can_read_cv for the latter, same as document_feed's own
+    corpus filter. This is the second, request-time enforcement point for
+    knowledge-document access (radar_intelligence's own SearchRequest.knowledge_ids
+    is the first) — it re-checks the caller's actual role here rather than
+    trusting whatever knowledge_ids the caller claimed.
+    """
     if not _service_authorized(request):
         return _deny()
+    try:
+        document_pk = int(document_id)
+    except ValueError:
+        return _deny()
     user = _scope_user(request.headers.get("X-Radar-Scope-Token", ""))
-    if (user is None or not roles.can_access(user, roles.MODULE_TALENT)
-            or not can_read_cv(user)):
+    if user is None:
+        return _deny()
+
+    if document_pk < 0:
+        if not roles.can_access(user, roles.MODULE_KNOWLEDGE):
+            return _deny()
+        document = KnowledgeDocument.objects.filter(pk=-document_pk, is_active=True).first()
+        if document is None:
+            return _deny()
+        return JsonResponse(_knowledge_identity(document))
+
+    if not roles.can_access(user, roles.MODULE_TALENT) or not can_read_cv(user):
         return _deny()
     document = (Document.objects.select_related("person", "primary_text_version")
-                .filter(pk=document_id, person__merged_into__isnull=True,
+                .filter(pk=document_pk, person__merged_into__isnull=True,
                         person__is_applicant=True).first())
     if document is None:
         return _deny()
