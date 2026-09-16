@@ -59,6 +59,13 @@ VALID_SENIORITY = {"manager", "executive"}
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
 
+#: Trần số khách hàng được CHẤM ĐIỂM trong một lượt tìm. `_score` đọc profile,
+#: interests, relationships và signals đã prefetch nên chi phí là CPU chứ không
+#: phải truy vấn; 500 người đo được vài chục mili-giây. Đặt ở đây thay vì nhân
+#: với `limit` vì ngân sách này thuộc về máy chủ, không thuộc về việc RM xin 5
+#: hay 50 người.
+SCORING_BUDGET = int(os.getenv("RB_PROSPECT_SCORING_BUDGET", "500"))
+
 SYSTEM_PROMPT = """Bạn chuyển câu hỏi tìm khách hàng của RM ngân hàng thành tiêu chí JSON.
 
 Chỉ trả về JSON, không giải thích. Các khoá được phép:
@@ -328,11 +335,36 @@ def _extract_json(raw):
 
 # --------------------------------------------------------------- tìm kiếm
 
+class ProspectList(list):
+    """Danh sách kết quả, mang theo độ phủ của lần quét.
+
+    Là `list` chứ không phải tuple `(rows, coverage)` để mọi nơi đang dùng
+    `search()` như một danh sách vẫn chạy nguyên. Cùng khuôn với
+    `talent/answer/judge.py::JudgeReport` — ở đó cũng cần kèm số liệu về chính
+    lần chạy mà không ép người gọi phải bóc tuple.
+    """
+
+    def __init__(self, rows, *, scanned=0, truncated=False):
+        super().__init__(rows)
+        self.scanned = scanned
+        self.truncated = truncated
+
+    @property
+    def coverage(self):
+        return {"scanned": self.scanned, "truncated": self.truncated}
+
+
 def search(criteria, user=None):
-    """Tiêu chí → danh sách người, đã chấm điểm và xếp hạng.
+    """Tiêu chí → `ProspectList` đã chấm điểm và xếp hạng.
 
     Dùng đúng những bộ lọc mà giao diện lọc tay đang dùng — không có đường tìm
     kiếm thứ hai song song chỉ dành cho AI.
+
+    `user` KHÔNG giới hạn phạm vi và chưa bao giờ giới hạn: RM bán lẻ nhìn được
+    toàn bộ kho khách hàng, việc phân công thể hiện qua `rb_profile.sales_owner`
+    chứ không phải bằng cách giấu bản ghi. Giữ tham số vì `rb/answer/` sắp tới
+    cần nó thật (câu hỏi về danh mục của chính RM), nhưng ai đọc tới đây phải
+    biết hôm nay nó chưa phải một ranh giới quyền.
     """
     queryset = (Person.objects.filter(merged_into__isnull=True)
                 .select_related("rb_profile")
@@ -379,14 +411,31 @@ def search(criteria, user=None):
                                 relationships__do_not_contact=True)
 
     limit = min(int(criteria.get("limit") or DEFAULT_LIMIT), MAX_LIMIT)
-    # Lấy rộng hơn `limit` rồi mới chấm điểm và cắt: xếp theo `updated_at` rồi
-    # cắt trước khi chấm sẽ trả về nhóm được sửa gần đây nhất, không phải nhóm
-    # phù hợp nhất.
-    rows = list(queryset.distinct().order_by("-updated_at")[:limit * 3])
+    # Chấm điểm TOÀN BỘ nhóm đã lọc, tới trần ngân sách, rồi mới cắt.
+    #
+    # Bản cũ lấy `order_by("-updated_at")[:limit * 3]`. Comment của nó nói lấy
+    # rộng hơn `limit` để tránh "trả về nhóm được sửa gần đây nhất" — nhưng
+    # `limit * 3` trên một nhóm lọc vài nghìn người vẫn đúng là lỗi đó, chỉ
+    # rộng hơn ba lần: `updated_at` đo lần cuối ai đó SỬA hồ sơ, không đo khách
+    # hàng đáng gọi tới mức nào. Khách phù hợp nhất mà hồ sơ lâu không ai động
+    # vào thì không bao giờ lọt.
+    #
+    # `-updated_at` vẫn là thứ tự cắt khi chạm trần, nhưng trần nay đủ rộng để
+    # phần lớn truy vấn thật không chạm tới, và khi chạm thì `truncated` nói ra
+    # thay vì im lặng.
+    rows = list(queryset.distinct().order_by("-updated_at")[:SCORING_BUDGET + 1])
+    truncated = len(rows) > SCORING_BUDGET
+    if truncated:
+        rows = rows[:SCORING_BUDGET]
+        log.warning("rb.prospects: nhóm lọc vượt %s người, chấm điểm trên phần "
+                    "đầu — tiêu chí quá rộng", SCORING_BUDGET)
 
     scored = [_score(person, products) for person in rows]
-    scored.sort(key=lambda item: -item["priority_score"])
-    return scored[:limit]
+    # `-priority_score` rồi `person_id`: điểm bằng nhau là chuyện thường (thang
+    # điểm rời rạc), và không có khoá phụ ổn định thì cùng một câu hỏi trả về
+    # thứ tự khác nhau giữa hai lần chạy.
+    scored.sort(key=lambda item: (-item["priority_score"], item["person_id"]))
+    return ProspectList(scored[:limit], scanned=len(rows), truncated=truncated)
 
 
 def _score(person, products):
@@ -444,4 +493,7 @@ def run(question, user=None, complete_fn=None, history=None):
     """Toàn bộ luồng: câu hỏi → tiêu chí → người → điểm → giải thích."""
     parsed = parse(question, complete_fn=complete_fn, history=history)
     results = search(parsed.criteria, user=user)
-    return {**parsed.as_dict(), "count": len(results), "results": results}
+    # `coverage` đi thẳng ra client: danh sách bị cắt vì tiêu chí quá rộng là
+    # chuyện RM phải biết để thu hẹp câu hỏi, không phải chuyện giấu đi.
+    return {**parsed.as_dict(), "count": len(results), "results": list(results),
+            "coverage": results.coverage}

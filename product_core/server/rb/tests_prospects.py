@@ -198,6 +198,60 @@ class SearchTest(TestCase):
         diem = [row["priority_score"] for row in rows]
         self.assertEqual(diem, sorted(diem, reverse=True))
 
+    def test_khach_hop_nhat_khong_bi_cat_vi_ho_so_lau_khong_sua(self):
+        """Tái hiện đúng lỗi cũ, thay vì chỉ kiểm tra danh sách trả về đã sắp.
+
+        Bản cũ lấy `order_by("-updated_at")[:limit * 3]`, nên chỉ cần nhiều hơn
+        `limit * 3` người thoả bộ lọc là người điểm cao nhất bị cắt TRƯỚC khi
+        `_score` chạy — miễn hồ sơ của họ lâu nhất không ai sửa. Danh sách trả
+        về vẫn sắp giảm dần nên test cũ vẫn xanh: nó canh chặng sắp xếp, còn
+        lỗi nằm ở chặng cắt.
+        """
+        from django.utils import timezone
+
+        limit = 2
+        # Người điểm cao nhất: có liên hệ + đúng cấp bậc, và được tạo TRƯỚC TIÊN
+        # nên `updated_at` cũ nhất — đúng nhóm mà bản cũ cắt mất.
+        tot_nhat = Person.objects.create(
+            display_name="Phạm Tốt Nhất", location="Hải Phòng",
+            primary_phone="+84908888888", primary_email="tot@example.test")
+        RBProfile.objects.create(person=tot_nhat, occupation="Giám đốc điều hành",
+                                 segment=RBProfile.SEGMENT_PRIORITY)
+        for index in range(limit * 3 + 2):
+            nguoi = Person.objects.create(display_name="Khách nền %d" % index,
+                                          location="Hải Phòng")
+            RBProfile.objects.create(person=nguoi, occupation="Nhân viên")
+
+        # `updated_at` là auto_now — ép lại bằng update() để không chạm save().
+        Person.objects.filter(pk=tot_nhat.pk).update(
+            updated_at=timezone.now() - timezone.timedelta(days=900))
+
+        rows = prospects.search(self._criteria(location="Hải Phòng", limit=limit))
+        self.assertIn(tot_nhat.pk, [row["person_id"] for row in rows])
+
+    def test_coverage_noi_ro_khi_danh_sach_bi_cat(self):
+        """Nhóm lọc vượt ngân sách chấm điểm phải NÓI RA, không im lặng."""
+        rows = prospects.search(self._criteria(location="Hà Nội"))
+        self.assertFalse(rows.truncated)
+        self.assertEqual(rows.coverage, {"scanned": rows.scanned, "truncated": False})
+
+        with mock.patch.object(prospects, "SCORING_BUDGET", 1):
+            chat = prospects.search(self._criteria(location="Hà Nội", limit=10))
+        self.assertEqual(chat.scanned, 1)
+
+    def test_thu_tu_on_dinh_khi_diem_bang_nhau(self):
+        """Điểm bằng nhau không được cho ra hai thứ tự khác nhau giữa hai lần chạy."""
+        for index in range(6):
+            nguoi = Person.objects.create(display_name="Khách đều %d" % index,
+                                          location="Cần Thơ")
+            RBProfile.objects.create(person=nguoi, occupation="Nhân viên")
+        lan_dau = [row["person_id"] for row in
+                   prospects.search(self._criteria(location="Cần Thơ", limit=4))]
+        lan_sau = [row["person_id"] for row in
+                   prospects.search(self._criteria(location="Cần Thơ", limit=4))]
+        self.assertEqual(lan_dau, lan_sau)
+        self.assertEqual(lan_dau, sorted(lan_dau))
+
     def test_ton_trong_gioi_han_so_luong(self):
         for index in range(5):
             person = Person.objects.create(display_name="Khách %d" % index,

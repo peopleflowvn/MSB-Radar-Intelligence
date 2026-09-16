@@ -1203,8 +1203,19 @@ def prospect_search(request):
         })
 
     payload = prospects_module.run(question, user=request.user, history=history)
-    response_answer = (f"Đã tìm thấy {payload['count']} khách hàng tiềm năng."
-                       if payload["count"] else "Chưa tìm thấy khách hàng vượt ngưỡng phù hợp.")
+    coverage = payload.get("coverage") or {}
+    if not payload["count"]:
+        response_answer = "Chưa tìm thấy khách hàng vượt ngưỡng phù hợp."
+    elif coverage.get("truncated"):
+        # Nói ra thay vì im lặng: danh sách đã bị cắt vì tiêu chí quá rộng, nên
+        # "top 20" ở đây là top của phần đã quét, không phải của toàn kho. RM
+        # cần biết để thu hẹp câu hỏi chứ không phải để tin nhầm.
+        response_answer = (
+            f"Đã tìm thấy {payload['count']} khách hàng tiềm năng, chấm điểm trên "
+            f"{coverage.get('scanned', 0)} hồ sơ đầu tiên — tiêu chí còn rộng, "
+            "anh/chị thu hẹp thêm để danh sách sát hơn.")
+    else:
+        response_answer = f"Đã tìm thấy {payload['count']} khách hàng tiềm năng."
     thread = conversation_state.record(
         request.user, "prospect", conversation_id, question, response_answer,
         criteria=payload.get("criteria"), mode="search",

@@ -288,12 +288,19 @@ class RouterTest(TestCase):
         # nữa. None nghĩa là "để nhà cung cấp tự chọn model mặc định" — chính
         # cái tầng đã lặng lẽ gán glm-5.2 cho 13 tác vụ, trong đó có một tác vụ
         # cần thị giác mà model ấy không có. Nay rơi vào mặc định của sổ đăng ký.
-        self.assertEqual(r._model_for("greennode", "assistant_conversation"),
-                         tasks_registry.DEFAULT_ROUTE["assistant_conversation"][1])
+        #
+        # Nhà cung cấp lấy TỪ sổ đăng ký, không viết cứng: `assistant_conversation`
+        # đã đổi greennode → gemini một lần (cb59be3, benchmark 09/2026) và bản
+        # viết cứng cũ đỏ từ đó mà không ai thấy. Đọc từ chính nguồn sự thật thì
+        # lần đổi tuyến sau không làm test sai lần nữa.
+        mac_dinh_provider, mac_dinh_model = tasks_registry.DEFAULT_ROUTE["assistant_conversation"]
+        self.assertEqual(r._model_for(mac_dinh_provider, "assistant_conversation"),
+                         mac_dinh_model)
         # Nhà cung cấp KHÁC với nhà cung cấp mặc định thì vẫn None — mặc định là
         # một cặp (nhà cung cấp, model), tách ra dùng chéo là gửi mã model của
         # hub này sang hub kia.
-        self.assertIsNone(r._model_for("openai", "assistant_conversation"))
+        khac = "openai" if mac_dinh_provider != "openai" else "greennode"
+        self.assertIsNone(r._model_for(khac, "assistant_conversation"))
         self.assertIsNone(r._model_for("greennode", ""))
 
     def test_model_theo_tac_vu_duoc_gui_toi_provider(self):

@@ -15,7 +15,6 @@ import { useCustomTheme } from './CustomThemeContext'
  * Quyền xem CV: Recruiter / TA / Admin được xem; RM / Sales không xem được CV.
  */
 
-type Tab = 'tong-quan' | 'cv' | 'lich-su'
 type RelationshipTab = 'talent' | 'rb'
 
 function bytes(size: number) {
@@ -188,6 +187,7 @@ function CvViewerSection({
   const [copySuccess, setCopySuccess] = useState(false)
   const [showText, setShowText] = useState(false)
   const [selectedTextId, setSelectedTextId] = useState<number | null>(null)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const currentDoc = documents.find((d) => d.id === selectedDocId) || documents[documents.length - 1]
   const documentText = useQuery({
@@ -326,13 +326,21 @@ function CvViewerSection({
             ) : (
               <span className="badge warn">Chưa lưu trữ file gốc</span>
             )}
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setIsExpanded(!isExpanded)}
+              title={isExpanded ? 'Thu nhỏ khung xem' : 'Mở rộng khung xem'}
+            >
+              {isExpanded ? '↕ Thu nhỏ' : '↕ Mở rộng'}
+            </button>
           </div>
         </div>
 
         {/* Khung nội dung tài liệu */}
         <div className="cv-document-body">
           {currentDoc.has_file || currentDoc.text_length > 0 ? (
-            <div className="cv-embed-frame-box">
+            <div className="cv-embed-frame-box" style={{ height: isExpanded ? '840px' : '580px', transition: 'height 0.25s ease' }}>
               <DocumentPreviewFrame
                 documentId={currentDoc.id}
                 filename={currentDoc.filename || `CV v${currentDoc.version}`}
@@ -1028,192 +1036,7 @@ function CandidateInsights({ person }: { person: PersonDetail }) {
   )
 }
 
-/** 8. HỒ SƠ 360° TỔNG QUAN (2 CỘT: TRÁI HỢP NHẤT TOÀN DIỆN / PHẢI QUAN HỆ THEO NGỮ CẢNH VÀ VAI TRÒ) */
-function UnifiedOverview({
-  person,
-  canManageTalent,
-  canManageRB,
-  initialRelTab,
-  isUnlocked,
-}: {
-  person: PersonDetail
-  canManageTalent: boolean
-  canManageRB: boolean
-  initialRelTab: RelationshipTab
-  isUnlocked?: boolean
-}) {
-  const { maskSensitiveData } = useCustomTheme()
-  const shouldMask = maskSensitiveData || !isUnlocked
-  const [relTab, setRelTab] = useState<RelationshipTab>(initialRelTab)
-  const hasBoth = canManageTalent && canManageRB
 
-  const t = person.talent
-  const curated = new Set(t?.curated_fields ?? [])
-
-  const rows: Array<[string, React.ReactNode, string?]> = [
-    ['Chức danh hiện tại', t?.current_title || person.headline || '—', 'current_title'],
-    ['Công ty / Tổ chức', t?.current_company || '—', 'current_company'],
-    ['Số năm kinh nghiệm', t?.years_experience != null ? `${t.years_experience} năm` : '—', 'years_experience'],
-    ['Cấp bậc chuyên môn', t?.seniority || '—', 'seniority'],
-    ['Trình độ học vấn', t?.education || '—', 'education'],
-    ['Khu vực / Nơi ở', t?.location || person.location || '—', 'location'],
-    ['Mức lương mong muốn', t?.expected_salary || '—', 'expected_salary'],
-    ['Chuyên viên tuyển dụng', t?.owner_name || '—'],
-  ]
-
-  return (
-    <div className="person-2col-layout">
-      {/* CỘT TRÁI (65%): Năng lực, Bộ kỹ năng, Cơ hội tài chính, Đợt tuyển, AI Signals & Định danh */}
-      <div className="person-main-col">
-        {/* Tóm tắt năng lực & tiểu sử */}
-        {t?.summary && (
-          <section className="person-section-card">
-            <h3 className="section-title">📝 Tóm tắt năng lực &amp; Tiểu sử</h3>
-            <p style={{ lineHeight: 1.6, color: 'var(--text)', margin: 0 }}>{t.summary}</p>
-          </section>
-        )}
-
-        {/* Chi tiết chuyên môn & năng lực */}
-        <section className="person-section-card">
-          <h3 className="section-title">🎓 Hồ sơ năng lực &amp; Chuyên môn</h3>
-          <dl className="detail-grid-modern">
-            {rows.map(([label, value, field]) => (
-              <div key={label} className="detail-item-modern">
-                <dt className="detail-dt">
-                  {label}
-                  {field && curated.has(field) && (
-                    <span className="badge ok" title="Do người dùng chỉnh sửa — không bị ghi đè khi suy lại">
-                      ✓ Xác nhận
-                    </span>
-                  )}
-                </dt>
-                <dd className="detail-dd">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-
-        {/* Bộ kỹ năng chuyên môn */}
-        {t?.skills && t.skills.length > 0 && (
-          <section className="person-section-card">
-            <div className="section-title-row">
-              <h3 className="section-title">
-                ⚡ Bộ kỹ năng chuyên môn <span className="skills-badge">{t.skills.length}</span>
-              </h3>
-            </div>
-            <div className="chips">
-              {t.skills.map((skill) => (
-                <span key={skill} className="chip skill-chip">
-                  {skill}
-                </span>
-              ))}
-            </div>
-            <p className="hint" style={{ marginTop: '10px' }}>Kỹ năng được tự động tổng hợp từ dữ liệu ứng tuyển và hồ sơ nghề nghiệp.</p>
-          </section>
-        )}
-
-        {/* Cơ hội tài chính & Bán chéo (Growth Radar) */}
-        {canManageRB && <CustomerOpportunitiesSection personId={person.id} />}
-
-        {/* Đợt tuyển đang xử lý (Talent Radar) */}
-        {canManageTalent && <ActiveWorklists person={person} />}
-
-        {/* Tín hiệu & Gợi ý AI */}
-        <CandidateInsights person={person} />
-
-        {/* Hỏi & đáp AI về người này — có phạm vi, chỉ dựa trên dữ kiện đã có */}
-        <PersonAskSection personId={person.id} />
-
-        {/* Định danh số & Kênh liên kết */}
-        <section className="person-section-card">
-          <div className="section-title-row">
-            <h3 className="section-title">🔑 Kênh định danh số &amp; Liên kết ({person.identities.length})</h3>
-            {shouldMask && (
-              <span className="badge muted" style={{ fontSize: '11px', padding: '3px 8px' }}>
-                🔒 Email &amp; SĐT đang được che bảo mật
-              </span>
-            )}
-          </div>
-          <table className="identities-table" style={{ width: '100%', margin: '10px 0 0' }}>
-            <thead>
-              <tr>
-                <th style={{ width: '140px' }}>Loại định danh</th>
-                <th>Giá trị ghi nhận</th>
-                <th style={{ width: '160px' }}>Ghi nhận đầu tiên</th>
-              </tr>
-            </thead>
-            <tbody>
-              {person.identities.map((identity) => {
-                const isEmail = identity.kind === 'email' || identity.value.includes('@')
-                const isPhone = identity.kind === 'phone' || identity.kind === 'mobile' || identity.kind === 'phone_number' || /^\+?\d{8,15}$/.test(identity.value.replace(/\s/g, ''))
-                const isSensitive = isEmail || isPhone
-                const displayVal = shouldMask && isEmail
-                  ? maskEmail(identity.value)
-                  : shouldMask && isPhone
-                  ? maskPhone(identity.value)
-                  : identity.value
-
-                return (
-                  <tr key={`${identity.kind}-${identity.value}`}>
-                    <td className="identity-kind-cell">
-                      <span className="kind-badge">{identity.kind}</span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <strong>{displayVal}</strong>
-                        {shouldMask && isSensitive && (
-                          <span className="badge muted" style={{ fontSize: '10px', padding: '1px 5px' }}>🔒 Đã che</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="muted small">{date(identity.first_seen_at)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </section>
-      </div>
-
-      {/* CỘT PHẢI (35%): QUAN HỆ THEO NGỮ CẢNH (TALENT / GROWTH) */}
-      <div className="person-side-col">
-        {/* Bộ chuyển đổi quan hệ dành cho Admin hoặc người có cả 2 quyền */}
-        {hasBoth && (
-          <div className="talent-submode-segmented" style={{ marginBottom: '14px', width: '100%' }}>
-            <button
-              type="button"
-              className={`submode-btn ${relTab === 'talent' ? 'active' : ''}`}
-              onClick={() => setRelTab('talent')}
-              style={{ flex: 1 }}
-            >
-              <span>💼 Quan hệ Ứng viên (Talent)</span>
-            </button>
-            <button
-              type="button"
-              className={`submode-btn ${relTab === 'rb' ? 'active' : ''}`}
-              onClick={() => setRelTab('rb')}
-              style={{ flex: 1 }}
-            >
-              <span>👔 Quan hệ Khách hàng (Growth)</span>
-            </button>
-          </div>
-        )}
-
-        {/* Hiển thị bảng Quan hệ tương ứng */}
-        {((hasBoth && relTab === 'talent') || (!hasBoth && canManageTalent)) && (
-          <>
-            <CandidateRelationship person={person} />
-            <ProfileManagement person={person} />
-          </>
-        )}
-
-        {((hasBoth && relTab === 'rb') || (!hasBoth && canManageRB)) && (
-          <CustomerRelationship personId={person.id} />
-        )}
-      </div>
-    </div>
-  )
-}
 
 /** 9. LỊCH SỬ NỘP HỒ SƠ & DÒNG THỜI GIAN HOẠT ĐỘNG */
 function HistoryAndTimelineSection({ person }: { person: PersonDetail }) {
@@ -1411,16 +1234,17 @@ function ProfileManagement({ person }: { person: PersonDetail }) {
   )
 }
 
-/** 11. MÀN HÌNH CHÍNH PERSON 360 HỢP NHẤT */
+/** 11. MÀN HÌNH CHÍNH PERSON 360 HỢP NHẤT — GIAO DIỆN ONE-PAGE HIỆN ĐẠI */
 export default function Person360() {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
   const fromParam = searchParams.get('from')
   const personId = Number(id)
-  const [tab, setTab] = useState<Tab>('tong-quan')
+  const [activeNav, setActiveNav] = useState<string>('tong-quan')
   const [unlockedContacts, setUnlockedContacts] = useState<{ email: string; phone: string } | null>(null)
   const isUnlocked = Boolean(unlockedContacts)
 
+  const { maskSensitiveData } = useCustomTheme()
   const queryClient = useQueryClient()
   const session = useQuery({ queryKey: ['me'], queryFn: api.me, retry: false })
   const roles = new Set(session.data?.authenticated ? session.data.roles : [])
@@ -1445,6 +1269,9 @@ export default function Person360() {
 
   // Xác định tab quan hệ ban đầu theo ngữ cảnh (from=talent vs from=rb)
   const initialRelTab: RelationshipTab = isRmOnly || fromParam === 'rb' ? 'rb' : 'talent'
+  const [relTab, setRelTab] = useState<RelationshipTab>(initialRelTab)
+  const hasBoth = canManageTalent && canManageRB
+  const shouldMask = maskSensitiveData || !isUnlocked
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -1468,6 +1295,20 @@ export default function Person360() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['person', personId] }),
   })
 
+  const scrollToAnchor = (elementId: string, navKey: string) => {
+    setActiveNav(navKey)
+    if (typeof document !== 'undefined') {
+      try {
+        const el = document.getElementById(elementId)
+        if (el && typeof el.scrollIntoView === 'function') {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      } catch {
+        // an toàn cho môi trường test jsdom
+      }
+    }
+  }
+
   if (person.error instanceof ApiError) {
     return (
       <div className="person-360-container" style={{ paddingTop: '40px' }}>
@@ -1484,14 +1325,43 @@ export default function Person360() {
 
   const data = person.data
   const t = data.talent
+  const curated = new Set(t?.curated_fields ?? [])
+
+  const rows: Array<[string, React.ReactNode, string?]> = [
+    ['Chức danh hiện tại', t?.current_title || data.headline || '—', 'current_title'],
+    ['Công ty / Tổ chức', t?.current_company || '—', 'current_company'],
+    ['Số năm kinh nghiệm', t?.years_experience != null ? `${t.years_experience} năm` : '—', 'years_experience'],
+    ['Cấp bậc chuyên môn', t?.seniority || '—', 'seniority'],
+    ['Trình độ học vấn', t?.education || '—', 'education'],
+    ['Khu vực / Nơi ở', t?.location || data.location || '—', 'location'],
+    ['Mức lương mong muốn', t?.expected_salary || '—', 'expected_salary'],
+    ['Chuyên viên tuyển dụng', t?.owner_name || '—'],
+  ]
 
   return (
     <div className="person-360-container">
-      {/* Breadcrumb quay lại theo ngữ cảnh nguồn */}
-      <div className="crumb-back-row">
-        <Link to={returnPath} className="back-link">
-          ← Quay lại {returnLabel}
-        </Link>
+      {/* Header Actions & Breadcrumb Bar */}
+      <div className="person-header-actions">
+        <div className="person-header-left">
+          <Link to={returnPath} className="person-back-link">
+            ← Quay lại {returnLabel}
+          </Link>
+          <span className="person-mode-badge">⚡ Hồ sơ 360° One-Page</span>
+        </div>
+
+        <div className="person-header-right">
+          {canManageTalent && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => rederive.mutate()}
+              disabled={rederive.isPending}
+              title="Tự động hợp nhất lại dữ liệu từ tất cả các nguồn và phiên bản CV"
+            >
+              {rederive.isPending ? 'Đang suy lại…' : '🔄 Suy lại hồ sơ'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Executive Hero Card */}
@@ -1534,21 +1404,21 @@ export default function Person360() {
 
       {/* Dossier Quick Stats Strip */}
       <div className="person-quick-stats">
-        <div className="stat-pill">
+        <div className="stat-pill" onClick={() => scrollToAnchor('sec-history', 'lich-su')} style={{ cursor: 'pointer' }}>
           <span className="s-icon">📦</span>
           <div>
             <span className="s-val">{data.sources.length}</span>
             <span className="s-lbl">Nguồn hồ sơ &amp; Nộp</span>
           </div>
         </div>
-        <div className="stat-pill">
+        <div className="stat-pill" onClick={() => scrollToAnchor('sec-history', 'lich-su')} style={{ cursor: 'pointer' }}>
           <span className="s-icon">🔑</span>
           <div>
             <span className="s-val">{data.identities.length}</span>
             <span className="s-lbl">Kênh định danh</span>
           </div>
         </div>
-        <div className="stat-pill">
+        <div className="stat-pill" onClick={() => scrollToAnchor('sec-history', 'lich-su')} style={{ cursor: 'pointer' }}>
           <span className="s-icon">⏳</span>
           <div>
             <span className="s-val">{data.timeline.length}</span>
@@ -1556,83 +1426,268 @@ export default function Person360() {
           </div>
         </div>
         {canViewCV && (
-          <div className="stat-pill">
+          <div className="stat-pill" onClick={() => scrollToAnchor('sec-cv', 'cv')} style={{ cursor: 'pointer' }}>
             <span className="s-icon">📄</span>
             <div>
               <span className="s-val">{data.document_stats.submission_count}</span>
-              <span className="s-lbl">Lượt nộp CV</span>
+              <span className="s-lbl">Lượt nộp CV ({data.documents.length} file)</span>
             </div>
           </div>
         )}
+        <div className="stat-pill" onClick={() => scrollToAnchor('sec-opportunities', 'dot-tuyen')} style={{ cursor: 'pointer' }}>
+          <span className="s-icon">⚡</span>
+          <div>
+            <span className="s-val">{data.signals.length}</span>
+            <span className="s-lbl">Tín hiệu AI</span>
+          </div>
+        </div>
       </div>
 
-      {/* Top Capsule Tab Switcher */}
-      <div className="talent-submode-wrapper" style={{ margin: '8px auto 24px', justifyContent: 'flex-start' }}>
-        <div className="talent-submode-segmented">
+      {/* Sticky Quick-Nav Dock */}
+      <div className="person-sticky-nav">
+        <div className="person-nav-pills">
           <button
             type="button"
-            className={`submode-btn ${tab === 'tong-quan' ? 'active' : ''}`}
-            onClick={() => setTab('tong-quan')}
+            className={`person-nav-pill-btn ${activeNav === 'tong-quan' ? 'active' : ''}`}
+            onClick={() => scrollToAnchor('sec-overview', 'tong-quan')}
           >
             <span>👤 Hồ sơ 360° Tổng quan</span>
           </button>
           {canViewCV ? (
             <button
               type="button"
-              className={`submode-btn ${tab === 'cv' ? 'active' : ''}`}
-              onClick={() => setTab('cv')}
+              className={`person-nav-pill-btn ${activeNav === 'cv' ? 'active' : ''}`}
+              onClick={() => scrollToAnchor('sec-cv', 'cv')}
             >
               <span>📄 Kho CV ({data.documents.length} file · {data.document_stats.submission_count} lượt)</span>
             </button>
           ) : (
             <button
               type="button"
-              className="submode-btn"
+              className="person-nav-pill-btn"
               disabled
               title="RM/Sales không có quyền xem tệp CV ứng viên"
-              style={{ opacity: 0.5, cursor: 'not-allowed' }}
             >
               <span>🔒 Kho CV (Chỉ dành cho TA)</span>
             </button>
           )}
           <button
             type="button"
-            className={`submode-btn ${tab === 'lich-su' ? 'active' : ''}`}
-            onClick={() => setTab('lich-su')}
+            className={`person-nav-pill-btn ${activeNav === 'dot-tuyen' ? 'active' : ''}`}
+            onClick={() => scrollToAnchor('sec-opportunities', 'dot-tuyen')}
+          >
+            <span>🎯 Đợt tuyển &amp; Cơ hội</span>
+          </button>
+          <button
+            type="button"
+            className={`person-nav-pill-btn ${activeNav === 'lich-su' ? 'active' : ''}`}
+            onClick={() => scrollToAnchor('sec-history', 'lich-su')}
           >
             <span>⏳ Lịch sử &amp; Nguồn ({data.sources.length})</span>
+          </button>
+          <button
+            type="button"
+            className={`person-nav-pill-btn ${activeNav === 'ai' ? 'active' : ''}`}
+            onClick={() => scrollToAnchor('sec-ai', 'ai')}
+          >
+            <span>💬 Hỏi &amp; đáp AI</span>
           </button>
         </div>
       </div>
 
-      {/* Nội dung theo từng Tab */}
-      <div className="person-tab-content">
-        {tab === 'tong-quan' && (
-          <UnifiedOverview
-            person={data}
-            canManageTalent={canManageTalent}
-            canManageRB={canManageRB}
-            initialRelTab={initialRelTab}
-            isUnlocked={isUnlocked}
-          />
-        )}
-        {tab === 'cv' && canViewCV && (
-          <CvViewerSection
-            documents={data.documents}
-            stats={data.document_stats}
-            isUnlocked={isUnlocked}
-          />
-        )}
-        {tab === 'lich-su' && (
-          <>
+      {/* 2-Column One-Page Cockpit Grid */}
+      <div className="person-cockpit-grid">
+        {/* CỘT TRÁI (~64%): HỒ SƠ NĂNG LỰC, KHO CV, ĐỢT TUYỂN & CƠ HỘI, LỊCH SỬ NGUỒN VÀ AI */}
+        <div className="person-main-col">
+          {/* KHỐI 1: TỔNG QUAN NĂNG LỰC & CHUYÊN MÔN */}
+          <div id="sec-overview" className="person-section-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Tóm tắt năng lực & tiểu sử */}
+            {t?.summary && (
+              <div style={{ paddingBottom: '14px', borderBottom: '1px solid var(--border, rgba(255,255,255,0.08))' }}>
+                <h3 className="section-title">📝 Tóm tắt năng lực &amp; Tiểu sử</h3>
+                <p style={{ lineHeight: 1.6, color: 'var(--text)', margin: 0 }}>{t.summary}</p>
+              </div>
+            )}
+
+            {/* Chi tiết chuyên môn & năng lực */}
+            <div>
+              <div className="section-title-row">
+                <h3 className="section-title">🎓 Hồ sơ năng lực &amp; Chuyên môn</h3>
+                <span className="person-section-tag">Năng lực cốt lõi</span>
+              </div>
+              <dl className="detail-grid-modern">
+                {rows.map(([label, value, field]) => (
+                  <div key={label} className="detail-item-modern">
+                    <dt className="detail-dt">
+                      {label}
+                      {field && curated.has(field) && (
+                        <span className="badge ok" title="Do người dùng chỉnh sửa — không bị ghi đè khi suy lại">
+                          ✓ Xác nhận
+                        </span>
+                      )}
+                    </dt>
+                    <dd className="detail-dd">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+
+            {/* Bộ kỹ năng chuyên môn */}
+            {t?.skills && t.skills.length > 0 && (
+              <div style={{ paddingTop: '14px', borderTop: '1px solid var(--border, rgba(255,255,255,0.08))' }}>
+                <div className="section-title-row">
+                  <h3 className="section-title">
+                    ⚡ Bộ kỹ năng chuyên môn <span className="skills-badge">{t.skills.length}</span>
+                  </h3>
+                </div>
+                <div className="chips">
+                  {t.skills.map((skill) => (
+                    <span key={skill} className="chip skill-chip">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+                <p className="hint" style={{ marginTop: '10px' }}>Kỹ năng được tự động tổng hợp từ dữ liệu ứng tuyển và hồ sơ nghề nghiệp.</p>
+              </div>
+            )}
+          </div>
+
+          {/* KHỐI 2: KHO CV & BẢN XEM TRƯỚC TÀI LIỆU */}
+          <div id="sec-cv">
+            {canViewCV ? (
+              <CvViewerSection
+                documents={data.documents}
+                stats={data.document_stats}
+                isUnlocked={isUnlocked}
+              />
+            ) : (
+              <section className="person-section-card empty-results-box" style={{ padding: '30px 20px' }}>
+                <div style={{ fontSize: '28px', marginBottom: '8px' }}>🔒</div>
+                <h3 style={{ margin: '0 0 6px' }}>Kho CV bảo mật</h3>
+                <p style={{ margin: 0, color: 'var(--text-muted)' }}>
+                  Tệp CV và văn bản trích xuất được giới hạn cho bộ phận Tuyển dụng (TA) theo chính sách bảo mật thông tin.
+                </p>
+              </section>
+            )}
+          </div>
+
+          {/* KHỐI 3: ĐỢT TUYỂN DỤNG & CƠ HỘI TÀI CHÍNH */}
+          <div id="sec-opportunities" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Cơ hội tài chính & Bán chéo (Growth Radar) */}
+            {canManageRB && <CustomerOpportunitiesSection personId={data.id} />}
+
+            {/* Đợt tuyển đang xử lý (Talent Radar) */}
+            {canManageTalent && <ActiveWorklists person={data} />}
+
+            {/* Tín hiệu & Gợi ý AI */}
+            <CandidateInsights person={data} />
+          </div>
+
+          {/* KHỐI 4: LỊCH SỬ NGUỒN, ĐỊNH DANH & BẰNG CHỨNG TRÍCH XUẤT */}
+          <div id="sec-history" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Lịch sử nộp & Timeline */}
             <HistoryAndTimelineSection person={data} />
+
+            {/* Bằng chứng & nguồn gốc facts đã bóc tách */}
             <PersonFactsSection personId={personId} />
-          </>
-        )}
+
+            {/* Định danh số & Kênh liên kết */}
+            <section className="person-section-card">
+              <div className="section-title-row">
+                <h3 className="section-title">🔑 Kênh định danh số &amp; Liên kết ({data.identities.length})</h3>
+                {shouldMask && (
+                  <span className="badge muted" style={{ fontSize: '11px', padding: '3px 8px' }}>
+                    🔒 Email &amp; SĐT đang được che bảo mật
+                  </span>
+                )}
+              </div>
+              <table className="identities-table" style={{ width: '100%', margin: '10px 0 0' }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: '140px' }}>Loại định danh</th>
+                    <th>Giá trị ghi nhận</th>
+                    <th style={{ width: '160px' }}>Ghi nhận đầu tiên</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.identities.map((identity) => {
+                    const isEmail = identity.kind === 'email' || identity.value.includes('@')
+                    const isPhone = identity.kind === 'phone' || identity.kind === 'mobile' || identity.kind === 'phone_number' || /^\+?\d{8,15}$/.test(identity.value.replace(/\s/g, ''))
+                    const isSensitive = isEmail || isPhone
+                    const displayVal = shouldMask && isEmail
+                      ? maskEmail(identity.value)
+                      : shouldMask && isPhone
+                      ? maskPhone(identity.value)
+                      : identity.value
+
+                    return (
+                      <tr key={`${identity.kind}-${identity.value}`}>
+                        <td className="identity-kind-cell">
+                          <span className="kind-badge">{identity.kind}</span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <strong>{displayVal}</strong>
+                            {shouldMask && isSensitive && (
+                              <span className="badge muted" style={{ fontSize: '10px', padding: '1px 5px' }}>🔒 Đã che</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="muted small">{date(identity.first_seen_at)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </section>
+          </div>
+
+          {/* KHỐI 5: HỎI & ĐÁP AI VỀ NGƯỜI NÀY */}
+          <div id="sec-ai">
+            <PersonAskSection personId={data.id} />
+          </div>
+        </div>
+
+        {/* CỘT PHẢI (~36%): STICKY CRM ACTION COCKPIT */}
+        <div className="person-sticky-sidebar">
+          {/* Bộ chuyển đổi quan hệ dành cho Admin hoặc người có cả 2 quyền */}
+          {hasBoth && (
+            <div className="talent-submode-segmented" style={{ width: '100%' }}>
+              <button
+                type="button"
+                className={`submode-btn ${relTab === 'talent' ? 'active' : ''}`}
+                onClick={() => setRelTab('talent')}
+                style={{ flex: 1 }}
+              >
+                <span>💼 Quan hệ Ứng viên (Talent)</span>
+              </button>
+              <button
+                type="button"
+                className={`submode-btn ${relTab === 'rb' ? 'active' : ''}`}
+                onClick={() => setRelTab('rb')}
+                style={{ flex: 1 }}
+              >
+                <span>👔 Quan hệ Khách hàng (Growth)</span>
+              </button>
+            </div>
+          )}
+
+          {/* Hiển thị bảng Quan hệ tương ứng */}
+          {((hasBoth && relTab === 'talent') || (!hasBoth && canManageTalent)) && (
+            <>
+              <CandidateRelationship person={data} />
+              <ProfileManagement person={data} />
+            </>
+          )}
+
+          {((hasBoth && relTab === 'rb') || (!hasBoth && canManageRB)) && (
+            <CustomerRelationship personId={data.id} />
+          )}
+        </div>
       </div>
 
-      {/* Footer Actions */}
-      <div className="person-footer-bar">
+      {/* Footer Bar */}
+      <div className="person-footer-bar" style={{ marginTop: '24px' }}>
         {canManageTalent && (
           <button
             type="button"

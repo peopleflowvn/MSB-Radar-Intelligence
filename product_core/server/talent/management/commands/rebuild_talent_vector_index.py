@@ -31,6 +31,11 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         import os
 
+        # Cố ý quét CẢ người không phải ứng viên (`is_applicant=False`), dù chỉ
+        # ứng viên mới được lập chỉ mục. `index_person` nay XOÁ projection +
+        # chunk của người không đủ điều kiện, nên vòng quét này kiêm luôn việc
+        # dọn những hàng đã lọt vào chỉ mục từ trước khi có lưới lọc. Bỏ họ ra
+        # khỏi vòng lặp là bỏ luôn đường dọn duy nhất.
         rows = Person.objects.filter(merged_into__isnull=True).order_by("pk")
         if options.get("person_id"):
             rows = rows.filter(pk=options["person_id"])
@@ -39,8 +44,14 @@ class Command(BaseCommand):
 
         stale = options["stale"]
         known = {}
+        applicant_ids = set()
         if stale:
             known = dict(PersonSearchDocument.objects.values_list("person_id", "fingerprint"))
+            # `--stale` bỏ qua hồ sơ có vân tay không đổi. Người KHÔNG phải ứng
+            # viên thì vân tay cũng không đổi, nên nếu chỉ so vân tay, hàng chỉ
+            # mục cũ của họ sẽ sống sót qua mọi lần chạy `--stale` — đúng nhóm
+            # cần dọn lại là nhóm không bao giờ được dọn.
+            applicant_ids = set(Person.applicants().values_list("pk", flat=True))
 
         with_embeddings = not options["no_embeddings"]
         batch = max(1, options["batch_size"])
@@ -57,7 +68,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(f"Gặp cờ dừng {stop_file} — dừng an toàn."))
                 break
             for person_id in ids[offset:offset + batch]:
-                if stale:
+                if stale and person_id in applicant_ids:
                     current = vector_index.document_text(
                         Person.objects.prefetch_related("documents", "source_records")
                         .select_related("talent_profile").get(pk=person_id))

@@ -2775,6 +2775,38 @@ class ResolveTest(TestCase):
         self.assertEqual({c.name for c in cands},
                          {"Nguyễn Thị Huyền", "Vũ Thị Khánh Huyền"})
 
+    def test_fts_khong_tra_nguoi_khong_phai_ung_vien(self):
+        """② phải cùng phạm vi với mọi đường tất định — `Person.applicants()`.
+
+        Trước bản sửa 16/09/2026, `_fts_person_ids` chỉ lọc `merged_into`. Hệ
+        quả đo được: `count` (lọc applicants) và `find_people` (không lọc) trả
+        hai con số khác nhau trên cùng một kho, và người chỉ được NHẮC TỚI
+        trong CV người khác bị Radar gọi là "ứng viên".
+        """
+        from people.models import Document
+        from talent import vector_index
+        from talent.answer import retrieve as R
+
+        nguoi_duoc_nhac = Person.objects.create(
+            display_name="Lê Được Nhắc", is_applicant=False)
+        Document.objects.create(person=nguoi_duoc_nhac, sha256="scope-1",
+                                parse_status="done",
+                                parsed_text="Kế toán trưởng công ty xây dựng. " * 30)
+        # Ép vào chỉ mục bằng tay: đây là đúng trạng thái mà một lần
+        # `rebuild_talent_vector_index` cũ để lại, và là thứ ② phải chịu được.
+        PersonSearchDocument.objects.create(
+            person=nguoi_duoc_nhac, fingerprint="scope-1",
+            content="Kế toán trưởng công ty xây dựng",
+            content_norm=vector_index.fold_text("Kế toán trưởng công ty xây dựng"))
+        CVChunk.objects.create(
+            person=nguoi_duoc_nhac, document=nguoi_duoc_nhac.documents.first(),
+            ordinal=0, fingerprint="scope-1",
+            text="Kế toán trưởng công ty xây dựng",
+            text_norm=vector_index.fold_text("Kế toán trưởng công ty xây dựng"))
+
+        self.assertNotIn(nguoi_duoc_nhac.pk,
+                         R._fts_person_ids("ke toan truong", 50))
+
     def test_pipeline_bo_qua_2_khi_so_sanh_theo_ten(self):
         """"So sánh A và B" — `_pipeline` không được gọi truy hồi ngữ nghĩa."""
         from talent.answer import engine as engine_mod

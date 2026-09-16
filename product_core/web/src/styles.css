@@ -17131,3 +17131,329 @@ body,
   flex-shrink: 0;
   margin-top: 1px;
 }
+
+/* ==========================================================================
+   PERSON 360 ONE-PAGE MODERN COCKPIT REDESIGN
+   ========================================================================== */
+
+.person-360-container {
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 16px 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.person-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 2px;
+}
+
+.person-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.person-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-secondary, #94a3b8);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--surface-raised, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  transition: all 0.18s ease;
+}
+
+.person-back-link:hover {
+  color: var(--accent, #ff8a33);
+  border-color: var(--accent, #ff8a33);
+  background: var(--accent-soft, rgba(255, 138, 51, 0.1));
+}
+
+.person-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.person-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(99, 102, 241, 0.12);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  letter-spacing: 0.02em;
+}
+
+/* Sticky Quick Navigation Dock */
+.person-sticky-nav {
+  position: sticky;
+  top: -1px;
+  z-index: 25;
+  background: var(--surface-translucent, rgba(15, 23, 42, 0.9));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 8px 0;
+  margin: 0 -8px 6px;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.person-sticky-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.person-nav-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  padding: 2px 8px;
+}
+
+.person-nav-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #94a3b8);
+  background: var(--surface, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.person-nav-pill-btn:hover:not(:disabled) {
+  color: var(--text, #f8fafc);
+  background: var(--surface-raised, rgba(255, 255, 255, 0.08));
+  border-color: var(--border-hover, rgba(255, 255, 255, 0.2));
+  transform: translateY(-1px);
+}
+
+.person-nav-pill-btn.active {
+  color: #ffffff;
+  background: var(--accent, #ff8a33);
+  border-color: var(--accent, #ff8a33);
+  box-shadow: 0 2px 10px var(--accent-soft, rgba(255, 138, 51, 0.35));
+}
+
+.person-nav-pill-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.person-nav-pill-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+}
+
+/* Enhanced 2-Column Cockpit Layout */
+.person-cockpit-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  gap: 24px;
+  align-items: start;
+  width: 100%;
+}
+
+@media (max-width: 1180px) {
+  .person-cockpit-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+.person-main-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.person-sticky-sidebar {
+  position: sticky;
+  top: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: calc(100vh - 74px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+.person-sticky-sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.person-sticky-sidebar::-webkit-scrollbar-thumb {
+  background: var(--border, rgba(255, 255, 255, 0.15));
+  border-radius: 4px;
+}
+
+@media (max-width: 1180px) {
+  .person-sticky-sidebar {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
+  }
+}
+
+/* Card Improvements & Scroll Margin */
+.person-section-card {
+  scroll-margin-top: 64px;
+  border-radius: 14px;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.person-section-card:focus-within {
+  border-color: rgba(255, 138, 51, 0.3);
+}
+
+.person-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.person-section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.person-section-tag {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--accent-soft, rgba(255, 138, 51, 0.14));
+  color: var(--accent, #ff8a33);
+}
+
+/* CV Inline Viewer Enhancements */
+.cv-inline-card {
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface, #111827);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
+.cv-inline-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  background: var(--surface-raised, rgba(255, 255, 255, 0.03));
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  flex-wrap: wrap;
+}
+
+.cv-inline-body {
+  position: relative;
+  width: 100%;
+  height: 580px;
+  transition: height 0.25s ease;
+  background: #0b0f19;
+}
+
+.cv-inline-body.expanded {
+  height: 840px;
+}
+
+.cv-inline-body.collapsed {
+  height: 280px;
+}
+
+/* Compact Timeline inside CRM Action Bar */
+.crm-timeline-card {
+  background: var(--surface, #111827);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.crm-timeline-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+
+.crm-timeline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  position: relative;
+}
+
+.crm-timeline-bullet {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent, #ff8a33);
+  margin-top: 5px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(255, 138, 51, 0.2));
+}
+
+.crm-timeline-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.crm-timeline-action {
+  font-weight: 600;
+  color: var(--text, #f8fafc);
+  line-height: 1.35;
+}
+
+.crm-timeline-time {
+  font-size: 11.5px;
+  color: var(--text-muted, #94a3b8);
+  margin-top: 2px;
+}

@@ -141,14 +141,19 @@ class _DenseBranch:
                 connection.close()
 
 
+#: Cùng một lưới phạm vi với nhánh vector — định nghĩa ở `vector_index` để hai
+#: nhánh của ② không thể trôi khỏi nhau. Nhánh này lọc lúc TRUY VẤN vì chỉ mục
+#: có thể còn hàng cũ của người vừa mất quyền xuất hiện.
+VISIBLE = vector_index.VISIBLE
+
+
 def _fts_person_ids(query, limit):
     """Full-text trên đoạn CV và projection hồ sơ; SQLite lùi về icontains."""
     out = []
     chunks = vector_index.fts_filter(
-        CVChunk.objects.filter(person__merged_into__isnull=True), "text_norm", query)
+        CVChunk.objects.filter(**VISIBLE), "text_norm", query)
     docs = vector_index.fts_filter(
-        PersonSearchDocument.objects.filter(person__merged_into__isnull=True),
-        "content_norm", query)
+        PersonSearchDocument.objects.filter(**VISIBLE), "content_norm", query)
     if chunks is None:                              # không phải PostgreSQL
         terms = [t for t in _fold(query).split() if len(t) >= 3][:6]
         if not terms:
@@ -156,12 +161,11 @@ def _fts_person_ids(query, limit):
         lexical = Q()
         for term in terms:
             lexical |= Q(text_norm__icontains=term)
-        chunks = CVChunk.objects.filter(lexical).filter(person__merged_into__isnull=True)
+        chunks = CVChunk.objects.filter(lexical).filter(**VISIBLE)
         profile_q = Q()
         for term in terms:
             profile_q |= Q(content_norm__icontains=term)
-        docs = PersonSearchDocument.objects.filter(profile_q).filter(
-            person__merged_into__isnull=True)
+        docs = PersonSearchDocument.objects.filter(profile_q).filter(**VISIBLE)
     for person_id in list(chunks.values_list("person_id", flat=True)[:limit]):
         if person_id not in out:
             out.append(person_id)
@@ -240,9 +244,15 @@ def pool_for(query_plan, cap=POOL):
     return max(MIN_POOL, min(cap, limit * 6))
 
 
-def retrieve(query_plan, *, user=None, pool=None, pinned_ids=(),
-             search_queries=None):
+def retrieve(query_plan, *, pool=None, pinned_ids=(), search_queries=None):
     """`QueryPlan` → danh sách `Candidate` xếp theo độ liên quan giảm dần.
+
+    KHÔNG nhận `user`. Tham số đó từng có mặt suốt và không được đọc lần nào —
+    một chữ ký hứa việc giới hạn phạm vi theo người dùng mà thân hàm không làm.
+    Phân quyền của Talent là theo VAI TRÒ và chặn ở view
+    (`corpus_qa.can_read_cv`), không theo từng dòng dữ liệu; còn liên hệ cá nhân
+    thì đã che tại `clean_passage`. Ai thêm ACL theo dòng sau này phải sửa ở đây
+    một cách tường minh, chứ không được tin vào một tham số trang trí.
 
     `pinned_ids`: người phải CÓ trong kết quả bất kể điểm truy hồi — tên riêng
     đã giải định danh, hoặc người của lượt trước cho câu so sánh / hỏi tiếp.

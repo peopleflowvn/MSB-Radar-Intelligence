@@ -20,6 +20,14 @@ from django.db import connection
 from people.models import Person
 from .models import CVChunk, PersonSearchDocument
 
+#: Ai được phép có mặt trong chỉ mục tìm kiếm Talent, và ai được phép quay ra
+#: từ nó. `is_applicant` KHÔNG thừa bên cạnh `merged_into`: mọi đường tất định
+#: của Answer Engine (`count`, `resolve`, `superlative`, `structured_match`,
+#: `corpus`) đều đi qua `Person.applicants()`. Lệch phạm vi giữa chỉ mục và
+#: những đường đó nghĩa là "có bao nhiêu người X" và "liệt kê người X" trả hai
+#: con số khác nhau trên cùng một kho.
+VISIBLE = {"person__is_applicant": True, "person__merged_into__isnull": True}
+
 
 def fold_text(text):
     """Bỏ dấu + hạ chữ thường. Là dạng được đánh chỉ mục full-text (`*_norm`).
@@ -241,11 +249,23 @@ def index_person(person_id, *, with_embeddings=True):
     rẻ, không gọi mạng, không làm ingest chậm hay hỏng vì provider lỗi. Vector do
     worker nền (`embed_talent_index`) bù sau theo `embedding_fingerprint`.
     """
-    person = (Person.objects.filter(pk=person_id, merged_into__isnull=True)
+    # `applicants()` chứ không chỉ `merged_into__isnull=True`: người có
+    # `is_applicant=False` là người được NHẮC TỚI trong CV của người khác (sếp
+    # cũ, người giới thiệu — xem `intel/contacts.py`), không phải hồ sơ ứng
+    # tuyển. Chỗ đó đã ghi rõ ý định "để tìm kiếm ứng viên và thống kê corpus
+    # không đếm họ", nhưng chỉ mình `Person.applicants()` thực thi được — chỉ
+    # mục thì không, nên họ vẫn vào pool đọc sâu của Answer Engine và bị gọi là
+    # "ứng viên". Không lập chỉ mục họ thì vừa đúng ngữ nghĩa vừa khỏi trả tiền
+    # embedding cho hồ sơ không ai được phép tìm thấy.
+    person = (Person.applicants().filter(pk=person_id)
               .select_related("talent_profile")
               .prefetch_related("documents", "source_records").first())
     if person is None:
+        # Xoá cả chunk, không riêng projection: một người đang là ứng viên rồi
+        # bị gộp / bị bỏ cờ ứng tuyển phải RỜI HẲN chỉ mục, nếu không nhánh
+        # dense đoạn CV vẫn trả họ về mãi mãi.
         PersonSearchDocument.objects.filter(person_id=person_id).delete()
+        CVChunk.objects.filter(person_id=person_id).delete()
         return None
     content = document_text(person)
     fingerprint = hashlib.sha256(content.encode("utf-8")).hexdigest()
@@ -308,12 +328,16 @@ def search(query, *, limit=250):
     if not vector:
         return []
     from pgvector.django import CosineDistance
+    # `VISIBLE` là lưới an toàn ở tầng TRUY VẤN, song song với lưới ở tầng lập
+    # chỉ mục (`index_person`). Chỉ mục có thể cũ — người vừa bị gộp hoặc vừa bị
+    # bỏ cờ ứng tuyển sáng nay vẫn còn vector tới lúc worker chạy lại. Đây là
+    # nhánh DUY NHẤT trước đây không lọc gì cả, kể cả `merged_into`.
     rows = list(PersonSearchDocument.objects.exclude(embedding__isnull=True)
-                .filter(embedding_model=model)
+                .filter(embedding_model=model, **VISIBLE)
                 .annotate(distance=CosineDistance("embedding", vector))
                 .order_by("distance").values_list("person_id", flat=True)[:limit])
     chunks = list(CVChunk.objects.exclude(embedding__isnull=True)
-                  .filter(embedding_model=model)
+                  .filter(embedding_model=model, **VISIBLE)
                   .annotate(distance=CosineDistance("embedding", vector))
                   .order_by("distance").values_list("person_id", flat=True)[:limit])
     out = []

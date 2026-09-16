@@ -385,19 +385,16 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
                                 if pid not in {row.person_id for row in candidates}]
                 if missing_pins:
                     pinned = retrieve_stage.retrieve(
-                        active_plan, user=user, pinned_ids=missing_pins,
-                        search_queries=[])
+                        active_plan, pinned_ids=missing_pins, search_queries=[])
                     candidates = pinned + candidates
             except Exception as exc:               # noqa: BLE001
                 log.warning("answer: Intelligence retrieval failed; using local fallback: %s", exc)
                 candidates = retrieve_stage.retrieve(
-                    active_plan, user=user, pinned_ids=pinned_ids,
-                    search_queries=queries)
+                    active_plan, pinned_ids=pinned_ids, search_queries=queries)
                 retrieval_engine = "product-core-fallback"
         else:
             candidates = retrieve_stage.retrieve(
-                active_plan, user=user, pinned_ids=pinned_ids,
-                search_queries=queries)
+                active_plan, pinned_ids=pinned_ids, search_queries=queries)
         if active_plan.shape == "count":
             from people.models import Person
             eligible = set(Person.applicants().filter(

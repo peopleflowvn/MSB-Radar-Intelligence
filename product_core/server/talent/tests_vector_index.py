@@ -74,3 +74,54 @@ class IndexPersonTest(TestCase):
         document.save(update_fields=["parsed_text"])
         vector_index.index_person(self.person.pk, with_embeddings=False)
         self.assertEqual(CVChunk.objects.filter(person=self.person).count(), 1)
+
+
+class IndexScopeTest(TestCase):
+    """Chỉ ỨNG VIÊN được vào chỉ mục — lưới chống rò rỉ của ② (audit 16/09/2026).
+
+    `intel/contacts.py` đặt `is_applicant=False` cho người chỉ được NHẮC TỚI
+    trong CV của người khác (sếp cũ, người giới thiệu), kèm đúng câu "để tìm
+    kiếm ứng viên và thống kê corpus không đếm họ". Ý định đó trước đây chỉ
+    được `Person.applicants()` thực thi, mà `Person.applicants()` thì không có
+    mặt ở tầng chỉ mục lẫn tầng truy hồi — nên sau một lần
+    `rebuild_talent_vector_index`, họ vào pool đọc sâu và bị Radar gọi là
+    "ứng viên".
+    """
+
+    def setUp(self):
+        self.ung_vien = Person.objects.create(display_name="Nguyễn Ứng Viên")
+        Document.objects.create(person=self.ung_vien, sha256="b1", parse_status="done",
+                                parsed_text="Chuyên viên tín dụng tại ngân hàng. " * 40)
+        self.nguoi_duoc_nhac = Person.objects.create(
+            display_name="Trần Được Nhắc", is_applicant=False)
+        Document.objects.create(person=self.nguoi_duoc_nhac, sha256="b2",
+                                parse_status="done",
+                                parsed_text="Chuyên viên tín dụng tại ngân hàng. " * 40)
+
+    def test_non_applicant_is_not_indexed(self):
+        vector_index.index_person(self.nguoi_duoc_nhac.pk, with_embeddings=False)
+        self.assertFalse(PersonSearchDocument.objects.filter(
+            person=self.nguoi_duoc_nhac).exists())
+        self.assertFalse(CVChunk.objects.filter(person=self.nguoi_duoc_nhac).exists())
+
+    def test_losing_applicant_flag_removes_existing_index_rows(self):
+        """Mất cờ ứng viên phải RỜI HẲN chỉ mục, cả projection lẫn chunk.
+
+        Chỉ xoá projection thì nhánh dense đoạn CV vẫn trả người đó về mãi.
+        """
+        vector_index.index_person(self.ung_vien.pk, with_embeddings=False)
+        self.assertTrue(CVChunk.objects.filter(person=self.ung_vien).exists())
+
+        Person.objects.filter(pk=self.ung_vien.pk).update(is_applicant=False)
+        vector_index.index_person(self.ung_vien.pk, with_embeddings=False)
+
+        self.assertFalse(PersonSearchDocument.objects.filter(person=self.ung_vien).exists())
+        self.assertFalse(CVChunk.objects.filter(person=self.ung_vien).exists())
+
+    def test_merged_person_also_leaves_the_index(self):
+        vector_index.index_person(self.ung_vien.pk, with_embeddings=False)
+        primary = Person.objects.create(display_name="Nguyễn Ứng Viên (gốc)")
+        Person.objects.filter(pk=self.ung_vien.pk).update(merged_into=primary)
+        vector_index.index_person(self.ung_vien.pk, with_embeddings=False)
+        self.assertFalse(PersonSearchDocument.objects.filter(person=self.ung_vien).exists())
+        self.assertFalse(CVChunk.objects.filter(person=self.ung_vien).exists())
