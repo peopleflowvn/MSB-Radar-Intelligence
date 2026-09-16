@@ -1062,10 +1062,19 @@ export interface ProspectRow {
   };
   why: string[];
   has_open_opportunity: boolean;
+  /** Chỉ có ở kết quả của engine mới (`/rb/ask/`): hành động tiếp theo do CODE
+   *  chọn từ trạng thái liên hệ + lịch sử tiếp cận. Hiển thị nguyên văn. */
+  action_label?: string;
+  /** Tín hiệu mới nhất cách đây bao nhiêu ngày. */
+  freshest_days?: number | null;
 }
 
 export interface ProspectResponse {
-  mode?: "search" | "conversation";
+  /** `answer` = Growth Answer Engine (`/rb/ask/`): câu trả lời có dẫn chứng, KHÔNG
+   *  có bộ tiêu chí 8 khoá — giao diện không được hiện thẻ tiêu chí rỗng cho nó. */
+  mode?: "search" | "conversation" | "answer";
+  /** Chỉ có ở `mode: "answer"`. */
+  answer_plan?: ProspectAnswerPlan;
   answer?: string;
   question: string;
   criteria: ProspectCriteria;
@@ -1718,10 +1727,115 @@ export async function talentAskTurn(clientTurnId: string): Promise<TalentTurnRes
   return (await res.json()) as TalentTurnResult;
 }
 
+/** Cách ① của Growth Answer Engine hiểu câu hỏi — nằm trong `trace.plan`.
+ *  Hiện ra cho RM TRƯỚC danh sách: ràng buộc sản phẩm "tiêu chí luôn hiện ra"
+ *  áp cho engine mới y như cho bộ lọc 8 khoá cũ. */
+export interface ProspectAnswerPlan {
+  shape?: string;
+  information_need?: string;
+  must_have?: string[];
+  should_have?: string[];
+  products?: string[];
+  filters?: Record<string, string | number | boolean>;
+  limit?: number;
+  fallback?: boolean;
+}
+
+/** Một khách hàng trong kết quả của Growth Answer Engine (`/rb/ask/`).
+ *  Mang đủ trường của `ProspectRow` để thẻ kết quả sẵn có hiển thị được. */
+export interface ProspectAnswerPerson {
+  person_id: number;
+  name: string;
+  location: string;
+  occupation: string;
+  has_open_opportunity: boolean;
+  /** Lời giải thích từ BẰNG CHỨNG đứng đầu, lý do chấm điểm theo sau. */
+  reasons: string[];
+  why: string;
+  product: string;
+  priority_score: number;
+  scores: Partial<ProspectRow["scores"]>;
+  /** "nhu_cau" (hành động được ngay) | "trang_thai" | "khong_ro". */
+  need_kind: string;
+  /** Tín hiệu MỚI NHẤT cách đây bao nhiêu ngày; null khi chỉ có dữ liệu tĩnh. */
+  freshest_days: number | null;
+  /** Mã hành động do CODE chọn — giao diện không được tự đổi. */
+  action: string;
+  action_label: string;
+  sources: number[];
+  url: string;
+}
+
+/** Nối `people` của engine mới vào `ProspectRow` mà thẻ kết quả + nút "Tạo cơ
+ *  hội" đang dùng. Một chỗ duy nhất làm việc này, để hai hình dạng không trôi
+ *  khỏi nhau ở nhiều nơi. */
+export function prospectRowFromAnswer(person: ProspectAnswerPerson): ProspectRow {
+  const scores = person.scores ?? {};
+  return {
+    person_id: person.person_id,
+    display_name: person.name,
+    location: person.location ?? "",
+    occupation: person.occupation ?? "",
+    product: person.product ?? "",
+    priority_score: person.priority_score ?? 0,
+    scores: {
+      fit: scores.fit ?? 0,
+      need: scores.need ?? 0,
+      timing: scores.timing ?? 0,
+      reachability: scores.reachability ?? 0,
+      value: scores.value ?? 0,
+    },
+    why: person.reasons?.length ? person.reasons : (person.why ? [person.why] : []),
+    has_open_opportunity: Boolean(person.has_open_opportunity),
+    action_label: person.action_label || undefined,
+    freshest_days: person.freshest_days ?? null,
+  };
+}
+
+/** Growth Answer Engine — trả lời câu hỏi tìm khách hàng tiềm năng có dẫn chứng.
+ *  Cùng khuôn sự kiện SSE với `talentAsk`. */
+export async function* rbAsk(body: {
+  q: string;
+  conversation_id?: string;
+  client_turn_id?: string;
+  history?: HistoryTurn[];
+}, signal?: AbortSignal): AsyncGenerator<AnswerStreamEvent> {
+  const response = await fetch("/api/v1/rb/ask/", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    let detail = `HTTP ${response.status}`;
+    try {
+      detail = (await response.json()).detail ?? detail;
+    } catch {
+      /* giữ thông báo theo mã trạng thái */
+    }
+    throw new ApiError(response.status, detail);
+  }
+  yield* readSse<AnswerStreamEvent>(response);
+}
+
+/** Lấy lại một lượt Growth khi mobile rớt kết nối — cùng hợp đồng `talentAskTurn`. */
+export async function rbAskTurn(clientTurnId: string): Promise<TalentTurnResult> {
+  const res = await fetch(`/api/v1/rb/ask/turn/${encodeURIComponent(clientTurnId)}/`, {
+    credentials: "same-origin",
+    headers: { "X-CSRFToken": csrfToken() },
+  });
+  if (res.status === 202) return { state: "running" };
+  if (!res.ok) throw new ApiError(res.status, `HTTP ${res.status}`);
+  return (await res.json()) as TalentTurnResult;
+}
+
 export const api = {
   assistantStream,
   talentAsk,
   talentAskTurn,
+  rbAsk,
+  rbAskTurn,
   /** Đánh giá một câu trả lời. Không có tín hiệu này thì không có cách nào biết
    *  chất lượng đang lên hay xuống. */
   aiFeedback: (body: {

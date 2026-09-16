@@ -67,7 +67,25 @@ class AnswerResult:
 
 
 def _people(chosen, actions, sources):
-    """Danh sách khách cho giao diện — kèm điểm, sản phẩm, hành động, nguồn."""
+    """Danh sách khách cho giao diện — kèm điểm, sản phẩm, hành động, nguồn.
+
+    Mang đủ các trường của `ProspectRow` bên web (`location`, `occupation`,
+    `has_open_opportunity`, và `reasons` dạng mảng) để thẻ kết quả + nút "Tạo cơ
+    hội" đang có hiển thị được kết quả của engine mới mà không phải viết lại.
+    `reasons` đặt lời giải thích từ BẰNG CHỨNG lên đầu, lý do chấm điểm xuống
+    sau: "tự viết cần vay mua xe 4 ngày trước" có ích cho RM hơn "nghề nghiệp
+    cấp quản lý".
+    """
+    from people.models import Person
+    from ..models import RBOpportunity
+
+    ids = [j.person_id for j in chosen]
+    facts = {row["pk"]: row for row in Person.objects.filter(pk__in=ids).values(
+        "pk", "location", "rb_profile__occupation")}
+    open_ids = set(RBOpportunity.objects.filter(
+        person_id__in=ids, status__in=RBOpportunity.OPEN_STATUSES)
+        .values_list("person_id", flat=True))
+
     by_person = {}
     for source in sources:
         by_person.setdefault(source["person_id"], []).append(source["n"])
@@ -75,9 +93,16 @@ def _people(chosen, actions, sources):
     for judgement in chosen:
         detail = (judgement.criteria or [{}])[0]
         code = actions.get(judgement.person_id, "WAIT")
+        fact = facts.get(judgement.person_id) or {}
+        reasons = [judgement.why] if judgement.why else []
+        reasons += [str(r) for r in (detail.get("why") or [])]
         out.append({
             "person_id": judgement.person_id,
             "name": judgement.name,
+            "location": fact.get("location") or "",
+            "occupation": fact.get("rb_profile__occupation") or "",
+            "has_open_opportunity": judgement.person_id in open_ids,
+            "reasons": reasons,
             "why": judgement.why,
             "product": detail.get("product", ""),
             "priority_score": detail.get("priority_score", 0.0),
@@ -328,7 +353,12 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
         yield from _stream_chat(question, query_plan, envelope, user, started, adapter)
         return
 
-    yield {"type": "preamble", "text": _preamble(query_plan, question)}
+    # Kế hoạch đi KÈM preamble, tức ngay sau ① và TRƯỚC ②③. Ràng buộc sản phẩm
+    # "tiêu chí luôn hiện ra" nói RM phải thấy hệ thống hiểu câu hỏi thế nào
+    # trước khi tin danh sách — gửi kế hoạch cùng lúc với danh sách ở `done` là
+    # đúng chữ nhưng sai tinh thần.
+    yield {"type": "preamble", "text": _preamble(query_plan, question),
+           "plan": query_plan.as_dict()}
 
     query_plan, chosen, near, stats, trace = yield from _pipeline(
         question, envelope=envelope, user=user, complete_fn=complete_fn,

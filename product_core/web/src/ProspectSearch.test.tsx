@@ -72,7 +72,16 @@ function renderSearch() {
   );
 }
 
+/**
+ * Đường DỰ PHÒNG: engine mới (`/rb/ask/`) hỏng trước khi trả chữ nào → giao diện
+ * rơi về bộ lọc 8 khoá (`/rb/prospects/`). Ép `rbAsk` hỏng TƯỜNG MINH ở đây —
+ * trước đây những test này chỉ qua được vì `fetch` thật trong jsdom tình cờ lỗi,
+ * tức chúng canh đường dự phòng mà không ai biết.
+ */
 async function ask(body: ProspectResponse) {
+  vi.spyOn(api, "rbAsk").mockImplementation(async function* () {
+    throw new Error("engine mới không phản hồi");
+  });
   vi.spyOn(api, "rbProspects").mockResolvedValue(body);
   renderSearch();
   fireEvent.change(screen.getByPlaceholderText(/Mô tả chân dung/), {
@@ -84,7 +93,7 @@ async function ask(body: ProspectResponse) {
   );
 }
 
-describe("Tìm khách bằng ngôn ngữ tự nhiên", () => {
+describe("Tìm khách bằng ngôn ngữ tự nhiên (đường dự phòng 8 khoá)", () => {
   it("gợi ý câu hỏi mẫu khi chưa hỏi gì", () => {
     renderSearch();
     expect(screen.getByText(/quan tâm thẻ tín dụng/)).toBeInTheDocument();
@@ -234,3 +243,114 @@ describe("Tìm khách bằng ngôn ngữ tự nhiên", () => {
     expect(ask).not.toHaveBeenCalled();
   });
 });
+
+describe("Growth Answer Engine — đường chính", () => {
+  const PLAN = {
+    shape: "find_prospects",
+    information_need: "khách cần vay mua xe",
+    must_have: ["có nhu cầu vay mua xe"],
+    products: ["auto_loan"],
+    limit: 20,
+  };
+  const PERSON = {
+    person_id: 42,
+    name: "Trần Thị Bình",
+    location: "Đà Nẵng",
+    occupation: "Chủ cửa hàng",
+    has_open_opportunity: false,
+    reasons: ["Tự viết cần vay mua xe điện 4 ngày trước.", "Có liên hệ"],
+    why: "Tự viết cần vay mua xe điện 4 ngày trước.",
+    product: "auto_loan",
+    priority_score: 81.2,
+    scores: { fit: 70, need: 90, timing: 95, reachability: 80, value: 60 },
+    need_kind: "nhu_cau",
+    freshest_days: 4,
+    action: "CALL_NOW",
+    action_label: "Gọi ngay",
+    sources: [1],
+    url: "/person/42?from=rb",
+  };
+
+  async function askEngine(events: Array<{ event: string; data: Record<string, unknown> }>) {
+    const stream = vi.spyOn(api, "rbAsk").mockImplementation(async function* () {
+      for (const ev of events) yield ev as never;
+    });
+    const legacy = vi.spyOn(api, "rbProspects");
+    renderSearch();
+    fireEvent.change(screen.getByPlaceholderText(/Mô tả chân dung/), {
+      target: { value: "khách nào cần vay mua xe" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Tìm khách hàng" }));
+    return { stream, legacy };
+  }
+
+  const fullTurn = [
+    { event: "step", data: { label: "Hiểu yêu cầu", state: "done" } },
+    { event: "preamble", data: { text: "Mình hiểu bạn cần…", plan: PLAN } },
+    { event: "step", data: { label: "Tìm khách hàng", state: "active" } },
+    { event: "answer", data: { text: "1. **Trần Thị Bình** cần vay mua xe [1]." } },
+    { event: "done", data: {
+      answer: "1. **Trần Thị Bình** cần vay mua xe [1].",
+      people: [PERSON], provider: "gemini", model: "m1", trace: { plan: PLAN } } },
+  ];
+
+  it("câu tìm khách đi engine mới, KHÔNG gọi bộ lọc 8 khoá", async () => {
+    const { stream, legacy } = await askEngine(fullTurn);
+    expect(await screen.findByText("Trần Thị Bình")).toBeInTheDocument();
+    expect(stream).toHaveBeenCalledTimes(1);
+    expect(legacy).not.toHaveBeenCalled();
+  });
+
+  it("vẫn hiện cách hệ thống hiểu câu hỏi — ràng buộc 'tiêu chí luôn hiện ra'", async () => {
+    await askEngine(fullTurn);
+    expect(await screen.findByText(/Hệ thống hiểu câu hỏi/)).toBeInTheDocument();
+    expect(screen.getByText("Phạm vi: Toàn kho khách hàng")).toBeInTheDocument();
+    expect(screen.getByText("Bắt buộc: có nhu cầu vay mua xe")).toBeInTheDocument();
+  });
+
+  it("kế hoạch hiện NGAY từ preamble, trước khi có danh sách", async () => {
+    // Dừng ở preamble: chưa có `done`, chưa có khách nào.
+    await askEngine(fullTurn.slice(0, 2));
+    expect(await screen.findByText("Bắt buộc: có nhu cầu vay mua xe")).toBeInTheDocument();
+    expect(screen.queryByText("Trần Thị Bình")).not.toBeInTheDocument();
+  });
+
+  it("hiện hành động do hệ thống chọn và độ mới của tín hiệu", async () => {
+    await askEngine(fullTurn);
+    expect(await screen.findByText(/→ Gọi ngay/)).toBeInTheDocument();
+    expect(screen.getByText(/tín hiệu 4 ngày trước/)).toBeInTheDocument();
+  });
+
+  it("nói đúng thứ tự đang sắp: mức đáng ưu tiên, không phải độ khớp chữ", async () => {
+    await askEngine(fullTurn);
+    expect(await screen.findByText(/xếp theo mức đáng ưu tiên liên hệ/)).toBeInTheDocument();
+  });
+
+  it("bản sửa sau kiểm trích dẫn THAY bản cũ, không nối thêm", async () => {
+    await askEngine([
+      { event: "preamble", data: { text: "…", plan: PLAN } },
+      { event: "answer", data: { text: "Bản nháp thiếu nguồn." } },
+      { event: "revision", data: { text: "Bản đã sửa có nguồn [1]." } },
+      { event: "done", data: { answer: "Bản đã sửa có nguồn [1].", people: [PERSON],
+        trace: { plan: PLAN } } },
+    ]);
+    expect(await screen.findByText(/Bản đã sửa có nguồn/)).toBeInTheDocument();
+    expect(screen.queryByText(/Bản nháp thiếu nguồn/)).not.toBeInTheDocument();
+  });
+
+  it("engine hỏng GIỮA CHỪNG (đã có chữ) thì giữ chữ, KHÔNG rơi về đường cũ", async () => {
+    vi.spyOn(api, "rbAsk").mockImplementation(async function* () {
+      yield { event: "answer", data: { text: "Đang viết dở" } } as never;
+      throw new Error("mất kết nối");
+    });
+    const legacy = vi.spyOn(api, "rbProspects");
+    renderSearch();
+    fireEvent.change(screen.getByPlaceholderText(/Mô tả chân dung/), {
+      target: { value: "khách nào cần vay mua xe" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Tìm khách hàng" }));
+    expect(await screen.findByText(/Đang viết dở/)).toBeInTheDocument();
+    expect(legacy).not.toHaveBeenCalled();
+  });
+});
+

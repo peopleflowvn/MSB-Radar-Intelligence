@@ -6,11 +6,15 @@ Cùng khuôn với `talent/answer_views.py` có chủ ý: cùng sự kiện SSE 
 sống sót khi client rớt, cùng endpoint lấy lại lượt. Giao diện Growth dựng được
 trên đúng bộ xử lý luồng mà `AiSearch.tsx` đã có.
 
-**Không thay `POST /api/v1/rb/prospects/` ngay.** Endpoint cũ vẫn chạy nguyên, vì
-màn hình tiêu chí sửa được của nó là một ràng buộc sản phẩm có thật ("RM phải
-thấy hệ thống hiểu câu hỏi thế nào trước khi tin vào danh sách"). Đường mới trả
-lời bằng câu chữ có trích dẫn; hai thứ phục vụ hai nhu cầu khác nhau cho tới khi
-giao diện mới có cách hiển thị tương đương cho kế hoạch của ①.
+**Ràng buộc "tiêu chí luôn hiện ra" vẫn giữ.** RM phải thấy hệ thống hiểu câu hỏi
+thế nào trước khi tin danh sách. Engine mới không có 8 khoá, nên sự kiện
+`preamble` mang kế hoạch của ① (phạm vi, điều kiện bắt buộc, sản phẩm, bộ lọc) —
+phát ngay sau ①, TRƯỚC khi tìm và đọc — và giao diện hiện nó ở đúng thẻ mà bộ
+tiêu chí cũ từng chiếm (`ProspectSearch.tsx::PlanChips`).
+
+**`POST /api/v1/rb/prospects/` KHÔNG bị gỡ.** Giao diện dùng nó làm đường dự phòng
+khi endpoint này hỏng trước khi kịp trả chữ nào — thà một danh sách lọc thô còn
+hơn một ô chat trống.
 """
 import json
 import logging
@@ -146,7 +150,8 @@ def prospect_ask(request):
                     persist=_persist_full):
                 kind = chunk.get("type")
                 if kind == "preamble":
-                    yield _sse("preamble", {"text": chunk.get("text") or ""})
+                    yield _sse("preamble", {"text": chunk.get("text") or "",
+                                            "plan": chunk.get("plan") or {}})
                 elif kind == "step":
                     yield _sse("step", {"label": chunk.get("label") or "",
                                         "state": chunk.get("state") or "active"})
