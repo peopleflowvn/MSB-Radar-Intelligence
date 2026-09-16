@@ -6,10 +6,18 @@ on:
       confirm_maintenance:
         description: "Type PRUNE_UNUSED_DOCKER_CACHE"
         required: true
+  # Weekly instead of per-deploy: this restarts the Docker/containerd daemons
+  # (brief interruption, compose `restart: unless-stopped` plus the health-wait
+  # loop below bring production back) — not something to run on every deploy,
+  # but the disk keeps refilling between manual runs if nobody remembers to
+  # dispatch this by hand. 03:00 ICT Monday (UTC+7) — deep off-hours for a
+  # Vietnamese-bank-hours internal tool.
+  schedule:
+    - cron: "0 20 * * 0"
 
 jobs:
   prune-unused-cache:
-    if: ${{ inputs.confirm_maintenance == 'PRUNE_UNUSED_DOCKER_CACHE' }}
+    if: github.event_name == 'schedule' || inputs.confirm_maintenance == 'PRUNE_UNUSED_DOCKER_CACHE'
     runs-on: [self-hosted, oracle, intelligence]
     steps:
       - name: Reclaim only unused Docker build data

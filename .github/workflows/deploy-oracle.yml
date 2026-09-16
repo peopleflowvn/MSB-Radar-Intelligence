@@ -132,6 +132,7 @@ jobs:
             | gzip > "/home/ubuntu/msb-radar-platform/backups/pre-${RELEASE_SHA}.dump.gz"
           test -s "/home/ubuntu/msb-radar-platform/backups/pre-${RELEASE_SHA}.dump.gz"
       - name: Deploy both services from this repository
+        id: deploy_services
         shell: bash
         env:
           RELEASE_SHA: ${{ github.sha }}
@@ -139,6 +140,10 @@ jobs:
           set -euo pipefail
           release="/home/ubuntu/msb-radar-platform/releases/${RELEASE_SHA}"
           previous=$(sudo cat /home/ubuntu/msb-radar-platform/current-sha 2>/dev/null || true)
+          # Captured BEFORE `current`/`current-sha` move below, for the rollback
+          # step further down — it only fires when THIS step (id: deploy_services)
+          # fully succeeds but the health verification after it fails.
+          echo "PREVIOUS_SHA=${previous}" >> "$GITHUB_ENV"
           build_product_core=1
           reuse_intelligence_parent=
           while read -r ancestor; do
@@ -202,6 +207,77 @@ jobs:
           sudo docker logs msbradar-hub --tail 100 || true
           sudo docker logs msbradar-intelligence --tail 100 || true
           sudo docker logs msbradar-intelligence-indexer --tail 100 || true
+          exit 1
+      - name: Roll back to the previous release if verification failed
+        # Fires ONLY when "Deploy both services" fully succeeded (both stacks
+        # replaced, `current`/`current-sha` already moved to the new SHA) but
+        # the health check right after it failed — i.e. the deploy "worked"
+        # but the new code is broken. Before this step existed, that state was
+        # PERMANENT until a human noticed and SSHed in.
+        #
+        # KNOWN GAP: does not cover "Deploy both services" itself failing
+        # midway — e.g. Product Core's `up -d` succeeds but the Intelligence
+        # build crashes straight after. `current-sha` is only written at the
+        # very end of that step, so in that window Product Core can already be
+        # running new (possibly broken) code while `current-sha` still shows
+        # the old one and `steps.deploy_services.outcome` reports 'failure'
+        # (skipping this step). That partial-deploy state needs a human; it is
+        # rarer than "deploy succeeds, health check catches a runtime bug",
+        # which is what this covers.
+        if: failure() && steps.deploy_services.outcome == 'success'
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          platform=/home/ubuntu/msb-radar-platform
+          if [ -z "${PREVIOUS_SHA:-}" ] || [ "${PREVIOUS_SHA}" = "${RELEASE_SHA}" ]; then
+            echo "rollback: no earlier release to restore (first deploy, or previous == current) — production stays on the failed release, needs a human"
+            exit 1
+          fi
+          previous_release="${platform}/releases/${PREVIOUS_SHA}"
+          if [ ! -d "${previous_release}/product_core" ]; then
+            echo "rollback: release directory for ${PREVIOUS_SHA} is gone — cannot auto-restore, needs a human"
+            exit 1
+          fi
+          echo "rollback: verification failed for ${RELEASE_SHA}; restoring ${PREVIOUS_SHA}"
+
+          cd "${previous_release}/product_core"
+          # Product Core has no per-SHA image tag (unlike Intelligence below) —
+          # the running image was already overwritten by the failed deploy, so
+          # restoring means rebuilding from the previous release's own source.
+          # Slower than a tagged-image swap, but correct.
+          sudo docker compose -p msbradar -f docker-compose.oracle-core.yml build hub extraction-worker embedding-worker alias-resolver
+          sudo docker compose -p msbradar -f docker-compose.oracle-core.yml up -d db hub extraction-worker embedding-worker alias-resolver web
+
+          cd "${previous_release}"
+          if sudo docker image inspect "msb-radar-intelligence:${PREVIOUS_SHA}" >/dev/null 2>&1; then
+            echo "rollback: reusing existing msb-radar-intelligence:${PREVIOUS_SHA}"
+          else
+            echo "rollback: msb-radar-intelligence:${PREVIOUS_SHA} was already reclaimed — rebuilding from source"
+            INTELLIGENCE_IMAGE_TAG="${PREVIOUS_SHA}" sudo -E docker compose -p msbradar-intelligence -f docker-compose.oracle.yml build
+          fi
+          INTELLIGENCE_IMAGE_TAG="${PREVIOUS_SHA}" sudo -E docker compose -p msbradar-intelligence -f docker-compose.oracle.yml up -d
+
+          sudo ln -sfn "${previous_release}" "${platform}/current"
+          printf '%s\n' "${PREVIOUS_SHA}" | sudo tee "${platform}/current-sha" >/dev/null
+
+          for attempt in $(seq 1 30); do
+            hub_health=$(sudo docker inspect msbradar-hub --format '{{.State.Health.Status}}' 2>/dev/null || true)
+            intelligence_health=$(sudo docker inspect msbradar-intelligence --format '{{.State.Health.Status}}' 2>/dev/null || true)
+            echo "rollback-verify attempt=${attempt} hub=${hub_health:-missing} intelligence=${intelligence_health:-missing} restored_sha=${PREVIOUS_SHA}"
+            if [ "${hub_health}" = healthy ] && [ "${intelligence_health}" = healthy ] \
+              && curl -fsS https://dev-radar.tunghr.io.vn/api/v1/health/ >/dev/null 2>&1; then
+              echo "rollback: production restored to ${PREVIOUS_SHA}"
+              # The job still ends FAILED (the deploy of ${RELEASE_SHA} did not
+              # ship) — this only confirms production itself is healthy again.
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "rollback: FAILED to restore ${PREVIOUS_SHA} — production may be down, needs a human NOW"
+          sudo docker logs msbradar-hub --tail 100 || true
+          sudo docker logs msbradar-intelligence --tail 100 || true
           exit 1
       - name: Reclaim disk from superseded Intelligence images
         shell: bash
