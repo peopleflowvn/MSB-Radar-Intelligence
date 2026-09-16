@@ -519,7 +519,14 @@ def answer(question, *, envelope=None, user=None, history=None, complete_fn=None
     query_plan = plan_stage.plan(question, envelope=envelope, complete_fn=complete_fn)
     branch = None
     internal_knowledge = None
-    if query_plan.shape == "analyze" and query_plan.needs_people:
+    # `shape=="analyze"` là nhánh cứu hộ đã biết (MSB ngân hàng bị nhầm thành
+    # kho CV). `query_plan.fallback` là một khe hở KHÁC, rộng hơn: bất kỳ lỗi
+    # nào của ① (timeout, JSON hỏng, provider chết) đều rơi về `_fallback()`,
+    # vốn LUÔN đặt `shape="find_people"` — một câu hỏi chính sách kiểu "thể lệ
+    # giới thiệu nội bộ ứng viên" gặp đúng lúc ① trục trặc sẽ bị đẩy thẳng vào
+    # pipeline tìm CV mà không ai kiểm tra kho tri thức nội bộ trước. Cùng một
+    # lưới đỡ, không phụ thuộc việc ① có phân loại đúng hay không.
+    if (query_plan.shape == "analyze" or query_plan.fallback) and query_plan.needs_people:
         from ai.conversation import knowledge_sources
         internal_knowledge = knowledge_sources(question, user)
         # Câu không hề nhắc CV/hồ sơ/ứng viên/kho (vd "tổng giám đốc msb là ai")
@@ -949,7 +956,10 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
     # liệu tri thức nội bộ luôn thắng nếu có — cùng nguyên tắc với
     # `chat.py::stream_chat` (nội bộ thắng web), chỉ khác chỗ áp dụng.
     internal_knowledge = None
-    if query_plan.shape == "analyze" and query_plan.needs_people:
+    # Xem giải thích đầy đủ ở `answer()`: `query_plan.fallback` (① lỗi/timeout,
+    # luôn rơi về shape="find_people") là một khe hở khác với "analyze" bị
+    # nhầm — cả hai đều cần lưới đỡ này trước khi chạy thẳng pipeline tìm CV.
+    if (query_plan.shape == "analyze" or query_plan.fallback) and query_plan.needs_people:
         from ai.conversation import knowledge_sources
         internal_knowledge = knowledge_sources(question, user)
         # Xem giải thích ở `answer()` — câu không nhắc CV/hồ sơ/kho mà vẫn ra

@@ -161,7 +161,13 @@ def knowledge_sources(question, user, *, limit=None):
     except Exception:                          # noqa: BLE001 - không được làm hỏng lượt
         import logging
 
-        logging.getLogger(__name__).info("knowledge context unavailable", exc_info=True)
+        # Nhánh này CHỈ chạy khi `knowledge_search` thật sự NÉM lỗi (service
+        # tri thức nội bộ chết/timeout/JSON hỏng) — thiếu quyền module hay
+        # không có tài liệu khớp trả `[]` bình thường, không tới đây. Mức
+        # WARNING để lỗi hạ tầng này lọt vào alerting thay vì chìm trong log
+        # INFO — trước đây một service chết âm thầm trông giống hệt "không có
+        # tài liệu nào khớp", không cách nào phân biệt trên production.
+        logging.getLogger(__name__).warning("knowledge context unavailable", exc_info=True)
         return []
 
 

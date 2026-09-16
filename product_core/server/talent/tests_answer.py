@@ -929,6 +929,32 @@ class EngineEndToEndTest(TestCase):
         self.assertNotIn("pass1", result.trace)
         self.assertIn("Nguyễn Hoàng Linh", result.text)
 
+    def test_ke_hoach_loi_van_khong_bo_qua_kho_tri_thuc(self):
+        """① lỗi (timeout/JSON hỏng/provider chết) luôn rơi về `_fallback()`,
+        vốn LUÔN đặt shape="find_people" — một câu chính sách gặp đúng lúc ①
+        trục trặc không được phép bỏ qua tài liệu nội bộ chỉ vì rơi vào nhánh
+        mặc định (khác hẳn trường hợp "analyze" bị nhầm, đây là lỗi kỹ thuật
+        của chính ①, không liên quan tới nội dung câu hỏi)."""
+        def boom(*args, **kwargs):
+            raise RuntimeError("provider chết")
+
+        class _FakeAdapter:
+            def stream(self, request):
+                yield {"type": "answer",
+                      "text": "Theo tài liệu nội bộ: đăng ký qua cổng Đại sứ tuyển dụng."}
+                yield {"type": "done", "response": None}
+
+        with mock.patch("ai.conversation.knowledge_sources",
+                        return_value=[("Thể lệ giới thiệu ứng viên",
+                                      "Đăng ký qua cổng Đại sứ tuyển dụng.")]), \
+                mock.patch("talent.answer.chat.websearch.enabled", return_value=False):
+            result = engine.answer(
+                "cho tôi thể lệ và cách thức giới thiệu nội bộ ứng viên cho MSB",
+                complete_fn=boom, adapter=_FakeAdapter())
+
+        self.assertNotIn("pass1", result.trace)
+        self.assertIn("Đại sứ tuyển dụng", result.text)
+
     def test_tra_web_hong_thi_lui_ve_hoi_thoai_chu_khong_tra_man_hinh_trang(self):
         caller = replies({
             plan_stage.TASK: json.dumps({"shape": "general", "search_queries": []})})
