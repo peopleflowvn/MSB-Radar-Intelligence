@@ -1,9 +1,15 @@
 # -*- coding: utf-8 -*-
 from django.urls import path
 
-from . import views
+from . import answer_views, views
 
 urlpatterns = [
+    # Growth Answer Engine — hỏi đáp có dẫn chứng, cùng khuôn `/talent/ask/`.
+    # `prospects/` bên dưới vẫn giữ: màn hình tiêu chí sửa được của nó là một
+    # ràng buộc sản phẩm riêng (xem docstring `rb/answer_views.py`).
+    path("ask/", answer_views.prospect_ask, name="rb-ask"),
+    path("ask/turn/<str:client_turn_id>/", answer_views.prospect_ask_turn,
+         name="rb-ask-turn"),
     path("people/", views.customer_search, name="rb-customer-search"),
     path("recently-viewed/", views.recently_viewed, name="rb-recently-viewed"),
     path("relationship-followups/", views.relationship_followups,

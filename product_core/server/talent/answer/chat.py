@@ -99,10 +99,16 @@ def _do_web(question, wants_web):
 
 
 def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None,
-                knowledge=None):
+                knowledge=None, surface="talent"):
     """Yield chunk giống `engine.stream_answer`: stage / answer / done.
 
     Chunk `done` mang `payload` để engine đóng gói thành `AnswerResult`.
+
+    `surface`: "talent" | "prospect". Nhánh hội thoại (chào hỏi, kiến thức chung,
+    tra web) không phụ thuộc kho nào, nên Growth dùng lại nguyên hàm này — chỉ
+    khác persona và phạm vi sản phẩm mà `ai/persona.py` gắn theo surface. Trước
+    đây giá trị này bị viết cứng "talent" ở bốn chỗ, nên RM hỏi "lãi suất vay mua
+    nhà" sẽ nhận một Radar tự giới thiệu là trợ lý tuyển dụng.
 
     `knowledge`: kết quả `knowledge_sources()` nếu bên gọi đã tự tra sẵn (ví dụ
     `engine.py` để quyết định có đẩy câu hỏi "analyze" vào nhánh này hay không
@@ -140,7 +146,7 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
         try:
             from ai import intent as intent_router
             wants_web = bool(intent_router.classify(
-                question, surface="talent", user=user).is_web)
+                question, surface=surface, user=user).is_web)
         except Exception:                          # noqa: BLE001
             wants_web = False
 
@@ -149,7 +155,7 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
         yield {"type": "stage", "stage": "web", "text": "Tra trên internet"}
         try:
             result = websearch.web_answer(
-                question, system=web_system("talent", user), adapter=model)
+                question, system=web_system(surface, user), adapter=model)
             text = str(getattr(result, "text", "") or "").strip()
             if text:
                 if not internal_sources:
@@ -176,7 +182,7 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
     if web_text:
         sources.append(("Kết quả tra Internet vừa thực hiện", web_text))
     request, guard_flags = build_conversation_request(
-        question, surface="talent", user=user, projection=projection,
+        question, surface=surface, user=user, projection=projection,
         knowledge=sources)
 
     # Bơm SỐ LIỆU THẬT về kho vào prompt khi câu hỏi có dính tới dữ liệu.
@@ -221,7 +227,7 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
         yield {"type": "stage", "stage": "web", "text": "Tra trên internet"}
         try:
             result = websearch.web_answer(
-                question, system=web_system("talent", user), adapter=model)
+                question, system=web_system(surface, user), adapter=model)
             wtext = str(getattr(result, "text", "") or "").strip()
             if wtext:
                 yield {"type": "answer", "text": wtext}

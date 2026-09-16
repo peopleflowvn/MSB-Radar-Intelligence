@@ -1,0 +1,397 @@
+# -*- coding: utf-8 -*-
+"""② Truy hồi khách hàng tiềm năng — CODE thuần, không LLM.
+
+## Khác Talent ở chỗ nào, và vì sao
+
+Talent có một kho text lớn đã lập chỉ mục vector (`PersonSearchDocument`,
+`CVChunk`), nên ② ở đó là *tìm trong một biển văn bản*. Growth thì ngược lại:
+bằng chứng nằm rải trong nhiều bảng có cấu trúc, mỗi bảng đã có chỉ mục theo
+thời gian, và **không bảng nào có vector**.
+
+Nên ② ở đây không giả vờ làm truy hồi ngữ nghĩa. Nó làm đúng thứ dữ liệu cho
+phép: dựng pool từ những đường ĐÃ CÓ CHỈ MỤC, rồi hợp nhất bằng RRF có trọng số.
+
+    social    bài khách tự viết       `SocialPost(person, -posted_at)`
+    signal    tín hiệu đã xử lý       `Signal(person, -observed_at)`
+    interest  quan tâm sản phẩm       `ProductInterest(-observed_at)`
+    outcome   kết quả tiếp cận trước  `OpportunityOutcome(-created_at)`
+    profile   nền tĩnh                `RBProfile(lead_status, -updated_at)`
+
+## Trọng số nhánh — đây là chỗ Growth khác Talent nhiều nhất
+
+Bên Talent mọi nhánh ngang nhau, và đúng: một câu khớp trong CV không đáng tin
+hơn hay kém một câu khớp khác. Ở đây thì KHÔNG ngang nhau, vì các nhánh khác
+nhau về *bản chất bằng chứng*:
+
+    lời khách tự nói ra   >  tín hiệu ta suy ra  >  thuộc tính hồ sơ
+
+"Có ai cho vay mua chung cư không ạ" do chính khách viết là bằng chứng mạnh hơn
+hẳn việc nghề nghiệp của họ khớp chữ "quản lý". Trọng số ghi lại đúng thứ tự đó,
+và `core/answer/fusion.py` nhận nó như một tham số chứ không phải một trường hợp
+đặc biệt.
+
+## Độ mới nằm TRONG truy hồi, không phải một bộ lọc
+
+`rb/prospects.py` cũ có `signal_recency_days` như một công tắc: hoặc lọc, hoặc
+không. Nhưng tín hiệu mua hàng mất giá LIÊN TỤC, không phải rơi khỏi vách đá tại
+ngày thứ 90. Nên mỗi nhánh xếp theo thời gian giảm dần và RRF lo phần còn lại —
+một tín hiệu ba ngày trước tự nhiên đứng trên một tín hiệu tám tháng trước, mà
+không ai phải chọn một con số ngày.
+
+## Ràng buộc tuân thủ là CỔNG, không phải bộ lọc
+
+`do_not_contact` và phạm vi theo RM áp ở đây, trước khi bất cứ thứ gì được xếp
+hạng — và tuyệt đối không áp ở ⑤ bằng lời dặn trong prompt. Một ràng buộc tuân
+thủ nằm trong prompt là một ràng buộc chưa có.
+"""
+from __future__ import annotations
+
+import logging
+
+from core.answer.fusion import reciprocal_rank_fusion
+from django.db.models import Q
+from django.utils import timezone
+from people.models import Person, Signal
+
+from . import evidence as evidence_stage
+from .evidence import Candidate
+
+log = logging.getLogger(__name__)
+
+#: Trần số khách ĐỌC KỸ ở ③ (ngân sách token một lượt).
+POOL = 60
+#: Sàn — dưới mức này ③ không còn gì để loại, và câu "có ai … không?" cần mẫu
+#: đủ rộng mới trả lời trung thực được.
+MIN_POOL = 16
+#: Trần mỗi nhánh. RRF cần dư ứng viên để xếp hạng khi kho lớn.
+PER_BRANCH = 120
+
+#: Trọng số theo BẢN CHẤT bằng chứng, không theo độ tiện của truy vấn.
+#: Xem docstring module.
+BRANCH_WEIGHTS = {
+    "social": 1.4,      # chính lời khách viết ra
+    "signal": 1.2,      # tín hiệu đã xử lý, vẫn là quan sát thật
+    "interest": 1.0,    # suy ra có căn cứ
+    "outcome": 0.9,     # chuyện đã xảy ra — mạnh, nhưng là quá khứ
+    "profile": 0.6,     # thuộc tính tĩnh, yếu nhất
+}
+
+
+def _fold(text):
+    from talent.vector_index import fold_text
+    return fold_text(text)
+
+
+def _terms(queries, *, limit=16, min_len=3):
+    out = []
+    for query in queries:
+        for token in _fold(query).split():
+            if len(token) >= min_len and token not in out:
+                out.append(token)
+    return out[:limit]
+
+
+def pool_for(query_plan, cap=POOL):
+    """Số khách mang sang ③, theo số hồ sơ RM thật sự muốn.
+
+    ③ là chặng đắt nhất. Hỏi "5 khách đáng gọi nhất" mà đọc kỹ 60 hồ sơ để rồi
+    hiển thị 5 là trả tiền cho 55 hồ sơ không ai nhìn.
+
+    Câu TỔNG HỢP (`analyze`) lấy pool tối thiểu: câu trả lời thật nằm ở số liệu
+    toàn kho, mấy hồ sơ truy hồi được chỉ là ví dụ minh hoạ.
+    """
+    if getattr(query_plan, "shape", "") == "analyze":
+        return MIN_POOL
+    limit = max(1, int(getattr(query_plan, "limit", 20) or 20))
+    return max(MIN_POOL, min(cap, limit * 4))
+
+
+# ------------------------------------------------------------------ cổng tuân thủ
+
+def eligible_people(query_plan, *, user=None):
+    """Tập người ĐƯỢC PHÉP xuất hiện, trước mọi việc xếp hạng.
+
+    Trả một queryset `Person` đã áp:
+
+    * loại người đã gộp;
+    * **loại `do_not_contact`** — ràng buộc tuân thủ, áp kể cả khi RM hỏi đích
+      danh nhóm đó;
+    * phạm vi theo shape: `portfolio` giới hạn vào danh mục của chính RM,
+      `whitespace` giới hạn vào khách chưa ai phụ trách;
+    * các bộ lọc cứng mà ① bóc được.
+    """
+    from ..models import RBOpportunity
+
+    queryset = Person.objects.filter(merged_into__isnull=True)
+
+    # Không bao giờ được xuất hiện. Đặt ĐẦU TIÊN để không ai đọc nhầm nó như
+    # một bộ lọc tuỳ chọn nằm lẫn giữa các bộ lọc khác.
+    queryset = queryset.exclude(relationships__domain=Signal.DOMAIN_RB,
+                                relationships__do_not_contact=True)
+
+    shape = getattr(query_plan, "shape", "")
+    if shape == "portfolio":
+        # Đây là lần đầu trong hệ thống danh tính người hỏi ĐỔI TẬP KẾT QUẢ.
+        # Không có user thì trả rỗng chứ KHÔNG lặng lẽ rơi về toàn kho: "khách
+        # của tôi" mà trả khách của người khác là RM gọi nhầm người đồng nghiệp
+        # đang chăm — hỏng đắt hơn nhiều so với một danh sách rỗng.
+        if user is None or not getattr(user, "pk", None):
+            log.warning("rb.answer.retrieve: shape=portfolio nhưng không có user")
+            return queryset.none()
+        queryset = queryset.filter(rb_profile__sales_owner_id=user.pk)
+    elif shape == "whitespace":
+        queryset = queryset.filter(rb_profile__sales_owner__isnull=True).exclude(
+            rb_opportunities__status__in=RBOpportunity.OPEN_STATUSES)
+
+    filters = dict(getattr(query_plan, "filters", None) or {})
+    if filters.get("tinh_thanh"):
+        from core.vn_locations import location_query_variants
+        where = Q()
+        for variant in location_query_variants(filters["tinh_thanh"]):
+            where |= Q(location__icontains=variant)
+        queryset = queryset.filter(where)
+    if filters.get("phan_khuc"):
+        queryset = queryset.filter(rb_profile__segment=filters["phan_khuc"])
+    if filters.get("phai_co_lien_he"):
+        queryset = queryset.exclude(primary_phone="", primary_email="")
+    if filters.get("cap_bac"):
+        from .. import scoring
+        hints = (scoring.SENIOR_HINTS if filters["cap_bac"] == "manager"
+                 else ["giám đốc", "ceo", "cfo", "cto", "founder", "chủ tịch",
+                       "tổng giám đốc"])
+        where = Q()
+        for hint in hints:
+            where |= Q(rb_profile__occupation__icontains=hint)
+        queryset = queryset.filter(where)
+    if filters.get("loai_co_hoi_dang_mo"):
+        queryset = queryset.exclude(
+            rb_opportunities__status__in=RBOpportunity.OPEN_STATUSES)
+
+    # `products` KHÔNG phải cổng. Cố ý không lọc theo nó ở đây.
+    #
+    # ① suy ra `san_pham` từ câu hỏi — đó là một SUY LUẬN về nhóm sản phẩm liên
+    # quan, không phải một điều kiện RM nói ra. Lọc cứng theo
+    # `rb_profile__interests__product` nghĩa là chỉ ai ĐÃ có `ProductInterest`
+    # mới được xét, tức loại đúng người mà Growth tồn tại để tìm: khách tự viết
+    # "em cần vay mua xe" nhưng hệ thống chưa kịp suy ra quan tâm nào. Lời khách
+    # tự nói là bằng chứng MẠNH NHẤT (xem `BRANCH_WEIGHTS`), và một bộ lọc chặn
+    # nó trước khi truy hồi là tái tạo nguyên lỗi của `rb/prospects.py`.
+    #
+    # `products` vẫn có tác dụng — ở nhánh `interest` (xếp hạng) và ở ④ (chọn
+    # sản phẩm để chấm điểm), tức nó ĐẨY LÊN người có quan tâm rõ, chứ không
+    # LOẠI người chưa có.
+
+    days = filters.get("tin_hieu_trong_ngay") or 0
+    if days:
+        since = timezone.now() - timezone.timedelta(days=int(days))
+        queryset = queryset.filter(signals__domain=Signal.DOMAIN_RB,
+                                   signals__observed_at__gte=since)
+
+    # `RBProfile` không bắt buộc: một người mới bắt được từ mạng xã hội chưa có
+    # hồ sơ bán lẻ vẫn là khách tiềm năng — và thường là khách tiềm năng NHẤT.
+    # Chỉ đòi có hồ sơ khi câu hỏi thật sự cần một trường của nó.
+    if shape == "portfolio" or any(k in filters for k in ("phan_khuc", "cap_bac")):
+        queryset = queryset.filter(rb_profile__isnull=False)
+    return queryset.distinct()
+
+
+# ----------------------------------------------------------------- các nhánh
+
+def _social_ids(allowed_ids, terms, limit):
+    from social.models import SocialPost
+
+    queryset = (SocialPost.objects.filter(person_id__in=allowed_ids)
+                .exclude(person__isnull=True))
+    if terms:
+        where = Q()
+        for term in terms:
+            where |= Q(content__icontains=term)
+        queryset = queryset.filter(where)
+    return list(queryset.order_by("-posted_at", "-created_at")
+                .values_list("person_id", flat=True)[:limit])
+
+
+def _signal_ids(allowed_ids, terms, limit):
+    from django.db.models import TextField
+    from django.db.models.functions import Cast
+
+    queryset = Signal.objects.filter(person_id__in=allowed_ids,
+                                     domain=Signal.DOMAIN_RB)
+    if terms:
+        # `evidence` là JSONField. `icontains` KHÔNG phải lookup hợp lệ của
+        # JSONField (Django hiểu `contains` trên JSON là phép bao hàm JSON, ngữ
+        # nghĩa khác hẳn, và trên jsonb thì `icontains` ném lỗi). Ép sang text
+        # rồi mới khớp chữ — thô, nhưng đúng và chạy được trên cả PostgreSQL lẫn
+        # SQLite. Xem "Giới hạn đã biết" ở `coverage()`.
+        queryset = queryset.annotate(_evidence_text=Cast("evidence", TextField()))
+        where = Q()
+        for term in terms:
+            where |= Q(signal_type__icontains=term)
+            where |= Q(_evidence_text__icontains=term)
+        queryset = queryset.filter(where)
+    return list(queryset.order_by("-observed_at")
+                .values_list("person_id", flat=True)[:limit])
+
+
+def _interest_ids(allowed_ids, products, limit):
+    from ..models import ProductInterest
+
+    queryset = ProductInterest.objects.filter(profile__person_id__in=allowed_ids)
+    if products:
+        queryset = queryset.filter(product__in=products)
+    # Xếp theo ĐỘ TIN CẬY trước, rồi mới độ mới: một quan tâm chắc chắn tháng
+    # trước đáng hơn một suy đoán mơ hồ hôm qua.
+    return list(queryset.order_by("-confidence", "-observed_at")
+                .values_list("profile__person_id", flat=True)[:limit])
+
+
+def _outcome_ids(allowed_ids, limit):
+    """Người từng được tiếp cận và kết quả CHO PHÉP quay lại.
+
+    Đây là Reactivation Radar: `MAYBE_LATER` và `NO_RESPONSE` là khách đáng gọi
+    lại, còn `NOT_INTERESTED`/`ALREADY_USING` thì không — xem
+    `rb/models.py::OpportunityOutcome.REACTIVATABLE`.
+    """
+    from ..models import OpportunityOutcome
+
+    return list(OpportunityOutcome.objects
+                .filter(person_id__in=allowed_ids,
+                        outcome__in=OpportunityOutcome.REACTIVATABLE)
+                .order_by("-created_at")
+                .values_list("person_id", flat=True)[:limit])
+
+
+def _profile_ids(allowed_ids, terms, limit):
+    from ..models import RBProfile
+
+    queryset = RBProfile.objects.filter(person_id__in=allowed_ids)
+    if terms:
+        where = Q()
+        for term in terms:
+            where |= Q(occupation__icontains=term)
+            where |= Q(employer__icontains=term)
+            where |= Q(interaction_summary__icontains=term)
+        queryset = queryset.filter(where)
+    return list(queryset.order_by("-updated_at")
+                .values_list("person_id", flat=True)[:limit])
+
+
+def retrieve(query_plan, *, user=None, pool=None, pinned_ids=()):
+    """`ProspectPlan` → danh sách `Candidate` xếp theo mức đáng xem giảm dần.
+
+    `pinned_ids`: người phải CÓ trong kết quả bất kể điểm truy hồi — khách được
+    gọi đích danh, hoặc nhóm của lượt trước. Không có họ thì "so sánh A và B"
+    lần này ra, lần sau rớt một.
+
+    Người ghim VẪN đi qua cổng tuân thủ. Đây là khác biệt cố ý so với Talent:
+    ở đó ghim nghĩa là "đọc kỹ người này dù truy hồi không xếp cao"; ở đây
+    `do_not_contact` phủ quyết cả việc RM hỏi đích danh.
+    """
+    pool = pool or pool_for(query_plan)
+    pinned_ids = list(dict.fromkeys(int(p) for p in pinned_ids if p))
+
+    allowed = eligible_people(query_plan, user=user)
+    allowed_ids = list(allowed.values_list("pk", flat=True)[:5000])
+    if pinned_ids:
+        # Lọc người ghim qua đúng cổng đó — bằng một truy vấn riêng, vì họ có
+        # thể không thoả các bộ lọc mềm của câu hỏi nhưng vẫn phải được đọc.
+        gate = Person.objects.filter(pk__in=pinned_ids, merged_into__isnull=True).exclude(
+            relationships__domain=Signal.DOMAIN_RB, relationships__do_not_contact=True)
+        pinned_ids = [pid for pid in pinned_ids
+                      if pid in set(gate.values_list("pk", flat=True))]
+        allowed_ids = list(dict.fromkeys(pinned_ids + allowed_ids))
+    if not allowed_ids:
+        return []
+
+    terms = _terms(getattr(query_plan, "search_queries", None) or [])
+    products = list(getattr(query_plan, "products", None) or [])
+
+    branches = [
+        ("social", _social_ids(allowed_ids, terms, PER_BRANCH)),
+        ("signal", _signal_ids(allowed_ids, terms, PER_BRANCH)),
+        ("interest", _interest_ids(allowed_ids, products, PER_BRANCH)),
+        ("outcome", _outcome_ids(allowed_ids, PER_BRANCH)),
+        ("profile", _profile_ids(allowed_ids, terms, PER_BRANCH)),
+    ]
+    ranked, weights = [], []
+    for name, ids in branches:
+        # Giữ thứ tự, bỏ trùng: một người có sáu bài đăng khớp không được tính
+        # sáu lần trong cùng một nhánh — đó là đếm bằng chứng, không phải đếm
+        # nguồn đồng thuận, và RRF dựa vào vế sau.
+        deduped = list(dict.fromkeys(ids))
+        if deduped:
+            ranked.append(deduped)
+            weights.append(BRANCH_WEIGHTS.get(name, 1.0))
+
+    if ranked:
+        order, hits = reciprocal_rank_fusion(ranked, weights=weights)
+    else:
+        # Không nhánh nào khớp (câu hỏi quá lạ, hoặc kho chưa có tín hiệu nào).
+        # Vẫn trả người thoả cổng, để ③ đọc và nói thật là không có bằng chứng —
+        # khác hẳn với việc trả rỗng và để ⑤ kết luận "không có ai".
+        order = [(pid, 0.0) for pid in allowed_ids[:pool]]
+        hits = {}
+
+    top_ids = [pid for pid, _score in order[:pool]]
+    if pinned_ids:
+        pin_set = set(pinned_ids)
+        top_ids = pinned_ids + [pid for pid in top_ids if pid not in pin_set]
+        top_ids = top_ids[:max(pool, len(pinned_ids))]
+        pin_score = {pid: 1_000.0 - i for i, pid in enumerate(pinned_ids)}
+        order = ([(pid, pin_score[pid]) for pid in pinned_ids]
+                 + [(pid, s) for pid, s in order if pid not in pin_set])
+        for pid in pinned_ids:
+            hits.setdefault(pid, 1)
+
+    if not top_ids:
+        return []
+
+    names = dict(Person.objects.filter(pk__in=top_ids)
+                 .values_list("pk", "display_name"))
+    passages = evidence_stage.passages_for(top_ids)
+
+    # Độ sâu bằng chứng giảm dần theo thứ hạng — người đứng đầu là người ③ sẽ
+    # thật sự chọn, đáng đọc kỹ; đuôi danh sách phần lớn bị loại.
+    depth_cut = max(1, pool // 3)
+    pinned_set = set(pinned_ids)
+    candidates = []
+    for rank, (person_id, score) in enumerate(order[:max(pool, len(pinned_ids))]):
+        if person_id not in names:
+            continue
+        depth = (evidence_stage.PASSAGES_PER_PERSON if rank < depth_cut
+                 else evidence_stage.TAIL_PASSAGES)
+        rows = list(passages.get(person_id) or [])[:depth]
+        if not rows and person_id not in pinned_set:
+            continue
+        candidates.append(Candidate(
+            person_id=person_id, name=names.get(person_id) or f"#{person_id}",
+            score=round(score, 6), hits=hits.get(person_id, 0), passages=rows))
+    return candidates
+
+
+def coverage():
+    """Số liệu để trace nói thật về độ phủ, không hứa suông.
+
+    ## Giới hạn đã biết (đọc trước khi tin vào recall)
+
+    Không nhánh nào ở đây là truy hồi NGỮ NGHĨA. Khớp chữ trên `content` /
+    `evidence` / `occupation` bằng `icontains`, nên "mua chung cư" không tự khớp
+    "mua căn hộ" như vector bên Talent làm được. `search_queries` nhiều cách
+    diễn đạt của ① là cách bù hiện tại, và nó chỉ bù được một phần.
+
+    Bước mở khoá phần còn lại giống hệt đường Talent đã đi: một cột chuẩn hoá có
+    chỉ mục GIN cho `SocialPost.content` (bỏ dấu, như `CVChunk.text_norm`), rồi
+    embedding cho chính cột đó. Chưa làm ở đây vì nó là một migration + một
+    worker nền, không phải một dòng trong hàm này — và ghi ra để không ai đọc
+    `coverage()` rồi tưởng đã có.
+    """
+    from social.models import SocialPost
+    from ..models import ProductInterest, RBProfile
+
+    return {
+        "profiles": RBProfile.objects.count(),
+        "interests": ProductInterest.objects.count(),
+        "signals": Signal.objects.filter(domain=Signal.DOMAIN_RB).count(),
+        "social_posts_linked": SocialPost.objects.exclude(person__isnull=True).count(),
+        "semantic_retrieval": "NOT_IMPLEMENTED",
+    }

@@ -59,8 +59,10 @@ jobs:
           # (`talent/tests_answer.py`) — nơi ghim mọi hành vi học được từ sự cố
           # thật — chưa bao giờ chạy trong CI. Hệ quả đo được: một test tuyến
           # model đỏ từ cb59be3 mà không ai thấy, tới tận đợt audit 16/09/2026.
-          # Danh sách module sẽ lại trôi; danh sách app thì không.
-          python manage.py test talent rb ai people intel --verbosity 2
+          # Danh sách module sẽ lại trôi; danh sách app thì không. `core` mang
+          # khung Answer Engine dùng chung (core/answer/) và `social` là nguồn
+          # bằng chứng của Growth — cả hai là phụ thuộc thật của đường hỏi đáp.
+          python manage.py test talent rb ai people intel core social --verbosity 2
 
   deploy-production:
     needs: validate
