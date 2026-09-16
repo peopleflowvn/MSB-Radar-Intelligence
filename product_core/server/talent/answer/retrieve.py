@@ -21,6 +21,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 from accounts import privacy
+from core.answer.fusion import reciprocal_rank_fusion
 from django.db import connection
 from django.db.models import Q
 
@@ -100,16 +101,13 @@ def _fold(text):
 
 
 def _rrf(ranked_lists, k=RRF_K):
-    """Reciprocal Rank Fusion — không nhánh nào chiếm pool nhờ được chạy trước."""
-    scores, hits = {}, {}
-    for ranked in ranked_lists:
-        for rank, person_id in enumerate(ranked, start=1):
-            scores[person_id] = scores.get(person_id, 0.0) + 1.0 / (k + rank)
-            hits[person_id] = hits.get(person_id, 0) + 1
-    # Person id is only a stable tie-breaker after the relevance score. This
-    # prevents database/insertion order from changing who enters the deep-read pool.
-    order = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
-    return order, hits
+    """Reciprocal Rank Fusion — không nhánh nào chiếm pool nhờ được chạy trước.
+
+    Thân hàm nằm ở `core/answer/fusion.py` vì Growth dùng đúng phép hợp nhất
+    này trên các nhánh của nó. Giữ tên `_rrf` ở đây: nó là từ vựng của ② trong
+    Talent, và cả tài liệu lẫn test đều gọi bằng tên này.
+    """
+    return reciprocal_rank_fusion(ranked_lists, k=k)
 
 
 class _DenseBranch:

@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from ai.conversation import extract_thinking
 from ai.router import stream as router_stream
 from ai.telemetry import traced_answer, traced_stream
+from core.answer.steps import drain, step
 from django.conf import settings
 
 from . import act as act_stage
@@ -151,13 +152,8 @@ def _answer_people(chosen, stats, sources):
     return people
 
 
-def _step(label, state="active"):
-    """Sự kiện BƯỚC — để giao diện tick dần thay vì đổ token suy nghĩ ra.
-
-    Người dùng nói: không cần thấy suy nghĩ, cần thấy các bước đang làm để đỡ
-    sốt ruột. Nhãn ngắn, tiếng Việt, đọc là hiểu đang ở đâu.
-    """
-    return {"type": "step", "label": label, "state": state}
+#: Sự kiện BƯỚC — hợp đồng với giao diện nằm ở `core/answer/steps.py`.
+_step = step
 
 
 def _preamble(query_plan, question):
@@ -194,13 +190,8 @@ def _preamble(query_plan, question):
     return body + " Đang thực hiện…"
 
 
-def _drain(gen):
-    """Chạy hết một generator, trả `return`-value của nó (bỏ mọi thứ nó yield)."""
-    try:
-        while True:
-            next(gen)
-    except StopIteration as stop:
-        return stop.value
+#: Chạy hết generator, lấy `return`-value — xem `core/answer/steps.py`.
+_drain = drain
 
 
 def _pipeline(question, *, envelope=None, user=None, history=None,

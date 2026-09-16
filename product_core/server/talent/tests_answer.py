@@ -1662,7 +1662,13 @@ class PipelineCacheTest(TestCase):
         self.assertNotEqual(before, cache_stage.key_for("quan hệ khách hàng"))
 
     def test_hai_tai_khoan_khac_quyen_khong_dung_chung_muc(self):
-        """② lọc theo quyền — dùng chung một mục là rò dữ liệu qua đường cache."""
+        """Hai tài khoản không bao giờ dùng chung một mục cache.
+
+        Không phải vì ② đang lọc theo quyền — hôm nay nó KHÔNG lọc, và đó là
+        đúng thiết kế (phân quyền Talent ở cấp module, xem
+        `core/answer/cache.py::key_for`). Đây là lưới đỡ phòng xa: ngày ai đó
+        thêm lọc cấp dòng, cache đã không thể là đường rò sẵn.
+        """
         from accounts import roles
         roles.ensure_groups()
         a = User.objects.create_user("cache-a", password="mat-khau-dai-1")
@@ -2307,11 +2313,12 @@ class RunnerResilienceTest(TestCase):
         return gen
 
     def test_incomplete_stream_is_aborted_in_both_modes(self):
+        from core.answer import runner as core_runner
         from talent.answer import runner
         for threaded in (False, True):
             with self.subTest(threaded=threaded):
                 persisted = []
-                with mock.patch("talent.answer.runner._threaded_ok", return_value=threaded), \
+                with mock.patch("core.answer.runner._threaded_ok", return_value=threaded), \
                         mock.patch("talent.answer.engine.stream_answer", return_value=iter([
                             {"type": "answer", "text": "partial"}])):
                     chunks = list(runner.stream("q", envelope=None, user=self.user, history=[],
@@ -2322,6 +2329,7 @@ class RunnerResilienceTest(TestCase):
                 self.assertNotIn("done", [chunk["type"] for chunk in chunks])
 
     def test_blocked_worker_keeps_slot_after_response_timeout(self):
+        from core.answer import runner as core_runner
         from talent.answer import runner
         release = threading.Event()
         cleaned = threading.Event()
@@ -2335,10 +2343,10 @@ class RunnerResilienceTest(TestCase):
                         client_turn_id=turn, persist=lambda *a, **k: None))
 
         with self.settings(ANSWER_RUNNER_MAX_WORKERS=1), \
-                mock.patch.object(runner, "_ACTIVE", set()), \
-                mock.patch.object(runner, "_threaded_ok", return_value=True), \
-                mock.patch.object(runner, "HARD_DEADLINE", .05), \
-                mock.patch.object(runner, "close_old_connections", side_effect=cleaned.set), \
+                mock.patch.object(core_runner, "_ACTIVE", set()), \
+                mock.patch.object(core_runner, "_threaded_ok", return_value=True), \
+                mock.patch.object(core_runner, "HARD_DEADLINE", .05), \
+                mock.patch.object(core_runner, "close_old_connections", side_effect=cleaned.set), \
                 mock.patch("talent.answer.engine.stream_answer", side_effect=blocked) as generate:
             try:
                 self.assertEqual(request("slot-one")[-1]["type"], "error")
@@ -2350,57 +2358,61 @@ class RunnerResilienceTest(TestCase):
                 release.set()
                 self.assertTrue(cleaned.wait(2))
                 for _ in range(100):
-                    with runner._LOCK:
-                        if not runner._ACTIVE:
+                    with core_runner._LOCK:
+                        if not core_runner._ACTIVE:
                             break
                     time.sleep(.01)
-            self.assertFalse(runner._ACTIVE)
+            self.assertFalse(core_runner._ACTIVE)
 
     def test_worker_start_failure_releases_admission_slot(self):
+        from core.answer import runner as core_runner
         from talent.answer import runner
-        with mock.patch.object(runner, "_ACTIVE", set()), \
-                mock.patch.object(runner, "_threaded_ok", return_value=True), \
-                mock.patch("talent.answer.runner.threading.Thread.start", side_effect=RuntimeError("fixture")), \
-                mock.patch.object(runner.log, "exception"):
+        with mock.patch.object(core_runner, "_ACTIVE", set()), \
+                mock.patch.object(core_runner, "_threaded_ok", return_value=True), \
+                mock.patch("core.answer.runner.threading.Thread.start", side_effect=RuntimeError("fixture")), \
+                mock.patch.object(core_runner.log, "exception"):
             chunks = list(runner.stream("q", envelope=None, user=self.user, history=[],
                           client_turn_id="start-fail", persist=mock.Mock()))
-            self.assertFalse(runner._ACTIVE)
+            self.assertFalse(core_runner._ACTIVE)
             self.assertEqual(chunks[-1]["type"], "error")
             self.assertEqual(runner.status_of(self.user, "start-fail"), "error")
 
     def test_durable_duplicate_does_not_start_worker_or_persist(self):
+        from core.answer import runner as core_runner
         from talent.answer import runner
         persist = mock.Mock()
-        with mock.patch.object(runner, "_threaded_ok", return_value=True), \
-                mock.patch.object(runner.run_state, "claim", return_value=None), \
-                mock.patch("talent.answer.runner.threading.Thread.start") as start:
+        with mock.patch.object(core_runner, "_threaded_ok", return_value=True), \
+                mock.patch.object(core_runner.run_state, "claim", return_value=None), \
+                mock.patch("core.answer.runner.threading.Thread.start") as start:
             chunks = list(runner.stream("q", envelope=None, user=self.user, history=[],
                           client_turn_id="duplicate-db", persist=persist))
         start.assert_not_called()
         persist.assert_not_called()
         self.assertEqual(chunks[-1]["type"], "error")
-        self.assertNotIn((self.user.pk, "duplicate-db"), runner._ACTIVE)
+        self.assertNotIn((self.user.pk, "duplicate-db"), core_runner._ACTIVE)
 
     def test_durable_claim_failure_fails_closed(self):
+        from core.answer import runner as core_runner
         from talent.answer import runner
-        with mock.patch.object(runner, "_threaded_ok", return_value=True), \
-                mock.patch.object(runner.run_state, "claim", side_effect=RuntimeError("database unavailable")), \
-                mock.patch.object(runner.log, "exception"), \
-                mock.patch("talent.answer.runner.threading.Thread.start") as start:
+        with mock.patch.object(core_runner, "_threaded_ok", return_value=True), \
+                mock.patch.object(core_runner.run_state, "claim", side_effect=RuntimeError("database unavailable")), \
+                mock.patch.object(core_runner.log, "exception"), \
+                mock.patch("core.answer.runner.threading.Thread.start") as start:
             chunks = list(runner.stream("q", envelope=None, user=self.user, history=[],
                           client_turn_id="claim-error", persist=mock.Mock()))
         start.assert_not_called()
         self.assertEqual(chunks[-1]["type"], "error")
-        self.assertNotIn((self.user.pk, "claim-error"), runner._ACTIVE)
+        self.assertNotIn((self.user.pk, "claim-error"), core_runner._ACTIVE)
 
     def test_persistence_failure_never_emits_done(self):
+        from core.answer import runner as core_runner
         from talent.answer import runner
         for threaded in (False, True):
             with self.subTest(threaded=threaded):
-                with mock.patch("talent.answer.runner._threaded_ok", return_value=threaded), \
+                with mock.patch("core.answer.runner._threaded_ok", return_value=threaded), \
                         mock.patch("talent.answer.engine.stream_answer", self._fake_stream()), \
-                        mock.patch("talent.answer.runner.log.exception"), \
-                        mock.patch("talent.answer.runner.close_old_connections"):
+                        mock.patch("core.answer.runner.log.exception"), \
+                        mock.patch("core.answer.runner.close_old_connections"):
                     chunks = list(runner.stream("q", envelope=None, user=self.user, history=[],
                         client_turn_id=f"persist-error-{threaded}",
                         persist=mock.Mock(side_effect=RuntimeError("fixture"))))
@@ -2410,10 +2422,11 @@ class RunnerResilienceTest(TestCase):
     def test_client_rot_giua_chung_engine_van_chay_xong_va_luu(self):
         """Đường LUỒNG NỀN (production/PostgreSQL): client rớt → engine chạy
         nốt và persist bản đầy đủ (aborted=False)."""
+        from core.answer import runner as core_runner
         from talent.answer import runner
         persisted = {}
         with mock.patch("talent.answer.engine.stream_answer", self._fake_stream("XONG")), \
-                mock.patch("talent.answer.runner._threaded_ok", return_value=True):
+                mock.patch("core.answer.runner._threaded_ok", return_value=True):
             gen = runner.stream("q", envelope=None, user=self.user, history=[],
                                 client_turn_id="t-abort",
                                 persist=lambda r, aborted=False: persisted.update(
@@ -2430,6 +2443,7 @@ class RunnerResilienceTest(TestCase):
     def test_sqlite_chay_inline_khong_spawn_luong(self):
         """Đường INLINE (SQLite/test): không luồng nền, client rớt → persist
         phần dang dở như hành vi cũ."""
+        from core.answer import runner as core_runner
         from talent.answer import runner
         persisted = {}
         with mock.patch("talent.answer.engine.stream_answer", self._fake_stream("Z")):
@@ -2476,19 +2490,21 @@ class RunnerResilienceTest(TestCase):
         self.assertEqual(self.client.get("/api/v1/talent/ask/turn/old/").json()["answer"], "legacy answer")
 
     def test_resume_202_khi_dang_chay(self):
+        from core.answer import runner as core_runner
         from talent.answer import runner
-        with runner._LOCK:
-            runner._INFLIGHT[(self.user.pk, "t-run")] = {
+        with core_runner._LOCK:
+            core_runner._INFLIGHT[("talent", self.user.pk, "t-run")] = {
                 "state": "running", "at": time.monotonic(), "error": ""}
         try:
             r = self.client.get("/api/v1/talent/ask/turn/t-run/")
             self.assertEqual(r.status_code, 202)
             self.assertEqual(r.json()["state"], "running")
         finally:
-            with runner._LOCK:
-                runner._INFLIGHT.pop((self.user.pk, "t-run"), None)
+            with core_runner._LOCK:
+                core_runner._INFLIGHT.pop(("talent", self.user.pk, "t-run"), None)
 
     def test_hard_deadline_tra_loi_va_danh_dau_timeout_du_provider_con_treo(self):
+        from core.answer import runner as core_runner
         from talent.answer import runner
         release = threading.Event()
         persisted = {}
@@ -2498,8 +2514,8 @@ class RunnerResilienceTest(TestCase):
             yield {"type": "answer", "text": "quá muộn"}
 
         with mock.patch("talent.answer.engine.stream_answer", blocked), \
-                mock.patch("talent.answer.runner._threaded_ok", return_value=True), \
-                mock.patch("talent.answer.runner.HARD_DEADLINE", 0.05):
+                mock.patch("core.answer.runner._threaded_ok", return_value=True), \
+                mock.patch("core.answer.runner.HARD_DEADLINE", 0.05):
             started = time.monotonic()
             chunks = list(runner.stream(
                 "q", envelope=None, user=self.user, history=[], client_turn_id="t-timeout",
@@ -2516,17 +2532,18 @@ class RunnerResilienceTest(TestCase):
         self.assertTrue(persisted.get("aborted"))
 
     def test_resume_bao_timeout_thay_vi_404(self):
+        from core.answer import runner as core_runner
         from talent.answer import runner
-        with runner._LOCK:
-            runner._INFLIGHT[(self.user.pk, "t-timeout-api")] = {
+        with core_runner._LOCK:
+            core_runner._INFLIGHT[("talent", self.user.pk, "t-timeout-api")] = {
                 "state": "timeout", "at": time.monotonic(), "error": "deadline"}
         try:
             response = self.client.get("/api/v1/talent/ask/turn/t-timeout-api/")
             self.assertEqual(response.status_code, 504)
             self.assertEqual(response.json()["state"], "timeout")
         finally:
-            with runner._LOCK:
-                runner._INFLIGHT.pop((self.user.pk, "t-timeout-api"), None)
+            with core_runner._LOCK:
+                core_runner._INFLIGHT.pop(("talent", self.user.pk, "t-timeout-api"), None)
 
     def test_resume_404_khi_khong_co_gi(self):
         r = self.client.get("/api/v1/talent/ask/turn/t-nope/")
@@ -2548,38 +2565,42 @@ class SharedRunnerStatusTest(SimpleTestCase):
 
     def test_status_survives_absent_local_registry_and_is_user_scoped(self):
         from types import SimpleNamespace
+        from core.answer import runner as core_runner
         from talent.answer import runner
         user, other = SimpleNamespace(pk=101), SimpleNamespace(pk=102)
-        with mock.patch.object(runner, "_INFLIGHT", {}):
-            runner._publish_status(user, "shared-turn", "running", deadline=time.time() + 30)
+        with mock.patch.object(core_runner, "_INFLIGHT", {}):
+            core_runner._publish_status("talent", user, "shared-turn", "running", deadline=time.time() + 30)
             self.assertEqual(runner.status_of(user, "shared-turn"), "running")
             self.assertIsNone(runner.status_of(other, "shared-turn"))
-            runner._publish_status(user, "shared-turn", "error")
+            core_runner._publish_status("talent", user, "shared-turn", "error")
             self.assertEqual(runner.status_of(user, "shared-turn"), "error")
 
     def test_abandoned_running_state_becomes_timeout(self):
         from types import SimpleNamespace
+        from core.answer import runner as core_runner
         from talent.answer import runner
         user = SimpleNamespace(pk=103)
-        with mock.patch.object(runner, "_INFLIGHT", {}):
-            runner._publish_status(user, "expired-turn", "running", deadline=time.time() - 1)
+        with mock.patch.object(core_runner, "_INFLIGHT", {}):
+            core_runner._publish_status("talent", user, "expired-turn", "running", deadline=time.time() - 1)
             self.assertEqual(runner.status_of(user, "expired-turn"), "timeout")
 
     def test_local_disconnected_worker_also_observes_deadline(self):
         from types import SimpleNamespace
+        from core.answer import runner as core_runner
         from talent.answer import runner
         user = SimpleNamespace(pk=105)
-        with mock.patch.object(runner, "_INFLIGHT", {(105, "stalled"): {
+        with mock.patch.object(core_runner, "_INFLIGHT", {("talent", 105, "stalled"): {
                 "state": "running", "at": time.monotonic(), "deadline": time.time() - 1}}):
             self.assertEqual(runner.status_of(user, "stalled"), "timeout")
 
     def test_cache_failure_does_not_mask_local_status(self):
         from types import SimpleNamespace
+        from core.answer import runner as core_runner
         from talent.answer import runner
         user = SimpleNamespace(pk=104)
-        with mock.patch.object(runner, "_INFLIGHT", {(104, "local"): {"state": "running", "at": time.monotonic()}}), \
-                mock.patch.object(runner.cache, "get", side_effect=RuntimeError("cache unavailable")), \
-                mock.patch.object(runner.log, "warning"):
+        with mock.patch.object(core_runner, "_INFLIGHT", {("talent", 104, "local"): {"state": "running", "at": time.monotonic()}}), \
+                mock.patch.object(core_runner.cache, "get", side_effect=RuntimeError("cache unavailable")), \
+                mock.patch.object(core_runner.log, "warning"):
             self.assertEqual(runner.status_of(user, "local"), "running")
             self.assertIsNone(runner.status_of(user, "remote"))
 
@@ -2588,13 +2609,14 @@ class SharedDatabaseRunnerStatusTest(TestCase):
     def test_database_status_is_readable_by_an_independent_cache_instance(self):
         from django.conf import settings
         from django.core.cache.backends.db import DatabaseCache
+        from core.answer import runner as core_runner
         from talent.answer import runner
         from types import SimpleNamespace
         user = SimpleNamespace(pk=106)
         config = settings.CACHES["default"]
         other_cache = DatabaseCache(config["LOCATION"], config)
-        runner._publish_status(user, "database-shared", "running", deadline=time.time() + 30)
-        with mock.patch.object(runner, "_INFLIGHT", {}), mock.patch.object(runner, "cache", other_cache):
+        core_runner._publish_status("talent", user, "database-shared", "running", deadline=time.time() + 30)
+        with mock.patch.object(core_runner, "_INFLIGHT", {}), mock.patch.object(core_runner, "cache", other_cache):
             self.assertEqual(runner.status_of(user, "database-shared"), "running")
 
 

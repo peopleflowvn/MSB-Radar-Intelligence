@@ -35,9 +35,13 @@ class AnswerRunClaimTest(TestCase):
         self.assertEqual(run_state.status(self.user, "done-turn"), "done")
         self.assertIsNone(run_state.claim(self.user, "done-turn", 150))
         self.assertIsNone(run_state.status(self.user, "absent"))
+        # Sổ trong tiến trình và cache chia sẻ nay nằm ở khung dùng chung
+        # (`core/answer/runner.py`); `talent.answer.runner` chỉ còn phần buộc
+        # vào Talent. Tắt cả hai nguồn nhanh để chứng minh trạng thái vẫn đọc
+        # được từ bản ghi BỀN — đó là điểm của phép kiểm này.
+        from core.answer import runner as core_runner
         from talent.answer import runner
-        with mock.patch.object(runner, "_INFLIGHT", {}), \
-                mock.patch.object(runner, "_shared_status", return_value=None):
+        with mock.patch.object(core_runner, "_INFLIGHT", {}),                 mock.patch.object(core_runner, "_shared_status", return_value=None):
             self.assertEqual(runner.status_of(self.user, "done-turn"), "done")
 
     def test_claim_uses_same_id_length_as_persisted_messages(self):
