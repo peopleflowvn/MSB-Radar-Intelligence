@@ -17,3 +17,20 @@ jobs:
           sudo docker ps --format '{{.Names}}|{{.Image}}|{{.Status}}' | sort
           echo compose-projects
           sudo docker ps --format '{{.Label "com.docker.compose.project"}}' | sort -u
+      - name: Report disk and Docker build-cache headroom
+        shell: bash
+        # `deploy-oracle.yml` unconditionally wipes ALL builder cache
+        # (`docker builder prune --all --force`) before building Intelligence,
+        # justified as "small boot disk cannot retain cache from three Product
+        # Core images plus a fresh Intelligence image". Before loosening that
+        # to a time-scoped prune (keep same-day cache, reclaim only stale
+        # layers) we need real numbers — this is read-only, no container is
+        # touched.
+        run: |
+          set -euo pipefail
+          echo disk-usage
+          df -h /
+          echo docker-system-df
+          sudo docker system df
+          echo docker-system-df-verbose-build-cache
+          sudo docker system df -v | sed -n '/Build cache usage/,$p'
