@@ -7,6 +7,12 @@ jobs:
   diagnose:
     runs-on: [self-hosted, oracle, intelligence]
     steps:
+      - name: Show currently deployed release SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo cat /home/ubuntu/msb-radar-platform/current-sha
+          sudo docker inspect msbradar-intelligence --format 'intelligence_image={{.Config.Image}}'
       - name: Show non-secret process and health metadata
         shell: bash
         run: |
