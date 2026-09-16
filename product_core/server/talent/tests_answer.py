@@ -111,6 +111,101 @@ class PlanTest(TestCase):
         self.assertIn("NGƯỜI DÙNG ĐÃ DẶN", sent)
         self.assertIn("chỉ tuyển ở Hà Nội", sent)
 
+    def test_suy_luan_duoc_hoi_truoc_khi_chot_shape(self):
+        """① sinh token trái→phải: khoá nào viết trước thì khoá sau bị đặt điều
+        kiện lên nó. Trước đây "shape" là khoá ĐẦU TIÊN, tức nhánh trả lời bị
+        chốt ngay ở token đầu, chưa có gì để suy nghĩ. Mọi lỗi định tuyến đều
+        sinh ra ở đúng chỗ đó."""
+        prompt = plan_stage.SYSTEM
+        self.assertIn('"suy_luan"', prompt)
+        self.assertLess(prompt.index('"suy_luan"'), prompt.index('- "shape"'),
+                        '"suy_luan" phải được yêu cầu TRƯỚC "shape"')
+
+    def test_suy_luan_duoc_giu_lai_de_soi_khi_dinh_tuyen_sai(self):
+        caller = replies({plan_stage.TASK: json.dumps({
+            "suy_luan": "Người dùng chỉ chào hỏi, không nhắc gì tới kho hồ sơ.",
+            "shape": "general",
+            "information_need": "chào hỏi",
+            "search_queries": [],
+        }, ensure_ascii=False)})
+        result = plan_stage.plan("xin chào", complete_fn=caller)
+        self.assertEqual(result.shape, "general")
+        self.assertIn("chỉ chào hỏi", result.reasoning)
+        # Có trong trace thì mới soi được ① đã nghĩ gì khi nó chọn sai nhánh.
+        self.assertIn("chỉ chào hỏi", result.as_dict()["reasoning"])
+
+    def test_do_tin_cay_thap_kem_cau_hoi_thi_hoi_lai(self):
+        caller = replies({plan_stage.TASK: json.dumps({
+            "suy_luan": "Câu này hiểu được hai kiểu, không đoán được kiểu nào đúng.",
+            "shape": "find_people", "do_tin_cay": 0.2,
+            "cau_hoi_lam_ro": "Anh/chị muốn ứng viên ĐANG làm ở MSB hay TỪNG làm ở MSB ạ?",
+            "search_queries": ["MSB"],
+        }, ensure_ascii=False)})
+        result = plan_stage.plan("tìm người MSB", complete_fn=caller)
+        self.assertTrue(result.wants_clarification)
+        self.assertIn("ĐANG làm ở MSB", result.clarify)
+
+    def test_khong_hoi_lai_khi_da_chac(self):
+        """Model hay kèm câu hỏi cho MỌI lượt. Chắc rồi thì phải bỏ đi, nếu
+        không Radar hoá ra hỏi lại suốt thay vì trả lời."""
+        caller = replies({plan_stage.TASK: json.dumps({
+            "suy_luan": "Rõ ràng: tìm ứng viên biết Java.",
+            "shape": "find_people", "do_tin_cay": 0.9,
+            "cau_hoi_lam_ro": "Anh/chị cần bao nhiêu hồ sơ ạ?",
+            "search_queries": ["Java"],
+        }, ensure_ascii=False)})
+        result = plan_stage.plan("tìm ứng viên Java", complete_fn=caller)
+        self.assertFalse(result.wants_clarification)
+        self.assertEqual(result.clarify, "")
+
+    def test_hoi_lai_khong_dong_toi_truy_hoi(self):
+        """Hỏi lại phải RẺ: không truy hồi, không đọc hồ sơ, không gọi model lần
+        hai — nếu không thì nó chẳng tiết kiệm được gì so với đoán bừa."""
+        def plan_must_not_run(*args, **kwargs):
+            raise AssertionError("② không được chạy khi Radar đang hỏi lại")
+        query_plan = plan_stage.QueryPlan(
+            shape="find_people", confidence=0.2, search_queries=["MSB"],
+            clarify="Anh/chị muốn ứng viên ĐANG làm hay TỪNG làm ở MSB ạ?")
+        with mock.patch("talent.answer.retrieve.retrieve", plan_must_not_run):
+            chunks = list(engine.stream_answer("tìm người MSB", query_plan=query_plan))
+        done = next(c for c in chunks if c.get("type") == "done")
+        self.assertEqual(done["result"].trace["mode"], "clarify")
+        self.assertIn("ĐANG làm", done["result"].text)
+
+    def test_chot_chan_kho_nhuong_duong_khi_muc_tin_rat_cao(self):
+        """Chốt chặn `mentions_store` chỉ dò TỪ KHOÁ, nên một câu "general" đúng
+        nghĩa mà lỡ có chữ "dữ liệu" vẫn bị nó bẻ sang nhánh tìm người."""
+        payload = {
+            "suy_luan": "Họ hỏi về luật bảo vệ dữ liệu cá nhân nói chung, "
+                        "không hỏi gì về kho hồ sơ của Radar.",
+            "shape": "general", "do_tin_cay": 0.95, "search_queries": [],
+        }
+        caller = replies({plan_stage.TASK: json.dumps(payload, ensure_ascii=False)})
+        result = plan_stage.plan("nghị định bảo vệ dữ liệu cá nhân có gì mới",
+                                 complete_fn=caller)
+        self.assertEqual(result.shape, "general")
+
+    def test_chot_chan_kho_van_ra_tay_khi_khong_chac(self):
+        """Chốt chặn cho lỗi TỆ NHẤT ("tôi không có dữ liệu" trong khi kho có
+        hàng trăm hồ sơ) không được nới chỉ vì đã có `do_tin_cay`."""
+        for confidence in (0.0, 0.5, 0.85):
+            caller = replies({plan_stage.TASK: json.dumps({
+                "suy_luan": "Chắc là câu hỏi chung.",
+                "shape": "general", "do_tin_cay": confidence, "search_queries": [],
+            }, ensure_ascii=False)})
+            result = plan_stage.plan("thế bạn có cv những ngành nào", complete_fn=caller)
+            self.assertEqual(result.shape, "analyze", confidence)
+
+    def test_khong_co_do_tin_cay_thi_giu_nguyen_hanh_vi_cu(self):
+        """Model cũ / model bỏ qua khoá mới ⇒ 0.0 ⇒ mọi chốt chặn giữ hiệu lực."""
+        caller = replies({plan_stage.TASK: json.dumps({
+            "shape": "general", "search_queries": [],
+        }, ensure_ascii=False)})
+        result = plan_stage.plan("thế bạn có cv những ngành nào", complete_fn=caller)
+        self.assertEqual(result.confidence, 0.0)
+        self.assertEqual(result.shape, "analyze")
+        self.assertFalse(result.wants_clarification)
+
     def test_widen_giu_bat_buoc_chi_mo_rong_truy_hoi(self):
         original = plan_stage.QueryPlan(
             information_need="nhân sự NEU", must_have=["tốt nghiệp NEU"],
@@ -1353,6 +1448,57 @@ class InternalKnowledgeBeatsWebTest(TestCase):
         self.assertTrue(any(c.get("type") == "done" and c.get("payload", {}).get("mode") == "web"
                             for c in chunks))
         self.assertIsNone(adapter.sent)  # không rơi xuống nhánh hội thoại thường
+
+
+class SmalltalkTest(TestCase):
+    """Người dùng gõ "xin chào" và nhận lại nguyên quy trình "GIỚI THIỆU ỨNG
+    VIÊN" (ảnh báo lỗi 16/09). Nguyên nhân: bộ truy hồi luôn trả top-k tài liệu
+    bất kể liên quan hay không, nên một câu chào vẫn kéo về một tài liệu nội bộ
+    ngẫu nhiên, rồi model ngoan ngoãn tóm tắt đúng tài liệu đó."""
+
+    class _FakeAdapter:
+        def __init__(self):
+            self.sent = None
+
+        def stream(self, request):
+            self.sent = request.messages
+            yield {"type": "answer", "text": "Chào anh/chị, Radar có thể giúp gì?"}
+            yield {"type": "done", "response": None}
+
+    def test_cau_chao_khong_tra_kho_khong_tra_web(self):
+        adapter = self._FakeAdapter()
+        with mock.patch("talent.answer.chat.knowledge_sources",
+                        return_value=[("Thong tin chung",
+                                       "Truy cập mục GIỚI THIỆU ỨNG VIÊN bằng tài khoản Outlook.")]) as kb,                 mock.patch("talent.answer.chat.websearch.enabled", return_value=True),                 mock.patch("talent.answer.chat.websearch.web_answer") as web_answer:
+            chunks = list(chat_stage.stream_chat("xin chào", adapter=adapter))
+        kb.assert_not_called()
+        web_answer.assert_not_called()
+        blob = json.dumps(adapter.sent, ensure_ascii=False)
+        self.assertNotIn("GIỚI THIỆU ỨNG VIÊN", blob)
+        done = next(c for c in chunks if c.get("type") == "done")
+        self.assertEqual(done["payload"]["mode"], "chat")
+        # Không còn bước "tra internet" nào để hiện trên thẻ tiến trình.
+        self.assertEqual([c.get("stage") for c in chunks if c.get("type") == "stage"],
+                         ["chat"])
+
+    def test_cau_hoi_that_van_tra_kho_nhu_cu(self):
+        """Giữ HẸP: câu dài hơn, dù mở đầu bằng lời chào, vẫn đi đường thường."""
+        adapter = self._FakeAdapter()
+        with mock.patch("talent.answer.chat.knowledge_sources",
+                        return_value=[("Quy trình nghỉ phép", "Nghỉ 12 ngày phép năm.")]) as kb,                 mock.patch("talent.answer.chat.websearch.enabled", return_value=False):
+            list(chat_stage.stream_chat("chào bạn, quy trình nghỉ phép thế nào",
+                                        adapter=adapter))
+        kb.assert_called_once()
+        self.assertIn("Nghỉ 12 ngày phép năm", json.dumps(adapter.sent, ensure_ascii=False))
+
+    def test_nhan_dien_cac_bien_the_chao_hoi(self):
+        for text in ("xin chào", "Chào bạn", "hello", "Hi", "cảm ơn nhé",
+                     "ok", "tạm biệt", "xin chào Radar"):
+            self.assertTrue(chat_stage._is_smalltalk(text), text)
+        for text in ("chào bạn, tìm giúp tôi ứng viên Java",
+                     "cảm ơn, giờ cho tôi xem hồ sơ Nguyễn An",
+                     "lãi suất huy động hiện nay thế nào"):
+            self.assertFalse(chat_stage._is_smalltalk(text), text)
 
 
 class PipelineCacheTest(TestCase):

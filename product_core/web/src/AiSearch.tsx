@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { api, ApiError, HistoryTurn } from "./api";
 import { useCustomTheme } from "./CustomThemeContext";
 import { AiChatMessage as ChatMessage, useAiChatState } from "./searchPersistence";
-import AnswerView, { AnswerTurn } from "./AnswerView";
+import AnswerView, { AnswerStep, AnswerTurn } from "./AnswerView";
 import StepTimeline from "./StepTimeline";
 
 const ACCEPTED_FILES = ".pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp";
@@ -278,6 +278,12 @@ export default function AiSearch() {
         Object.assign(turn, patch);
         patchMsg({ text: turn.text || aiPendingMsg.text, answer: { ...turn } });
       };
+      // Bước cuối ("Soạn câu trả lời") được máy chủ gửi ở trạng thái `active` và
+      // KHÔNG bao giờ có chunk đóng riêng — chỉ có `done` của cả lượt. Không tự
+      // tick ở đây thì thẻ tiến trình quay mãi sau khi câu trả lời đã xong
+      // (người dùng báo 16/09). Mọi đường kết thúc lượt đều phải đi qua hàm này.
+      const closedSteps = (): AnswerStep[] =>
+        (turn.steps ?? []).map((s) => (s.state === "done" ? s : { ...s, state: "done" }));
       try {
         for await (const ev of api.talentAsk(
           { q: query, conversation_id: threadId, client_turn_id: clientTurnId, history, files },
@@ -319,6 +325,7 @@ export default function AiSearch() {
             Object.assign(turn, {
               text: finalText,
               stage: undefined,
+              steps: closedSteps(),
               sources: (ev.data.citations as AnswerTurn["sources"]) ?? turn.sources,
               webSources: (ev.data.web_sources as AnswerTurn["webSources"]) ?? [],
               people: (ev.data.people as AnswerTurn["people"]) ?? [],
@@ -338,6 +345,7 @@ export default function AiSearch() {
         if (userStopped) {
           turn.text = turn.text ? `${turn.text}\n\n*(Đã dừng trả lời)*` : `*(Đã dừng)*`;
           turn.stage = undefined;
+          turn.steps = closedSteps();
           patchMsg({ isPending: false, text: turn.text, answer: { ...turn } });
           setActiveTurn(null);
         } else {
@@ -348,7 +356,7 @@ export default function AiSearch() {
           patchMsg({ answer: { ...turn } });
           const recovered = await recoverTurn(clientTurnId, startedAt);
           if (recovered) {
-            Object.assign(turn, recovered, { stage: undefined });
+            Object.assign(turn, recovered, { stage: undefined, steps: closedSteps() });
             patchMsg({ isPending: false, text: recovered.text, answer: { ...turn } });
             setActiveTurn(null);
             void refreshConversations();
@@ -356,6 +364,7 @@ export default function AiSearch() {
             const detail = err instanceof ApiError ? err.message : "Mất kết nối khi đang trả lời.";
             turn.text = turn.text ? `${turn.text}\n\n⚠️ ${detail}` : `⚠️ Đã có lỗi xảy ra: ${detail}`;
             turn.stage = undefined;
+            turn.steps = closedSteps();
             patchMsg({ isPending: false, text: turn.text, answer: { ...turn } });
             setActiveTurn(null);
           }

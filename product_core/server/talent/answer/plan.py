@@ -34,14 +34,32 @@ DEFAULT_LIMIT = 10
 MAX_LIMIT = 50
 MAX_QUERIES = 6
 
+#: Trên mức này thì TIN phán đoán của ① và tắt chốt chặn từ khoá bên dưới.
+#: Đặt cao có chủ đích: chốt chặn `mentions_store` chặn đúng lỗi tệ nhất Radar
+#: từng mắc ("thế bạn có cv những ngành nào" → "tôi không có dữ liệu"), nên chỉ
+#: nhường đường khi ① vừa rất chắc vừa đã thật sự suy luận.
+TRUST_SHAPE_ABOVE = 0.85
+
+#: Dưới mức này, có câu hỏi làm rõ thì HỎI LẠI thay vì đoán rồi chạy ①→⑤.
+CLARIFY_BELOW = 0.4
+
 SYSTEM = """Bạn là bộ lập kế hoạch truy vấn cho Radar — trợ lý tra cứu Kho con người
 của MSB (hồ sơ ứng viên + CV đã bóc tách text).
 
 Nhiệm vụ: đọc câu hỏi (kèm ngữ cảnh hội thoại nếu có) và trả về MỘT kế hoạch tìm
 kiếm dạng JSON. Bạn KHÔNG trả lời câu hỏi, KHÔNG bịa dữ liệu.
 
-Chỉ trả JSON với các khoá:
+Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
 
+- "suy_luan": 2–4 câu NGẮN, và phải là khoá ĐẦU TIÊN bạn viết ra. Đây là chỗ
+  bạn NGHĨ để chọn nhánh, không phải chỗ giải thích sau khi đã chọn. Lần lượt:
+  (a) Người dùng thực sự đang muốn gì? Nói lại bằng lời của bạn.
+  (b) Câu này có dính tới kho hồ sơ/CV/ứng viên không — kể cả khi họ hỏi theo
+      lối "bạn có…"? Nếu có thì KHÔNG BAO GIỜ là "general".
+  (c) Họ muốn TRA CỨU thông tin, hay đang BẢO LÀM một việc trên nhóm người đã
+      nhắc ở lượt trước (→ "action")?
+  (d) Nếu chỉ là chào hỏi / cảm ơn / kiến thức chung ngoài kho → "general".
+  Viết "shape" TRƯỚC rồi bịa "suy_luan" cho khớp là hỏng đúng cơ chế này.
 - "shape": một trong "find_people" (tìm/liệt kê người), "analyze" (tổng hợp,
   nhận xét về kho), "count" (đếm/thống kê), "compare" (so sánh), "followup"
   (hỏi tiếp về kết quả vừa rồi), "action" (người dùng bảo LÀM một việc trên
@@ -62,6 +80,16 @@ Chỉ trả JSON với các khoá:
     "bạn có bao nhiêu hồ sơ"                → count
   Chọn nhầm những câu này thành "general" khiến Radar trả lời "tôi không có dữ
   liệu" trong khi kho có hàng trăm hồ sơ — sai nghiêm trọng nhất có thể mắc.
+- "do_tin_cay": 0.0–1.0 — bạn CHẮC tới đâu về "shape" vừa chọn, viết NGAY SAU
+  nó. Chấm thật thà, đây không phải điểm thi:
+    ≥ 0.8  câu hỏi rõ ràng, chỉ có một cách hiểu.
+    0.4–0.8 hiểu được nhưng còn một điểm mập mờ, vẫn đoán được ý chính.
+    < 0.4  thật sự không biết họ muốn gì — hai cách hiểu trở lên, khác hẳn nhau.
+  Cho điểm cao cho mọi câu là làm hỏng công dụng của khoá này.
+- "cau_hoi_lam_ro": CHỈ điền khi "do_tin_cay" < 0.4 — MỘT câu hỏi ngắn hỏi lại
+  người dùng để gỡ đúng chỗ mập mờ đó, xưng "anh/chị". Không mập mờ thì để "".
+  Ví dụ: "Anh/chị muốn tìm ứng viên đang làm ở MSB, hay ứng viên từng làm ở MSB ạ?"
+  ĐỪNG hỏi lại chỉ vì câu hỏi khó — hỏi lại khi nó ĐA NGHĨA.
 - "information_need": viết lại câu hỏi thành MỘT câu độc lập, đã ghép ngữ cảnh
   hội thoại, đủ nghĩa khi đọc riêng.
 - "must_have": mảng câu chữ — điều kiện BẮT BUỘC, không thoả thì loại. Rất ít.
@@ -121,7 +149,21 @@ thức chung) thì shape="general" và search_queries=[]."""
 
 @dataclass
 class QueryPlan:
+    #: Vài câu ① tự nghĩ TRƯỚC khi chốt `shape`. Đứng đầu JSON có chủ đích: model
+    #: sinh token trái→phải, nên khoá nào viết trước thì khoá sau được đặt điều
+    #: kiện lên nó. Trước đây "shape" là token ĐẦU TIÊN — nhánh bị chốt xong mới
+    #: có gì để suy nghĩ, và mọi lỗi định tuyến ("xin chào" ra tài liệu nội bộ,
+    #: "thế bạn có cv những ngành nào" ra "tôi không có dữ liệu") đều sinh ra ở
+    #: đúng token đó. Cũng được ghi vào trace để xem ① đã nghĩ gì khi chọn sai.
+    reasoning: str = ""
     shape: str = "find_people"
+    #: ① tự chấm mình chắc tới đâu về `shape`. Dùng để quyết định khi nào TIN ①
+    #: và khi nào để chốt chặn cứng bên dưới ra tay — xem `TRUST_SHAPE_ABOVE`.
+    confidence: float = 0.0
+    #: Câu hỏi lại người dùng, chỉ có khi ① thật sự không biết họ muốn gì. Đoán
+    #: bừa rồi chạy hết ①→⑤ mất vài chục giây để ra một câu trả lời lạc đề thì
+    #: tệ hơn hẳn việc hỏi lại một câu.
+    clarify: str = ""
     information_need: str = ""
     must_have: list = field(default_factory=list)
     should_have: list = field(default_factory=list)
@@ -158,8 +200,17 @@ class QueryPlan:
     def wants_action(self) -> bool:
         return self.shape == "action"
 
+    @property
+    def wants_clarification(self) -> bool:
+        """Hỏi lại thay vì đoán. Cần CẢ HAI: ① tự nhận là không chắc, VÀ nó viết
+        ra được một câu hỏi cụ thể. Thiếu câu hỏi thì hỏi lại cũng vô ích."""
+        return bool(self.clarify) and self.confidence < CLARIFY_BELOW
+
     def as_dict(self):
-        return {"shape": self.shape, "information_need": self.information_need,
+        return {"reasoning": self.reasoning,
+                "shape": self.shape, "confidence": self.confidence,
+                "clarify": self.clarify,
+                "information_need": self.information_need,
                 "must_have": self.must_have, "should_have": self.should_have,
                 "extract": self.extract, "sort_by": self.sort_by,
                 "limit": self.limit, "search_queries": self.search_queries,
@@ -233,7 +284,10 @@ def plan(question, *, envelope=None, complete_fn=None) -> QueryPlan:
     try:
         result = caller(
             [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
-            task=TASK, temperature=0, max_tokens=900, reasoning_effort="none",
+            # `suy_luan` tốn thêm ~80 token. Hạn mức chật thì JSON bị cắt giữa
+            # chừng, `extract_json` trượt, và cả lượt rơi về `_fallback` (đi tìm
+            # người cho MỌI câu) — đắt hơn nhiều so với phần token nới ở đây.
+            task=TASK, temperature=0, max_tokens=1100, reasoning_effort="none",
             budget_seconds=25, response_format={"type": "json_object"})
     except Exception as exc:                       # noqa: BLE001
         log.warning("answer.plan: LLM lỗi, dùng kế hoạch tối thiểu: %s", exc)
@@ -245,6 +299,8 @@ def plan(question, *, envelope=None, complete_fn=None) -> QueryPlan:
                          model=getattr(result, "model", ""))
 
     queries = as_list(payload.get("search_queries"), limit=MAX_QUERIES)
+    reasoning = " ".join(str(payload.get("suy_luan") or "").split())[:600]
+    confidence = _confidence(payload.get("do_tin_cay"))
     shape = str(payload.get("shape") or "").strip().lower()
     if shape not in SHAPES:
         shape = "general" if not queries else "find_people"
@@ -253,10 +309,19 @@ def plan(question, *, envelope=None, complete_fn=None) -> QueryPlan:
     # hàng trăm hồ sơ. Đã xảy ra thật trên production ("thế bạn có cv những ngành
     # nào"). Prompt đã dặn kỹ, nhưng đây là lỗi tệ nhất có thể mắc nên không để
     # nó phụ thuộc một mình vào việc model có nghe lời hay không.
+    # Nay nó là TRỌNG TÀI chứ không phải luật tuyệt đối: `mentions_store` chỉ dò
+    # từ khoá, nên một câu "general" đúng nghĩa mà lỡ có chữ "dữ liệu" vẫn bị nó
+    # bẻ sang nhánh tìm người. Nhường đường khi ① vừa rất chắc vừa CÓ suy luận —
+    # thiếu `reasoning` nghĩa là model bỏ qua phần nghĩ, không đáng tin.
     if shape == "general" and mentions_store(question):
-        log.info("answer.plan: ép 'general' → 'analyze' vì câu hỏi nhắc tới kho: %r",
-                 question[:80])
-        shape = "analyze"
+        if confidence > TRUST_SHAPE_ABOVE and reasoning:
+            log.info("answer.plan: giữ 'general' cho %r — ① chắc %.2f (nghĩ: %r)",
+                     question[:80], confidence, reasoning[:200])
+        else:
+            log.info("answer.plan: ép 'general' → 'analyze' vì câu hỏi nhắc tới kho: "
+                     "%r (① chắc %.2f, nghĩ: %r)",
+                     question[:80], confidence, reasoning[:200])
+            shape = "analyze"
     # "Lấy/mở hồ sơ X và phân tích" là yêu cầu ĐỌC hồ sơ, không phải action
     # qua tool. Model đôi khi xếp nó thành action khiến nhánh tool đã biết tên
     # ở preamble nhưng cuối cùng lại hỏi "làm gì với ai".
@@ -286,7 +351,16 @@ def plan(question, *, envelope=None, complete_fn=None) -> QueryPlan:
     if shape == "count" and sort_by:
         shape = "find_people"
 
+    # Câu hỏi làm rõ chỉ có nghĩa khi ① tự nhận là không chắc. Model hay viết
+    # kèm một câu hỏi cho MỌI lượt; giữ nguyên là Radar hoá ra hỏi lại suốt.
+    clarify = " ".join(str(payload.get("cau_hoi_lam_ro") or "").split())[:300]
+    if confidence >= CLARIFY_BELOW:
+        clarify = ""
+
     return QueryPlan(
+        reasoning=reasoning,
+        confidence=confidence,
+        clarify=clarify,
         shape=shape,
         information_need=" ".join(str(payload.get("information_need") or question).split())[:500],
         must_have=as_list(payload.get("must_have"), limit=6),
@@ -317,6 +391,15 @@ def _next_steps(value):
             continue
         out.append({"shape": shape, "yeu_cau": need})
     return out
+
+
+def _confidence(value):
+    """0.0–1.0. Không đọc được thì 0.0 — coi như ① không tự chấm, và mọi chốt
+    chặn cứng bên dưới giữ nguyên hiệu lực như trước khi có khoá này."""
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _sort_by(value):

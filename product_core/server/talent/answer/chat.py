@@ -21,7 +21,8 @@ import logging
 
 from ai import websearch
 from ai.adapter import ModelError, get_adapter
-from ai.conversation import build_conversation_request, knowledge_sources, web_system
+from ai.conversation import (build_conversation_request, knowledge_sources,
+                            plain_text, web_system)
 
 from . import corpus
 
@@ -39,6 +40,37 @@ _STORE_WORDS = ("cv", "hồ sơ", "ho so", "ứng viên", "ung vien", "kho", "d�
 def _asks_about_store(question):
     low = str(question or "").casefold()
     return any(word in low for word in _STORE_WORDS)
+
+
+#: Câu chào / cảm ơn / tạm biệt. Không có gì để tra, trong kho lẫn trên web.
+_SMALLTALK = frozenset((
+    "xin chao", "chao", "chao ban", "chao radar", "hello", "hi", "hey", "yo",
+    "alo", "co do khong", "ban co do khong", "ban con do khong",
+    "cam on", "cam on ban", "cam on nhe", "thanks", "thank you", "tks", "thks",
+    "ok", "oke", "okay", "okie", "uh", "um", "vang", "da", "duoc", "duoc roi",
+    "roi", "hieu roi", "tam biet", "bye", "goodbye", "hen gap lai", "chao nhe",
+))
+
+#: Mở đầu một câu chào có kèm tên/đại từ: "xin chào Radar", "chào em nhé".
+_SMALLTALK_PREFIXES = ("xin chao", "chao ", "hello ", "hi ", "cam on ", "thanks ")
+
+
+def _is_smalltalk(question):
+    """Câu chào hỏi xã giao — KHÔNG tra kho tri thức, KHÔNG tra web.
+
+    Bộ truy hồi luôn trả về top-k tài liệu bất kể câu hỏi có liên quan hay
+    không (điểm RRF xếp theo thứ hạng, nên tài liệu đầu bảng luôn ~1.0 — không
+    có ngưỡng điểm nào lọc được). Với "xin chào" nó trả về một tài liệu bất kỳ,
+    model ngoan ngoãn tóm tắt đúng tài liệu đó, và người dùng chào một câu thì
+    nhận lại nguyên quy trình "GIỚI THIỆU ỨNG VIÊN" (ảnh báo lỗi 16/09).
+
+    Giữ HẸP: chỉ khớp câu rất ngắn và đúng mẫu chào. "chào anh, cho tôi xem hồ
+    sơ Java" dài hơn 4 từ nên vẫn đi đường thường.
+    """
+    text = plain_text(question)
+    if not text or len(text.split()) > 4:
+        return False
+    return text in _SMALLTALK or text.startswith(_SMALLTALK_PREFIXES)
 
 
 def _do_web(question, wants_web):
@@ -79,16 +111,26 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
     model = adapter or get_adapter()
     projection = getattr(envelope, "projection", None)
 
+    # Câu chào xã giao đi thẳng tới model hội thoại: không tra kho, không tra
+    # web, không phân loại ý định. Xem `_is_smalltalk`.
+    smalltalk = _is_smalltalk(question)
+
     # Tài liệu tri thức nội bộ (chính sách/quy trình công ty) được tra TRƯỚC.
     # Rẻ cho phần lớn tài khoản: `knowledge_sources` trả `[]` ngay lập tức,
     # không gọi mạng, nếu user không có module `knowledge`
     # (accounts/roles.py::MODULE_KNOWLEDGE).
-    internal_sources = knowledge_sources(question, user) if knowledge is None else knowledge
+    if smalltalk:
+        internal_sources = []
+    else:
+        internal_sources = (knowledge_sources(question, user)
+                            if knowledge is None else knowledge)
 
     # Cần dữ liệu ngoài kho → tra web. `intent` do người gọi cấp (đã phân
     #    loại rồi thì không phân loại lại); không có thì tự hỏi.
     wants_web = getattr(intent, "is_web", None)
-    if wants_web is None:
+    if smalltalk:
+        wants_web = False
+    elif wants_web is None:
         try:
             from ai import intent as intent_router
             wants_web = bool(intent_router.classify(
@@ -97,8 +139,8 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
             wants_web = False
 
     web_text, web_citations = "", []
-    if _do_web(question, wants_web):
-        yield {"type": "stage", "stage": "web", "text": "Đang tra trên internet"}
+    if not smalltalk and _do_web(question, wants_web):
+        yield {"type": "stage", "stage": "web", "text": "Tra trên internet"}
         try:
             result = websearch.web_answer(
                 question, system=web_system("talent", user), adapter=model)
@@ -123,7 +165,7 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
             log.warning("answer.chat: tra web hỏng, lùi về hội thoại: %s", exc)
 
     # 3. Hội thoại thường — persona + quyền + memory, model hội thoại.
-    yield {"type": "stage", "stage": "chat", "text": "Đang trả lời"}
+    yield {"type": "stage", "stage": "chat", "text": "Soạn câu trả lời"}
     sources = list(internal_sources)
     if web_text:
         sources.append(("Kết quả tra Internet vừa thực hiện", web_text))
@@ -169,8 +211,8 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
     # persona). Thử web lần cuối — thà một câu có nguồn còn hơn "không có nội
     # dung". Kể cả khi lần web đầu đã hỏng: model chạy mất vài giây, backend có
     # thể đã hết nghẽn.
-    if not text and websearch.enabled():
-        yield {"type": "stage", "stage": "web", "text": "Đang tra trên internet"}
+    if not text and not smalltalk and websearch.enabled():
+        yield {"type": "stage", "stage": "web", "text": "Tra trên internet"}
         try:
             result = websearch.web_answer(
                 question, system=web_system("talent", user), adapter=model)

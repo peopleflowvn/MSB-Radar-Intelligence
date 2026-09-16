@@ -15297,6 +15297,24 @@ button.chip.active {
   color: #fff;
 }
 
+/* Tên ứng viên trong câu trả lời → mở thẳng hồ sơ, cùng đích với chip
+   "Hồ sơ được nhắc tới". Gạch chân mảnh thay vì đổi màu: một câu trả lời nhắc
+   năm sáu cái tên mà tên nào cũng xanh đậm thì đoạn văn vỡ vụn. */
+.chat-person-link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: color 0.12s ease, text-decoration-color 0.12s ease;
+}
+.chat-person-link:hover {
+  color: var(--accent);
+  text-decoration-style: solid;
+}
+
 .answer-people {
   display: flex;
   flex-direction: column;

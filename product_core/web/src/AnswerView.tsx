@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AnswerPerson, AnswerSource, api } from "./api";
-import FormattedMarkdown from "./FormattedMarkdown";
+import FormattedMarkdown, { LinkablePerson } from "./FormattedMarkdown";
 import SourcePreview, { SourceRef } from "./SourcePreview";
 
 /**
@@ -118,6 +118,22 @@ export default function AnswerView({ turn, isPending, question, conversationId }
   const [showSources, setShowSources] = useState(false);
   const byNumber = new Map(turn.sources.map((source) => [source.n, source]));
 
+  // Tên người trong câu chữ thành liên kết mở hồ sơ. Gom từ CẢ `people` lẫn
+  // `sources`: ⑤ hay nhắc tên một người nó vừa trích CV mà không đưa vào danh
+  // sách `people`, và đúng cái tên đó mới là chỗ người đọc muốn bấm.
+  const linkablePeople = useMemo<LinkablePerson[]>(() => {
+    const byId = new Map<number, LinkablePerson>();
+    for (const person of turn.people) {
+      if (person.name) byId.set(person.person_id, { personId: person.person_id, name: person.name });
+    }
+    for (const source of turn.sources) {
+      if (source.name && !byId.has(source.person_id)) {
+        byId.set(source.person_id, { personId: source.person_id, name: source.name });
+      }
+    }
+    return [...byId.values()];
+  }, [turn.people, turn.sources]);
+
   const openCitation = (n: number) => {
     const source = byNumber.get(n);
     if (source) setPreview(sourceRef(source));
@@ -136,7 +152,8 @@ export default function AnswerView({ turn, isPending, question, conversationId }
       )}
 
       {turn.text && (
-        <FormattedMarkdown content={turn.text} onCitation={openCitation} />
+        <FormattedMarkdown content={turn.text} onCitation={openCitation}
+                           people={linkablePeople} />
       )}
 
       <PeopleStrip people={turn.people} />

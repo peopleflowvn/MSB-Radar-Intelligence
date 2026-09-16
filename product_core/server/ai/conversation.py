@@ -16,7 +16,8 @@ MAX_HISTORY_TURNS = 16
 
 __all__ = ["address_for", "common_answer", "extract_thinking",
            "answer_if_conversation", "sanitize_history", "ConversationReply",
-           "is_conversational", "build_conversation_request", "knowledge_sources"]
+           "is_conversational", "build_conversation_request", "knowledge_sources",
+           "plain_text"]
 
 
 class ConversationReply(str):
@@ -54,6 +55,12 @@ def _plain(value):
     value = unicodedata.normalize("NFD", value)
     value = "".join(ch for ch in value if unicodedata.category(ch) != "Mn")
     return re.sub(r"[^a-z0-9]+", " ", value).strip()
+
+
+#: Tên công khai của `_plain` cho các module khác so khớp cụm từ tiếng Việt
+#: không dấu (`talent.answer.chat` dò câu chào). Viết lại bộ chuẩn hoá ở nơi
+#: khác là chép lại cả cái bẫy chữ "đ" ở trên.
+plain_text = _plain
 
 
 def common_answer(question, surface="talent", user=None):

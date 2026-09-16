@@ -1,8 +1,21 @@
 import React from "react";
+import { Link } from "react-router-dom";
+
+/** Một người trong kho mà câu trả lời có thể nhắc tới. */
+export interface LinkablePerson {
+  personId: number;
+  name: string;
+}
 
 interface Props {
   content: string;
   className?: string;
+  /**
+   * Tên những người này, hễ xuất hiện trong câu chữ, thành liên kết mở thẳng hồ
+   * sơ — cùng đích với chip ở "Hồ sơ được nhắc tới". Trước đây muốn mở hồ sơ
+   * người vừa đọc tên trong câu, người dùng phải rà xuống cuối bài tìm lại chip.
+   */
+  people?: LinkablePerson[];
   /**
    * Có hàm này thì `[n]` trong văn bản thành nút bấm được, mở đúng đoạn CV gốc.
    * Trích dẫn phải nằm NGAY trong câu chữ chứ không chỉ ở danh sách nguồn cuối
@@ -15,12 +28,80 @@ interface Props {
  *  không dùng được hook/context ở đó). */
 type CiteHandler = ((n: number) => void) | undefined;
 
+/** Bộ dò tên đã dựng sẵn, luồn xuống các hàm render inline như `CiteHandler`. */
+type NameMatcher = { regex: RegExp; byName: Map<string, number> } | undefined;
+
+/** Ký tự chữ (có dấu tiếng Việt) — dùng để chặn khớp giữa chừng một từ. */
+const LETTER = /\p{L}/u;
+
+/**
+ * Dựng MỘT regex cho mọi tên cần gắn liên kết.
+ *
+ * Tên dài xếp trước để "Nguyễn Văn An" không bị "Nguyễn Văn" nuốt mất phần đuôi
+ * — `RegExp` chọn nhánh khớp đầu tiên chứ không chọn nhánh dài nhất.
+ */
+function buildNameMatcher(people?: LinkablePerson[]): NameMatcher {
+  const byName = new Map<string, number>();
+  for (const person of people ?? []) {
+    const name = String(person?.name ?? "").trim();
+    if (name.length >= 3 && Number.isFinite(person?.personId)) {
+      byName.set(name.toLowerCase(), person.personId);
+    }
+  }
+  if (byName.size === 0) return undefined;
+  const names = [...byName.keys()].sort((a, b) => b.length - a.length);
+  const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return { regex: new RegExp(`(${escaped.join("|")})`, "giu"), byName };
+}
+
+/**
+ * Cắt một đoạn chữ thuần thành các mảnh, tên người thành `<Link>`.
+ *
+ * Chỉ khớp khi hai đầu KHÔNG phải chữ cái: "An" trong "Ánh" hay "Lan Anh" không
+ * được biến thành liên kết tới một người khác.
+ */
+function linkNames(text: string, matcher: NameMatcher, keyBase: string): React.ReactNode {
+  if (!matcher || !text) return text;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  matcher.regex.lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = matcher.regex.exec(text)) !== null) {
+    const before = text[match.index - 1];
+    const after = text[match.index + match[0].length];
+    if ((before && LETTER.test(before)) || (after && LETTER.test(after))) continue;
+
+    const personId = matcher.byName.get(match[0].toLowerCase());
+    if (personId === undefined) continue;
+
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+    parts.push(
+      <Link
+        key={`${keyBase}-name-${match.index}`}
+        to={`/person/${personId}?from=talent-ai`}
+        className="chat-person-link"
+        title="Mở hồ sơ"
+      >
+        {match[0]}
+      </Link>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (parts.length === 0) return text;
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return <>{parts}</>;
+}
+
 /**
  * Trình render Markdown & Rich Text chuyên dụng cho AI Chatbot Radar.
  * Phân tích và hiển thị đẹp mắt: xuống dòng, danh sách gạch đầu dòng, chữ in đậm,
  * tiêu đề, khối mã (code block), trích dẫn và bảng biểu.
  */
-export default function FormattedMarkdown({ content, className = "", onCitation }: Props) {
+export default function FormattedMarkdown({ content, className = "", people, onCitation }: Props) {
+  // Đặt TRƯỚC `if (!content)`: hook không được đứng sau một nhánh return.
+  const matcher = React.useMemo(() => buildNameMatcher(people), [people]);
   if (!content) return null;
 
   const rawText = String(content || "");
@@ -52,7 +133,7 @@ export default function FormattedMarkdown({ content, className = "", onCitation 
                 const Tag = `h${sec.level}` as keyof JSX.IntrinsicElements;
                 return (
                   <Tag key={`sec-${sIdx}`} className={`chat-heading chat-h${sec.level}`}>
-                    {renderInline(sec.text, onCitation)}
+                    {renderInline(sec.text, onCitation, matcher)}
                   </Tag>
                 );
               }
@@ -60,7 +141,7 @@ export default function FormattedMarkdown({ content, className = "", onCitation 
               if (sec.type === "blockquote") {
                 return (
                   <blockquote key={`sec-${sIdx}`} className="chat-blockquote">
-                    {renderInline(sec.text, onCitation)}
+                    {renderInline(sec.text, onCitation, matcher)}
                   </blockquote>
                 );
               }
@@ -70,7 +151,7 @@ export default function FormattedMarkdown({ content, className = "", onCitation 
                   <ul key={`sec-${sIdx}`} className="chat-list">
                     {sec.items.map((item, iIdx) => (
                       <li key={`item-${iIdx}`} className="chat-list-item">
-                        {renderInline(item, onCitation)}
+                        {renderInline(item, onCitation, matcher)}
                       </li>
                     ))}
                   </ul>
@@ -82,7 +163,7 @@ export default function FormattedMarkdown({ content, className = "", onCitation 
                   <ol key={`sec-${sIdx}`} className="chat-ordered-list">
                     {sec.items.map((item, iIdx) => (
                       <li key={`item-${iIdx}`} className="chat-list-item">
-                        {renderInline(item, onCitation)}
+                        {renderInline(item, onCitation, matcher)}
                       </li>
                     ))}
                   </ol>
@@ -92,7 +173,7 @@ export default function FormattedMarkdown({ content, className = "", onCitation 
               // Đoạn văn thông thường
               return (
                 <p key={`sec-${sIdx}`} className="chat-paragraph">
-                  {renderInlineWithLineBreaks(sec.text, onCitation)}
+                  {renderInlineWithLineBreaks(sec.text, onCitation, matcher)}
                 </p>
               );
             })}
@@ -254,16 +335,17 @@ function parseTextSections(raw: string): Section[] {
   return sections;
 }
 
-function renderInlineWithLineBreaks(text: string, onCitation?: CiteHandler): React.ReactNode {
+function renderInlineWithLineBreaks(text: string, onCitation?: CiteHandler,
+                                    matcher?: NameMatcher): React.ReactNode {
   const lines = text.split("\n");
   if (lines.length <= 1) {
-    return renderInline(text, onCitation);
+    return renderInline(text, onCitation, matcher);
   }
   return (
     <>
       {lines.map((line, idx) => (
         <React.Fragment key={idx}>
-          {renderInline(line, onCitation)}
+          {renderInline(line, onCitation, matcher)}
           {idx < lines.length - 1 && <br />}
         </React.Fragment>
       ))}
@@ -275,7 +357,8 @@ function renderInlineWithLineBreaks(text: string, onCitation?: CiteHandler): Rea
  * Phân tích các định dạng inline: **in đậm**, *in nghiêng*, `code`, [link](url),
  * và trích dẫn [n] khi có `onCitation`.
  */
-function renderInline(text: string, onCitation?: CiteHandler): React.ReactNode {
+function renderInline(text: string, onCitation?: CiteHandler,
+                      matcher?: NameMatcher): React.ReactNode {
   if (!text) return "";
 
   // Regex bắt token: **bold**, `code`, [link](url), trích dẫn, *italic*.
@@ -292,7 +375,8 @@ function renderInline(text: string, onCitation?: CiteHandler): React.ReactNode {
 
   while ((match = tokenRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index));
+      parts.push(linkNames(text.slice(lastIndex, match.index), matcher,
+                           `plain-${match.index}`));
     }
 
     const token = match[0];
@@ -301,7 +385,7 @@ function renderInline(text: string, onCitation?: CiteHandler): React.ReactNode {
     if (token.startsWith("**") && token.endsWith("**")) {
       parts.push(
         <strong key={key} className="chat-bold">
-          {token.slice(2, -2)}
+          {linkNames(token.slice(2, -2), matcher, `${key}-b`)}
         </strong>
       );
     } else if (token.startsWith("`") && token.endsWith("`")) {
@@ -353,7 +437,7 @@ function renderInline(text: string, onCitation?: CiteHandler): React.ReactNode {
     } else if (token.startsWith("*") && token.endsWith("*")) {
       parts.push(
         <em key={key} className="chat-italic">
-          {token.slice(1, -1)}
+          {linkNames(token.slice(1, -1), matcher, `${key}-i`)}
         </em>
       );
     } else {
@@ -364,7 +448,7 @@ function renderInline(text: string, onCitation?: CiteHandler): React.ReactNode {
   }
 
   if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
+    parts.push(linkNames(text.slice(lastIndex), matcher, `plain-${lastIndex}`));
   }
 
   return parts.length === 1 ? parts[0] : parts;

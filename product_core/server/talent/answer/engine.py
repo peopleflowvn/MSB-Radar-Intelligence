@@ -525,7 +525,9 @@ def answer(question, *, envelope=None, user=None, history=None, complete_fn=None
         if internal_knowledge:
             from dataclasses import replace
             query_plan = replace(query_plan, shape="general")
-    if query_plan.wants_action and act_stage.available(user):
+    if query_plan.wants_clarification:
+        branch = _stream_clarify(question, query_plan, started)
+    elif query_plan.wants_action and act_stage.available(user):
         branch = _stream_action(question, query_plan, envelope, user, history, started)
     elif not query_plan.needs_people:
         branch = _stream_chat(question, query_plan, envelope, user, started, adapter,
@@ -847,6 +849,25 @@ def _stream_chat(question, query_plan, envelope, user, started, adapter=None,
                "ms_total": int((time.monotonic() - started) * 1000)})}
 
 
+def _stream_clarify(question, query_plan, started):
+    """① không biết người dùng muốn gì → HỎI LẠI, không đoán.
+
+    Đoán bừa rồi chạy hết ①→⑤ mất vài chục giây, đốt một lượt truy hồi toàn kho,
+    để cuối cùng trả lời nhầm câu hỏi — rồi người dùng vẫn phải gõ lại. Một câu
+    hỏi lại rẻ hơn tất cả những thứ đó. Chỉ chạy khi ① vừa tự chấm là không chắc
+    vừa viết ra được câu hỏi cụ thể (`QueryPlan.wants_clarification`).
+
+    Không gọi model lần nữa: câu hỏi đã có sẵn trong kế hoạch.
+    """
+    text = query_plan.clarify
+    yield {"type": "answer", "text": text}
+    yield {"type": "done", "result": AnswerResult(
+        text=text,
+        trace={"question": question, "plan": query_plan.as_dict(),
+               "mode": "clarify",
+               "ms_total": int((time.monotonic() - started) * 1000)})}
+
+
 def _stream_action(question, query_plan, envelope, user, history, started):
     """Chuyển tiếp nhánh hành động, đóng gói `AnswerResult` như nhánh trả lời."""
     payload = {}
@@ -902,6 +923,11 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
         query_plan = plan_stage.plan(question, envelope=envelope,
                                      complete_fn=complete_fn)
     yield _step("Hiểu yêu cầu", "done")
+    # Hỏi lại đứng TRƯỚC mọi nhánh khác: không nhánh nào trả lời đúng được một
+    # câu mà chính ① còn không biết nó hỏi gì.
+    if query_plan.wants_clarification:
+        yield from _stream_clarify(question, query_plan, started)
+        return
     if query_plan.wants_action and act_stage.available(user):
         yield {"type": "preamble",
                "text": f"Bạn yêu cầu: {query_plan.information_need or question}. "

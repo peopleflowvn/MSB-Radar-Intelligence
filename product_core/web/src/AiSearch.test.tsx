@@ -128,6 +128,29 @@ describe("Answer Engine trên giao diện", () => {
     expect(link).toHaveAttribute("href", "https://sbv.gov.vn");
   });
 
+  it("trả lời xong thì mọi bước đều tick xong, không còn bước nào đang chạy", async () => {
+    // Máy chủ gửi bước cuối ở trạng thái `active` rồi kết thúc bằng `done` —
+    // KHÔNG có chunk đóng riêng cho nó. Trước đây thẻ tiến trình đứng lại ở
+    // "2/3 bước" kèm vòng xoay bên cạnh câu trả lời đã hiện đủ.
+    fakeAsk([
+      { event: "step", data: { label: "Hiểu yêu cầu", state: "done" } },
+      { event: "step", data: { label: "Tra trên internet", state: "active" } },
+      { event: "step", data: { label: "Soạn câu trả lời", state: "active" } },
+      { event: "answer", data: { text: "Chào anh/chị!" } },
+      { event: "done", data: { answer: "Chào anh/chị!", citations: [], people: [] } },
+    ]);
+    const { container } = renderSearch();
+
+    ask("xin chào");
+
+    expect(await screen.findByText(/Chào anh\/chị!/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Quá trình xử lý \(3\/3 bước\)/)).toBeInTheDocument();
+    });
+    expect(container.querySelectorAll(".step-spinner-icon")).toHaveLength(0);
+    expect(container.querySelectorAll(".radar-step-item.step-active")).toHaveLength(0);
+  });
+
   it("trích dẫn gộp [1,2] thành hai nút bấm riêng", async () => {
     const second = { ...SOURCE, n: 2, document_id: 43, snippet: "tư vấn khách hàng" };
     fakeAsk([

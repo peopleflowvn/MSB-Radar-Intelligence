@@ -78,7 +78,11 @@ _RUBRIC = (
     "- \"web\": cần dữ kiện CẬP NHẬT hoặc NGOÀI kho nội bộ — tin tức, số liệu thị trường, "
     "thông tin công khai về một công ty/ngành/khung lương, quy định mới. KHÔNG dùng \"web\" cho "
     "câu hỏi về một cá nhân cụ thể.\n"
-    "Chỉ trả JSON: {\"intent\": \"...\", \"confidence\": 0.0-1.0, \"reason\": \"ngắn gọn\"}."
+    "Chỉ trả JSON, ĐÚNG THỨ TỰ khoá này: "
+    "{\"reason\": \"...\", \"intent\": \"...\", \"confidence\": 0.0-1.0}.\n"
+    "\"reason\" viết TRƯỚC \"intent\": một câu ngắn nói người dùng đang muốn gì và "
+    "vì sao nhãn đó đúng. Đây là chỗ NGHĨ để chọn, không phải chỗ biện minh sau "
+    "khi đã chọn."
 )
 
 
@@ -141,7 +145,10 @@ def classify(question, *, surface="talent", user=None, history=None, adapter=Non
     request = ModelRequest(
         messages=[{"role": "system", "content": _RUBRIC},
                   {"role": "user", "content": user_block}],
-        task="assistant_intent", temperature=0.0, max_tokens=180,
+        # Nới từ 180: "reason" nay đứng TRƯỚC "intent", nên hạn mức chật sẽ cắt
+        # JSON trước khi model kịp viết ra nhãn, và cả bộ phân loại rơi về
+        # heuristic.
+        task="assistant_intent", temperature=0.0, max_tokens=320,
         response_format={"type": "json_object"},
         meta={"router": "intent", "surface": surface})
     try:

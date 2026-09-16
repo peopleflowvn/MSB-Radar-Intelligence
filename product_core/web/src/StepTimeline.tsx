@@ -26,8 +26,13 @@ export default function StepTimeline({
   compact = false,
 }: Props) {
   const [expanded, setExpanded] = useState(!compact);
-  const doneCount = steps.filter((s) => s.state === "done").length;
   const totalCount = steps.length;
+  // Lượt đã kết thúc thì không còn bước nào "đang chạy" — kể cả khi máy chủ
+  // chưa kịp gửi chunk đóng cho bước cuối. Không chốt ở đây thì thẻ hiện
+  // "2/3 bước" kèm một vòng xoay vĩnh viễn bên cạnh câu trả lời đã xong.
+  const doneCount = isPending
+    ? steps.filter((s) => s.state === "done").length
+    : totalCount;
 
   // Nếu không có bước nào và không pending thì không hiển thị
   if (!totalCount && !isPending && !stage) return null;
@@ -79,8 +84,8 @@ export default function StepTimeline({
       {totalCount > 0 ? (
         <ol className="radar-steps-list">
           {steps.map((step, i) => {
-            const isStepActive = step.state === "active";
-            const isStepDone = step.state === "done";
+            const isStepActive = step.state === "active" && isPending;
+            const isStepDone = step.state === "done" || (step.state === "active" && !isPending);
 
             return (
               <li
@@ -99,7 +104,7 @@ export default function StepTimeline({
 
                 <div className="radar-step-content">
                   <span className="radar-step-name">{step.label}</span>
-                  {isStepActive && isPending && (
+                  {isStepActive && (
                     <span className="radar-step-active-meta">
                       {elapsedSeconds > 0 && <span className="step-timer-badge">{elapsedSeconds}s</span>}
                       <span className="step-typing-pulse">
