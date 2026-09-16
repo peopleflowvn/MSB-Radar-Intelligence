@@ -34,3 +34,22 @@ jobs:
           sudo docker system df
           echo docker-system-df-verbose-build-cache
           sudo docker system df -v | sed -n '/Build cache usage/,$p'
+      - name: Report platform release/backup/image accumulation
+        shell: bash
+        # Ground truth before any cleanup: which release is live (the `current`
+        # symlink + `current-sha`), how many old releases/backups/images have
+        # piled up with no existing retention, and their sizes. Read-only.
+        run: |
+          set -euo pipefail
+          platform=/home/ubuntu/msb-radar-platform
+          echo current-release
+          sudo readlink -f "${platform}/current" || true
+          sudo cat "${platform}/current-sha" || true
+          echo releases
+          sudo du -sh "${platform}"/releases/*/ 2>/dev/null | sort -k2 || true
+          echo backups
+          sudo ls -lh "${platform}/backups/" 2>/dev/null || true
+          echo archived-old-checkouts
+          sudo du -sh /home/ubuntu/msbradar-local-only-before-* 2>/dev/null || true
+          echo msb-radar-intelligence-image-tags
+          sudo docker image ls msb-radar-intelligence --format '{{.Tag}}\t{{.CreatedAt}}\t{{.Size}}' | sort -k2 -r || true
