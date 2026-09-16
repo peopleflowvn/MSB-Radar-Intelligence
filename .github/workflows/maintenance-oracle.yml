@@ -46,3 +46,63 @@ jobs:
           echo "Disk after maintenance"
           df -h / /var/lib/docker
           sudo docker system df || true
+
+      - name: Reclaim old releases, backups and the archived pre-migration checkout
+        shell: bash
+        # None of this has an existing retention policy — every deploy adds a
+        # release directory and a pre-deploy DB dump that nothing ever removes.
+        # Measured via Inventory Oracle Runtime (2026-09-16): 35 release dirs
+        # (~530MB total), 35 backup dumps (~750MB total), and one 4.6GB
+        # directory archived by deploy-oracle.yml's "Retire the old checkout"
+        # step during the one-time migration to this release-based layout —
+        # orphaned since (nothing reads it back; grepped the workflows to
+        # confirm), and alone bigger than the entire free disk headroom.
+        run: |
+          set -euo pipefail
+          platform=/home/ubuntu/msb-radar-platform
+          # String-compare against `current-sha`, not `readlink -f current` —
+          # matches exactly how deploy-oracle.yml derives the release path
+          # (`release="${platform}/releases/${RELEASE_SHA}"`), so it can't
+          # disagree with the deploy job about which release is live.
+          current_sha=$(sudo cat "${platform}/current-sha")
+          current_release="${platform}/releases/${current_sha}"
+
+          echo "Releases before: $(sudo ls -1 "${platform}/releases" | wc -l)"
+          # Newest-first by mtime; keep the live release plus 2 predecessors —
+          # cheap (~15MB each) and the only thing that makes a manual emergency
+          # rollback (re-point `current`/`current-sha`, no automation for this
+          # today) even possible.
+          mapfile -t old_releases < <(
+            sudo find "${platform}/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
+              | sort -rn | awk '{print $2}' | tail -n +4
+          )
+          for dir in ${old_releases[@]+"${old_releases[@]}"}; do
+            [ -n "${dir}" ] || continue
+            if [ "${dir}" = "${current_release}" ]; then
+              echo "reclaim-releases: skip live release ${dir}"
+              continue
+            fi
+            sudo rm -rf -- "${dir}"
+          done
+          echo "Releases after: $(sudo ls -1 "${platform}/releases" | wc -l)"
+
+          echo "Backups before: $(sudo ls -1 "${platform}/backups" | wc -l)"
+          # DB dumps are the actual disaster-recovery net, not a deploy
+          # convenience — keep a longer tail than releases/images.
+          mapfile -t old_backups < <(
+            sudo find "${platform}/backups" -mindepth 1 -maxdepth 1 -type f -printf '%T@ %p\n' \
+              | sort -rn | awk '{print $2}' | tail -n +11
+          )
+          for f in ${old_backups[@]+"${old_backups[@]}"}; do
+            [ -n "${f}" ] || continue
+            sudo rm -f -- "${f}"
+          done
+          echo "Backups after: $(sudo ls -1 "${platform}/backups" | wc -l)"
+
+          # One-time migration artifact: deploy-oracle.yml only ever creates
+          # this the first time /home/ubuntu/msbradar isn't already a symlink,
+          # which is true for every deploy from the second one onward. Nothing
+          # reads it back.
+          sudo rm -rf /home/ubuntu/msbradar-local-only-before-*
+          echo "Disk after release/backup/checkout cleanup"
+          df -h /
