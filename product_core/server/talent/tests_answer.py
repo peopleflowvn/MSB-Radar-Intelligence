@@ -1988,12 +1988,19 @@ class AskEndpointTest(TransactionTestCase):
         document = Document.objects.create(person=person, sha256="b" * 64,
                                            parsed_text="Chuyên viên quan hệ khách hàng.")
         text = "Phạm Ứng Viên: chuyên viên quan hệ khách hàng cá nhân, sinh năm 1995."
-        CVChunk.objects.create(person=person, document=document, ordinal=0,
-                               fingerprint="f", text=text,
-                               text_norm=retrieve_stage._fold(text))
-        PersonSearchDocument.objects.create(person=person, fingerprint="f",
-                                            content=text,
-                                            content_norm=retrieve_stage._fold(text))
+        # `update_or_create`, không `create`: dưới TransactionTestCase, save()
+        # ở trên COMMIT THẬT ngay lập tức nên `talent/signals.py`'s
+        # `on_commit(rebuild)` đã tự tạo CVChunk/PersonSearchDocument cho
+        # document này rồi (trước đây dùng TestCase, transaction không bao
+        # giờ commit thật nên on_commit không chạy — `create` thẳng vẫn qua).
+        CVChunk.objects.update_or_create(
+            document=document, ordinal=0,
+            defaults={"person": person, "fingerprint": "f", "text": text,
+                     "text_norm": retrieve_stage._fold(text)})
+        PersonSearchDocument.objects.update_or_create(
+            person=person,
+            defaults={"fingerprint": "f", "content": text,
+                     "content_norm": retrieve_stage._fold(text)})
         self.person = person
 
     def _result(self):
