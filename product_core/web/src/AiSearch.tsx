@@ -402,7 +402,7 @@ export default function AiSearch() {
     void runAsk();
   };
 
-  const handleFiles = (selected: FileList | null) => {
+  const handleFiles = (selected: FileList | File[] | null) => {
     if (!selected) return;
     const incoming = Array.from(selected);
     const tooLarge = incoming.find((file) => file.size > MAX_ATTACHMENT_BYTES);
@@ -424,6 +424,48 @@ export default function AiSearch() {
     });
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
+
+    const filesToAttach: File[] = [];
+
+    // 1. Nhận diện ảnh chụp màn hình hoặc ảnh copy từ clipboard (Ctrl+V)
+    const items = clipboardData.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith("image/")) {
+          const blob = item.getAsFile();
+          if (blob) {
+            const ext = item.type === "image/jpeg" ? "jpg" : item.type.split("/")[1] || "png";
+            const nowStr = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+            const filename = blob.name && blob.name !== "image.png"
+              ? blob.name
+              : `anh-chup-${nowStr}.${ext}`;
+            const file = new File([blob], filename, { type: item.type });
+            filesToAttach.push(file);
+          }
+        }
+      }
+    }
+
+    // 2. Nhận diện tệp tài liệu copy từ File Explorer (nếu có)
+    if (filesToAttach.length === 0 && clipboardData.files && clipboardData.files.length > 0) {
+      for (let i = 0; i < clipboardData.files.length; i++) {
+        filesToAttach.push(clipboardData.files[i]);
+      }
+    }
+
+    if (filesToAttach.length > 0) {
+      const hasText = Array.from(items || []).some((it) => it.type === "text/plain");
+      if (!hasText) {
+        e.preventDefault();
+      }
+      handleFiles(filesToAttach);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -437,6 +479,7 @@ export default function AiSearch() {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onPaste={handlePaste}
     >
       {isDraggingOver && (
         <div className="copilot-drag-overlay" aria-hidden="true">
@@ -479,10 +522,11 @@ export default function AiSearch() {
               <textarea
                 rows={2}
                 className="hero-command-textarea"
-                placeholder="Mô tả người cần tìm hoặc kéo thả JD/CV vào đây…"
+                placeholder="Mô tả người cần tìm, dán ảnh chụp (Ctrl+V) hoặc kéo thả JD/CV vào đây…"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
                 disabled={asking}
               />
             </div>
@@ -511,7 +555,7 @@ export default function AiSearch() {
                   <span>Đính kèm JD / CV</span>
                 </button>
                 <span className="hero-shortcut-hint">
-                  💡 <strong>Enter</strong> để gửi · <strong>Shift+Enter</strong> xuống dòng · Có thể kéo thả tệp vào đây
+                  💡 <strong>Enter</strong> để gửi · <strong>Shift+Enter</strong> xuống dòng · Có thể dán ảnh (<strong>Ctrl+V</strong>) hoặc kéo thả tệp
                 </span>
               </div>
 
@@ -711,7 +755,7 @@ export default function AiSearch() {
               <textarea
                 rows={1}
                 className="copilot-textarea"
-                placeholder="Mô tả người cần tìm hoặc tải lên JD…"
+                placeholder="Mô tả người cần tìm, dán ảnh chụp (Ctrl+V) hoặc tải lên JD…"
                 value={inputText}
                 onChange={(e) => {
                   setInputText(e.target.value);
@@ -719,6 +763,7 @@ export default function AiSearch() {
                   e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
                 }}
                 onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
                 disabled={asking}
               />
               {asking ? (

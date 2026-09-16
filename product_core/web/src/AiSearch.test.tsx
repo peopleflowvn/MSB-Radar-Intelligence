@@ -201,6 +201,29 @@ describe("Answer Engine trên giao diện", () => {
     expect(screen.getByText(/yeu-cau.txt/)).toBeInTheDocument();
   });
 
+  it("nhận ảnh dán từ clipboard (paste Ctrl+V) làm tệp đính kèm", async () => {
+    const { container } = renderSearch();
+    const textarea = screen.getByPlaceholderText(/Mô tả người cần tìm/);
+
+    const imageFile = new File(["fake-image-data"], "anh-chup-man-hinh.png", { type: "image/png" });
+    const pasteEvent = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(pasteEvent, "clipboardData", {
+      value: {
+        items: [
+          {
+            type: "image/png",
+            kind: "file",
+            getAsFile: () => imageFile,
+          },
+        ],
+        files: [imageFile],
+      },
+    });
+
+    fireEvent(textarea, pasteEvent);
+    expect(await screen.findByText(/anh-chup-man-hinh\.png/)).toBeInTheDocument();
+  });
+
   it("có nút đánh giá câu trả lời và gửi được", async () => {
     fakeAsk([{ event: "done", data: {
       answer: "Có 1 hồ sơ [1].", citations: [SOURCE], people: [] } }]);
