@@ -3789,9 +3789,7 @@ button.mark.on {
 
 
 /* =========================================================
-   AI AMBIENT BACKGROUND (Subtle Top-Spotlight Mesh)
-   Phong cách sang trọng, tĩnh lặng chuẩn Enterprise / Banking,
-   tối ưu 100% tài nguyên GPU, chống mỏi mắt và tăng tối đa độ sắc nét của văn bản.
+   AI DYNAMIC AMBIENT GLOW (Full Viewport Aurora Animation)
    ========================================================= */
 .ai-ambient-glow {
   position: fixed;
@@ -3802,22 +3800,73 @@ button.mark.on {
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
-  background: 
-    radial-gradient(ellipse 90% 45% at 50% -10%, rgba(255, 138, 51, 0.08) 0%, rgba(245, 158, 11, 0.03) 40%, transparent 70%),
-    radial-gradient(circle at 15% 10%, rgba(234, 88, 12, 0.035) 0%, transparent 45%),
-    radial-gradient(circle at 85% 12%, rgba(255, 138, 51, 0.035) 0%, transparent 45%);
 }
 
-:root[data-theme="dark"] .ai-ambient-glow {
-  background: 
-    radial-gradient(ellipse 90% 50% at 50% -12%, rgba(255, 138, 51, 0.13) 0%, rgba(234, 88, 12, 0.05) 45%, transparent 75%),
-    radial-gradient(circle at 18% 12%, rgba(245, 158, 11, 0.05) 0%, transparent 50%),
-    radial-gradient(circle at 82% 15%, rgba(255, 77, 90, 0.04) 0%, transparent 50%);
-}
-
-/* Ẩn các orb trôi nổi cũ để loại bỏ hoàn toàn tính toán repaint/composite GPU liên tục */
 .glow-orb {
-  display: none !important;
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(85px);
+  opacity: 0.42;
+  animation: floatOrb 5.5s infinite ease-in-out alternate;
+}
+
+:root[data-theme="dark"] .glow-orb {
+  opacity: 0.5;
+  filter: blur(95px);
+}
+
+.glow-orb.orb-1 {
+  width: 540px;
+  height: 540px;
+  background: radial-gradient(circle, var(--gradient-from, var(--accent)) 0%, color-mix(in srgb, var(--gradient-via, var(--accent)) 40%, transparent) 60%, transparent 100%);
+  top: -80px;
+  left: 10%;
+  animation-duration: 6.5s;
+}
+
+.glow-orb.orb-2 {
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, var(--gradient-to, var(--accent)) 0%, color-mix(in srgb, var(--gradient-from, var(--accent)) 30%, transparent) 60%, transparent 100%);
+  top: 60px;
+  right: 5%;
+  animation-duration: 7.5s;
+  animation-delay: -1.5s;
+}
+
+.glow-orb.orb-3 {
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, #06b6d4 0%, var(--accent) 60%, transparent 100%);
+  bottom: 40px;
+  left: 20%;
+  animation-duration: 6s;
+  animation-delay: -3s;
+}
+
+.glow-orb.orb-4 {
+  width: 380px;
+  height: 380px;
+  background: radial-gradient(circle, #ec4899 0%, #8b5cf6 60%, transparent 100%);
+  top: 45%;
+  left: 45%;
+  animation-duration: 8s;
+  animation-delay: -4s;
+}
+
+@keyframes floatOrb {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate(70px, -30px) scale(1.18) rotate(60deg);
+  }
+  66% {
+    transform: translate(-50px, 60px) scale(0.92) rotate(120deg);
+  }
+  100% {
+    transform: translate(30px, 40px) scale(1.1) rotate(180deg);
+  }
 }
 
 /* Hero Welcome View */
