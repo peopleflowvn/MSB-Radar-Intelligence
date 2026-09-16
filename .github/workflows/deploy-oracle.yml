@@ -203,6 +203,44 @@ jobs:
           sudo docker logs msbradar-intelligence --tail 100 || true
           sudo docker logs msbradar-intelligence-indexer --tail 100 || true
           exit 1
+      - name: Reclaim disk from superseded Intelligence images
+        shell: bash
+        # `docker image prune` (used above and in "Maintain Oracle Docker
+        # Storage") only removes DANGLING (untagged) images. Every Intelligence
+        # build is tagged with its own commit SHA and never becomes dangling —
+        # these are the actual driver of the disk pressure that forces
+        # `docker builder prune --all --force` before every Intelligence build
+        # (boot disk measured at 95% full, 2.5GB free — see Inventory Oracle
+        # Runtime). Runs AFTER verification so a bad deploy still has its image
+        # on disk for `docker logs`/manual inspection.
+        #
+        # Keeps the running release plus 2 predecessors: the "reuse unchanged
+        # ancestor" step above walks `git rev-list` looking for the nearest
+        # ancestor whose image still exists locally, so at least one
+        # predecessor must survive for that optimisation to ever fire. This
+        # never touches the just-verified running image (RELEASE_SHA is
+        # explicitly skipped even if it somehow fell outside the kept range).
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          keep=3
+          mapfile -t old_tags < <(
+            sudo docker image ls msb-radar-intelligence --format '{{.Tag}}\t{{.CreatedAt}}' \
+              | grep -v '^local\b' \
+              | sort -t "$(printf '\t')" -k2 -r \
+              | tail -n "+$((keep + 1))" \
+              | cut -f1
+          )
+          for tag in ${old_tags[@]+"${old_tags[@]}"}; do
+            [ -n "${tag}" ] || continue
+            if [ "${tag}" = "${RELEASE_SHA}" ]; then
+              echo "reclaim-intelligence-images: skip current release ${tag}"
+              continue
+            fi
+            echo "reclaim-intelligence-images: removing msb-radar-intelligence:${tag}"
+            sudo docker rmi "msb-radar-intelligence:${tag}" || true
+          done
       - name: Retire the old checkout after successful verification
         shell: bash
         env:
