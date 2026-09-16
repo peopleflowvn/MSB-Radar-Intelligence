@@ -202,7 +202,7 @@ describe("Answer Engine trên giao diện", () => {
   });
 
   it("nhận ảnh dán từ clipboard (paste Ctrl+V) làm tệp đính kèm", async () => {
-    const { container } = renderSearch();
+    renderSearch();
     const textarea = screen.getByPlaceholderText(/Mô tả người cần tìm/);
 
     const imageFile = new File(["fake-image-data"], "anh-chup-man-hinh.png", { type: "image/png" });

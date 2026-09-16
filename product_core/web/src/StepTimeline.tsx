@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { AnswerStep } from "./AnswerView";
 
 interface Props {
@@ -28,7 +28,6 @@ export default function StepTimeline({
   compact = false,
   durationMs = 0,
 }: Props) {
-  const [userToggled, setUserToggled] = useState(false);
   const [expanded, setExpanded] = useState(true);
 
   const totalCount = steps.length;
@@ -48,10 +47,7 @@ export default function StepTimeline({
         <button
           type="button"
           className="radar-steps-compact-btn"
-          onClick={() => {
-            setUserToggled(true);
-            setExpanded(true);
-          }}
+          onClick={() => setExpanded(true)}
           title="Xem chi tiết các bước xử lý của AI"
         >
           {isPending ? (
@@ -97,10 +93,7 @@ export default function StepTimeline({
             <button
               type="button"
               className="radar-steps-toggle-btn"
-              onClick={() => {
-                setUserToggled(true);
-                setExpanded(false);
-              }}
+              onClick={() => setExpanded(false)}
               title="Thu gọn danh sách bước"
             >
               Thu gọn ▲
