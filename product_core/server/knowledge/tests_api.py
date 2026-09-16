@@ -13,13 +13,16 @@ from .models import KnowledgeDocument
 class KnowledgeApiPermissionTest(TestCase):
     def setUp(self):
         roles.ensure_groups()
-        self.recruiter = get_user_model().objects.create_user("kb-api-recruiter", password="x")
-        self.recruiter.groups.add(Group.objects.get(name=roles.RECRUITER))
+        # Recruiter được cấp MODULE_KNOWLEDGE mặc định (sửa 16/09) nên không
+        # còn đại diện cho "thiếu quyền" — dùng Hiring Manager cho việc đó.
+        self.no_knowledge_user = get_user_model().objects.create_user(
+            "kb-api-hm", password="x")
+        self.no_knowledge_user.groups.add(Group.objects.get(name=roles.HIRING_MANAGER))
         self.admin = get_user_model().objects.create_user(
             "kb-api-admin", password="x", is_superuser=True)
 
-    def test_recruiter_without_module_is_forbidden(self):
-        self.client.force_login(self.recruiter)
+    def test_user_without_module_is_forbidden(self):
+        self.client.force_login(self.no_knowledge_user)
         response = self.client.get(reverse("knowledge-documents"))
         self.assertEqual(response.status_code, 403)
 

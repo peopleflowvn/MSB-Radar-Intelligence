@@ -37,8 +37,10 @@ TASK = "talent_answer_judge"
 #: model vượt trần token và trả JSON cụt — parse ra rỗng, và ⑤ đi báo "kho không
 #: có ai" trong khi ② đã tìm được 40 người.
 BATCH = 8
-#: Đủ rộng cho một lô 8 hồ sơ kèm trích dẫn nguyên văn.
-MAX_TOKENS = 4000
+#: Đủ rộng cho một lô 8 hồ sơ kèm trích dẫn nguyên văn. Nới từ 4000 lên khi
+#: "vi_sao" đổi từ 1 câu ngắn thành 2-4 câu có chi tiết — 8 hồ sơ x lý do dài
+#: hơn dễ vượt trần cũ và bị cắt JSON giữa chừng (§ `_read_batch`).
+MAX_TOKENS = 6000
 #: Số lô đọc song song. Giữ vừa phải: VPS 1 vCPU, và bắn quá nhiều lượt cùng lúc
 #: vào một khoá nhà cung cấp thì dính hạn mức, đổi chậm lấy lỗi 429.
 WORKERS = 4
@@ -70,7 +72,10 @@ Chỉ trả JSON:
   "id": <id hồ sơ>,
   "thoa": true|false,
   "do_tin": 0.0-1.0,
-  "vi_sao": "<1 câu ngắn: khớp ở điểm nào, hoặc vì sao loại>",
+  "vi_sao": "<2-4 câu MỘT DÒNG (không xuống dòng trong chuỗi JSON): vai trò/kinh
+    nghiệm CỤ THỂ đọc được (chức danh, nơi làm, thời gian nếu đoạn có ghi), khớp
+    ở điểm nào với từng điều kiện, hoặc vì sao loại. Không viết chung chung kiểu
+    'có kinh nghiệm về X' mà không nói rõ kinh nghiệm đó là gì>",
   "trich_dan": [{"doan": <số thứ tự đoạn>, "nguyen_van": "<copy đúng chữ>"}],
   "boc_duoc": {"<tên thuộc tính>": <giá trị hoặc null>},
   "con_thieu": "<điều chưa rõ, để trống nếu không>"
@@ -326,7 +331,7 @@ def _parse_batch(text, batch, query_plan):
         out.append(Judgement(
             person_id=candidate.person_id, name=candidate.name,
             relevant=relevant, confidence=confidence,
-            why=" ".join(str(row.get("vi_sao") or "").split())[:300],
+            why=" ".join(str(row.get("vi_sao") or "").split())[:800],
             evidence=evidence, extracted=extracted,
             gap=" ".join(str(row.get("con_thieu") or "").split())[:200],
             attribute_status=statuses, criteria=criteria))

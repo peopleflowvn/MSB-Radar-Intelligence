@@ -30,9 +30,12 @@ TASK = "talent_answer_compose"
 #: nghĩ, và `providers.py` tước `reasoning_effort` của mọi model `deepseek/*`
 #: (chúng trả HTTP 400 khi thấy nó). Ở mức 1600, phần suy nghĩ ăn gần hết và câu
 #: trả lời bị cắt GIỮA CHỮ — đo trên kho thật: "Kho có 6 ứng viên đ".
-MAX_TOKENS = 4000
+#: Nới từ 4000 lên khi bỏ trần "~100 từ/người, 700 từ toàn bài" trong SYSTEM —
+#: câu trả lời cho 10 người giờ có thể dài hơn nhiều, cần thêm chỗ cho cả phần
+#: suy nghĩ lẫn phần chữ thật sự hiển thị.
+MAX_TOKENS = 6000
 #: Thử lại một lần với ngân sách này khi vẫn bị cắt.
-RETRY_MAX_TOKENS = 7000
+RETRY_MAX_TOKENS = 10000
 #: Ngân sách cho đường STREAM — cao ngay từ đầu, bằng mức retry.
 #:
 #: Đường `complete` bị cắt thì gọi lại được. Đường stream thì KHÔNG: chữ đã phát
@@ -67,9 +70,14 @@ TUYỆT ĐỐI:
 CÁCH VIẾT:
 1. Câu đầu trả lời thẳng câu hỏi (có bao nhiêu người, ai đứng đầu, kết luận là
    gì). Không mở bài, không "dựa trên dữ liệu hiện có tôi thấy rằng".
-2. Sau đó trình bày từng người bằng VĂN XUÔI hoặc gạch đầu dòng rõ: tên, mức độ
-   phù hợp, bằng chứng gắn với từng điều kiện, điểm mạnh khác biệt và khoảng
-   trống/rủi ro cần xác minh, kèm [n]. Không lặp nhận xét chung chung.
+2. Sau đó trình bày TỪNG người trên một đoạn/dòng RIÊNG, cách nhau bằng một
+   dòng trống — không viết nhiều người dồn chung một đoạn văn liền mạch, kể cả
+   khi danh sách dài. Mỗi người: tên in đậm, vai trò/kinh nghiệm cụ thể liên
+   quan tới nhu cầu (chức danh, nơi làm, thời gian nếu bằng chứng có ghi), mức
+   độ phù hợp với TỪNG điều kiện, điểm mạnh khác biệt so với người khác trong
+   danh sách, và khoảng trống/rủi ro cần xác minh, kèm [n] ngay sau mỗi khẳng
+   định. Không lặp nhận xét chung chung kiểu "có kinh nghiệm về X" mà không nói
+   rõ kinh nghiệm đó là gì.
 3. Nếu "sap_xep" có giá trị, nói rõ đang xếp theo tiêu chí gì và nêu con số của
    từng người (ví dụ năm sinh) để người đọc kiểm chứng được thứ tự.
 4. Nếu "thieu_du_lieu" > 0, nói thẳng có bao nhiêu người không xác định được
@@ -104,9 +112,10 @@ CÁCH VIẾT:
 
 Giọng: đồng nghiệp giỏi nghề, nói thẳng, có phân tích và thuyết phục nhưng trung
 thực về giới hạn dữ liệu. Hiểu câu hỏi trong mạch hội thoại, không trả lời lại
-từ đầu nếu người dùng đang hỏi tiếp. Tiếng Việt. Không emoji. Ưu tiên cấu trúc
-dễ đọc; tối đa khoảng 100 từ mỗi người và 700 từ toàn bài, trừ khi người dùng
-yêu cầu ngắn hơn.""" + "\n\n" + GUARD_RULE
+từ đầu nếu người dùng đang hỏi tiếp. Tiếng Việt. Không emoji. Không gò theo một
+số từ cố định — viết đủ dài để phân tích thấu đáo TỪNG người trong "ket_qua",
+nhưng không lặp lại thông tin, không đệm câu chữ, và không thêm chi tiết ngoài
+"bang_chung"/"thuoc_tinh" của chính người đó.""" + "\n\n" + GUARD_RULE
 
 
 def build_sources(chosen):
@@ -320,7 +329,18 @@ def used_sources(text, sources):
         return f"[{','.join(str(n) for n in kept)}]" if kept else ""
 
     cleaned = _CITE.sub(_keep, str(text or ""))
-    return " ".join(cleaned.split()) if cleaned != text else text, ordered
+    if cleaned == text:
+        return text, ordered
+    # Gỡ trích dẫn để lại khoảng trắng thừa quanh nó (vd "phù hợp [7] ." → "phù
+    # hợp ."). Gộp khoảng trắng NGANG (space/tab) nhưng GIỮ NGUYÊN xuống dòng —
+    # bài trả lời nhiều ứng viên xuống dòng giữa từng người, và bản cũ
+    # `" ".join(cleaned.split())` xoá cả newline nên MỌI lần có dù chỉ một
+    # trích dẫn ngoài dải cũng dồn cả bài thành một đoạn văn liền (ảnh báo lỗi
+    # 16/09 — 10 ứng viên dồn cục do model trích [11] khi chỉ có 10 nguồn).
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    cleaned = re.sub(r"[ \t]*\n[ \t]*", "\n", cleaned)
+    cleaned = re.sub(r" +([.,;:!?])", r"\1", cleaned)
+    return cleaned.strip(), ordered
 
 
 def compose(query_plan, chosen, near_misses, stats, *, history=None, complete_fn=None,

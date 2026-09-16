@@ -61,8 +61,8 @@ async def to_async_iter(sync_iterable):
     try:
         while True:
             item = await sync_to_async(
-                next, thread_sensitive=False, executor=executor, context=context,
-            )(iterator, _SENTINEL)
+                context.run, thread_sensitive=False, executor=executor,
+            )(next, iterator, _SENTINEL)
             if item is _SENTINEL:
                 return
             yield item

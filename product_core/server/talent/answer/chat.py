@@ -121,9 +121,15 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
     # (accounts/roles.py::MODULE_KNOWLEDGE).
     if smalltalk:
         internal_sources = []
+    elif knowledge is not None:
+        internal_sources = knowledge
     else:
-        internal_sources = (knowledge_sources(question, user)
-                            if knowledge is None else knowledge)
+        # Bước này TRƯỚC im lặng hoàn toàn trên UI — người dùng thấy thẳng
+        # "Tra trên internet" và tưởng nội bộ chưa hề được tra, dù hàm này vẫn
+        # chạy (thường trả rỗng vì thiếu quyền module `knowledge` hoặc chưa có
+        # tài liệu khớp — không phải vì bị bỏ qua). Phát bước để thấy rõ.
+        yield {"type": "stage", "stage": "knowledge", "text": "Tra tài liệu nội bộ"}
+        internal_sources = knowledge_sources(question, user)
 
     # Cần dữ liệu ngoài kho → tra web. `intent` do người gọi cấp (đã phân
     #    loại rồi thì không phân loại lại); không có thì tự hỏi.

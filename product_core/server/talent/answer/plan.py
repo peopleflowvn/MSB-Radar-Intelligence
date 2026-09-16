@@ -80,6 +80,19 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
     "bạn có bao nhiêu hồ sơ"                → count
   Chọn nhầm những câu này thành "general" khiến Radar trả lời "tôi không có dữ
   liệu" trong khi kho có hàng trăm hồ sơ — sai nghiêm trọng nhất có thể mắc.
+
+  NGƯỢC LẠI — "MSB" trong câu hỏi không tự động nghĩa là "kho": MSB vừa là tên
+  ngân hàng thật (Ngân hàng TMCP Hàng Hải Việt Nam) vừa là tên kho CV ứng viên
+  ứng tuyển vào MSB. Câu hỏi về BẢN THÂN ngân hàng — lãnh đạo, tổ chức, tin tức,
+  sản phẩm, lãi suất — là kiến thức thế giới thực, KHÔNG phải một phép tổng hợp
+  trên kho CV, dù câu có chữ "MSB":
+    "tổng giám đốc msb là ai"          → general (hỏi về ngân hàng, không phải
+                                          hồ sơ nào trong kho)
+    "msb có bao nhiêu chi nhánh"       → general
+    "lãi suất huy động của msb"        → general
+  Phân biệt bằng: câu có đang hỏi về NGƯỜI/HỒ SƠ nằm TRONG kho không (ứng viên,
+  CV, "chúng ta có ai…"), hay đang hỏi một sự thật về chính ngân hàng MSB như
+  một tổ chức ngoài đời? Chỉ vế đầu mới là analyze/find_people/count.
 - "do_tin_cay": 0.0–1.0 — bạn CHẮC tới đâu về "shape" vừa chọn, viết NGAY SAU
   nó. Chấm thật thà, đây không phải điểm thi:
     ≥ 0.8  câu hỏi rõ ràng, chỉ có một cách hiểu.
@@ -229,6 +242,19 @@ def mentions_store(question):
     """Câu hỏi có nhắc tới kho hồ sơ không (dù hỏi theo lối "bạn có…")."""
     low = " ".join(str(question or "").casefold().split())
     return any(word in low for word in _STORE_WORDS)
+
+
+def has_recent_candidates(envelope):
+    """Lượt trước đã trả về người nào chưa.
+
+    Câu hỏi tiếp ("ai trong số đó nhiều kinh nghiệm nhất") không nhắc CV/kho
+    nhưng vẫn là follow-up trên kho — không được coi như lạc đề kiểu
+    "MSB là ngân hàng". Xem chỗ gọi ở `engine.py`.
+    """
+    projection = getattr(envelope, "projection", None)
+    if projection is None:
+        return False
+    return bool(projection.last_result_people(limit=1))
 
 
 def _context_block(envelope):

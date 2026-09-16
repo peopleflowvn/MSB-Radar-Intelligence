@@ -92,6 +92,30 @@ export default function AiSearch() {
   const [asking, setAsking] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDraggingOver) setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDraggingOver(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  };
 
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
@@ -408,7 +432,22 @@ export default function AiSearch() {
   };
 
   return (
-    <div className="copilot-chat-container">
+    <div
+      className={`copilot-chat-container ${isDraggingOver ? "is-dragover" : ""}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDraggingOver && (
+        <div className="copilot-drag-overlay" aria-hidden="true">
+          <div className="copilot-drag-box">
+            <span className="drag-icon">📄</span>
+            <strong className="drag-title">Thả tệp JD hoặc CV vào đây</strong>
+            <span className="drag-desc">Radar sẽ tự động đọc nội dung để phân tích và tìm kiếm ứng viên</span>
+          </div>
+        </div>
+      )}
+
       <div className="radar-conversation-content full-width">
       {/* 1. Màn hình chào mừng khi chưa có hội thoại */}
       {messages.length === 0 ? (
@@ -440,7 +479,7 @@ export default function AiSearch() {
               <textarea
                 rows={2}
                 className="hero-command-textarea"
-                placeholder="Mô tả người cần tìm hoặc tải lên JD…"
+                placeholder="Mô tả người cần tìm hoặc kéo thả JD/CV vào đây…"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -472,7 +511,7 @@ export default function AiSearch() {
                   <span>Đính kèm JD / CV</span>
                 </button>
                 <span className="hero-shortcut-hint">
-                  💡 <strong>Enter</strong> để gửi · <strong>Shift+Enter</strong> xuống dòng
+                  💡 <strong>Enter</strong> để gửi · <strong>Shift+Enter</strong> xuống dòng · Có thể kéo thả tệp vào đây
                 </span>
               </div>
 
@@ -535,6 +574,28 @@ export default function AiSearch() {
       ) : (
         /* 2. Dòng hội thoại (Message Stream) khi đã bắt đầu chat */
         <>
+          {/* Thanh công cụ đỉnh dòng hội thoại (Top Bar) với nút Đoạn chat mới trực tiếp */}
+          <div className="copilot-stream-header">
+            <div className="stream-header-left">
+              <span className="stream-header-title">💬 Hội thoại với Radar AI</span>
+              <span className="stream-header-badge">
+                {messages.filter((m) => m.sender === "user").length} câu hỏi
+              </span>
+            </div>
+            <button
+              type="button"
+              className="copilot-new-chat-top-btn"
+              onClick={resetConversation}
+              title="Bắt đầu đoạn chat mới"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span>Bắt đầu chat mới</span>
+            </button>
+          </div>
+
           <div className="copilot-chat-stream">
             {messages.map((msg, mi) => (
               <div key={msg.id}
@@ -577,7 +638,7 @@ export default function AiSearch() {
                     ) : null}
 
                     {/* Khối Tiến trình & Các bước thực thi hợp nhất (không lặp lại) */}
-                    {msg.sender === "ai" && (msg.isPending || (msg.answer?.steps?.length ?? 0) > 0) ? (
+                    {msg.sender === "ai" && (msg.isPending || (msg.answer?.steps?.length ?? 0) > 0 || (msg.answer?.durationMs ?? Number(msg.answer?.trace?.ms_total ?? 0)) > 0) ? (
                       <StepTimeline
                         steps={msg.answer?.steps}
                         stage={msg.answer?.stage}
@@ -585,6 +646,7 @@ export default function AiSearch() {
                         hint={waitingHint(Math.max(0, Math.floor((now - (msg.startedAt ?? now)) / 1000)))}
                         isPending={msg.isPending}
                         compact={!!msg.text}
+                        durationMs={msg.answer?.durationMs ?? Number(msg.answer?.trace?.ms_total ?? 0)}
                       />
                     ) : null}
 
@@ -595,6 +657,7 @@ export default function AiSearch() {
                         question={messages[mi - 1]?.sender === "user"
                           ? messages[mi - 1].text : undefined}
                         conversationId={threadId}
+                        onFollowUp={(query) => handleSendMessage(query)}
                       />
                     ) : (
                       msg.text && <p className="chat-paragraph">{msg.text}</p>

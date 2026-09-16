@@ -903,6 +903,32 @@ class EngineEndToEndTest(TestCase):
         self.assertIn("pass1", result.trace)
         self.assertNotEqual(result.trace.get("mode"), "chat")
 
+    def test_cau_hoi_msb_that_bi_xep_nham_analyze_van_duoc_cuu_sang_web(self):
+        """"Tổng giám đốc msb là ai" không nhắc cv/hồ sơ/ứng viên/kho — nếu ①
+        vẫn lỡ xếp "analyze" (nhầm MSB ngân hàng với kho CV), không có tài liệu
+        nội bộ nào khớp (đây là dữ kiện thời sự, không phải chính sách công ty),
+        thì `mentions_store` phải bắt được và đẩy sang nhánh hội thoại có tra
+        web — thay vì chạy ②→⑤ trên kho CV rồi báo "không tìm thấy"."""
+        from ai.websearch import WebResult
+        caller = replies({
+            plan_stage.TASK: json.dumps({
+                "shape": "analyze",
+                "search_queries": ["tổng giám đốc msb"]})})
+        hit = WebResult(text="Tổng giám đốc MSB là ông Nguyễn Hoàng Linh.",
+                        citations=[{"title": "MSB", "url": "https://msb.com.vn"}],
+                        provider="gemini_grounding", model="gemini")
+
+        with mock.patch("ai.conversation.knowledge_sources", return_value=[]), \
+                mock.patch("talent.answer.chat.websearch.enabled", return_value=True), \
+                mock.patch("talent.answer.chat.websearch.web_answer",
+                           return_value=hit) as web, \
+                mock.patch("ai.intent.classify", return_value=_NoWeb()):
+            result = engine.answer("tổng giám đốc msb là ai", complete_fn=caller)
+
+        web.assert_called_once()
+        self.assertNotIn("pass1", result.trace)
+        self.assertIn("Nguyễn Hoàng Linh", result.text)
+
     def test_tra_web_hong_thi_lui_ve_hoi_thoai_chu_khong_tra_man_hinh_trang(self):
         caller = replies({
             plan_stage.TASK: json.dumps({"shape": "general", "search_queries": []})})
@@ -1490,6 +1516,18 @@ class SmalltalkTest(TestCase):
                                         adapter=adapter))
         kb.assert_called_once()
         self.assertIn("Nghỉ 12 ngày phép năm", json.dumps(adapter.sent, ensure_ascii=False))
+
+    def test_tra_noi_bo_co_buoc_rieng_tren_giao_dien(self):
+        """Trước đây bước tra `knowledge_sources()` chạy hoàn toàn im lặng —
+        người dùng chỉ thấy "Tra trên internet" và tưởng nội bộ chưa hề được
+        tra (dù nó có chạy, chỉ trả rỗng). Giờ phải có một bước riêng hiện ra."""
+        adapter = self._FakeAdapter()
+        with mock.patch("talent.answer.chat.knowledge_sources", return_value=[]) as kb,                 mock.patch("talent.answer.chat.websearch.enabled", return_value=False):
+            chunks = list(chat_stage.stream_chat(
+                "cho tôi thể lệ giới thiệu nội bộ ứng viên cho MSB", adapter=adapter))
+        kb.assert_called_once()
+        stages = [c.get("stage") for c in chunks if c.get("type") == "stage"]
+        self.assertEqual(stages, ["knowledge", "chat"])
 
     def test_nhan_dien_cac_bien_the_chao_hoi(self):
         for text in ("xin chào", "Chào bạn", "hello", "Hi", "cảm ơn nhé",

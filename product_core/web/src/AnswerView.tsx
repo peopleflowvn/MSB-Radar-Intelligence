@@ -111,12 +111,58 @@ function Rating({ turn, question, conversationId }: {
   );
 }
 
-export default function AnswerView({ turn, isPending, question, conversationId }: {
-  turn: AnswerTurn; isPending?: boolean; question?: string; conversationId?: string;
+function getFollowUpSuggestions(turn: AnswerTurn): string[] {
+  if (turn.people && turn.people.length > 1) {
+    return [
+      `So sánh chi tiết các ứng viên vừa tìm được`,
+      `Ai trong số đó có nhiều năm kinh nghiệm nhất?`,
+      `Soạn thư mời phỏng vấn cho ${turn.people[0].name}`,
+    ];
+  }
+  if (turn.people && turn.people.length === 1) {
+    return [
+      `Tóm tắt điểm mạnh nổi bật của ${turn.people[0].name}`,
+      `Tìm thêm các ứng viên tương tự ${turn.people[0].name}`,
+      `Soạn email liên hệ hẹn phỏng vấn`,
+    ];
+  }
+  if (turn.webSources && turn.webSources.length > 0) {
+    return [
+      "Tóm tắt các ý chính quan trọng",
+      "Chính sách này áp dụng thế nào tại MSB?",
+    ];
+  }
+  return [
+    "Gợi ý thêm tiêu chí tìm kiếm mở rộng trong kho",
+    "Có hồ sơ ứng viên nào khác liên quan không?",
+  ];
+}
+
+export default function AnswerView({
+  turn,
+  isPending,
+  question,
+  conversationId,
+  onFollowUp,
+}: {
+  turn: AnswerTurn;
+  isPending?: boolean;
+  question?: string;
+  conversationId?: string;
+  onFollowUp?: (query: string) => void;
 }) {
   const [preview, setPreview] = useState<SourceRef | null>(null);
   const [showSources, setShowSources] = useState(false);
+  const [copied, setCopied] = useState(false);
   const byNumber = new Map(turn.sources.map((source) => [source.n, source]));
+
+  const handleCopy = () => {
+    if (!turn.text) return;
+    navigator.clipboard.writeText(turn.text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => undefined);
+  };
 
   // Tên người trong câu chữ thành liên kết mở hồ sơ. Gom từ CẢ `people` lẫn
   // `sources`: ⑤ hay nhắc tên một người nó vừa trích CV mà không đưa vào danh
@@ -201,15 +247,40 @@ export default function AnswerView({ turn, isPending, question, conversationId }
         </div>
       )}
 
+      {/* Gợi ý các câu hỏi tiếp theo (Smart Follow-ups) khi đã có câu trả lời */}
+      {!isPending && turn.text && onFollowUp && (
+        <div className="answer-followup-section">
+          <span className="answer-followup-title">💡 GỢI Ý CÂU HỎI TIẾP THEO:</span>
+          <div className="answer-followup-chips">
+            {getFollowUpSuggestions(turn).map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                className="answer-followup-chip"
+                onClick={() => onFollowUp(suggestion)}
+              >
+                <span className="followup-icon">💬</span>
+                <span className="followup-text">{suggestion}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!isPending && turn.text && (
-        <>
-          {(turn.durationMs ?? Number(turn.trace?.ms_total ?? 0)) > 0 && (
-            <div className="muted small answer-duration">
-              Hoàn tất trong {((turn.durationMs ?? Number(turn.trace?.ms_total)) / 1000).toFixed(1)} giây
-            </div>
-          )}
+        <div className="answer-footer-row">
+          <div className="answer-footer-meta">
+            <button
+              type="button"
+              className="answer-copy-btn"
+              onClick={handleCopy}
+              title="Sao chép nội dung câu trả lời"
+            >
+              {copied ? "✓ Đã chép" : "📋 Sao chép"}
+            </button>
+          </div>
           <Rating turn={turn} question={question} conversationId={conversationId} />
-        </>
+        </div>
       )}
     </div>
   );

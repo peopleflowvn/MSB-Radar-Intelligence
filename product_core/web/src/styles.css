@@ -3789,7 +3789,9 @@ button.mark.on {
 
 
 /* =========================================================
-   AI DYNAMIC AMBIENT GLOW (Full Viewport Aurora Animation)
+   AI AMBIENT BACKGROUND (Subtle Top-Spotlight Mesh)
+   Phong cách sang trọng, tĩnh lặng chuẩn Enterprise / Banking,
+   tối ưu 100% tài nguyên GPU, chống mỏi mắt và tăng tối đa độ sắc nét của văn bản.
    ========================================================= */
 .ai-ambient-glow {
   position: fixed;
@@ -3800,73 +3802,22 @@ button.mark.on {
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
+  background: 
+    radial-gradient(ellipse 90% 45% at 50% -10%, rgba(255, 138, 51, 0.08) 0%, rgba(245, 158, 11, 0.03) 40%, transparent 70%),
+    radial-gradient(circle at 15% 10%, rgba(234, 88, 12, 0.035) 0%, transparent 45%),
+    radial-gradient(circle at 85% 12%, rgba(255, 138, 51, 0.035) 0%, transparent 45%);
 }
 
+:root[data-theme="dark"] .ai-ambient-glow {
+  background: 
+    radial-gradient(ellipse 90% 50% at 50% -12%, rgba(255, 138, 51, 0.13) 0%, rgba(234, 88, 12, 0.05) 45%, transparent 75%),
+    radial-gradient(circle at 18% 12%, rgba(245, 158, 11, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 82% 15%, rgba(255, 77, 90, 0.04) 0%, transparent 50%);
+}
+
+/* Ẩn các orb trôi nổi cũ để loại bỏ hoàn toàn tính toán repaint/composite GPU liên tục */
 .glow-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(85px);
-  opacity: 0.42;
-  animation: floatOrb 5.5s infinite ease-in-out alternate;
-}
-
-:root[data-theme="dark"] .glow-orb {
-  opacity: 0.5;
-  filter: blur(95px);
-}
-
-.glow-orb.orb-1 {
-  width: 540px;
-  height: 540px;
-  background: radial-gradient(circle, var(--gradient-from, var(--accent)) 0%, color-mix(in srgb, var(--gradient-via, var(--accent)) 40%, transparent) 60%, transparent 100%);
-  top: -80px;
-  left: 10%;
-  animation-duration: 6.5s;
-}
-
-.glow-orb.orb-2 {
-  width: 480px;
-  height: 480px;
-  background: radial-gradient(circle, var(--gradient-to, var(--accent)) 0%, color-mix(in srgb, var(--gradient-from, var(--accent)) 30%, transparent) 60%, transparent 100%);
-  top: 60px;
-  right: 5%;
-  animation-duration: 7.5s;
-  animation-delay: -1.5s;
-}
-
-.glow-orb.orb-3 {
-  width: 420px;
-  height: 420px;
-  background: radial-gradient(circle, #06b6d4 0%, var(--accent) 60%, transparent 100%);
-  bottom: 40px;
-  left: 20%;
-  animation-duration: 6s;
-  animation-delay: -3s;
-}
-
-.glow-orb.orb-4 {
-  width: 380px;
-  height: 380px;
-  background: radial-gradient(circle, #ec4899 0%, #8b5cf6 60%, transparent 100%);
-  top: 45%;
-  left: 45%;
-  animation-duration: 8s;
-  animation-delay: -4s;
-}
-
-@keyframes floatOrb {
-  0% {
-    transform: translate(0, 0) scale(1) rotate(0deg);
-  }
-  33% {
-    transform: translate(70px, -30px) scale(1.18) rotate(60deg);
-  }
-  66% {
-    transform: translate(-50px, 60px) scale(0.92) rotate(120deg);
-  }
-  100% {
-    transform: translate(30px, 40px) scale(1.1) rotate(180deg);
-  }
+  display: none !important;
 }
 
 /* Hero Welcome View */
@@ -10576,8 +10527,8 @@ button.chip.active {
 }
 
 .hero-command-card:focus-within {
-  border-color: rgba(99, 102, 241, 0.8);
-  box-shadow: 0 10px 36px rgba(99, 102, 241, 0.22), 0 0 0 3px rgba(99, 102, 241, 0.2);
+  border-color: var(--accent, #FF8A33);
+  box-shadow: 0 10px 36px rgba(255, 138, 51, 0.16), 0 0 0 3px var(--accent-soft, rgba(255, 138, 51, 0.12));
 }
 
 .hero-input-main-row {
@@ -14880,7 +14831,7 @@ button.chip.active {
 
 .radar-step-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 9px;
   font-size: 13px;
   line-height: 1.4;
@@ -14904,6 +14855,7 @@ button.chip.active {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
 .step-check-icon {
@@ -14931,13 +14883,32 @@ button.chip.active {
   border-radius: 50%;
   background: var(--muted);
   opacity: 0.5;
+  margin-top: 6px;
 }
 
 .radar-step-content {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+}
+
+.radar-step-title-row {
+  display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.radar-step-finish-duration {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .radar-step-name {
@@ -15413,6 +15384,242 @@ button.chip.active {
   display: inline-flex;
   gap: 2px;
 }
+
+/* ==========================================================================
+   Copilot Top Stream Header & Actions
+   ========================================================================== */
+.copilot-stream-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  margin-bottom: 14px;
+  background: var(--surface-raised, rgba(0, 0, 0, 0.02));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+}
+
+:root[data-theme="dark"] .copilot-stream-header {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.stream-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stream-header-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stream-header-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.copilot-new-chat-top-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.copilot-new-chat-top-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* Drag & Drop Upload Overlay */
+.copilot-drag-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 999;
+  background: rgba(15, 23, 42, 0.68);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  border: 2px dashed var(--accent, #FF8A33);
+  pointer-events: none;
+  animation: fadeInDrag 0.2s ease-out;
+}
+
+@keyframes fadeInDrag {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.copilot-drag-box {
+  background: var(--surface, #1e293b);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  padding: 30px 40px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.copilot-drag-box .drag-icon {
+  font-size: 38px;
+}
+
+.copilot-drag-box .drag-title {
+  font-size: 16px;
+  font-weight: 750;
+  color: var(--text);
+}
+
+.copilot-drag-box .drag-desc {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Radar Steps Header Right & Timer Glow */
+.radar-steps-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-timer-badge.timer-ticking {
+  animation: timerPulse 2s infinite ease-in-out;
+}
+
+@keyframes timerPulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(255, 138, 51, 0); }
+  50% { box-shadow: 0 0 8px rgba(255, 138, 51, 0.35); }
+}
+
+.radar-step-item.step-transitioning {
+  color: var(--accent);
+  font-style: normal;
+}
+
+/* Smart Follow-up Suggestions */
+.answer-followup-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.answer-followup-title {
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.answer-followup-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.answer-followup-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  background: var(--surface-raised, rgba(0, 0, 0, 0.03));
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="dark"] .answer-followup-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.answer-followup-chip:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 10px rgba(255, 138, 51, 0.15);
+}
+
+.answer-followup-chip .followup-icon {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+/* Answer Footer Row & Copy Button */
+.answer-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.answer-footer-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.answer-duration {
+  font-variant-numeric: tabular-nums;
+}
+
+.answer-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.answer-copy-btn:hover {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--text-secondary);
+}
+
 
 /* ── Cấu hình thumbnail / xem trước liên kết ───────────────────────────────── */
 

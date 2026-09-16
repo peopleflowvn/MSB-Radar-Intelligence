@@ -204,6 +204,12 @@ class KnowledgeIntelligenceBridgeTest(TestCase):
         self.admin = User.objects.create_user("admin1", password="secret", is_superuser=True)
         self.recruiter = User.objects.create_user("recruiter2", password="secret")
         Group.objects.get_or_create(name=roles.RECRUITER)[0].user_set.add(self.recruiter)
+        # Recruiter được cấp MODULE_KNOWLEDGE mặc định (đúng nghiệp vụ, sửa
+        # ngày 16/09) nên không còn đại diện cho "có TALENT mà thiếu
+        # KNOWLEDGE" — dùng Hiring Manager (chỉ MODULE_TALENT) cho việc đó.
+        self.talent_only_user = User.objects.create_user("hm1", password="secret")
+        Group.objects.get_or_create(
+            name=roles.HIRING_MANAGER)[0].user_set.add(self.talent_only_user)
         self.doc = KnowledgeDocument.objects.create(
             title="Quy trinh nghi phep", category=KnowledgeDocument.CATEGORY_HR_POLICY,
             parsed_text="Nhan vien duoc nghi 12 ngay phep nam.")
@@ -281,10 +287,11 @@ class KnowledgeIntelligenceBridgeTest(TestCase):
         self.assertIsNone(event["text"])
 
     def test_evidence_document_requires_knowledge_module_not_talent(self):
-        # Recruiter has MODULE_TALENT but not MODULE_KNOWLEDGE by default.
+        # Hiring Manager has MODULE_TALENT but not MODULE_KNOWLEDGE by default.
         response = self.client.get(
             reverse("intelligence-evidence-document", args=[-self.doc.pk]),
-            **self.service_headers, HTTP_X_RADAR_SCOPE_TOKEN=issue_scope_token(self.recruiter))
+            **self.service_headers,
+            HTTP_X_RADAR_SCOPE_TOKEN=issue_scope_token(self.talent_only_user))
         self.assertEqual(response.status_code, 404)
 
         response = self.client.get(

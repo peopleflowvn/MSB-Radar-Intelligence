@@ -79,16 +79,20 @@ LOCKED_GRANTS = frozenset({(ADMIN, MODULE_ADMIN)})
 # trước khi có tính năng. Muốn cho Recruiter/Manager nhập liệu thì Admin tự bật
 # trong trang Quản trị → Phân quyền Module theo Vai trò.
 #
-# `knowledge` (tài liệu tri thức nội bộ — quy trình/quyết định/hướng dẫn) theo
-# đúng khuôn đó: mặc định chỉ Admin, vì tài liệu loại này thường có nội dung
-# nhạy cảm (lương thưởng, quyết định nhân sự...) mà một module mới không nên
-# tự ý mở rộng phạm vi người xem. Cấp thêm cho Manager/Recruiter/... qua trang
-# Quản trị → Phân quyền Module theo Vai trò, không cần sửa code.
+# `knowledge` (tài liệu tri thức nội bộ — quy trình/quyết định/hướng dẫn):
+# Recruiter được cấp mặc định vì đây chính là người hỏi Radar các câu chính
+# sách/quy trình tuyển dụng (vd "thể lệ giới thiệu nội bộ ứng viên") — thiếu
+# quyền này khiến `knowledge_sources()` luôn trả rỗng và Radar rơi thẳng vào
+# nhánh tra web, dù tài liệu nội bộ đã có sẵn (đo trên production 16/09). Nội
+# dung thật sự nhạy cảm (lương thưởng, quyết định nhân sự) là chuyện phân loại
+# ở TỪNG tài liệu trong `/knowledge`, không phải lý do chặn cả module với vai
+# trò dùng nó nhiều nhất. Vai trò khác vẫn mặc định không có — cấp thêm qua
+# trang Quản trị → Phân quyền Module theo Vai trò khi cần.
 ROLE_MODULES = {
     ADMIN: {MODULE_TALENT, MODULE_RB, MODULE_SOCIAL, MODULE_EDGE, MODULE_INTAKE,
            MODULE_AI_SETTINGS, MODULE_REPORTS, MODULE_ADMIN, MODULE_KNOWLEDGE},
     EDGE_OPERATOR: {MODULE_EDGE, MODULE_INTAKE},
-    RECRUITER: {MODULE_TALENT, MODULE_SOCIAL},
+    RECRUITER: {MODULE_TALENT, MODULE_SOCIAL, MODULE_KNOWLEDGE},
     HIRING_MANAGER: {MODULE_TALENT},
     RB_SALES: {MODULE_RB, MODULE_TALENT, MODULE_SOCIAL},
     MANAGER: {MODULE_TALENT, MODULE_RB, MODULE_REPORTS},

@@ -1,6 +1,24 @@
-import { createContext, Dispatch, ReactNode, SetStateAction, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, Dispatch, ReactNode, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { api, AssistantConversation, ProspectResponse, SearchFilters } from "./api";
 import { AnswerTurn } from "./AnswerView";
+
+// SearchStateProvider được mount NGOÀI <App/> (xem main.tsx) nên không bị
+// unmount khi App chuyển qua lại giữa màn hình Login và giao diện chính —
+// state (hội thoại, danh sách lịch sử) sống sót qua một lượt đăng xuất/đăng
+// nhập trên CÙNG tab. Trên máy dùng chung (nhiều chuyên viên tuyển dụng dùng
+// chung máy), nếu không dọn state này thì người đăng nhập sau sẽ thấy ngay
+// lịch sử chat của người trước. Hook này theo dõi danh tính đang đăng nhập
+// (dùng chung cache react-query với session query trong App.tsx qua cùng
+// queryKey ['me']) để các provider bên dưới tự xoá state khi danh tính đổi.
+function useAuthUsername(): string | null | undefined {
+  const { data, isSuccess } = useQuery({ queryKey: ["me"], queryFn: api.me, retry: false });
+  // undefined = session query chưa có kết quả lần nào (đang tải/lỗi mạng) —
+  // KHÔNG được coi là "đăng xuất", nếu không mọi lần tải lại trang sẽ bị
+  // hiểu nhầm thành đổi danh tính và xoá nhầm hội thoại đang có.
+  if (!isSuccess) return undefined;
+  return data.authenticated ? data.username : null;
+}
 
 // Giữ nguyên kết quả tìm kiếm AI (Talent lẫn RB "tìm khách bằng AI") khi
 // điều hướng sang trang khác trong ứng dụng rồi quay lại.
@@ -95,6 +113,7 @@ function readFilterState() {
 }
 
 function TalentFilterProvider({ children }: { children: ReactNode }) {
+  const username = useAuthUsername();
   const initial = useState(readFilterState)[0];
   const [draft, setDraft] = useState<SearchFilters>(initial.draft);
   const [applied, setApplied] = useState<SearchFilters>(initial.applied);
@@ -104,6 +123,28 @@ function TalentFilterProvider({ children }: { children: ReactNode }) {
   const [page, setPage] = useState(initial.page);
   const [scrollY, setScrollY] = useState(initial.scrollY);
   const [history, setHistory] = useState<TalentFilterHistoryEntry[]>(initial.history);
+
+  const prevUsernameRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevUsernameRef.current;
+    prevUsernameRef.current = username;
+    // Bỏ qua lần đầu (session query còn đang tải) — không phải đổi danh tính thật.
+    if (prev === undefined || prev === username) return;
+    // Đổi danh tính (đăng xuất/đăng nhập tài khoản khác) trên cùng máy —
+    // xoá bộ lọc/lịch sử tìm kiếm của người trước, tránh lộ sang người sau.
+    setDraft(EMPTY_FILTER);
+    setApplied(EMPTY_FILTER);
+    setHasSearched(false);
+    setShowAdvanced(false);
+    setPage(0);
+    setScrollY(0);
+    setHistory([]);
+    try {
+      localStorage.removeItem(FILTER_STATE_KEY);
+    } catch {
+      // ignore
+    }
+  }, [username]);
 
   useEffect(() => {
     try {
@@ -155,6 +196,7 @@ interface AiChatState {
 const AiChatContext = createContext<AiChatState | null>(null);
 
 function AiChatProvider({ children }: { children: ReactNode }) {
+  const username = useAuthUsername();
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
   const [threadId, setThreadId] = useState(() => makeThreadId("talent"));
   const [conversations, setConversations] = useState<AssistantConversation[]>([]);
@@ -176,6 +218,18 @@ function AiChatProvider({ children }: { children: ReactNode }) {
     setConversations(data.results);
   }, []);
   useEffect(() => { refreshConversations().catch(() => undefined); }, [refreshConversations]);
+  const prevUsernameRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevUsernameRef.current;
+    prevUsernameRef.current = username;
+    // Bỏ qua lần đầu (session query còn đang tải) — không phải đổi danh tính thật.
+    if (prev === undefined || prev === username) return;
+    setMessages([]);
+    setConversations([]);
+    setActiveTurn(null);
+    setThreadId(resetThreadId("talent"));
+    if (username) refreshConversations().catch(() => undefined);
+  }, [username, refreshConversations, setActiveTurn]);
   const selectConversation = async (id: string) => {
     try {
       const row = await api.conversation(id, "talent");
@@ -254,6 +308,7 @@ interface ProspectChatState {
 const ProspectChatContext = createContext<ProspectChatState | null>(null);
 
 function ProspectChatProvider({ children }: { children: ReactNode }) {
+  const username = useAuthUsername();
   const [messages, setMessages] = useState<ProspectChatMessage[]>([]);
   const [threadId, setThreadId] = useState(() => makeThreadId("prospect"));
   const [conversations, setConversations] = useState<AssistantConversation[]>([]);
@@ -262,6 +317,16 @@ function ProspectChatProvider({ children }: { children: ReactNode }) {
     setConversations(data.results);
   }, []);
   useEffect(() => { refreshConversations().catch(() => undefined); }, [refreshConversations]);
+  const prevUsernameRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevUsernameRef.current;
+    prevUsernameRef.current = username;
+    if (prev === undefined || prev === username) return;
+    setMessages([]);
+    setConversations([]);
+    setThreadId(resetThreadId("prospect"));
+    if (username) refreshConversations().catch(() => undefined);
+  }, [username, refreshConversations]);
   const selectConversation = async (id: string) => {
     try {
       const row = await api.conversation(id, "prospect");

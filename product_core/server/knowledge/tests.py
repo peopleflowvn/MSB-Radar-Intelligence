@@ -33,8 +33,15 @@ class KnowledgeModuleAccessTest(TestCase):
         roles.ensure_groups()
         self.user = get_user_model().objects.create_user("recruiter1", password="x")
 
-    def test_recruiter_does_not_have_knowledge_module_by_default(self):
+    def test_recruiter_has_knowledge_module_by_default(self):
+        """Recruiter là người hỏi Radar các câu chính sách/quy trình tuyển
+        dụng nhiều nhất — thiếu quyền này khiến Radar luôn rơi vào tra web dù
+        tài liệu nội bộ đã có sẵn (sửa 16/09, xem `accounts/roles.py`)."""
         self.user.groups.add(Group.objects.get(name=roles.RECRUITER))
+        self.assertTrue(roles.can_access(self.user, roles.MODULE_KNOWLEDGE))
+
+    def test_hiring_manager_does_not_have_knowledge_module_by_default(self):
+        self.user.groups.add(Group.objects.get(name=roles.HIRING_MANAGER))
         self.assertFalse(roles.can_access(self.user, roles.MODULE_KNOWLEDGE))
 
     def test_admin_has_knowledge_module_by_default(self):
@@ -44,9 +51,9 @@ class KnowledgeModuleAccessTest(TestCase):
     def test_admin_can_grant_knowledge_to_another_role_via_override(self):
         from accounts.models import RoleModuleAccess
 
-        self.user.groups.add(Group.objects.get(name=roles.RECRUITER))
+        self.user.groups.add(Group.objects.get(name=roles.HIRING_MANAGER))
         RoleModuleAccess.objects.create(
-            role=roles.RECRUITER, module=roles.MODULE_KNOWLEDGE, allowed=True)
+            role=roles.HIRING_MANAGER, module=roles.MODULE_KNOWLEDGE, allowed=True)
         self.assertTrue(roles.can_access(self.user, roles.MODULE_KNOWLEDGE))
 
 

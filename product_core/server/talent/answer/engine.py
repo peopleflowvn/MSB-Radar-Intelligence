@@ -221,9 +221,9 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         yield _step("Hiểu yêu cầu")
         query_plan = plan_stage.plan(question, envelope=envelope,
                                      complete_fn=complete_fn)
+        yield _step("Hiểu yêu cầu", "done")
     trace["plan"] = query_plan.as_dict()
     trace["ms_plan"] = int((time.monotonic() - started) * 1000)
-    yield _step("Hiểu yêu cầu", "done")
 
     if not query_plan.needs_people:
         return query_plan, [], [], {"judged": 0, "relevant": 0, "shown": 0,
@@ -522,7 +522,14 @@ def answer(question, *, envelope=None, user=None, history=None, complete_fn=None
     if query_plan.shape == "analyze" and query_plan.needs_people:
         from ai.conversation import knowledge_sources
         internal_knowledge = knowledge_sources(question, user)
-        if internal_knowledge:
+        # Câu không hề nhắc CV/hồ sơ/ứng viên/kho (vd "tổng giám đốc msb là ai")
+        # mà vẫn bị ① xếp "analyze" là phân loại nhầm: "MSB" ở đây là ngân hàng
+        # thật, không phải kho. Đẩy sang nhánh hội thoại (có tra web) thay vì
+        # chạy ②→⑤ trên kho CV rồi báo "không có dữ liệu". Xem `chat.py::_do_web`.
+        # Nhưng nếu lượt trước vừa trả về người (has_recent_candidates), câu này
+        # nhiều khả năng là follow-up ("ai trong số đó…") chứ không lạc đề.
+        if internal_knowledge or not (plan_stage.mentions_store(question)
+                                       or plan_stage.has_recent_candidates(envelope)):
             from dataclasses import replace
             query_plan = replace(query_plan, shape="general")
     if query_plan.wants_clarification:
@@ -945,13 +952,18 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
     if query_plan.shape == "analyze" and query_plan.needs_people:
         from ai.conversation import knowledge_sources
         internal_knowledge = knowledge_sources(question, user)
-        if internal_knowledge:
+        # Xem giải thích ở `answer()` — câu không nhắc CV/hồ sơ/kho mà vẫn ra
+        # "analyze" là ① nhầm "MSB" (ngân hàng) với kho CV. Trừ khi lượt trước
+        # vừa trả người (follow-up thật).
+        if internal_knowledge or not (plan_stage.mentions_store(question)
+                                       or plan_stage.has_recent_candidates(envelope)):
             from dataclasses import replace
             query_plan = replace(query_plan, shape="general")
 
     # Câu hỏi không về Kho con người → nhánh hội thoại (có tra web). Trước đây
     # nó vẫn chạy tiếp xuống ⑤ và nhận một câu trả lời sai giọng.
     if not query_plan.needs_people and not query_plan.wants_action:
+        yield _step("Tra cứu & soạn câu trả lời")
         yield from _stream_chat(question, query_plan, envelope, user, started,
                                 adapter, knowledge=internal_knowledge)
         return
