@@ -300,7 +300,9 @@ describe("Answer Engine trên giao diện", () => {
     renderSearch();
     ask("tìm ứng viên Java");
     expect(await screen.findByText("Bạn có thể chuyển tab, Radar vẫn tiếp tục xử lý.")).toBeInTheDocument();
-    expect(screen.getByText(/giây/)).toBeInTheDocument();
+    // StepTimeline hiện đếm giây bằng nhãn ngắn "Ns" (component gộp Bước +
+    // Đếm giây + Trạng thái), không còn chữ "giây" như thẻ chờ cũ.
+    expect(await screen.findByText(/^\d+s$/)).toBeInTheDocument();
     release();
   });
 
