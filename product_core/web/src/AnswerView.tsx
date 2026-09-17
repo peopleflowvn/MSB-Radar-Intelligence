@@ -277,11 +277,11 @@ export default function AnswerView<TPerson = AnswerPerson>({
       {!isPending && turn.text && (
         <div className="answer-footer-row">
           <div className="answer-footer-meta">
-            {(turn.model || turn.provider) && (
+            {!Boolean((turn.trace?.compose as { fallback?: boolean } | undefined)?.fallback) && (turn.model || turn.provider) ? (
               <span className="ai-model-tag" title="Mô hình AI xử lý câu trả lời này">
                 🤖 Mô hình: <code>{turn.provider ? `${turn.provider}/${turn.model || "mặc định"}` : turn.model}</code>
               </span>
-            )}
+            ) : null}
             {turn.durationMs ? (
               <span className="answer-duration muted small" title="Thời gian xử lý câu trả lời">
                 ⏱️ {(turn.durationMs / 1000).toFixed(1)}s
