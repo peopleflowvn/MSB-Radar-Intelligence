@@ -1,0 +1,26 @@
+name: Diagnose Intelligence Indexer
+
+# `msbradar-intelligence-indexer` chạy `python -m radar_intelligence.indexing`
+# (không có HTTP, không có HEALTHCHECK riêng trong Dockerfile — xem
+# docker-compose.oracle.yml) nhưng `diagnose-oracle.yml` hôm 17/09/2026 báo nó
+# "unhealthy" trong `docker ps`. Chỉ đọc: log gần nhất + số lần khởi động lại,
+# không đổi gì.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: [self-hosted, oracle, intelligence]
+    steps:
+      - name: Show container state and restart history
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo docker inspect msbradar-intelligence-indexer --format \
+            'status={{.State.Status}} running={{.State.Running}} restarting={{.State.Restarting}} restart_count={{.RestartCount}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} started_at={{.State.StartedAt}} error={{json .State.Error}} health={{.State.Health.Status}}'
+      - name: Show recent log lines (event JSON only — no document text)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo docker logs msbradar-intelligence-indexer --tail 200 --timestamps
