@@ -562,6 +562,82 @@ def document_preview(request, document_id):
     return response
 
 
+def _score_portrait_image(pil_img, bbox=None, page_rect=None):
+    """Đánh giá và chấm điểm chất lượng ảnh chân dung ứng viên:
+    - Loại bỏ logo, nhãn sàn (TopCV, VietnamWorks...), icon nhỏ, watermark, banner.
+    - Nhận diện vùng màu da người (skin-tone detection) và độ phong phú màu sắc.
+    - Ưu tiên vị trí nửa trên trang 1 (header/sidebar của CV).
+    """
+    try:
+        w, h = pil_img.size
+        if w < 45 or h < 45 or w > 3000 or h > 3000:
+            return -999999
+
+        aspect = w / float(h)
+        if aspect < 0.45 or aspect > 1.8:
+            return -999999
+
+        rgb_img = pil_img.convert("RGB")
+        sample = rgb_img.resize((100, 100))
+        pixels = list(sample.getdata())
+
+        skin_count = 0
+        r_list = []
+        g_list = []
+        b_list = []
+
+        for r, g, b in pixels:
+            r_list.append(r)
+            g_list.append(g)
+            b_list.append(b)
+            # Công thức nhận diện màu da người chuẩn (YCbCr & RGB)
+            cb = -0.168736 * r - 0.331264 * g + 0.5 * b + 128
+            cr = 0.5 * r - 0.418688 * g - 0.081312 * b + 128
+            if 75 <= cb <= 135 and 133 <= cr <= 180 and r > 50 and r > g and (r - b) >= 10:
+                skin_count += 1
+
+        skin_ratio = skin_count / 10000.0
+
+        # Logo/Badge (như nhãn TopCV Tiềm Năng, con dấu, icon) hầu như không có màu da (< 3.5%)
+        if skin_ratio < 0.035:
+            return -50000
+
+        # Độ phân tán màu sắc (Color Standard Deviation)
+        std_r = (sum((x - (sum(r_list) / 10000.0)) ** 2 for x in r_list) / 10000.0) ** 0.5
+        std_g = (sum((x - (sum(g_list) / 10000.0)) ** 2 for x in g_list) / 10000.0) ** 0.5
+        std_b = (sum((x - (sum(b_list) / 10000.0)) ** 2 for x in b_list) / 10000.0) ** 0.5
+        color_std = (std_r + std_g + std_b) / 3.0
+
+        if color_std < 16:  # Quá đơn sắc / màu phẳng của vector logo
+            return -20000
+
+        score = skin_ratio * 100000 + color_std * 100
+
+        if 90 <= w <= 1600 and 90 <= h <= 1600:
+            score += 20000
+
+        # Kiểm tra tọa độ hiển thị trên trang PDF
+        if bbox is not None and page_rect is not None:
+            x0, y0, x1, y1 = bbox
+            disp_w = x1 - x0
+            disp_h = y1 - y0
+            page_h = page_rect.height or 842.0
+
+            if disp_w < 30 or disp_h < 30:
+                return -50000
+
+            if y0 < page_h * 0.40:
+                score += 40000
+            elif y0 < page_h * 0.55:
+                score += 15000
+            else:
+                score -= 30000
+
+        return score
+    except Exception:
+        return -999999
+
+
 @api_view(["GET"])
 @permission_classes([RequiresTalent])
 def person_avatar(request, person_id):
@@ -581,7 +657,7 @@ def person_avatar(request, person_id):
         data = storage.read(doc.storage_key)
         ext = Path(doc.filename or "").suffix.lower()
 
-        # Nếu là ảnh trực tiếp
+        # Nếu là file ảnh trực tiếp
         if (doc.mime_type or "").lower() in {"image/jpeg", "image/png", "image/webp"} or ext in {".jpg", ".jpeg", ".png", ".webp"}:
             from PIL import Image
             img = Image.open(io.BytesIO(data)).convert("RGB")
@@ -607,9 +683,9 @@ def person_avatar(request, person_id):
                 image_list = page.get_images(full=True)
 
                 best_img = None
-                best_score = -1
+                best_score = 0  # Phải đạt điểm dương (nhận diện được màu da & sắc thái chân dung hợp lệ)
 
-                for img_info in image_list[:10]:
+                for img_info in image_list:
                     xref = img_info[0]
                     base_image = pdf.extract_image(xref)
                     image_bytes = base_image.get("image")
@@ -617,18 +693,13 @@ def person_avatar(request, person_id):
                         continue
                     try:
                         pil_img = Image.open(io.BytesIO(image_bytes))
-                        w, h = pil_img.size
+                        rects = page.get_image_rects(xref)
+                        bbox = rects[0] if rects else None
 
-                        # Avatar chân dung thường có kích thước tối thiểu và tỉ lệ khung hình gần vuông hoặc dọc (0.55 đến 1.5)
-                        if w >= 50 and h >= 50 and w <= 1600 and h <= 1600:
-                            ratio = w / float(h)
-                            if 0.55 <= ratio <= 1.5:
-                                score = w * h
-                                if 80 <= w <= 800 and 80 <= h <= 800:
-                                    score += 50000
-                                if score > best_score:
-                                    best_score = score
-                                    best_img = pil_img
+                        score = _score_portrait_image(pil_img, bbox, page.rect)
+                        if score > best_score:
+                            best_score = score
+                            best_img = pil_img
                     except Exception:
                         continue
 
@@ -649,6 +720,7 @@ def person_avatar(request, person_id):
         pass
 
     return HttpResponse(status=404)
+
 
 
 @api_view(["GET"])
