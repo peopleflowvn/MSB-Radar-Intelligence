@@ -1356,7 +1356,6 @@ export default function Person360() {
           <Link to={returnPath} className="person-back-link">
             ← Quay lại {returnLabel}
           </Link>
-          <span className="person-mode-badge">⚡ Hồ sơ 360° One-Page</span>
         </div>
 
         <div className="person-header-right">
@@ -1421,56 +1420,72 @@ export default function Person360() {
         </div>
       </div>
 
-      {/* Dossier Quick Stats Strip */}
+      {/* Dossier Quick Stats Strip (Tinh gọn & Hiện đại) */}
       <div className="person-quick-stats">
-        <div className="stat-pill" onClick={() => scrollToAnchor('sec-history', 'lich-su')} style={{ cursor: 'pointer' }}>
+        <div className="stat-pill" onClick={() => scrollToAnchor('sec-history', 'lich-su')} style={{ cursor: 'pointer' }} title="Xem nguồn hồ sơ & lượt nộp">
           <span className="s-icon">📦</span>
-          <div>
+          <div className="s-body">
             <span className="s-val">{data.sources.length}</span>
             <span className="s-lbl">Nguồn hồ sơ &amp; Nộp</span>
           </div>
         </div>
-        <div className="stat-pill" onClick={() => scrollToAnchor('sec-history', 'lich-su')} style={{ cursor: 'pointer' }}>
+        <div className="stat-pill" onClick={() => scrollToAnchor('sec-history', 'lich-su')} style={{ cursor: 'pointer' }} title="Xem các kênh định danh (Email, SĐT...)">
           <span className="s-icon">🔑</span>
-          <div>
+          <div className="s-body">
             <span className="s-val">{data.identities.length}</span>
             <span className="s-lbl">Kênh định danh</span>
           </div>
         </div>
-        <div className="stat-pill" onClick={() => scrollToAnchor('sec-history', 'lich-su')} style={{ cursor: 'pointer' }}>
+        <div className="stat-pill" onClick={() => scrollToAnchor('sec-history', 'lich-su')} style={{ cursor: 'pointer' }} title="Xem lịch sử tương tác">
           <span className="s-icon">⏳</span>
-          <div>
+          <div className="s-body">
             <span className="s-val">{data.timeline.length}</span>
             <span className="s-lbl">Sự kiện tương tác</span>
           </div>
         </div>
         {canViewCV && (
-          <div className="stat-pill" onClick={() => scrollToAnchor('sec-cv', 'cv')} style={{ cursor: 'pointer' }}>
+          <div className="stat-pill" onClick={() => scrollToAnchor('sec-cv', 'cv')} style={{ cursor: 'pointer' }} title="Xem kho CV & văn bản trích xuất">
             <span className="s-icon">📄</span>
-            <div>
+            <div className="s-body">
               <span className="s-val">{data.document_stats.submission_count}</span>
               <span className="s-lbl">Lượt nộp CV ({data.documents.length} file)</span>
             </div>
           </div>
         )}
-        <div className="stat-pill" onClick={() => scrollToAnchor('sec-opportunities', 'dot-tuyen')} style={{ cursor: 'pointer' }}>
+        <div className="stat-pill" onClick={() => scrollToAnchor('sec-opportunities', 'dot-tuyen')} style={{ cursor: 'pointer' }} title="Xem tín hiệu AI">
           <span className="s-icon">⚡</span>
-          <div>
+          <div className="s-body">
             <span className="s-val">{data.signals.length}</span>
             <span className="s-lbl">Tín hiệu AI</span>
           </div>
         </div>
       </div>
 
-      {/* Sticky Quick-Nav Dock */}
+      {/* Sticky Quick-Nav Dock (Ghim nút quay lại + Mini Profile + Nút chuyển tab) */}
       <div className="person-sticky-nav">
+        <div className="sticky-nav-left">
+          <Link to={returnPath} className="sticky-mini-back" aria-label="Về trang trước" title={`Quay lại ${returnLabel}`}>
+            ← Trở về
+          </Link>
+          <div className="sticky-mini-person" onClick={() => scrollToAnchor('sec-overview', 'tong-quan')} title={data.display_name || 'Hồ sơ'}>
+            <div className="sticky-mini-avatar">
+              {!avatarError ? (
+                <img src={api.personAvatarUrl(data.id)} alt={data.display_name} onError={() => setAvatarError(true)} />
+              ) : (
+                (data.display_name || 'U').charAt(0).toUpperCase()
+              )}
+            </div>
+            <span className="sticky-mini-name">Hồ sơ #{data.id}</span>
+          </div>
+        </div>
+
         <div className="person-nav-pills">
           <button
             type="button"
             className={`person-nav-pill-btn ${activeNav === 'tong-quan' ? 'active' : ''}`}
             onClick={() => scrollToAnchor('sec-overview', 'tong-quan')}
           >
-            <span>👤 Hồ sơ 360° Tổng quan</span>
+            <span>👤 Tổng quan</span>
           </button>
           {canViewCV ? (
             <button
