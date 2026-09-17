@@ -8,6 +8,22 @@ Tool mới = code review, không phải plugin.
 `toolset_for()` trả schema (OpenAI tool format) để đưa vào request. `dispatch()`
 thực thi một tool-call: kiểm RBAC lần nữa (không tin model), gọi handler ở
 `ai/tool_handlers.py`, trả `ToolResult` JSON-safe cho vòng lặp `ai/agent.py`.
+
+**Surface "prospect" (Growth) — đọc kỹ trước khi tưởng một tool "dùng được trên
+Growth" vì có mặt `"prospect"` trong `surfaces`:**
+
+Đường LIVE của Growth (`/rb/ask/` → `rb/answer/engine.py` → `rb/answer/act.py`)
+là CODE-driven, KHÔNG bao giờ gọi `ai/agent.py` — xem docstring đầu
+`rb/answer/act.py`. Tool đăng ký `"prospect"` ở đây chỉ chạm tới được qua một
+đường THỨ HAI: `rb/views.py::prospect_search` (route `/rb/prospects/`) →
+`ai/conversation.py::answer_if_conversation` → `_answer_via_agent`, và đường
+đó hiện KHÔNG component UI sản phẩm nào gọi nữa (chỉ còn trong test) — xem
+`rb/views.py::prospect_search`. Thêm nữa, 4/6 tool có `"prospect"` trong
+`surfaces` (`read_allowed_evidence`, `canonical_lookup`, `draft_outreach`,
+`enrich_company_from_web`) đòi `module=roles.MODULE_TALENT`, nên một tài khoản
+Growth thuần (không có module Talent) sẽ không thấy chúng dù qua đường nào —
+chỉ `remember_proposal`/`feedback` (`module=None`) là thực sự chạm tới được,
+và chỉ khi endpoint mồ côi đó được gọi lại.
 """
 from dataclasses import dataclass, field
 
@@ -198,6 +214,25 @@ TOOLS = {
             "required": ["person_id"],
         },
     },
+    "estimate_profile_gaps": {
+        "module": roles.MODULE_TALENT,
+        "surfaces": ("talent", "general"),
+        "tier": 2,
+        "description": "ƯỚC TÍNH (KHÔNG PHẢI dữ liệu có bằng chứng trong CV) số năm kinh "
+                       "nghiệm/năm tốt nghiệp/năm sinh còn thiếu của MỘT ứng viên đã "
+                       "nhắc tới. Hai mức: 'formula' (tính từ một mốc thời gian khác đã "
+                       "biết, đáng tin hơn) và 'model_reasoning' (mô hình tự phỏng đoán "
+                       "từ chức danh/kỹ năng/học vấn khi không có mốc thời gian nào, kém "
+                       "chắc chắn hơn — có thể đổi giữa các lượt hỏi). CHỈ dùng khi CV "
+                       "không ghi trực tiếp field cần hỏi. Khi trả lời PHẢI nói rõ đây "
+                       "là ước tính kèm mức độ tin cậy tương ứng, không trình bày như "
+                       "dữ kiện đã xác nhận.",
+        "parameters": {
+            "type": "object",
+            "properties": {"person_id": {"type": "integer"}},
+            "required": ["person_id"],
+        },
+    },
     # --- Tier 3: sinh nội dung / tra ngoài. Bật riêng bằng ASSISTANT_TOOLS_TIER3.
     #     KHÔNG gửi / đăng gì — chỉ trả bản nháp để người dùng tự dùng.
     "draft_outreach": {
@@ -290,6 +325,7 @@ LABELS = {
     "aggregate_corpus": "Thống kê toàn kho",
     "match_candidate_job": "Đối chiếu ứng viên với JD",
     "person_activity": "Xem hoạt động và quan hệ",
+    "estimate_profile_gaps": "Ước tính field còn thiếu",
     "draft_outreach": "Soạn nháp tiếp cận",
     "enrich_company_from_web": "Tra thông tin công ty (web)",
 }
@@ -304,6 +340,7 @@ def label_of(name, fallback=""):
 _AGENT_TOOLS = {"read_allowed_evidence", "remember_proposal", "feedback",
                 "compare_candidates", "canonical_lookup", "fact_provenance",
                 "aggregate_corpus", "match_candidate_job", "person_activity",
+                "estimate_profile_gaps",
                 "draft_outreach", "enrich_company_from_web"}
 _TIER3_TOOLS = {"draft_outreach", "enrich_company_from_web"}
 
@@ -337,7 +374,7 @@ def dispatch(name, arguments, *, user, surface, context=None):
     selected = (context or {}).get("selected_person_ids")
     if selected is not None and name in {
             "draft_outreach", "read_allowed_evidence", "fact_provenance", "compare_candidates",
-            "person_activity", "match_candidate_job"}:
+            "person_activity", "match_candidate_job", "estimate_profile_gaps"}:
         args = arguments if isinstance(arguments, dict) else {}
         targets = args.get("person_ids") if name == "compare_candidates" else [args.get("person_id")]
         if (not isinstance(targets, list) or not targets

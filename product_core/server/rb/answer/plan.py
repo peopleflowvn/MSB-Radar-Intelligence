@@ -126,6 +126,13 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
   Ví dụ: "Anh/chị muốn tìm khách đang có nhu cầu vay, hay khách đã từng vay ạ?"
   ĐỪNG hỏi lại chỉ vì câu hỏi khó — hỏi lại khi nó ĐA NGHĨA.
 
+  CẢNH BÁO về CÂU XÁC NHẬN / ĐỒNG Ý NGẮN ("có", "vâng", "ừ", "ok", "đồng ý", "làm đi", "tiếp tục", "lọc đi"...):
+  - Khi lượt trước Radar vừa hỏi hoặc đề xuất một hướng tiếp theo:
+    + Câu trả lời "có", "vâng", "ok", "đồng ý", "làm đi", "tiếp tục", "lọc đi" là sự XÁC NHẬN ĐỒNG Ý thực hiện đề xuất đó.
+    + Đây là câu có mục tiêu rõ ràng từ ngữ cảnh, TUYỆT ĐỐI KHÔNG coi là mơ hồ hay không hiểu được (do_tin_cay >= 0.85, TUYỆT ĐỐI KHÔNG sinh "cau_hoi_lam_ro").
+    + "information_need": viết lại thành câu thực thi đầy đủ đề xuất đó.
+    + "shape": chọn "followup", "find_prospects" hoặc "action" phù hợp.
+
 - "information_need": viết lại câu hỏi thành MỘT câu độc lập, đã ghép ngữ cảnh
   hội thoại, đủ nghĩa khi đọc riêng.
 
@@ -319,13 +326,22 @@ def _context_block(envelope):
     recent = getattr(projection, "recent_turns", []) or []
     if recent:
         lines = []
-        for turn in recent[-4:]:
-            question = str((turn or {}).get("question") or "")[:200]
-            if question:
-                lines.append(f"- {question}")
+        for index, turn in enumerate(recent[-6:]):
+            is_last = (index == len(recent[-6:]) - 1)
+            q = str((turn or {}).get("question") or "")[:200]
+            raw_a = str((turn or {}).get("answer") or "").strip()
+            if is_last:
+                a = raw_a if len(raw_a) <= 2500 else (raw_a[:1600] + "\n...\n" + raw_a[-800:])
+            else:
+                a = raw_a[:500]
+            if q:
+                lines.append(f"H: {q}")
+            if a:
+                lines.append(f"Đ: {a}")
         if lines:
             parts.append("CÁC LƯỢT GẦN ĐÂY:\n" + "\n".join(lines))
     return "\n\n".join(parts)
+
 
 
 def _fallback(question, provider="", model=""):
@@ -364,7 +380,17 @@ def plan(question, *, envelope=None, user=None, complete_fn=None) -> ProspectPla
 
     caller = complete_fn or complete
     try:
-        result = caller(messages, task=TASK, temperature=0, max_tokens=900,
+        # `reasoning_effort="none"` + `max_tokens=1300`: cùng bài học đã vá bên
+        # `talent/answer/plan.py` (comment ở đó, và `ai/tasks.py` mục DEFAULT_ROUTE)
+        # — schema ở đây CÒN NHIỀU khoá hơn Talent (13 khoá + object `bo_loc` lồng
+        # 6 khoá con so với 12 khoá phẳng), lại có "suy_luan" là khoá ĐẦU TIÊN, nên
+        # rủi ro model "nghĩ" ngốn hết token trước khi ra JSON còn cao hơn. Thiếu
+        # `reasoning_effort` (bản trước) để model tự quyết định có nghĩ hay không,
+        # và `max_tokens=900` (thấp hơn cả mức 1100 Talent cần) — kết quả nhiều khả
+        # năng là JSON bị cắt giữa chừng, `extract_json` trượt, rơi thẳng xuống
+        # nhánh dự phòng "đoán theo từ khoá" (UI: badge "Dự phòng").
+        result = caller(messages, task=TASK, temperature=0, max_tokens=1300,
+                        reasoning_effort="none", budget_seconds=25,
                         response_format={"type": "json_object"})
     except Exception as exc:                       # noqa: BLE001 - xem docstring
         log.warning("rb.answer.plan: LLM lỗi, dùng kế hoạch tối thiểu: %s", exc)
@@ -374,6 +400,13 @@ def plan(question, *, envelope=None, user=None, complete_fn=None) -> ProspectPla
     provider = getattr(result, "provider", "")
     model = getattr(result, "model", "")
     if not isinstance(raw, dict) or not raw:
+        # Nhánh này TRƯỚC ĐÂY im lặng — không có exception nên không đi qua log ở
+        # trên, và người vận hành không có cách nào biết ① vừa rơi vào dự phòng vì
+        # sao. Ghi log để `docker logs | grep "rb.answer.plan"` bắt được CẢ hai
+        # kiểu lỗi, không chỉ kiểu ném exception.
+        log.warning("rb.answer.plan: JSON rỗng/không đọc được (provider=%s model=%s), "
+                   "dùng kế hoạch tối thiểu. Raw text: %r",
+                   provider, model, str(getattr(result, "text", ""))[:300])
         return _fallback(question, provider, model)
 
     shape = raw.get("shape") if raw.get("shape") in SHAPES else "find_prospects"
@@ -416,6 +449,25 @@ def plan(question, *, envelope=None, user=None, complete_fn=None) -> ProspectPla
     queries = [str(q).strip() for q in as_list(raw.get("search_queries"))
                if str(q or "").strip()][:MAX_QUERIES]
     need = str(raw.get("information_need") or question)[:500]
+    clarify = str(raw.get("cau_hoi_lam_ro") or "")[:300]
+
+    from talent.answer.plan import clean_proposal_to_need, detect_last_proposal, is_short_affirmation
+    if is_short_affirmation(question) and envelope is not None:
+        last_proposal = detect_last_proposal(envelope)
+        if last_proposal:
+            clean_need = clean_proposal_to_need(last_proposal)
+            if clarify or confidence < CLARIFY_BELOW:
+                clarify = ""
+                confidence = max(confidence, 0.9)
+                if not reasoning:
+                    reasoning = f"RM xác nhận đồng ý với đề xuất của Radar: {last_proposal[:150]}"
+            if shape in ("general", ""):
+                shape = "followup"
+            if not queries or queries == [need or question]:
+                queries = [clean_need]
+            if not need or need.casefold() == question.casefold():
+                need = clean_need
+
     if not queries:
         # Không có truy vấn thì ② không có gì để chạy. Dùng chính câu hỏi —
         # kém hơn nhiều truy vấn, nhưng khác hẳn với việc trả về rỗng.
@@ -434,7 +486,7 @@ def plan(question, *, envelope=None, user=None, complete_fn=None) -> ProspectPla
         limit=max(1, min(limit, MAX_LIMIT)),
         reasoning=reasoning,
         confidence=confidence,
-        clarifying_question=str(raw.get("cau_hoi_lam_ro") or "")[:300],
+        clarifying_question=clarify,
         provider=provider,
         model=model,
     )

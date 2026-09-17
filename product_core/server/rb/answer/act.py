@@ -16,7 +16,13 @@ Nên ở đây mọi thứ quyết định bằng CODE:
     thực thi    `rb/outreach.draft` (cùng hàm nút "Soạn tin" đang dùng) và cùng
                 luật tạo cơ hội của `rb/views.py::opportunity_list`
 
-LLM chỉ còn ở một chỗ: viết lời trong bản nháp, qua đúng `rb/outreach.draft`.
+LLM chỉ còn ở hai chỗ, cả hai đều KHÔNG chọn hành động: viết lời trong bản
+nháp (`rb/outreach.draft`), và — thí điểm theo yêu cầu người dùng 2026-09-17 —
+`_reason_suggest_products` tự luận gợi ý sản phẩm CHỈ khi dò từ khoá tất định
+(`routing.suggest_products`) ra 0 kết quả, luôn gắn nhãn phỏng đoán và luôn bị
+ép tin cậy thấp hơn hẳn một tín hiệu khớp từ khoá thật. Không đụng tới
+`create_opportunity`/`draft_message`/`draft_call_script` — ba việc đó vẫn
+CODE chọn 100%, đúng ranh giới đạo đức ở dưới.
 
 ## Ranh giới
 
@@ -317,14 +323,89 @@ def run(question, *, envelope=None, user=None):
             "actions": actions}
 
 
-def _suggest_product(question):
-    """Gợi ý nhóm sản phẩm từ MỘT câu mô tả nhu cầu tự do. Tất định, không LLM.
+#: Tầng 2 không bao giờ được coi ngang tín hiệu khớp từ khoá thật (bắt đầu ở
+#: `routing.py::suggest_products`'s `base_confidence=0.6`) — ép thấp hơn hẳn
+#: `routing.MIN_CONFIDENCE` để RM nhìn số là biết ngay đây là suy đoán.
+_REASONING_CONFIDENCE = {"thấp": 0.3, "trung bình": 0.4}
 
-    Dùng đúng `rb.routing.suggest_products` — thuật toán dò cụm từ mà
-    `rb/agent.py` đã dùng để tự gắn `ProductInterest` khi có tín hiệu mới. Ở
-    đây là bản RM tự gõ ngay trong chat một câu khách vừa nói ("khách bảo đang
-    tính mua ô tô trả góp") để biết ngay nên chào gì, không phải đợi tín hiệu
-    tự động sinh ra rồi mới thấy trong hồ sơ.
+
+def _reason_suggest_products(question):
+    """Tầng 2 — model TỰ LUẬN gợi ý sản phẩm, CHỈ chạy khi dò từ khoá tất định
+    (`routing.suggest_products`) ra 0 kết quả cho câu này.
+
+    KHÁC `suggest_products()`: model được PHÉP tự do đọc hiểu câu mô tả thay
+    vì bị giới hạn ở bảng từ khoá cố định — đổi lại KHÔNG TẤT ĐỊNH, hai lượt
+    hỏi giống nhau có thể ra hai gợi ý khác nhau. Vẫn giữ đúng ranh giới đạo
+    đức của `routing.py`: CHỈ được chọn trong danh mục sản phẩm MSB thật có
+    (`PRODUCT_CHOICES`) — không tự bịa sản phẩm — và tin cậy luôn bị ép THẤP
+    HƠN `routing.MIN_CONFIDENCE`, không được lẫn với một tín hiệu khớp từ khoá
+    thật. Thí điểm theo yêu cầu người dùng 2026-09-17, cùng tinh thần với
+    `ai/tool_handlers.py::_reason_missing_fields` bên Talent.
+
+    Trả `[]` (không lỗi) khi model không gọi được hoặc không chọn được gì hợp
+    lệ — đây là phần vá lỗ hổng của tầng 1, không phải phần cốt lõi.
+    """
+    from ai.adapter import ModelRequest, get_adapter
+    from ai.jsonx import extract_json
+
+    from .. import routing
+    from ..models import PRODUCT_CHOICES, PRODUCT_LABELS
+
+    text = str(question or "").strip()
+    if len(text) < 4:
+        return []
+
+    catalog = "; ".join(f'"{code}" ({label})' for code, label in PRODUCT_CHOICES)
+    system = (
+        "Bạn ĐOÁN nhóm sản phẩm ngân hàng phù hợp từ một câu mô tả nhu cầu "
+        "khách hàng, khi dò từ khoá cố định không khớp được câu này. CHỈ được "
+        f"chọn mã sản phẩm trong danh mục sau — TUYỆT ĐỐI không bịa mã khác: "
+        f"[{catalog}]. Không đủ căn cứ để đoán thì để mảng rỗng, đừng cố đoán "
+        "bừa.\n"
+        'Trả về DUY NHẤT một JSON object dạng {"suggestions": [{"product": '
+        "mã sản phẩm trong danh mục trên, \"need\": nhu cầu diễn đạt ngắn bằng "
+        'tiếng Việt, "confidence": "thấp" hoặc "trung bình"}, ...]}.')
+    try:
+        resp = get_adapter().complete(ModelRequest(
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": text}],
+            task="rb_suggest_product_reasoning", temperature=0.2, max_tokens=400,
+            response_format={"type": "json_object"},
+            extra={"budget_seconds": 20, "reasoning_effort": "none"}))
+    except Exception:                                  # noqa: BLE001
+        return []
+
+    payload = extract_json(getattr(resp, "text", ""))
+    items = payload.get("suggestions") if isinstance(payload, dict) else None
+    if not isinstance(items, list):
+        return []
+
+    out = []
+    for item in items[:routing.MAX_PRODUCTS]:
+        if not isinstance(item, dict):
+            continue
+        product = str(item.get("product") or "").strip()
+        if product not in PRODUCT_LABELS:
+            continue
+        confidence = _REASONING_CONFIDENCE.get(
+            str(item.get("confidence") or "").strip().casefold(), 0.3)
+        need = str(item.get("need") or "").strip()[:200] or PRODUCT_LABELS[product]
+        out.append(routing.Suggestion(
+            product, confidence, need, ["phỏng đoán — chưa khớp từ khoá cố định"]))
+    return out
+
+
+def _suggest_product(question):
+    """Gợi ý nhóm sản phẩm từ MỘT câu mô tả nhu cầu tự do — hai tầng.
+
+    1. **Từ khoá tất định** (`rb.routing.suggest_products`) — dùng đúng thuật
+       toán mà `rb/agent.py` đã dùng để tự gắn `ProductInterest` khi có tín
+       hiệu mới. Ở đây là bản RM tự gõ ngay trong chat một câu khách vừa nói
+       ("khách bảo đang tính mua ô tô trả góp") để biết ngay nên chào gì,
+       không phải đợi tín hiệu tự động sinh ra rồi mới thấy trong hồ sơ.
+    2. **Model tự luận** (`_reason_suggest_products`) — CHỈ chạy khi tầng 1 ra
+       0 kết quả. Luôn nói rõ với RM đây là phỏng đoán, không phải kết quả dò
+       cụm từ — RM tự xác nhận lại với khách trước khi chào.
 
     Không cần danh sách khách của lượt trước, và không tạo/sửa gì — gợi ý
     xong là hết việc, khác hẳn `create_opportunity`.
@@ -333,6 +414,11 @@ def _suggest_product(question):
     from ..models import PRODUCT_LABELS
 
     suggestions = routing.suggest_products(question)
+    reasoned = False
+    if not suggestions:
+        suggestions = _reason_suggest_products(question)
+        reasoned = bool(suggestions)
+
     if not suggestions:
         text = ("Chưa thấy cụm từ nào để gợi ý sản phẩm. Anh/chị mô tả cụ thể nhu "
                 "cầu khách vừa nói giúp mình (ví dụ \"khách bảo đang tính mua ô tô "
@@ -341,6 +427,12 @@ def _suggest_product(question):
         lines = [f"- **{PRODUCT_LABELS.get(s.product, s.product)}** — {s.need} "
                  f"(khớp: {', '.join(s.matched)}; tin cậy {s.confidence:.0%})"
                  for s in suggestions]
-        text = ("Gợi ý sản phẩm dựa trên câu vừa mô tả (dò cụm từ tất định, KHÔNG "
-                "phải đánh giá tín dụng hay cam kết lãi suất):\n\n" + "\n".join(lines))
+        if reasoned:
+            head = ("Chưa khớp từ khoá cố định nào — đây là **PHỎNG ĐOÁN** của mô "
+                    "hình từ câu vừa mô tả, KHÔNG PHẢI kết quả dò cụm từ. Anh/chị tự "
+                    "xác nhận lại với khách trước khi chào:")
+        else:
+            head = ("Gợi ý sản phẩm dựa trên câu vừa mô tả (dò cụm từ tất định, KHÔNG "
+                    "phải đánh giá tín dụng hay cam kết lãi suất):")
+        text = f"{head}\n\n" + "\n".join(lines)
     return {"mode": VERB_SUGGEST_PRODUCT, "text": text, "people": [], "actions": []}

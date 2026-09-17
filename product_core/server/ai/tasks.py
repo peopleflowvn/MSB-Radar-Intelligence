@@ -111,6 +111,11 @@ _ROWS = [
            GROUP_ASSISTANT, "json"),
     AiTask("assistant_outreach", "Soạn nháp tiếp cận (tool)",
            "Tool `draft_outreach` soạn bản nháp tin nhắn.", GROUP_ASSISTANT, "viet"),
+    AiTask("assistant_estimate_reasoning", "Tự luận ước tính field còn thiếu (tool)",
+           "Tool `estimate_profile_gaps`, tầng 2: khi không có mốc thời gian nào "
+           "để tính bằng công thức, cho model TỰ DO phỏng đoán từ chức danh/kỹ "
+           "năng/học vấn — không tất định, kém tin cậy hơn tầng công thức.",
+           GROUP_ASSISTANT, "json"),
 
     # --- Nhập liệu & bóc tách ------------------------------------------------
     AiTask("cv_parsing", "Chuẩn hoá văn bản CV",
@@ -143,6 +148,11 @@ _ROWS = [
            "Câu hỏi tự nhiên → bộ lọc khách hàng tiềm năng.", GROUP_RB, "json"),
     AiTask("rb_outreach_draft", "Soạn thư tiếp cận (RB)",
            "Soạn nháp tin nhắn cho khách hàng tiềm năng.", GROUP_RB, "viet"),
+    AiTask("rb_suggest_product_reasoning", "Tự luận gợi ý sản phẩm (tool, dự phòng)",
+           "Tool `suggest_product`, tầng 2: chỉ chạy khi dò từ khoá tất định "
+           "(`rb.routing.suggest_products`) ra 0 kết quả — cho model tự luận từ "
+           "câu mô tả nhu cầu, CHỈ được chọn trong danh mục sản phẩm cố định. "
+           "Không tất định, luôn gắn nhãn phỏng đoán cho RM.", GROUP_RB, "json"),
 
     # --- Khác ----------------------------------------------------------------
     AiTask("social_intent", "Phân loại bài đăng mạng xã hội",
@@ -212,6 +222,7 @@ DEFAULT_ROUTE = {
     "assistant_web": _QWEN,              # hạn mức 1200
     "assistant_agent": _QWEN,
     "assistant_outreach": _QWEN,         # hạn mức 700 — chật nhất trong hệ
+    "assistant_estimate_reasoning": _QWEN,  # JSON ngắn, hạn mức 500
 
     "cv_parsing": _QWEN,
     "cv_ocr": _QWEN,                     # đo được: đọc đúng ảnh chữ
@@ -224,6 +235,7 @@ DEFAULT_ROUTE = {
 
     "rb_prospect_search": _QWEN,
     "rb_outreach_draft": _QWEN,          # hạn mức 800
+    "rb_suggest_product_reasoning": _QWEN,  # JSON ngắn, hạn mức 400
 
     "social_intent": _QWEN,
     "title_similarity": _QWEN,

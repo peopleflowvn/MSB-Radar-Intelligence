@@ -54,6 +54,14 @@ def _system(people):
         "…' để người dùng sửa nếu sai. Đứng lại hỏi khi bối cảnh đã đủ để đoán "
         "hợp lý là bắt người dùng gõ thêm một lượt cho việc họ vừa mới nhờ.",
         "- Chỉ HỎI LẠI khi thật sự không suy ra nổi, và hỏi đúng MỘT câu ngắn.",
+        "- Dùng tool `estimate_profile_gaps` xong thì KHÔNG được viết số ước tính "
+        "như một dữ kiện đã xác nhận. Luôn gắn rõ đây là ước tính, VÀ phân biệt "
+        "hai mức: method='formula' nói 'ước tính khoảng 6 năm kinh nghiệm (suy từ "
+        "năm tốt nghiệp 2018, CV không ghi trực tiếp)'; method='model_reasoning' "
+        "phải nói rõ hơn là PHỎNG ĐOÁN CHƯA CHẮC CHẮN, ví dụ 'phỏng đoán (chưa "
+        "chắc) khoảng 5 năm kinh nghiệm, dựa trên chức danh Senior trong CV — "
+        "không có mốc thời gian nào để tính chính xác hơn'. Không viết trống "
+        "'có 6 năm kinh nghiệm' cho cả hai mức.",
         "- Trả lời tiếng Việt, gọn, nói rõ bạn đã làm gì.",
     ]
     if people:

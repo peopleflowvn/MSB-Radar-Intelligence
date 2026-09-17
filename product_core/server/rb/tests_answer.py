@@ -733,7 +733,65 @@ class SuggestProductCommandTest(SimpleTestCase):
         self.assertEqual(out["actions"], [])
 
     def test_khong_khop_cum_tu_nao_thi_noi_ro_khong_doan(self):
+        """Model tự luận không gọi được (không cấu hình provider trong test) —
+        vẫn phải nuốt lỗi và lùi về đúng câu cũ, không lộ traceback."""
         out = act_stage.run("gợi ý sản phẩm gì", envelope=None, user=None)
+        self.assertEqual(out["mode"], act_stage.VERB_SUGGEST_PRODUCT)
+        self.assertIn("Chưa thấy cụm từ nào", out["text"])
+
+
+class SuggestProductReasoningTierTest(SimpleTestCase):
+    """Tầng 2 — model tự luận gợi ý sản phẩm, CHỈ khi từ khoá tất định ra 0.
+
+    Ghim: (a) tầng 1 khớp được thì KHÔNG gọi model; (b) model chỉ được chọn
+    trong danh mục sản phẩm thật, mã lạ bị loại; (c) tin cậy luôn bị ép thấp
+    hơn hẳn một tín hiệu khớp từ khoá thật; (d) câu trả lời phải nói rõ đây là
+    phỏng đoán, không phải kết quả dò cụm từ.
+    """
+
+    def test_tang_1_khop_duoc_thi_khong_goi_model(self):
+        with mock.patch("ai.adapter.get_adapter") as g:
+            out = act_stage.run(
+                "khách bảo đang tính mua ô tô trả góp thì gợi ý sản phẩm gì",
+                envelope=None, user=None)
+        self.assertIn("Vay mua xe", out["text"])
+        g.assert_not_called()
+
+    def test_tang_2_tu_luan_khi_tang_1_ra_0(self):
+        from ai.adapter import ModelResponse
+
+        with mock.patch("ai.adapter.get_adapter") as g:
+            g.return_value.complete.return_value = ModelResponse(
+                text='{"suggestions": [{"product": "insurance", '
+                     '"need": "Chuẩn bị tài chính dài hạn cho con cái", '
+                     '"confidence": "trung bình"}]}',
+                provider="p", model="m")
+            out = act_stage.run(
+                "khách nói muốn chuẩn bị tài chính cho tương lai con cái, "
+                "gợi ý sản phẩm gì", envelope=None, user=None)
+        self.assertEqual(out["mode"], act_stage.VERB_SUGGEST_PRODUCT)
+        self.assertIn("PHỎNG ĐOÁN", out["text"])
+        self.assertIn("Bảo hiểm", out["text"])
+        self.assertIn("40%", out["text"])  # confidence "trung bình" → 0.4, ép thấp
+
+    def test_ma_san_pham_la_bi_loai(self):
+        from ai.adapter import ModelResponse
+
+        with mock.patch("ai.adapter.get_adapter") as g:
+            g.return_value.complete.return_value = ModelResponse(
+                text='{"suggestions": [{"product": "crypto_wallet", '
+                     '"need": "Ví tiền số", "confidence": "trung bình"}]}',
+                provider="p", model="m")
+            out = act_stage.run("khách hỏi về ví tiền số thì gợi ý sản phẩm gì",
+                                envelope=None, user=None)
+        self.assertIn("Chưa thấy cụm từ nào", out["text"])
+
+    def test_loi_model_khong_lam_hong_lenh(self):
+        with mock.patch("ai.adapter.get_adapter") as g:
+            g.return_value.complete.side_effect = RuntimeError("timeout")
+            out = act_stage.run(
+                "khách nói muốn để dành cho tương lai con cái, gợi ý sản phẩm gì",
+                envelope=None, user=None)
         self.assertEqual(out["mode"], act_stage.VERB_SUGGEST_PRODUCT)
         self.assertIn("Chưa thấy cụm từ nào", out["text"])
 

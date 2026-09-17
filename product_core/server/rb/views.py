@@ -1137,6 +1137,13 @@ def work_profile(request):
 def prospect_search(request):
     """Tìm prospect bằng ngôn ngữ tự nhiên (Master Plan mục 16).
 
+    KHÔNG component UI sản phẩm nào còn gọi endpoint này (`/rb/prospects/`) —
+    `ProspectSearch.tsx` đã chuyển hẳn sang `api.rbAsk`/`api.rbAskTurn`
+    (`/rb/ask/` → `rb/answer/engine.py`, code-driven). Route + `api.rbProspects`
+    ở `web/src/api.ts` vẫn còn (chỉ `ProspectSearch.test.tsx` dùng), nên đừng
+    tưởng đây là đường đang phục vụ traffic thật khi đọc log/route list — và
+    đừng sửa hành vi ở đây mong ảnh hưởng UI, vì nó không chạm tới.
+
         "Tìm 20 quản lý ở Hà Nội có contact, quan tâm thẻ tín dụng"
 
     Trả về **cả tiêu chí lẫn kết quả**. Tiêu chí hiện ra và sửa được là ràng

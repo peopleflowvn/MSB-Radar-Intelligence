@@ -388,6 +388,206 @@ def draft_outreach(args, *, user, surface, context):
             "disclaimer": "Bản nháp do Radar sinh — người dùng phải tự rà và gửi."}
 
 
+#: Ba field `estimate_profile_gaps` biết suy — nhãn tiếng Việt để dựng prompt
+#: và câu trả lời cho model tự luận ở tầng 2.
+_ESTIMATE_FIELDS = {
+    "years_experience": "số năm kinh nghiệm",
+    "graduation_year": "năm tốt nghiệp",
+    "birth_year": "năm sinh",
+}
+#: Field ExtractedFact loại khỏi ngữ cảnh cho model tự luận: chính field đang
+#: đoán (nếu có mặt nghĩa là đã "known", không cần đoán), và field nhạy cảm/liên
+#: hệ không liên quan gì tới tuổi tác hay kinh nghiệm — cho model thấy thêm chỉ
+#: tăng rủi ro rò rỉ dữ liệu, không tăng chất lượng đoán.
+_REASONING_CONTEXT_EXCLUDE = {"date_of_birth", "graduation_year", "years_experience",
+                              "email", "phone", "current_address", "current_salary",
+                              "expected_salary"}
+
+
+def _reasoning_context_lines(person, tp):
+    """Dữ kiện KHÔNG nhạy cảm, không phải chính field đang đoán — làm căn cứ
+    cho model tự luận ở `_reason_missing_fields`."""
+    from intel.facts import current_facts
+
+    lines = []
+    if tp is not None:
+        for field, label in (("current_title", "chức danh"), ("current_company", "công ty"),
+                             ("seniority", "cấp bậc"), ("education", "học vấn")):
+            val = getattr(tp, field, "")
+            if val:
+                lines.append(f"{label}: {val}")
+        if tp.skills:
+            lines.append("kỹ năng: " + ", ".join(tp.skills[:15]))
+        if tp.industries:
+            lines.append("ngành từng làm: " + ", ".join(tp.industries[:8]))
+    for fact in current_facts(person).exclude(field__in=_REASONING_CONTEXT_EXCLUDE)[:20]:
+        val = (fact.canonical_label or fact.raw_value or "")[:200]
+        if val:
+            lines.append(f"{fact.field}: {val}")
+    return lines[:25]
+
+
+def _reason_missing_fields(person, tp, fields):
+    """Tầng 2 — cho model TỰ LUẬN suy đoán field còn thiếu từ MỌI dữ kiện khác
+    đã biết (chức danh, kỹ năng, học vấn...), khi công thức tất định ở
+    `talent.estimate` không đủ mốc thời gian để tính.
+
+    KHÁC HẲN công thức: ở đây model được PHÉP tự do suy luận thay vì bị giới
+    hạn trong một phép tính cố định — đổi lại KHÔNG TẤT ĐỊNH, hai lượt hỏi có
+    thể ra hai con số khác nhau. Thí điểm theo yêu cầu người dùng 2026-09-17,
+    CHỈ áp dụng ở tool ước tính này — không áp cho `match_candidate_job`,
+    `aggregate_corpus` và các tool tất định khác, vì chúng phải cho cùng một
+    đáp án ở mọi màn hình dùng chung; phá bất biến đó thì hai màn hình có thể
+    kết luận khác nhau cho cùng một ứng viên.
+
+    Trả `{}` (không lỗi) khi thiếu dữ kiện để suy luận hoặc model không gọi
+    được — đây là phần LÀM GIÀU, không phải phần cốt lõi của tool.
+    """
+    from .adapter import ModelRequest, get_adapter
+    from .jsonx import extract_json
+
+    context = _reasoning_context_lines(person, tp)
+    if not context:
+        return {}
+
+    wanted = [f for f in fields if f in _ESTIMATE_FIELDS]
+    if not wanted:
+        return {}
+    labels = "; ".join(f'"{f}" ({_ESTIMATE_FIELDS[f]})' for f in wanted)
+    system = (
+        "Bạn ƯỚC TÍNH field còn thiếu của một ứng viên từ dữ kiện CV đã có. "
+        "KHÁC với trích xuất dữ liệu: ở đây bạn ĐƯỢC PHÉP tự do suy luận/phỏng "
+        "đoán hợp lý (ví dụ chức danh 'Senior' thường ứng với nhiều năm kinh "
+        "nghiệm hơn 'Fresher/Junior'; ngành và kỹ năng gợi ý ngành học). TUYỆT "
+        "ĐỐI không bịa thêm dữ kiện ngoài danh sách được cấp — chỉ được suy "
+        "luận TỪ chúng. Field nào không đủ căn cứ để đoán thì để null, đừng "
+        "cố đoán bừa.\n"
+        f"Trả về DUY NHẤT một JSON object, khoá là tên field trong [{labels}], "
+        "mỗi giá trị là object {\"value\": số hoặc null, \"reasoning\": lý do "
+        "ngắn 1-2 câu bằng tiếng Việt, \"confidence\": \"thấp\" hoặc \"trung bình\"}.")
+    prompt = "Dữ kiện đã biết về ứng viên:\n" + "\n".join(f"- {line}" for line in context)
+    try:
+        resp = get_adapter().complete(ModelRequest(
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": prompt}],
+            task="assistant_estimate_reasoning", temperature=0.2, max_tokens=500,
+            response_format={"type": "json_object"},
+            extra={"budget_seconds": 20, "reasoning_effort": "none"}))
+    except Exception:                                  # noqa: BLE001
+        return {}
+
+    payload = extract_json(getattr(resp, "text", ""))
+    if not isinstance(payload, dict):
+        return {}
+
+    out = {}
+    for field in wanted:
+        entry = payload.get(field)
+        if not isinstance(entry, dict):
+            continue
+        value = entry.get("value")
+        if value in (None, "", "null"):
+            continue
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            continue
+        if field != "years_experience" or value == int(value):
+            value = int(value)
+        confidence = str(entry.get("confidence") or "thấp").strip().casefold()
+        if confidence not in ("thấp", "trung bình"):
+            confidence = "thấp"
+        reasoning = str(entry.get("reasoning") or "").strip()[:300]
+        out[field] = {
+            "value": value, "method": "model_reasoning", "confidence": confidence,
+            "basis": reasoning or "mô hình tự luận từ các dữ kiện CV khác",
+        }
+    return out
+
+
+def estimate_profile_gaps(args, *, user, surface, context):
+    """Ước tính field còn thiếu của MỘT Person — hai tầng, cả hai đều KHÔNG
+    phải fact có bằng chứng:
+
+    1. **Công thức** (`talent.estimate`) — tất định, chỉ chạy được khi có ĐÚNG
+       một mốc thời gian khác (năm sinh hoặc năm tốt nghiệp) đã biết.
+    2. **Model tự luận** (`_reason_missing_fields`) — chỉ chạy cho field tầng 1
+       BỎ TRỐNG, cho model tự do suy đoán từ mọi dữ kiện khác (chức danh, kỹ
+       năng, học vấn...). Không tất định — gắn nhãn "model_reasoning" và độ
+       tin để câu trả lời phân biệt rõ với tầng 1.
+
+    Field nào CV đã ghi trực tiếp thì để nguyên trong "known", KHÔNG bao giờ bị
+    ghi đè bằng giá trị đoán ở bất kỳ tầng nào.
+    """
+    _require(user, roles.MODULE_TALENT)
+    from intel.facts import current_facts
+    from people.models import Person
+    from talent import estimate
+
+    pid = _int(args.get("person_id"), "person_id")
+    person = Person.objects.filter(pk=pid, merged_into__isnull=True).first()
+    if person is None:
+        raise ToolError(f"không có Person #{pid} (hoặc đã hợp nhất)")
+
+    def _known_year(field):
+        fact = current_facts(person, field).first()
+        if fact is None:
+            return None
+        return estimate.extract_year(fact.canonical_label or fact.raw_value)
+
+    tp = getattr(person, "talent_profile", None)
+    known = {
+        "years_experience": getattr(tp, "years_experience", None),
+        "graduation_year": _known_year("graduation_year"),
+        "birth_year": _known_year("date_of_birth"),
+    }
+
+    estimated = {}
+    if known["years_experience"] is None and known["graduation_year"] is not None:
+        value = estimate.estimate_years_experience(known["graduation_year"])
+        if value is not None:
+            estimated["years_experience"] = {
+                "value": value, "method": "formula", "confidence": "trung bình",
+                "basis": f"năm hiện tại - năm tốt nghiệp ({known['graduation_year']})"}
+    if known["graduation_year"] is None and known["birth_year"] is not None:
+        value = estimate.estimate_graduation_year(known["birth_year"])
+        if value is not None:
+            estimated["graduation_year"] = {
+                "value": value, "method": "formula", "confidence": "trung bình",
+                "basis": f"năm sinh ({known['birth_year']}) + tuổi tốt nghiệp trung bình "
+                         f"({estimate.TYPICAL_GRADUATION_AGE})"}
+    if known["birth_year"] is None and known["graduation_year"] is not None:
+        value = estimate.estimate_birth_year(known["graduation_year"])
+        if value is not None:
+            estimated["birth_year"] = {
+                "value": value, "method": "formula", "confidence": "trung bình",
+                "basis": f"năm tốt nghiệp ({known['graduation_year']}) - tuổi tốt nghiệp "
+                         f"trung bình ({estimate.TYPICAL_GRADUATION_AGE})"}
+
+    still_missing = [f for f in _ESTIMATE_FIELDS
+                     if known[f] is None and f not in estimated]
+    if still_missing:
+        estimated.update(_reason_missing_fields(person, tp, still_missing))
+
+    return {
+        "person_id": pid, "display_name": person.display_name or f"Person #{pid}",
+        "known": known,
+        "estimated": estimated,
+        "note": ("Không đủ dữ kiện (mốc thời gian khác, chức danh, kỹ năng...) để "
+                 "ước tính thêm field nào." if not estimated else ""),
+        "disclaimer": ("Giá trị trong 'estimated' KHÔNG PHẢI dữ liệu có bằng chứng "
+                       "trích dẫn từ CV. method='formula' là suy luận toán học từ một "
+                       "mốc thời gian khác đã biết (đáng tin hơn); method='model_reasoning' "
+                       "là model TỰ DO phỏng đoán từ dữ kiện gián tiếp (chức danh, kỹ "
+                       "năng...) — kém chắc chắn hơn, có thể ra kết quả khác ở lượt hỏi "
+                       "khác. Khi trả lời, LUÔN nói rõ đây là ước tính và mức độ tin cậy "
+                       "tương ứng (ví dụ 'ước tính khoảng X năm kinh nghiệm, suy từ năm "
+                       "tốt nghiệp' cho formula, hoặc 'phỏng đoán chưa chắc chắn, dựa "
+                       "trên chức danh hiện tại' cho model_reasoning) — không trình bày "
+                       "như một dữ kiện đã xác nhận."),
+    }
+
+
 def _chan_gui_nguoi_ra_ngoai(chuoi):
     """Luật TẤT ĐỊNH chặn dữ liệu người rời khỏi hệ thống qua đường tra web.
 
@@ -457,6 +657,7 @@ HANDLERS = {
     "aggregate_corpus": aggregate_corpus,
     "match_candidate_job": match_candidate_job,
     "person_activity": person_activity,
+    "estimate_profile_gaps": estimate_profile_gaps,
     "draft_outreach": draft_outreach,
     "enrich_company_from_web": enrich_company_from_web,
 }

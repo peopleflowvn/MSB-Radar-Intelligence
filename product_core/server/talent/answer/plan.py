@@ -86,6 +86,13 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
     tiếng Anh, trên 3 năm"). Phân biệt bằng: đối tượng so sánh là NGƯỜI KHÁC
     (→ compare) hay một DANH SÁCH YÊU CẦU không phải người (→ action).
 
+  CÒN MỘT TRƯỜNG HỢP "action" NỮA — ƯỚC TÍNH field còn thiếu của MỘT ứng viên
+  đã nhắc tới, khi CV không ghi trực tiếp field đó ("ước tính giúp tôi ứng viên
+  này khoảng bao nhiêu năm kinh nghiệm", "đoán năm sinh/năm tốt nghiệp hộ tôi
+  người này"). Đây LÀ "action" (tool tính từ mốc thời gian khác đã biết, không
+  đọc lại CV) — khác với hỏi con số CV đã ghi rõ (đó vẫn là analyze/find_people,
+  đọc thẳng từ CV, không suy đoán).
+
   CẢNH BÁO về "general" — đây là chỗ hay bị chọn nhầm nhất:
   "general" CHỈ dành cho câu KHÔNG dính gì tới kho hồ sơ — chào hỏi, hỏi Radar
   là gì, kiến thức chung, tin tức, thời tiết, lãi suất.
@@ -120,6 +127,15 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
   người dùng để gỡ đúng chỗ mập mờ đó, xưng "anh/chị". Không mập mờ thì để "".
   Ví dụ: "Anh/chị muốn tìm ứng viên đang làm ở MSB, hay ứng viên từng làm ở MSB ạ?"
   ĐỪNG hỏi lại chỉ vì câu hỏi khó — hỏi lại khi nó ĐA NGHĨA.
+
+  CẢNH BÁO về CÂU XÁC NHẬN / ĐỒNG Ý NGẮN ("có", "vâng", "ừ", "ok", "đồng ý", "làm đi", "tiếp tục", "lọc đi"...):
+  - Khi lượt trước Radar vừa hỏi hoặc đề xuất một hướng tiếp theo (ví dụ: "Anh/chị có muốn Radar ưu tiên lọc sâu hơn các ứng viên đã xác định ở Hà Nội như Giang Lê và Tạ Nguyễn Phương Minh trước không?"):
+    + Câu trả lời "có", "vâng", "ok", "đồng ý", "làm đi", "tiếp tục", "lọc đi" là sự XÁC NHẬN ĐỒNG Ý thực hiện đề xuất đó.
+    + Đây là câu có mục tiêu rõ ràng từ ngữ cảnh, TUYỆT ĐỐI KHÔNG coi là mơ hồ hay không hiểu được (do_tin_cay >= 0.85, TUYỆT ĐỐI KHÔNG sinh "cau_hoi_lam_ro").
+    + "information_need": viết lại thành câu thực thi đầy đủ đề xuất đó (ví dụ: "Ưu tiên lọc sâu hơn các ứng viên đã xác định ở Hà Nội như Giang Lê và Tạ Nguyễn Phương Minh trước").
+    + "shape": chọn "followup" hoặc "find_people" (hoặc "action" nếu đề xuất là soạn thư / thao tác công cụ).
+    + "should_have" / "must_have": bám sát tiêu chí của đề xuất (ví dụ: "ở Hà Nội", "ưu tiên Giang Lê", "ưu tiên Tạ Nguyễn Phương Minh").
+    + "search_queries": tạo các truy vấn tìm kiếm phù hợp với đề xuất đó.
 - "information_need": viết lại câu hỏi thành MỘT câu độc lập, đã ghép ngữ cảnh
   hội thoại, đủ nghĩa khi đọc riêng.
 - "must_have": mảng câu chữ — điều kiện BẮT BUỘC, không thoả thì loại. Rất ít.
@@ -277,6 +293,69 @@ def has_recent_candidates(envelope):
     return bool(projection.last_result_people(limit=1))
 
 
+_AFFIRMATIVE_WORDS = frozenset((
+    "co", "vang", "da", "uh", "um", "ok", "oke", "okay", "okie",
+    "duoc", "duoc chu", "dong y", "nhat tri", "chinh xac", "dung roi",
+    "lam di", "tiep tuc", "loc di", "trien khai di", "loc tiep",
+    "loc giup toi", "tim giup toi", "loc them", "tien hanh di", "yes", "yep",
+))
+
+_AFFIRMATIVE_PREFIXES = (
+    "co ", "vang ", "da ", "dong y ", "ok ", "duoc ", "lam di ",
+    "tiep tuc ", "loc di ", "loc tiep ", "trien khai ", "nhat tri ",
+)
+
+
+def is_short_affirmation(question):
+    """True nếu câu hỏi là phản hồi ngắn đồng ý / xác nhận."""
+    text = normalize_name(question)
+    if not text:
+        return False
+    words = text.split()
+    if len(words) > 6:
+        return False
+    return text in _AFFIRMATIVE_WORDS or text.startswith(_AFFIRMATIVE_PREFIXES)
+
+
+def detect_last_proposal(envelope):
+    """Trích xuất câu hỏi/đề xuất ở cuối lượt trả lời gần nhất của Radar (nếu có)."""
+    projection = getattr(envelope, "projection", None)
+    if projection is None:
+        return ""
+    turns = list(getattr(projection, "recent_turns", []) or [])
+    if not turns:
+        return ""
+    last_ans = str(turns[-1].get("answer") or "").strip()
+    if not last_ans:
+        return ""
+    paragraphs = [p.strip() for p in last_ans.split("\n") if p.strip()]
+    if not paragraphs:
+        return ""
+    for p in reversed(paragraphs[-4:]):
+        p_fold = normalize_name(p)
+        if any(p_fold.startswith(prefix) for prefix in ("ho so duoc nhac", "trich dan", "goi y cau hoi", "goi y")):
+            continue
+        if "?" in p or any(kw in p_fold for kw in ("co muon", "muon radar", "uu tien loc", "loc sau")):
+            sentences = re.split(r"(?<=[.?!])\s+", p)
+            for s in reversed(sentences):
+                s_fold = normalize_name(s)
+                if "?" in s or any(kw in s_fold for kw in ("co muon", "muon radar", "uu tien loc", "loc sau")):
+                    return s.strip()
+            return p.strip()
+    return ""
+
+
+def clean_proposal_to_need(proposal):
+    """Chuyển câu hỏi đề xuất của Radar thành câu yêu cầu (information_need)."""
+    text = proposal.strip()
+    text = re.sub(r"^(?:anh/chị|anh|chị|bạn)?\s*(?:có\s+)?(?:muốn\s+)?(?:radar\s+)?", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*(?:không\s*\??|ạ\s*\??|\?+)$", "", text, flags=re.IGNORECASE)
+    text = text.strip()
+    if text:
+        return text[0].upper() + text[1:]
+    return proposal
+
+
 def _context_block(envelope):
     """Vài lượt gần nhất + kết quả lượt trước + điều người dùng đã dặn.
 
@@ -304,9 +383,19 @@ def _context_block(envelope):
         parts.append("TIÊU CHÍ ĐANG CÓ HIỆU LỰC:\n" + str(criteria)[:1200])
 
     turns = list(getattr(projection, "recent_turns", []) or [])[-12:]
-    for turn in turns:
+    for index, turn in enumerate(turns):
+        is_last = (index == len(turns) - 1)
         question = str(turn.get("question") or "").strip()[:500]
-        answer = str(turn.get("answer") or "").strip()[:700]
+        raw_answer = str(turn.get("answer") or "").strip()
+        if is_last:
+            # Lượt gần nhất: giữ tối đa 2500 ký tự. Nếu dài hơn, giữ đoạn đầu và đoạn đuôi
+            # (chứa câu hỏi gợi mở / đề xuất tiếp theo của Radar).
+            if len(raw_answer) <= 2500:
+                answer = raw_answer
+            else:
+                answer = raw_answer[:1600] + "\n...\n" + raw_answer[-800:]
+        else:
+            answer = raw_answer[:700]
         if question:
             parts.append(f"H: {question}")
         if answer:
@@ -315,6 +404,7 @@ def _context_block(envelope):
     if last:
         parts.append(last[:600])
     return "\n\n".join(parts)
+
 
 
 def plan(question, *, envelope=None, complete_fn=None) -> QueryPlan:
@@ -403,12 +493,35 @@ def plan(question, *, envelope=None, complete_fn=None) -> QueryPlan:
     if confidence >= CLARIFY_BELOW:
         clarify = ""
 
+    info_need = " ".join(str(payload.get("information_need") or question).split())[:500]
+
+    # Bảo vệ câu xác nhận ngắn ("có", "vâng", "đồng ý", "ok"): nếu lượt trước Radar
+    # vừa hỏi/đề xuất một hướng đi và người dùng chỉ gõ xác nhận, không để ① rơi vào
+    # nhánh hỏi lại (clarify) hoặc general ngô nghê.
+    if is_short_affirmation(question) and envelope is not None:
+        last_proposal = detect_last_proposal(envelope)
+        if last_proposal:
+            clean_need = clean_proposal_to_need(last_proposal)
+            if clarify or confidence < CLARIFY_BELOW:
+                log.info("answer.plan: gỡ clarify cho câu xác nhận %r theo đề xuất %r",
+                         question, last_proposal[:100])
+                clarify = ""
+                confidence = max(confidence, 0.9)
+                if not reasoning:
+                    reasoning = f"Người dùng xác nhận đồng ý với đề xuất của Radar: {last_proposal[:150]}"
+            if shape in ("general", ""):
+                shape = "followup"
+            if not queries or queries == [question]:
+                queries = [clean_need]
+            if not info_need or info_need.casefold() == question.casefold():
+                info_need = clean_need
+
     return QueryPlan(
         reasoning=reasoning,
         confidence=confidence,
         clarify=clarify,
         shape=shape,
-        information_need=" ".join(str(payload.get("information_need") or question).split())[:500],
+        information_need=info_need,
         must_have=as_list(payload.get("must_have"), limit=6),
         should_have=as_list(payload.get("should_have"), limit=10),
         extract=as_list(payload.get("extract"), limit=8),
