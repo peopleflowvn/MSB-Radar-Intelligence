@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 from django.urls import path
 
 from . import answer_views, intelligence_views, views
@@ -38,6 +38,7 @@ urlpatterns = [
          name="talent-relationship"),
     path("people/<int:person_id>/rederive/", views.talent_rederive,
          name="talent-rederive"),
+    path("people/<int:person_id>/avatar/", views.person_avatar, name="talent-person-avatar"),
     path("people/<int:person_id>/tags/", views.person_tags, name="talent-person-tags"),
     path("documents/<int:document_id>/download/", views.document_download,
          name="talent-document-download"),

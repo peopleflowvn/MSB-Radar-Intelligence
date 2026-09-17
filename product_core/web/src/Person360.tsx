@@ -1041,36 +1041,45 @@ function CandidateInsights({ person }: { person: PersonDetail }) {
 /** 9. LỊCH SỬ NỘP HỒ SƠ & DÒNG THỜI GIAN HOẠT ĐỘNG */
 function HistoryAndTimelineSection({ person }: { person: PersonDetail }) {
   return (
-    <div className="history-timeline-grid">
-      {/* Cột trái: Lịch sử nộp hồ sơ qua các nguồn */}
+    <div className="history-timeline-stack" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* 1. Lịch sử nộp hồ sơ qua các nguồn */}
       <section className="person-section-card">
-        <h3 className="section-title">📍 Lịch sử nộp hồ sơ &amp; Nguồn ứng tuyển ({person.sources.length})</h3>
+        <div className="section-title-row">
+          <h3 className="section-title">📍 Lịch sử nộp hồ sơ &amp; Nguồn ứng tuyển ({person.sources.length})</h3>
+          <span className="badge" style={{ background: 'var(--accent-soft, rgba(99,102,241,0.12))', color: 'var(--accent, #6366f1)', fontWeight: 600 }}>
+            🔗 Định danh hợp nhất
+          </span>
+        </div>
         <p className="hint">Mọi nguồn ứng tuyển và dữ liệu khách hàng được định danh về cùng 1 người nhờ đối soát Email/SĐT chuẩn hóa.</p>
-        <table className="sources-table" style={{ width: '100%', marginTop: '12px' }}>
-          <thead>
-            <tr>
-              <th>Kênh nguồn</th>
-              <th>Vị trí / Thông tin ghi nhận</th>
-              <th>Ngày ghi nhận</th>
-              <th>Tài khoản</th>
-            </tr>
-          </thead>
-          <tbody>
-            {person.sources.map((source) => (
-              <tr key={source.id}>
-                <td><span className="source-tag">{source.source}</span></td>
-                <td><strong>{source.position || '—'}</strong></td>
-                <td>{source.applied_ts?.slice(0, 10) || '—'}</td>
-                <td className="muted small">{source.account}</td>
+        <div className="table-responsive-wrapper" style={{ marginTop: '12px', overflowX: 'auto' }}>
+          <table className="sources-table" style={{ width: '100%' }}>
+            <thead>
+              <tr>
+                <th style={{ width: '110px' }}>Kênh nguồn</th>
+                <th>Vị trí / Thông tin ghi nhận</th>
+                <th style={{ width: '120px' }}>Ngày ghi nhận</th>
+                <th style={{ width: '220px' }}>Tài khoản</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {person.sources.map((source) => (
+                <tr key={source.id}>
+                  <td><span className="source-tag">{source.source}</span></td>
+                  <td><strong>{source.position || '—'}</strong></td>
+                  <td>{source.applied_ts?.slice(0, 10) || '—'}</td>
+                  <td className="muted small">{source.account || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      {/* Cột phải: Dòng thời gian tương tác */}
+      {/* 2. Dòng thời gian hoạt động & Tương tác */}
       <section className="person-section-card">
-        <h3 className="section-title">⏳ Dòng thời gian hoạt động &amp; Tương tác</h3>
+        <div className="section-title-row">
+          <h3 className="section-title">⏳ Dòng thời gian hoạt động &amp; Tương tác ({person.timeline.length})</h3>
+        </div>
         {person.timeline.length === 0 ? (
           <div className="empty-box">Chưa có ghi nhận tương tác nào.</div>
         ) : (
@@ -1241,6 +1250,7 @@ export default function Person360() {
   const fromParam = searchParams.get('from')
   const personId = Number(id)
   const [activeNav, setActiveNav] = useState<string>('tong-quan')
+  const [avatarError, setAvatarError] = useState(false)
   const [unlockedContacts, setUnlockedContacts] = useState<{ email: string; phone: string } | null>(null)
   const isUnlocked = Boolean(unlockedContacts)
 
@@ -1368,7 +1378,16 @@ export default function Person360() {
       <div className="person-hero-card">
         <div className="person-hero-left">
           <div className="person-avatar-large">
-            {(data.display_name || 'U').charAt(0).toUpperCase()}
+            {!avatarError ? (
+              <img
+                src={api.personAvatarUrl(data.id)}
+                alt={data.display_name || 'Avatar'}
+                className="person-avatar-img"
+                onError={() => setAvatarError(true)}
+              />
+            ) : (
+              <span>{(data.display_name || 'U').charAt(0).toUpperCase()}</span>
+            )}
           </div>
           <div>
             <div className="person-name-row">
@@ -1377,7 +1396,7 @@ export default function Person360() {
                 <span className="badge err">⚠️ Cần xem lại định danh</span>
               )}
               {t?.seniority && (
-                <span className="badge" style={{ background: 'rgba(99, 102, 241, 0.12)', color: '#4f46e5', fontWeight: 700 }}>
+                <span className="badge" style={{ background: 'var(--accent-soft, rgba(99,102,241,0.12))', color: 'var(--accent, #6366f1)', fontWeight: 700 }}>
                   {t.seniority}
                 </span>
               )}
@@ -1585,11 +1604,11 @@ export default function Person360() {
 
           {/* KHỐI 4: LỊCH SỬ NGUỒN, ĐỊNH DANH & BẰNG CHỨNG TRÍCH XUẤT */}
           <div id="sec-history" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* Lịch sử nộp & Timeline */}
+            {/* Lịch sử nộp & Timeline (Stack dọc thoáng đãng) */}
             <HistoryAndTimelineSection person={data} />
 
-            {/* Bằng chứng & nguồn gốc facts đã bóc tách */}
-            <PersonFactsSection personId={personId} />
+            {/* Bằng chứng & nguồn gốc facts đã bóc tách (Chỉ dành cho Admin) */}
+            <PersonFactsSection personId={personId} isAdmin={roles.has('admin')} />
 
             {/* Định danh số & Kênh liên kết */}
             <section className="person-section-card">
@@ -1652,22 +1671,24 @@ export default function Person360() {
         <div className="person-sticky-sidebar">
           {/* Bộ chuyển đổi quan hệ dành cho Admin hoặc người có cả 2 quyền */}
           {hasBoth && (
-            <div className="talent-submode-segmented" style={{ width: '100%' }}>
+            <div className="person-crm-segmented-dock">
               <button
                 type="button"
-                className={`submode-btn ${relTab === 'talent' ? 'active' : ''}`}
+                aria-label="💼 Quan hệ Ứng viên (Talent)"
+                className={`person-crm-segmented-btn ${relTab === 'talent' ? 'active' : ''}`}
                 onClick={() => setRelTab('talent')}
-                style={{ flex: 1 }}
               >
-                <span>💼 Quan hệ Ứng viên (Talent)</span>
+                <span className="crm-btn-icon">💼</span>
+                <span className="crm-btn-text">Talent (Ứng viên)</span>
               </button>
               <button
                 type="button"
-                className={`submode-btn ${relTab === 'rb' ? 'active' : ''}`}
+                aria-label="👔 Quan hệ Khách hàng (Growth)"
+                className={`person-crm-segmented-btn ${relTab === 'rb' ? 'active' : ''}`}
                 onClick={() => setRelTab('rb')}
-                style={{ flex: 1 }}
               >
-                <span>👔 Quan hệ Khách hàng (Growth)</span>
+                <span className="crm-btn-icon">👔</span>
+                <span className="crm-btn-text">Growth (Khách hàng)</span>
               </button>
             </div>
           )}
@@ -1705,3 +1726,4 @@ export default function Person360() {
     </div>
   )
 }
+

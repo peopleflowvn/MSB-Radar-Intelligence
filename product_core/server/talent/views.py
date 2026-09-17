@@ -563,6 +563,95 @@ def document_preview(request, document_id):
 
 
 @api_view(["GET"])
+@permission_classes([RequiresTalent])
+def person_avatar(request, person_id):
+    """Trích xuất ảnh chân dung đại diện từ trang 1 của CV ứng viên (hoặc tài liệu gần nhất)."""
+    person = get_object_or_404(Person, pk=person_id)
+    doc = person.documents.filter(storage_key__isnull=False).exclude(storage_key="").order_by("-observed_at", "-created_at").first()
+    if not doc or not doc.storage_key:
+        return HttpResponse(status=404)
+
+    storage = get_storage()
+    if not storage.exists(doc.storage_key):
+        return HttpResponse(status=404)
+
+    try:
+        import io
+        from pathlib import Path
+        data = storage.read(doc.storage_key)
+        ext = Path(doc.filename or "").suffix.lower()
+
+        # Nếu là ảnh trực tiếp
+        if (doc.mime_type or "").lower() in {"image/jpeg", "image/png", "image/webp"} or ext in {".jpg", ".jpeg", ".png", ".webp"}:
+            from PIL import Image
+            img = Image.open(io.BytesIO(data)).convert("RGB")
+            w, h = img.size
+            min_dim = min(w, h)
+            left = (w - min_dim) // 2
+            top = (h - min_dim) // 2
+            img = img.crop((left, top, left + min_dim, top + min_dim))
+            img.thumbnail((256, 256))
+            out = io.BytesIO()
+            img.save(out, format="JPEG", quality=90)
+            return HttpResponse(out.getvalue(), content_type="image/jpeg")
+
+        # Nếu là PDF
+        if ext == ".pdf" or (doc.mime_type or "").lower() == "application/pdf":
+            import fitz
+            from PIL import Image
+            pdf = fitz.open(stream=data, filetype="pdf")
+            try:
+                if len(pdf) == 0:
+                    return HttpResponse(status=404)
+                page = pdf[0]
+                image_list = page.get_images(full=True)
+
+                best_img = None
+                best_score = -1
+
+                for img_info in image_list[:10]:
+                    xref = img_info[0]
+                    base_image = pdf.extract_image(xref)
+                    image_bytes = base_image.get("image")
+                    if not image_bytes:
+                        continue
+                    try:
+                        pil_img = Image.open(io.BytesIO(image_bytes))
+                        w, h = pil_img.size
+
+                        # Avatar chân dung thường có kích thước tối thiểu và tỉ lệ khung hình gần vuông hoặc dọc (0.55 đến 1.5)
+                        if w >= 50 and h >= 50 and w <= 1600 and h <= 1600:
+                            ratio = w / float(h)
+                            if 0.55 <= ratio <= 1.5:
+                                score = w * h
+                                if 80 <= w <= 800 and 80 <= h <= 800:
+                                    score += 50000
+                                if score > best_score:
+                                    best_score = score
+                                    best_img = pil_img
+                    except Exception:
+                        continue
+
+                if best_img:
+                    best_img = best_img.convert("RGB")
+                    w, h = best_img.size
+                    min_dim = min(w, h)
+                    left = (w - min_dim) // 2
+                    top = (h - min_dim) // 2
+                    best_img = best_img.crop((left, top, left + min_dim, top + min_dim))
+                    best_img.thumbnail((256, 256))
+                    out = io.BytesIO()
+                    best_img.save(out, format="JPEG", quality=90)
+                    return HttpResponse(out.getvalue(), content_type="image/jpeg")
+            finally:
+                pdf.close()
+    except Exception:
+        pass
+
+    return HttpResponse(status=404)
+
+
+@api_view(["GET"])
 @permission_classes([RequiresRecruiting])
 def document_text(request, document_id):
     """Nguyên văn CV — dùng cho panel xem nguồn khi bấm một trích dẫn.

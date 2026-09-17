@@ -2064,6 +2064,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ question, ...(history.length ? { history } : {}) }),
     }),
+  personAvatarUrl: (id: number) => `/api/v1/talent/people/${id}/avatar/`,
   documentUrl: (id: number, inline = false) =>
     `/api/v1/talent/documents/${id}/download/${inline ? "?inline=1" : ""}`,
   documentPreviewUrl: (id: number) => `/api/v1/talent/documents/${id}/preview/`,

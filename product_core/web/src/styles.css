@@ -17457,3 +17457,306 @@ body,
   color: var(--text-muted, #94a3b8);
   margin-top: 2px;
 }
+
+/* ==========================================================================
+   PERSON 360 DOCK & CRM SEGMENTED SWITCH & AVATAR & FULL-WIDTH SECTIONS
+   ========================================================================== */
+
+.person-hero-card {
+  background: var(--surface, #111827);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+.person-hero-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--accent-gradient, linear-gradient(135deg, var(--accent, #ff8a33) 0%, #ea580c 100%));
+}
+
+.person-hero-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+  min-width: 0;
+}
+
+.person-avatar-large {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--surface-raised, #1e293b);
+  border: 2.5px solid var(--accent, #ff8a33);
+  box-shadow: 0 0 0 4px var(--accent-soft, rgba(255, 138, 51, 0.15)), 0 8px 24px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--accent, #ff8a33);
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.person-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.person-fullname {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text, #f8fafc);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.person-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.person-headline-text {
+  margin: 6px 0 0;
+  font-size: 14.5px;
+  color: var(--text-secondary, #94a3b8);
+  line-height: 1.45;
+}
+
+.person-headline-text .company-text {
+  font-weight: 600;
+  color: var(--text, #f8fafc);
+}
+
+/* Quick Stats Bar */
+.person-quick-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.stat-pill {
+  background: var(--surface, #111827);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.stat-pill:hover {
+  border-color: var(--accent, #ff8a33);
+  background: var(--surface-raised, #1e293b);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px var(--accent-soft, rgba(255, 138, 51, 0.15));
+}
+
+.stat-pill .s-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.stat-pill .s-val {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text, #f8fafc);
+  line-height: 1.2;
+  display: block;
+}
+
+.stat-pill .s-lbl {
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+  font-weight: 500;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* CRM Segmented Switch Dock (Cột phải) */
+.person-crm-segmented-dock {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface, #111827);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.person-crm-segmented-btn {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary, #94a3b8);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.person-crm-segmented-btn:hover:not(.active) {
+  color: var(--text, #f8fafc);
+  background: var(--surface-raised, rgba(255, 255, 255, 0.05));
+}
+
+.person-crm-segmented-btn.active {
+  color: #ffffff;
+  background: var(--accent-gradient, var(--accent, #ff8a33));
+  border-color: transparent;
+  box-shadow: 0 2px 10px var(--accent-soft, rgba(255, 138, 51, 0.35));
+}
+
+.person-crm-segmented-btn .crm-btn-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.person-crm-segmented-btn .crm-btn-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sources Table & Timeline Full-Width Modern */
+.sources-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13.5px;
+}
+
+.sources-table th {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted, #94a3b8);
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+
+.sources-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.05));
+  vertical-align: middle;
+  color: var(--text, #f8fafc);
+  line-height: 1.5;
+}
+
+.sources-table tr:last-child td {
+  border-bottom: none;
+}
+
+.sources-table tr:hover td {
+  background: var(--surface-raised, rgba(255, 255, 255, 0.02));
+}
+
+.source-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--accent-soft, rgba(255, 138, 51, 0.12));
+  color: var(--accent, #ff8a33);
+  border: 1px solid var(--accent-soft, rgba(255, 138, 51, 0.2));
+}
+
+.timeline-modern {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  position: relative;
+}
+
+.timeline-modern::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 11px;
+  width: 2px;
+  background: var(--border, rgba(255, 255, 255, 0.08));
+}
+
+.timeline-item-modern {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 10px 0;
+  position: relative;
+}
+
+.timeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent, #ff8a33);
+  box-shadow: 0 0 0 4px var(--accent-soft, rgba(255, 138, 51, 0.25));
+  margin-top: 5px;
+  margin-left: 7px;
+  flex-shrink: 0;
+  z-index: 2;
+}
+
+.timeline-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-time {
+  font-size: 12px;
+  color: var(--text-muted, #94a3b8);
+  font-weight: 500;
+}
+
+.timeline-action {
+  margin-top: 3px;
+  font-size: 13.5px;
+  color: var(--text, #f8fafc);
+  line-height: 1.45;
+}
+
+.timeline-actor {
+  color: var(--text-muted, #94a3b8);
+  font-size: 13px;
+}
+
