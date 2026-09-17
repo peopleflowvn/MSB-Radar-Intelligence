@@ -63,6 +63,8 @@ POOL = 60
 #: Sàn — dưới mức này ③ không còn gì để loại, và câu "có ai … không?" cần mẫu
 #: đủ rộng mới trả lời trung thực được.
 MIN_POOL = 16
+#: Trần tập khách được phép mỗi lượt (sau cổng tuân thủ và bộ lọc cứng).
+MAX_ELIGIBLE = 5000
 #: Trần mỗi nhánh. RRF cần dư ứng viên để xếp hạng khi kho lớn.
 PER_BRANCH = 120
 
@@ -126,12 +128,15 @@ def eligible_people(query_plan, *, user=None):
     """
     from ..models import RBOpportunity
 
-    queryset = Person.objects.filter(merged_into__isnull=True)
+    from .population import customers, do_not_contact_ids
+
+    # Khách hàng, không phải toàn bảng `Person` (dùng chung với ứng viên) — xem
+    # `population.py` cho hai lỗi mà định nghĩa cũ gây ra.
+    queryset = customers()
 
     # Không bao giờ được xuất hiện. Đặt ĐẦU TIÊN để không ai đọc nhầm nó như
     # một bộ lọc tuỳ chọn nằm lẫn giữa các bộ lọc khác.
-    queryset = queryset.exclude(relationships__domain=Signal.DOMAIN_RB,
-                                relationships__do_not_contact=True)
+    queryset = queryset.exclude(pk__in=do_not_contact_ids())
 
     shape = getattr(query_plan, "shape", "")
     if shape == "portfolio":
@@ -336,12 +341,20 @@ def retrieve(query_plan, *, user=None, pool=None, pinned_ids=()):
     pinned_ids = list(dict.fromkeys(int(p) for p in pinned_ids if p))
 
     allowed = eligible_people(query_plan, user=user)
-    allowed_ids = list(allowed.values_list("pk", flat=True)[:5000])
+    # Có `order_by`: cắt không thứ tự trên bảng lớn trả một tập con TUỲ Ý, khác
+    # nhau giữa hai lần chạy. Mới nhất trước — khách mới tạo/cập nhật gần đây
+    # có tín hiệu mới hơn. Chạm trần thì nói ra trong log thay vì im lặng.
+    allowed_ids = list(allowed.order_by("-updated_at", "-pk")
+                       .values_list("pk", flat=True)[:MAX_ELIGIBLE + 1])
+    if len(allowed_ids) > MAX_ELIGIBLE:
+        log.warning("rb.answer.retrieve: tập khách được phép vượt %s, chỉ xét phần mới "
+                    "nhất — tiêu chí quá rộng", MAX_ELIGIBLE)
+        allowed_ids = allowed_ids[:MAX_ELIGIBLE]
     if pinned_ids:
         # Lọc người ghim qua đúng cổng đó — bằng một truy vấn riêng, vì họ có
         # thể không thoả các bộ lọc mềm của câu hỏi nhưng vẫn phải được đọc.
-        gate = Person.objects.filter(pk__in=pinned_ids, merged_into__isnull=True).exclude(
-            relationships__domain=Signal.DOMAIN_RB, relationships__do_not_contact=True)
+        from .population import customers, do_not_contact_ids
+        gate = customers().filter(pk__in=pinned_ids).exclude(pk__in=do_not_contact_ids())
         pinned_ids = [pid for pid in pinned_ids
                       if pid in set(gate.values_list("pk", flat=True))]
         allowed_ids = list(dict.fromkeys(pinned_ids + allowed_ids))

@@ -324,6 +324,58 @@ def _stream_action(question, query_plan, envelope, user, started):
                "ms_total": int((time.monotonic() - started) * 1000)})}
 
 
+def _memories(envelope):
+    """Điều RM đã chủ động bảo Radar nhớ. `projection` đã lọc injection."""
+    projection = getattr(envelope, "projection", None)
+    return list(getattr(projection, "memories", []) or []) if projection else []
+
+
+#: Câu cần số liệu toàn phạm vi, không chỉ vài chục khách vừa đọc.
+_AGGREGATE_SHAPES = ("analyze", "portfolio")
+
+
+def _corpus_facts(query_plan, user):
+    if query_plan.shape not in _AGGREGATE_SHAPES:
+        return ""
+    from .corpus import facts_for_prompt
+    from .count import SCOPE_LABEL
+    from .population import scope_queryset
+    return facts_for_prompt(scope_queryset=scope_queryset(query_plan.shape, user),
+                            scope_label=SCOPE_LABEL.get(query_plan.shape, "toàn kho khách hàng"))
+
+
+def _stream_count(question, query_plan, envelope, user, started, complete_fn):
+    """Câu đếm — xem `count.py`. Chính xác bằng SQL khi làm được, ước lượng có nhãn khi không."""
+    from . import count as count_stage
+    from .structured import analyse_plan
+
+    analysis = analyse_plan(query_plan)
+    trace = {"question": question, "plan": query_plan.as_dict(),
+             "count_analysis": {"all_covered": analysis.all_covered,
+                                "uncovered": analysis.uncovered,
+                                "filters": analysis.filters,
+                                "product_groups": analysis.product_groups}}
+    people = []
+    if analysis.all_covered:
+        yield step("Đếm trên toàn bộ dữ liệu")
+        count = count_stage.exact(query_plan, analysis, user=user)
+        yield step("Đếm trên toàn bộ dữ liệu", "done")
+    else:
+        effective = count_stage.effective_plan(query_plan, analysis)
+        effective, chosen, _near, stats, pipeline_trace = yield from _pipeline(
+            question, envelope=envelope, user=user, complete_fn=complete_fn,
+            deadline=started + BUDGET_SECONDS, query_plan=effective)
+        trace.update({k: v for k, v in pipeline_trace.items() if k != "question"})
+        count = count_stage.inference(effective, analysis, stats, user=user)
+        people = _people(chosen, _actions_for(chosen), compose_stage.build_sources(chosen))
+    text = count_stage.text_for(count)
+    trace["count"] = count
+    trace["ms_total"] = int((time.monotonic() - started) * 1000)
+    trace["compose"] = {"deterministic": True}
+    yield {"type": "answer", "text": text}
+    yield {"type": "done", "result": AnswerResult(text=text, people=people, trace=trace)}
+
+
 def stream_answer(question, *, envelope=None, user=None, history=None,
                   complete_fn=None, stream_fn=None, query_plan=None, adapter=None):
     """Phát dần một lượt trả lời. Yield dict:
@@ -364,6 +416,10 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
     yield {"type": "preamble", "text": _preamble(query_plan, question),
            "plan": query_plan.as_dict()}
 
+    if query_plan.shape == "count":
+        yield from _stream_count(question, query_plan, envelope, user, started, complete_fn)
+        return
+
     query_plan, chosen, near, stats, trace = yield from _pipeline(
         question, envelope=envelope, user=user, complete_fn=complete_fn,
         deadline=started + BUDGET_SECONDS, query_plan=query_plan)
@@ -372,9 +428,15 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
     sources = compose_stage.build_sources(chosen)
     people = _people(chosen, actions, sources)
 
+    corpus_facts = _corpus_facts(query_plan, user)
+    if corpus_facts:
+        trace["corpus_facts"] = True
+
     # Không có gì để viết, hoặc ③ hỏng → văn bản tất định. Không gọi LLM để nói
-    # "chưa tìm thấy": vừa tốn, vừa có thể bịa ra một lý do nghe hợp lý.
-    if not chosen or stats.get("read_failed"):
+    # "chưa tìm thấy": vừa tốn, vừa có thể bịa ra một lý do nghe hợp lý. TRỪ câu
+    # tổng hợp có số liệu toàn kho: câu trả lời thật nằm ở số liệu, không ở danh
+    # sách, nên danh sách rỗng không có nghĩa là không có gì để nói.
+    if (not chosen and not corpus_facts) or stats.get("read_failed"):
         text = compose_stage.deterministic_text(query_plan, chosen, stats, actions=actions)
         yield {"type": "answer", "text": text}
         trace["ms_total"] = int((time.monotonic() - started) * 1000)
@@ -384,7 +446,9 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
         return
 
     messages = compose_stage.build_messages(query_plan, chosen, near, stats, sources,
-                                            user=user, history=history, actions=actions)
+                                            user=user, history=history, actions=actions,
+                                            memories=_memories(envelope),
+                                            corpus_facts=corpus_facts)
     yield step("Viết câu trả lời")
 
     buffer, provider, model, truncated = [], "", "", False

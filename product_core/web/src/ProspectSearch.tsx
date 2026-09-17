@@ -13,12 +13,10 @@ import {
   SavedView,
   SearchFilters,
   TalentCard,
-  ToolCallTrace,
   WebSource,
 } from "./api";
 import { useCustomTheme } from "./CustomThemeContext";
 import { ProspectChatMessage, useProspectChatState } from "./searchPersistence";
-import { looksConversational } from "./conversationHeuristic";
 import FormattedMarkdown from "./FormattedMarkdown";
 import ThinkingProcess from "./ThinkingProcess";
 
@@ -436,85 +434,6 @@ export default function ProspectSearch({ initialMode = "ai" }: { initialMode?: "
     const patchMsg = (patch: Partial<ProspectChatMessage>) =>
       setMessages((prev) => prev.map((m) => (m.id === aiMsgId ? { ...m, ...patch } : m)));
 
-    const TOOL_LABEL: Record<string, string> = {
-      read_allowed_evidence: "Đọc bằng chứng hồ sơ",
-      remember_proposal: "Đề xuất ghi nhớ",
-      feedback: "Ghi nhận đánh giá",
-      compare_candidates: "So sánh ứng viên",
-      canonical_lookup: "Chuẩn hoá giá trị",
-      fact_provenance: "Truy nguồn gốc dữ liệu",
-  draft_outreach: "Soạn nháp tiếp cận",
-  enrich_company_from_web: "Tra thông tin công ty (web)",
-    };
-    const conversationData = (answer: string, reasoning: string,
-      provider = "", model = "", sources: WebSource[] = [],
-      tools: ToolCallTrace[] = []): ProspectResponse => ({
-      mode: "conversation", answer, question: cleaned, provider, model,
-      reasoning_content: reasoning || undefined,
-      sources: sources.length ? sources : undefined,
-      tools: tools.length ? tools : undefined,
-      trace: tools.map((t) => ({
-        label: TOOL_LABEL[t.name] ?? `Tool: ${t.name}`,
-        detail: t.ok ? "" : `lỗi: ${t.error ?? ""}`,
-      })),
-      criteria: {} as ProspectCriteria, criteria_from: "llm", error: "",
-      count: 0, results: [],
-    });
-
-    const runAskStream = async () => {
-      const controller = new AbortController();
-      streamAbortRef.current = controller;
-      let answer = "";
-      let reasoning = "";
-      let sources: WebSource[] = [];
-      let tools: ToolCallTrace[] = [];
-      try {
-        for await (const ev of api.assistantStream(
-          { q: cleaned, surface: "prospect", conversation_id: threadId,
-            client_turn_id: clientTurnId, history },
-          controller.signal,
-        )) {
-          if (ev.event === "route") { void runEvidenceAsk(); return; }
-          if (ev.event === "thinking") {
-            reasoning += String(ev.data.text ?? "");
-            patchMsg({ data: conversationData(answer, reasoning, "", "", sources, tools) });
-          } else if (ev.event === "sources") {
-            sources = (ev.data.items as WebSource[] | undefined) ?? [];
-            patchMsg({ data: conversationData(answer, reasoning, "", "", sources, tools) });
-          } else if (ev.event === "tool") {
-            tools = [...tools, ev.data as unknown as ToolCallTrace];
-            patchMsg({ data: conversationData(answer, reasoning, "", "", sources, tools) });
-          } else if (ev.event === "answer") {
-            answer += String(ev.data.text ?? "");
-            patchMsg({ text: answer || "Radar đang suy nghĩ...",
-              data: conversationData(answer, reasoning, "", "", sources, tools) });
-          } else if (ev.event === "error") {
-            throw new ApiError(0, String(ev.data.text ?? "Lỗi khi stream câu trả lời."));
-          } else if (ev.event === "done") {
-            const finalAnswer = String(ev.data.answer ?? answer) || answer;
-            const finalSources = (ev.data.sources as WebSource[] | undefined) ?? sources;
-            const finalTools = (ev.data.tools as ToolCallTrace[] | undefined) ?? tools;
-            patchMsg({ isPending: false, text: finalAnswer,
-              data: conversationData(finalAnswer, reasoning,
-                String(ev.data.provider ?? ""), String(ev.data.model ?? ""),
-                finalSources, finalTools) });
-            void refreshConversations();
-          }
-        }
-      } catch (err: any) {
-        if (err?.name === "AbortError" || streamAbortRef.current?.signal?.aborted) {
-          patchMsg({ isPending: false, text: answer ? `${answer}\n\n*(Đã dừng trả lời)*` : `*(Đã dừng)*` });
-        } else {
-          if (!answer) { runAsk(); return; }
-          const detail = err instanceof ApiError ? err.message : "Mất kết nối khi đang trả lời.";
-          patchMsg({ isPending: false, text: `${answer}\n\n⚠️ ${detail}` });
-        }
-      } finally {
-        streamAbortRef.current = null;
-        setIsAsking(false);
-      }
-    };
-
     // Growth Answer Engine (`/rb/ask/`): câu trả lời có dẫn chứng + danh sách khách
     // xếp theo mức đáng ưu tiên + hành động do CODE chọn. Đường 8 khoá cũ
     // (`runAsk`) KHÔNG bị xoá: nó là dự phòng khi endpoint mới hỏng TRƯỚC khi có
@@ -525,8 +444,10 @@ export default function ProspectSearch({ initialMode = "ai" }: { initialMode?: "
       let answer = "";
       let steps: Array<{ label: string; detail: string }> = [];
       let plan: ProspectAnswerPlan | undefined;
+      let webSources: WebSource[] = [];
       const answerData = (text: string, people: ProspectAnswerPerson[] = [],
         provider = "", model = ""): ProspectResponse => ({
+        sources: webSources.length ? webSources : undefined,
         // Chưa có kế hoạch = chưa phải lượt tìm kiếm (hoặc là câu lệnh): hiện như
         // hội thoại, để không thoáng hiện thẻ tiêu chí rỗng và ô "chưa có khách nào".
         mode: plan ? "answer" : "conversation", answer: text, question: cleaned, provider, model,
@@ -564,8 +485,8 @@ export default function ProspectSearch({ initialMode = "ai" }: { initialMode?: "
             throw new ApiError(0, String(ev.data.text ?? "Lỗi khi trả lời."));
           } else if (ev.event === "done") {
             const people = (ev.data.people as ProspectAnswerPerson[] | undefined) ?? [];
-            const trace = (ev.data.trace as { plan?: ProspectAnswerPlan; keeps_last_result?: boolean }
-              | undefined) ?? {};
+            const trace = (ev.data.trace as { plan?: ProspectAnswerPlan; keeps_last_result?: boolean;
+              count?: { exact?: boolean } } | undefined) ?? {};
             // Vòng nới có thể đổi kế hoạch sau preamble — bản ở `done` là bản cuối.
             plan = trace.plan ?? plan;
             const finalAnswer = String(ev.data.answer ?? answer) || answer;
@@ -577,8 +498,14 @@ export default function ProspectSearch({ initialMode = "ai" }: { initialMode?: "
             // Lượt CÂU LỆNH (soạn nháp, tạo cơ hội) không phải một kết quả tìm kiếm:
             // không có điểm, không có kế hoạch tìm. Hiện nó thành thẻ khách điểm 0
             // kèm "Hệ thống hiểu câu hỏi là…" rỗng là nói sai điều vừa xảy ra.
+            // Đếm CHÍNH XÁC cũng vậy: câu trả lời là con số + mẫu số, không có danh
+            // sách — ô "chưa có khách nào có đủ bằng chứng" dưới con số là nói ngược.
+            const textOnly = trace.keeps_last_result || Boolean(trace.count?.exact);
+            // Nhánh `general` của engine (chào hỏi, kiến thức chung, tra web) mang
+            // nguồn web — hiện lại đúng khối "Nguồn tham khảo" mà luồng trợ lý cũ hiện.
+            webSources = (ev.data.web_sources as WebSource[] | undefined) ?? [];
             patchMsg({ isPending: false, text: finalAnswer,
-              data: trace.keeps_last_result
+              data: textOnly || !plan
                 ? { ...answerData(finalAnswer, [], provider, model), mode: "conversation" }
                 : answerData(finalAnswer, people, provider, model) });
             void refreshConversations();
@@ -635,11 +562,12 @@ export default function ProspectSearch({ initialMode = "ai" }: { initialMode?: "
       },
     );
 
-    if (looksConversational(cleaned)) {
-      void runAskStream();
-    } else {
-      void runEvidenceAsk();
-    }
+    // MỘT đường duy nhất, như Talent. Bộ đoán "câu hội thoại" phía giao diện từng
+    // đẩy mọi câu có "bao nhiêu", "so sánh", "tìm hiểu", "mới nhất" sang luồng
+    // trợ lý chung — tức câu đếm, câu so sánh và cả "ai đang tìm hiểu vay mua
+    // chung cư" chỉ tới được engine nếu bộ phân loại phía máy chủ tình cờ trả
+    // `route`. Engine tự nhận câu chào hỏi / kiến thức chung qua nhánh `general`.
+    void runEvidenceAsk();
   };
 
   const handleApplyFilters = (e?: React.FormEvent) => {

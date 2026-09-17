@@ -84,6 +84,11 @@ Quy tắc bắt buộc:
 
 7. Nếu "khach_hang" rỗng: nói thật là chưa tìm thấy, nói rõ đã xét bao nhiêu hồ
    sơ, và gợi ý MỘT cách hỏi lại cụ thể. Không xin lỗi dài dòng.
+
+8. Nếu có khối "SỐ LIỆU ... (truy vấn CSDL, CHÍNH XÁC)": đây là câu hỏi TỔNG
+   HỢP. Mọi con số về quy mô, tỷ lệ, phân bố PHẢI lấy từ khối đó và nói kèm mẫu
+   số. Danh sách "khach_hang" chỉ là VÍ DỤ minh hoạ — TUYỆT ĐỐI không đếm nó rồi
+   trình bày như số liệu toàn kho.
 """
 
 
@@ -189,12 +194,21 @@ def build_payload(query_plan, chosen, near_misses, stats, sources, *, actions=No
 
 
 def build_messages(query_plan, chosen, near_misses, stats, sources, *,
-                   user=None, history=None, actions=None):
+                   user=None, history=None, actions=None, memories=None, corpus_facts=""):
     payload = build_payload(query_plan, chosen, near_misses, stats, sources,
                             actions=actions)
     messages = [
         {"role": "system", "content": stable_system("prospect", user) + "\n\n" + SYSTEM},
     ]
+    remembered = [str(m)[:300] for m in list(memories or [])[:8]]
+    if remembered:
+        # Điều RM đã chủ động bảo Radar nhớ ("tôi chỉ phụ trách khu Cầu Giấy").
+        # `projection` đã lọc prompt-injection trước khi tới đây.
+        messages.append({"role": "system", "content":
+                         "RM ĐÃ DẶN (tôn trọng khi trình bày, không bịa thêm):\n"
+                         + "\n".join(f"- {m}" for m in remembered)})
+    if corpus_facts:
+        messages.append({"role": "system", "content": corpus_facts})
     if history:
         lines = []
         for turn in list(history)[-4:]:

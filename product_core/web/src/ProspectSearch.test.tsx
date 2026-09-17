@@ -219,28 +219,43 @@ describe("Tìm khách bằng ngôn ngữ tự nhiên (đường dự phòng 8 kh
     expect(screen.getByText("Nguyễn Văn An")).toBeInTheDocument();
   });
 
-  it("câu hỏi hội thoại thì stream SSE, không gọi rbProspects", async () => {
-    async function* fakeStream() {
-      yield { event: "thinking" as const, data: { text: "Xác định phạm vi." } };
-      yield { event: "answer" as const, data: { text: "Radar hỗ trợ RM tìm khách hàng." } };
-      yield { event: "done" as const, data: { answer: "Radar hỗ trợ RM tìm khách hàng.",
-        provider: "greennode", model: "m1" } };
-    }
-    const stream = vi.spyOn(api, "assistantStream").mockImplementation(fakeStream);
-    const ask = vi.spyOn(api, "rbProspects");
-    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
-    render(
-      <QueryClientProvider client={client}>
-        <MemoryRouter><SearchStateProvider><ProspectSearch /></SearchStateProvider></MemoryRouter>
-      </QueryClientProvider>,
-    );
+  it("câu hội thoại cũng đi MỘT đường qua engine, nguồn web vẫn hiện", async () => {
+    const engineStream = vi.spyOn(api, "rbAsk").mockImplementation(async function* () {
+      yield { event: "answer", data: { text: "Radar hỗ trợ RM tìm khách hàng." } } as never;
+      yield { event: "done", data: { answer: "Radar hỗ trợ RM tìm khách hàng.",
+        web_sources: [{ title: "Trang MSB", url: "https://msb.com.vn" }],
+        trace: { mode: "chat" } } } as never;
+    });
+    const legacyStream = vi.spyOn(api, "assistantStream");
+    const legacy = vi.spyOn(api, "rbProspects");
+    renderSearch();
     fireEvent.change(screen.getByPlaceholderText(/Mô tả chân dung/), {
       target: { value: "Radar là gì?" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Tìm khách hàng" }));
     expect(await screen.findByText("Radar hỗ trợ RM tìm khách hàng.")).toBeInTheDocument();
-    expect(stream).toHaveBeenCalledTimes(1);
-    expect(ask).not.toHaveBeenCalled();
+    expect(screen.getByText("Trang MSB")).toBeInTheDocument();
+    expect(engineStream).toHaveBeenCalledTimes(1);
+    expect(legacyStream).not.toHaveBeenCalled();
+    expect(legacy).not.toHaveBeenCalled();
+  });
+
+  it("câu có 'bao nhiêu', 'so sánh', 'tìm hiểu' KHÔNG bị đẩy khỏi engine", async () => {
+    for (const q of ["bao nhiêu khách ở Hà Nội", "so sánh hai khách đầu",
+      "ai đang tìm hiểu vay mua chung cư"]) {
+      cleanup();
+      vi.restoreAllMocks();
+      vi.spyOn(api, "conversations").mockResolvedValue({ results: [] });
+      const engineStream = vi.spyOn(api, "rbAsk").mockImplementation(async function* () {
+        yield { event: "done", data: { answer: "ok", people: [], trace: {} } } as never;
+      });
+      const legacyStream = vi.spyOn(api, "assistantStream");
+      renderSearch();
+      fireEvent.change(screen.getByPlaceholderText(/Mô tả chân dung/), { target: { value: q } });
+      fireEvent.click(screen.getByRole("button", { name: "Tìm khách hàng" }));
+      await waitFor(() => expect(engineStream).toHaveBeenCalledTimes(1));
+      expect(legacyStream).not.toHaveBeenCalled();
+    }
   });
 });
 
@@ -375,5 +390,25 @@ describe("Growth Answer Engine — lượt câu lệnh", () => {
     expect(screen.queryByText(/Hệ thống hiểu câu hỏi/)).not.toBeInTheDocument();
     expect(screen.queryByText("Khách Năm")).not.toBeInTheDocument();
     expect(legacy).not.toHaveBeenCalled();
+  });
+});
+
+describe("Growth Answer Engine — lượt đếm", () => {
+  it("đếm chính xác hiện con số, KHÔNG kèm ô 'chưa có khách nào'", async () => {
+    vi.spyOn(api, "rbAsk").mockImplementation(async function* () {
+      yield { event: "preamble", data: { text: "…", plan: { shape: "count" } } } as never;
+      yield { event: "answer", data: { text: "Có **12** khách hàng thoả: ở Hà Nội." } } as never;
+      yield { event: "done", data: {
+        answer: "Có **12** khách hàng thoả: ở Hà Nội.", people: [],
+        trace: { plan: { shape: "count" }, count: { exact: true } } } } as never;
+    });
+    renderSearch();
+    fireEvent.change(screen.getByPlaceholderText(/Mô tả chân dung/), {
+      target: { value: "bao nhiêu khách ở Hà Nội" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Tìm khách hàng" }));
+    // Markdown tách "**12**" thành phần tử riêng — tìm đúng con số.
+    expect(await screen.findByText("12")).toBeInTheDocument();
+    expect(screen.queryByText(/Chưa có khách hàng nào có đủ bằng chứng/)).not.toBeInTheDocument();
   });
 });

@@ -808,3 +808,30 @@ class CommandTurnKeepsListTest(TestCase):
         self.assertEqual([i["id"] for i in items], [1, 2])
         self.assertEqual(items[0]["product"], "fx")
 
+
+
+class CustomerPopulationTest(TestCase):
+    """`Person` dùng chung với Talent: ứng viên tuyển dụng KHÔNG phải khách hàng."""
+
+    def test_ung_vien_khong_chiem_cho_cua_khach_trong_tran(self):
+        """Hậu quả thật của tập cũ: ứng viên ăn hết trần, khách thật bị cắt."""
+        from .answer.population import customers
+        khach = _customer("Khách Thật")
+        _post(khach, "em cần vay mua nhà")
+        for i in range(3):                       # ứng viên MỚI hơn, đứng đầu theo -updated_at
+            Person.objects.create(display_name=f"Ứng Viên {i}")
+        self.assertEqual(set(customers().values_list("pk", flat=True)), {khach.pk})
+        with mock.patch.object(retrieve_stage, "MAX_ELIGIBLE", 2):
+            got = [c.person_id for c in retrieve_stage.retrieve(
+                ProspectPlan(search_queries=["vay mua nhà"]))]
+        self.assertIn(khach.pk, got)
+
+    def test_nguoi_chi_co_bai_dang_hoac_tin_hieu_van_la_khach(self):
+        from .answer.population import customers
+        chi_bai = Person.objects.create(display_name="Chỉ Có Bài")
+        _post(chi_bai, "hỏi vay")
+        chi_tin_hieu = Person.objects.create(display_name="Chỉ Có Tín Hiệu")
+        Signal.objects.create(person=chi_tin_hieu, domain=Signal.DOMAIN_RB,
+                              signal_type="loan", observed_at=timezone.now())
+        ids = set(customers().values_list("pk", flat=True))
+        self.assertTrue({chi_bai.pk, chi_tin_hieu.pk} <= ids)
