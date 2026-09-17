@@ -356,6 +356,25 @@ def _read_batch(query_plan, batch, caller):
     return rows
 
 
+def _read_batch_in_thread(query_plan, batch, caller):
+    """`_read_batch` chạy trong luồng phụ — đóng kết nối CSDL CỦA LUỒNG ĐÓ khi xong.
+
+    Django cấp kết nối theo từng luồng. Bộ định tuyến model đọc cấu hình nhà cung
+    cấp qua ORM, nên mỗi luồng phụ mở một kết nối PostgreSQL riêng; không đóng
+    thì mỗi lượt hỏi để lại vài kết nối treo tới khi hết `max_connections`.
+
+    Đóng Ở ĐÂY, không phải ở luồng gọi sau khi gộp kết quả: bản trước gọi
+    `connection.close()` ở luồng gọi — đóng nhầm kết nối của luồng chính (mà nó
+    còn cần, và nếu đang trong một giao dịch thì làm hỏng giao dịch đó) trong khi
+    kết nối của luồng phụ vẫn rò.
+    """
+    from django.db import connection
+    try:
+        return _read_batch(query_plan, batch, caller)
+    finally:
+        connection.close()
+
+
 def judge(query_plan, candidates, *, complete_fn=None, batch_size=BATCH):
     """`[Candidate]` → `JudgeReport`. Không bao giờ ném lỗi lên trên."""
     candidates = list(candidates)
@@ -372,7 +391,7 @@ def judge(query_plan, candidates, *, complete_fn=None, batch_size=BATCH):
     else:
         from ai.telemetry import submit
         with ThreadPoolExecutor(max_workers=min(WORKERS, len(batches))) as workers:
-            futures = {submit(workers, _read_batch, query_plan, b, caller): i
+            futures = {submit(workers, _read_batch_in_thread, query_plan, b, caller): i
                        for i, b in enumerate(batches)}
             for future, index in futures.items():
                 try:
@@ -380,10 +399,6 @@ def judge(query_plan, candidates, *, complete_fn=None, batch_size=BATCH):
                 except Exception:                  # noqa: BLE001
                     log.exception("rb.answer.judge: lô %d hỏng", index)
                     results[index] = None
-        # Luồng phụ dùng ORM qua `_verify_quote`/prompt guard; Django cấp kết nối
-        # theo TỪNG luồng và không đóng thì mỗi lượt để lại vài kết nối treo.
-        from django.db import connection
-        connection.close()
 
     rows, failed = [], 0
     for result in results:

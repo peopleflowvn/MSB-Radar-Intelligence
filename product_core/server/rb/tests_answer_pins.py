@@ -184,3 +184,35 @@ class NamePhraseSharedWithTalentTest(SimpleTestCase):
         from core.answer import names
         from talent.answer import resolve as talent_resolve
         self.assertIs(talent_resolve._phrases, names.phrases)
+
+
+class JudgeConnectionTest(TestCase):
+    """Kết nối CSDL được đóng ở LUỒNG PHỤ của từng lô, không ở luồng gọi.
+
+    Không kiểm bằng cách mở giao dịch rồi truy vấn tiếp: SQLite bộ nhớ trong môi
+    trường test cố ý bỏ qua `close()`, nên phép kiểm đó xanh cả với bản lỗi (đã
+    thử). Kiểm thẳng luồng nào gọi `close()`.
+    """
+
+    def test_dong_ket_noi_trong_luong_phu_moi_lo_mot_lan(self):
+        import threading
+        from django.db import connections
+        from .answer import judge as judge_stage
+        from .answer.evidence import Candidate, Passage
+
+        def caller(messages, **kwargs):
+            ids = [int(x) for x in re.findall(r"id=(\d+)", messages[-1]["content"])]
+            return FakeCompletion(json.dumps({"ket_qua": [
+                {"id": pid, "thoa": False} for pid in ids]}))
+
+        candidates = [Candidate(i, f"K{i}", passages=[Passage(i, "nội dung đủ dài để đọc", "profile")])
+                      for i in range(1, 17)]
+        closers = []
+        main = threading.get_ident()
+        # `connection` là proxy; lớp thật là DatabaseWrapper — mọi luồng dùng chung lớp.
+        with mock.patch.object(type(connections["default"]), "close", autospec=True,
+                               side_effect=lambda *a, **k: closers.append(threading.get_ident())):
+            report = judge_stage.judge(ProspectPlan(), candidates, complete_fn=caller, batch_size=4)
+        self.assertEqual(report.batches, 4)
+        self.assertEqual(len(closers), 4)
+        self.assertNotIn(main, closers)
