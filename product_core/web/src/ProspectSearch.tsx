@@ -527,7 +527,9 @@ export default function ProspectSearch({ initialMode = "ai" }: { initialMode?: "
       let plan: ProspectAnswerPlan | undefined;
       const answerData = (text: string, people: ProspectAnswerPerson[] = [],
         provider = "", model = ""): ProspectResponse => ({
-        mode: "answer", answer: text, question: cleaned, provider, model,
+        // Chưa có kế hoạch = chưa phải lượt tìm kiếm (hoặc là câu lệnh): hiện như
+        // hội thoại, để không thoáng hiện thẻ tiêu chí rỗng và ô "chưa có khách nào".
+        mode: plan ? "answer" : "conversation", answer: text, question: cleaned, provider, model,
         trace: steps, answer_plan: plan,
         criteria: {} as ProspectCriteria, criteria_from: "llm", error: "",
         count: people.length, results: people.map(prospectRowFromAnswer),
@@ -562,16 +564,23 @@ export default function ProspectSearch({ initialMode = "ai" }: { initialMode?: "
             throw new ApiError(0, String(ev.data.text ?? "Lỗi khi trả lời."));
           } else if (ev.event === "done") {
             const people = (ev.data.people as ProspectAnswerPerson[] | undefined) ?? [];
-            const trace = (ev.data.trace as { plan?: ProspectAnswerPlan } | undefined) ?? {};
+            const trace = (ev.data.trace as { plan?: ProspectAnswerPlan; keeps_last_result?: boolean }
+              | undefined) ?? {};
             // Vòng nới có thể đổi kế hoạch sau preamble — bản ở `done` là bản cuối.
             plan = trace.plan ?? plan;
             const finalAnswer = String(ev.data.answer ?? answer) || answer;
             // Bước cuối được gửi ở `active` và không bao giờ có chunk đóng riêng —
             // tự đóng mọi bước còn treo, nếu không thẻ tiến trình quay mãi.
             steps = steps.map((row) => ({ ...row, detail: "xong" }));
+            const provider = String(ev.data.provider ?? "");
+            const model = String(ev.data.model ?? "");
+            // Lượt CÂU LỆNH (soạn nháp, tạo cơ hội) không phải một kết quả tìm kiếm:
+            // không có điểm, không có kế hoạch tìm. Hiện nó thành thẻ khách điểm 0
+            // kèm "Hệ thống hiểu câu hỏi là…" rỗng là nói sai điều vừa xảy ra.
             patchMsg({ isPending: false, text: finalAnswer,
-              data: answerData(finalAnswer, people,
-                String(ev.data.provider ?? ""), String(ev.data.model ?? "")) });
+              data: trace.keeps_last_result
+                ? { ...answerData(finalAnswer, [], provider, model), mode: "conversation" }
+                : answerData(finalAnswer, people, provider, model) });
             void refreshConversations();
           }
         }

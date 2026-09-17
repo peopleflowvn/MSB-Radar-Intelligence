@@ -528,12 +528,15 @@ class EngineEndToEndTest(TestCase):
         self.assertEqual(calls["n"], 2)
         self.assertEqual(result.text, good)
 
-    def test_menh_lenh_KHONG_gia_vo_da_lam(self):
-        """"Đã soạn thư cho 3 khách" mà không có thư nào là tệ hơn "chưa làm được"."""
-        result = engine.answer("soạn thư cho 3 khách đầu", complete_fn=fake_complete({
-            "shape": "action", "do_tin_cay": 0.9, "suy_luan": "mệnh lệnh"}))
-        self.assertEqual(result.trace["mode"], "action_unavailable")
-        self.assertIn("chưa thực hiện", result.text)
+    def test_menh_lenh_di_nhanh_cau_lenh_khong_chay_tim_kiem(self):
+        """Câu lệnh chạy lại ② thì có thể ra danh sách KHÁC danh sách RM đang trỏ tới."""
+        with mock.patch.object(retrieve_stage, "retrieve") as retrieve:
+            result = engine.answer("soạn tin cho 3 khách đầu", complete_fn=fake_complete({
+                "shape": "action", "do_tin_cay": 0.9, "suy_luan": "mệnh lệnh"}))
+        retrieve.assert_not_called()
+        # Không có danh sách lượt trước → hỏi lại, không đoán.
+        self.assertEqual(result.trace["mode"], "action_needs_list")
+        self.assertTrue(result.trace["keeps_last_result"])
 
     def test_mo_ho_thi_hoi_lai_khong_chay_pipeline(self):
         with mock.patch.object(retrieve_stage, "retrieve") as retrieve:
@@ -634,3 +637,174 @@ class AskEndpointTest(TestCase):
         self.client.force_login(self.rm)
         response = self.client.get("/api/v1/rb/ask/turn/khong-ton-tai/")
         self.assertEqual(response.status_code, 404)
+
+
+# ============================================================ câu lệnh
+
+from .answer import act as act_stage  # noqa: E402
+
+
+def _envelope(items):
+    projection = SimpleNamespace(
+        last_result={"kind": "answer", "items": items},
+        last_result_people=lambda limit=12: [{"id": i["id"], "name": i["name"]}
+                                             for i in items][:limit])
+    return SimpleNamespace(projection=projection)
+
+
+class CommandVerbIsDecidedByCodeTest(SimpleTestCase):
+    """Tập động từ đóng: model không được tự nghĩ ra một việc để làm."""
+
+    def test_nhan_dung_dong_tu(self):
+        cases = {
+            "soạn tin cho 3 khách đầu": act_stage.VERB_MESSAGE,
+            "viết tin nhắn zalo cho khách thứ 2": act_stage.VERB_MESSAGE,
+            "soạn kịch bản gọi cho khách đầu tiên": act_stage.VERB_CALL_SCRIPT,
+            "viết lời để gọi cho cả danh sách": act_stage.VERB_CALL_SCRIPT,
+            "tạo cơ hội cho cả danh sách": act_stage.VERB_CREATE,
+            "tạo cơ hội rồi soạn tin sau": act_stage.VERB_CREATE,
+        }
+        for question, verb in cases.items():
+            with self.subTest(question=question):
+                self.assertEqual(act_stage.detect_verb(question), verb)
+
+    def test_cau_hoi_tra_cuu_khong_phai_cau_lenh(self):
+        for question in ("khách nào cần vay mua nhà", "khách của tôi ai nên gọi",
+                         "so sánh hai khách đầu"):
+            with self.subTest(question=question):
+                self.assertIsNone(act_stage.detect_verb(question))
+
+    def test_plan_ep_ve_action_khi_khong_chac(self):
+        plan = plan_stage.plan("soạn tin cho 3 khách đầu", complete_fn=fake_complete({
+            "shape": "find_prospects", "do_tin_cay": 0.6, "suy_luan": "tìm"}))
+        self.assertEqual(plan.shape, "action")
+
+
+class CommandNeverGuessesTargetsTest(SimpleTestCase):
+    """Soạn tin cho nhầm người là lỗi không rút lại được khi RM đã bấm gửi."""
+
+    ITEMS = [{"id": 11, "name": "Nguyễn An", "product": "mortgage", "why": ""},
+             {"id": 12, "name": "Trần Bình", "product": "auto_loan", "why": ""},
+             {"id": 13, "name": "Lê Chi", "product": "", "why": ""}]
+
+    def _ids(self, question):
+        rows = act_stage.resolve_targets(self.ITEMS, question)
+        return None if rows is None else [r["id"] for r in rows]
+
+    def test_theo_thu_tu_hien_thi(self):
+        self.assertEqual(self._ids("soạn tin cho 2 khách đầu"), [11, 12])
+        self.assertEqual(self._ids("soạn tin cho hai khách hàng đầu"), [11, 12])
+        self.assertEqual(self._ids("soạn tin cho khách thứ 2"), [12])
+        self.assertEqual(self._ids("soạn tin cho khách đầu tiên"), [11])
+        self.assertEqual(self._ids("tạo cơ hội cho cả danh sách"), [11, 12, 13])
+        self.assertEqual(self._ids("tạo cơ hội cho những khách trên"), [11, 12, 13])
+
+    def test_theo_ten(self):
+        self.assertEqual(self._ids("soạn tin cho Trần Bình"), [12])
+
+    def test_vuot_danh_sach_tra_rong_khong_phai_nguoi_khac(self):
+        self.assertEqual(self._ids("soạn tin cho khách thứ 7"), [])
+
+    def test_khong_chi_ro_ai_thi_None_de_hoi_lai(self):
+        self.assertIsNone(self._ids("soạn tin giúp tôi"))
+
+
+class CommandExecutionTest(TestCase):
+    def setUp(self):
+        self.rm = get_user_model().objects.create_user("act-rm")
+        self.an = _customer("Nguyễn An", phone="0900000101")
+        self.binh = _customer("Trần Bình", phone="0900000102")
+        self.items = [
+            {"id": self.an.pk, "name": "Nguyễn An", "product": "mortgage",
+             "why": "Tự viết cần vay mua chung cư."},
+            {"id": self.binh.pk, "name": "Trần Bình", "product": "auto_loan",
+             "why": "Hỏi vay mua xe."},
+        ]
+
+    def _run(self, question):
+        return act_stage.run(question, envelope=_envelope(self.items), user=self.rm)
+
+    @mock.patch("rb.outreach.complete")
+    def test_soan_nhap_KHONG_luu_co_hoi_va_noi_ro_chua_gui(self, complete):
+        complete.return_value = SimpleNamespace(
+            text="Chào anh An, em bên MSB muốn trao đổi về khoản vay mua nhà anh quan tâm.",
+            truncated=False)
+        out = self._run("soạn tin cho 2 khách đầu")
+        self.assertEqual(out["mode"], act_stage.VERB_MESSAGE)
+        self.assertEqual(RBOpportunity.objects.count(), 0)
+        self.assertIn("Chưa gửi cho ai", out["text"])
+        drafted = [a for a in out["actions"] if a["status"] == "drafted"]
+        self.assertEqual([a["product"] for a in drafted], ["mortgage", "auto_loan"])
+
+    @mock.patch("rb.outreach.complete")
+    def test_dnc_bi_bo_qua_KE_CA_KHI_goi_dich_danh(self, complete):
+        complete.return_value = SimpleNamespace(text="x" * 60, truncated=False)
+        Relationship.objects.create(person=self.an, domain=Signal.DOMAIN_RB,
+                                    state="cold", do_not_contact=True)
+        out = self._run("soạn tin cho Nguyễn An")
+        self.assertEqual([a["status"] for a in out["actions"]], ["do_not_contact"])
+        complete.assert_not_called()
+
+    @mock.patch("rb.outreach.complete", side_effect=RuntimeError("model bận"))
+    def test_model_ban_van_tra_khung_de_viet_tiep(self, _complete):
+        out = self._run("soạn tin cho khách đầu tiên")
+        action = out["actions"][0]
+        self.assertEqual(action["status"], "drafted")
+        self.assertTrue(action["error"])
+        self.assertIn("Chào anh/chị", action["draft"])
+
+    def test_tao_co_hoi_giao_cho_rm_va_khong_tao_trung(self):
+        first = self._run("tạo cơ hội cho cả danh sách")
+        self.assertEqual([a["status"] for a in first["actions"]], ["created", "created"])
+        row = RBOpportunity.objects.get(person=self.an)
+        self.assertEqual(row.product, "mortgage")
+        self.assertEqual(row.assigned_to, self.rm)
+        again = self._run("tạo cơ hội cho cả danh sách")
+        self.assertEqual([a["status"] for a in again["actions"]], ["exists", "exists"])
+        self.assertEqual(RBOpportunity.objects.count(), 2)
+
+    def test_khong_ro_san_pham_thi_bo_qua_khong_bia(self):
+        """Mời vay người chưa từng có dấu hiệu là nhắc nhu cầu khách chưa đề cập."""
+        self.items[0]["product"] = ""
+        out = self._run("tạo cơ hội cho khách đầu tiên")
+        self.assertEqual(out["actions"][0]["status"], "no_product")
+        self.assertEqual(RBOpportunity.objects.count(), 0)
+
+    def test_gioi_han_so_luong_moi_lan(self):
+        with mock.patch.object(act_stage, "MAX_CREATE", 1):
+            out = self._run("tạo cơ hội cho cả danh sách")
+        self.assertEqual(len(out["actions"]), 1)
+        self.assertIn("còn 1 khách chưa làm", out["text"])
+
+    def test_dong_tu_la_thi_liet_ke_viec_lam_duoc(self):
+        out = self._run("gửi email cho cả danh sách ngay")
+        self.assertEqual(out["mode"], "action_unsupported")
+
+    def test_so_thu_tu_vuot_danh_sach_thi_hoi_lai(self):
+        out = self._run("tạo cơ hội cho khách thứ 5")
+        self.assertEqual(out["mode"], "action_needs_target")
+        self.assertEqual(RBOpportunity.objects.count(), 0)
+
+
+class CommandTurnKeepsListTest(TestCase):
+    """Hai câu lệnh liên tiếp phải cùng trỏ về một danh sách."""
+
+    def test_luot_cau_lenh_khong_ghi_de_danh_sach(self):
+        from ai import conversation_state
+        from ai.models import AssistantThread
+        from .answer_views import _persist
+        rm = get_user_model().objects.create_user("keep-rm")
+        found = engine.AnswerResult(text="tìm thấy", people=[
+            {"person_id": 1, "name": "A", "product": "fx", "why": ""},
+            {"person_id": 2, "name": "B", "product": "fx", "why": ""}], trace={})
+        _persist(rm, "keep-thread", "t1", "", "khách cần đổi ngoại tệ", found)
+        command = engine.AnswerResult(text="đã soạn", people=[
+            {"person_id": 2, "name": "B", "product": "fx", "why": ""}],
+            trace={"keeps_last_result": True})
+        _persist(rm, "keep-thread", "t2", "", "soạn tin cho khách thứ 2", command)
+        thread = AssistantThread.objects.get(
+            user=rm, thread_id=conversation_state.normalize_thread_id("keep-thread"))
+        items = thread.state["last_result_ref"]["items"]
+        self.assertEqual([i["id"] for i in items], [1, 2])
+        self.assertEqual(items[0]["product"], "fx")
+

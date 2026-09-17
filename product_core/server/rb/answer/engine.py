@@ -9,15 +9,11 @@ nằm ở cách nối các chặng.
 ## Phạm vi của bản đầu
 
 Có: tìm khách (`find_prospects`), danh mục của RM (`portfolio`), khoảng trống
-(`whitespace`), tổng hợp, đếm, so sánh, hỏi tiếp, hỏi lại khi mập mờ, và nhánh
-hội thoại chung.
+(`whitespace`), tổng hợp, đếm, so sánh, hỏi tiếp, hỏi lại khi mập mờ, câu lệnh
+soạn nháp / tạo cơ hội (`act.py`), và nhánh hội thoại chung.
 
 Chưa có, và nói rõ để không ai tưởng đã có:
 
-* **Nhánh `action`** (soạn thư, tạo cơ hội hàng loạt từ câu lệnh). Bên Talent nó
-  đi qua `talent/answer/act.py` với bộ công cụ riêng. Growth đã có
-  `rb/outreach.py` và API tạo cơ hội, nhưng chưa có lớp công cụ nối chúng vào
-  hội thoại. Hiện câu mệnh lệnh được trả lời bằng hướng dẫn thay vì thực thi.
 * **Truy hồi ngữ nghĩa** — xem `retrieve.py::coverage`.
 * **Tài liệu đính kèm** — Talent đánh giá thẳng CV được kéo vào; Growth chưa có
   loại tài liệu tương ứng đáng làm.
@@ -304,20 +300,28 @@ def _stream_chat(question, query_plan, envelope, user, started, adapter=None):
                "ms_total": int((time.monotonic() - started) * 1000)})}
 
 
-def _stream_action_unavailable(question, query_plan, started):
-    """Nhánh `action` chưa có ở Growth — nói thật, và chỉ đường làm được ngay.
+def _stream_action(question, query_plan, envelope, user, started):
+    """Câu lệnh → `act.run`. Hành động và đối tượng do CODE quyết, xem `act.py`."""
+    from . import act as act_stage
 
-    Không giả vờ đã làm. Một câu "đã soạn thư cho 3 khách" mà không có thư nào
-    được soạn là tệ hơn nhiều so với "chưa làm được, anh/chị bấm vào đây".
-    """
-    text = ("Mình chưa thực hiện trực tiếp được yêu cầu này trong khung hỏi đáp. "
-            "Anh/chị mở hồ sơ từng khách trong danh sách vừa rồi và dùng nút "
-            "\"Soạn tin tiếp cận\" hoặc \"Tạo cơ hội\" — hai thao tác đó đã có sẵn.")
-    yield {"type": "answer", "text": text}
+    yield step("Thực hiện yêu cầu")
+    try:
+        outcome = act_stage.run(question, envelope=envelope, user=user)
+    except Exception:                              # noqa: BLE001
+        log.exception("rb.answer.act: câu lệnh hỏng")
+        outcome = {"mode": "action_error", "people": [], "actions": [],
+                   "text": "Chưa thực hiện được yêu cầu này. Anh/chị thử lại giúp mình."}
+    yield step("Thực hiện yêu cầu", "done")
+    yield {"type": "answer", "text": outcome["text"]}
     yield {"type": "done", "result": AnswerResult(
-        text=text, trace={"question": question, "plan": query_plan.as_dict(),
-                          "mode": "action_unavailable",
-                          "ms_total": int((time.monotonic() - started) * 1000)})}
+        text=outcome["text"], people=outcome.get("people") or [],
+        trace={"question": question, "plan": query_plan.as_dict(),
+               "mode": outcome["mode"], "actions": outcome.get("actions") or [],
+               # Lượt câu lệnh KHÔNG thay danh sách lượt trước: "soạn tin cho khách
+               # thứ 2" rồi "tạo cơ hội cho khách thứ 3" phải cùng trỏ về một danh
+               # sách. Xem `answer_views._persist`.
+               "keeps_last_result": True,
+               "ms_total": int((time.monotonic() - started) * 1000)})}
 
 
 def stream_answer(question, *, envelope=None, user=None, history=None,
@@ -346,7 +350,7 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
         yield from _stream_clarify(question, query_plan, started)
         return
     if query_plan.shape == "action":
-        yield from _stream_action_unavailable(question, query_plan, started)
+        yield from _stream_action(question, query_plan, envelope, user, started)
         return
     if not query_plan.needs_people:
         yield step("Tra cứu & soạn câu trả lời")

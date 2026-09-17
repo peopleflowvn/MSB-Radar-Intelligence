@@ -63,10 +63,16 @@ def _persist(user, conversation_id, client_turn_id, parent_turn_id, question,
     snapshot = {
         "kind": "answer",
         "count": len(result.people),
+        # `product` đi kèm để câu lệnh sau ("soạn tin cho khách thứ 2") soạn đúng
+        # sản phẩm ④ đã chọn, không phải đoán lại.
         "items": [{"id": p["person_id"], "name": p["name"],
+                   "product": p.get("product") or "",
                    "why": (p.get("why") or "")[:160]}
                   for p in result.people],
     }
+    if (result.trace or {}).get("keeps_last_result"):
+        # None = giữ nguyên danh sách lượt trước (`ai/thread_state.apply_turn`).
+        snapshot = None
     try:
         thread = conversation_state.record(
             user, SURFACE, conversation_id, question,

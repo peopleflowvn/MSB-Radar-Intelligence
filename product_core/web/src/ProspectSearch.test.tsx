@@ -354,3 +354,26 @@ describe("Growth Answer Engine — đường chính", () => {
   });
 });
 
+
+describe("Growth Answer Engine — lượt câu lệnh", () => {
+  it("bản nháp hiện thành văn bản, KHÔNG thành thẻ khách điểm 0 hay thẻ tiêu chí", async () => {
+    vi.spyOn(api, "rbAsk").mockImplementation(async function* () {
+      yield { event: "step", data: { label: "Thực hiện yêu cầu", state: "done" } } as never;
+      yield { event: "answer", data: { text: "Đã soạn 1 bản nháp tin nhắn. Chưa gửi cho ai" } } as never;
+      yield { event: "done", data: {
+        answer: "Đã soạn 1 bản nháp tin nhắn. Chưa gửi cho ai",
+        people: [{ person_id: 5, name: "Khách Năm", product: "fx", why: "" }],
+        trace: { mode: "draft_message", keeps_last_result: true } } } as never;
+    });
+    const legacy = vi.spyOn(api, "rbProspects");
+    renderSearch();
+    fireEvent.change(screen.getByPlaceholderText(/Mô tả chân dung/), {
+      target: { value: "soạn tin cho khách đầu tiên" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Tìm khách hàng" }));
+    expect(await screen.findByText(/Chưa gửi cho ai/)).toBeInTheDocument();
+    expect(screen.queryByText(/Hệ thống hiểu câu hỏi/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Khách Năm")).not.toBeInTheDocument();
+    expect(legacy).not.toHaveBeenCalled();
+  });
+});

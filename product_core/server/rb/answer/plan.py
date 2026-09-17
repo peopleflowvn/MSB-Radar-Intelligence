@@ -333,7 +333,10 @@ def _fallback(question, provider="", model=""):
     """
     text = " ".join(str(question or "").split())[:400]
     shape = "find_prospects"
-    if looks_like_portfolio(text):
+    from .act import detect_verb
+    if detect_verb(text):
+        shape = "action"
+    elif looks_like_portfolio(text):
         shape = "portfolio"
     elif looks_like_whitespace(text):
         shape = "whitespace"
@@ -394,6 +397,15 @@ def plan(question, *, envelope=None, user=None, complete_fn=None) -> ProspectPla
         elif looks_like_whitespace(question):
             log.info("rb.answer.plan: ép '%s' → 'whitespace' theo từ khoá", shape)
             shape = "whitespace"
+
+    # Câu lệnh bị xếp nhầm thành tìm kiếm thì ② đi tìm lại từ đầu và có thể ra
+    # một danh sách KHÁC với danh sách RM đang trỏ tới. Động từ nhận bằng cùng
+    # quy tắc mà `act.py` sẽ thực thi, nên hai nơi không thể hiểu khác nhau.
+    if shape not in ("action", "general") and confidence <= TRUST_SHAPE_ABOVE:
+        from .act import detect_verb
+        if detect_verb(question):
+            log.info("rb.answer.plan: ép '%s' → 'action' theo động từ câu lệnh", shape)
+            shape = "action"
 
     limit = as_int(raw.get("so_luong"), 0) or DEFAULT_LIMIT
     queries = [str(q).strip() for q in as_list(raw.get("search_queries"))
