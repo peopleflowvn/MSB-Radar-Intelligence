@@ -200,22 +200,27 @@ TASKS = {row.name: row for row in _ROWS}
 #: `docs/AI_AGENT_ACCEPTANCE_CRITERIA.md` §4 — câu cụt giữa chừng, lặp ba lần.
 #: `ai/tests_model_param_fit.py` canh không cho tổ hợp này tái diễn.
 _QWEN = ("greennode", "qwen/qwen3.6-flash")        # nhanh, rẻ, có thị giác
-_GEMINI_FAST = ("gemini", "gemini-3.5-flash")      # benchmark 2026-09: plan/judge nhanh hơn 5-6x
 _VIET_TOT = ("greennode", "deepseek/deepseek-v4-pro")   # CHỈ khi hạn mức ≥ 4000
 _VIET_NHANH = ("greennode", "deepseek/deepseek-v4-flash")
 _EMBED = ("gemini", "models/gemini-embedding-2")
 
+# GreenNode là hạ tầng chính (điều kiện tranh giải Best Use of GreenNode AI
+# Platform) cho MỌI tác vụ sinh văn bản — Gemini chỉ còn là dự phòng khi
+# GreenNode lỗi tạm thời (xem `ai/router.py::DEFAULT_ORDER`, greennode đứng
+# đầu, gemini đứng sau). Ngoại lệ duy nhất là `talent_embedding`: GreenNode
+# chưa phục vụ model embedding nào (xem `ai/catalog.py::STATIC`), nên tác vụ
+# đó bắt buộc ở lại Gemini.
 DEFAULT_ROUTE = {
     # ① và ③ cần nhanh/rẻ; ⑤ là chặng duy nhất người dùng đọc thấy.
-    "talent_answer_plan": _GEMINI_FAST,
-    "talent_answer_judge": _GEMINI_FAST,
-    "talent_answer_compose": _GEMINI_FAST,
+    "talent_answer_plan": _QWEN,
+    "talent_answer_judge": _QWEN,
+    "talent_answer_compose": _VIET_TOT,  # hạn mức 7000 — đủ chỗ cho phần nghĩ
     "talent_corpus_qa": _QWEN,           # hạn mức 900
     "talent_search": _QWEN,
     "talent_embedding": _EMBED,
     "person_qa": _VIET_NHANH,
 
-    "assistant_conversation": _GEMINI_FAST,
+    "assistant_conversation": _QWEN,     # hạn mức 600 — model phải tôn trọng
     #                                      reasoning_effort, nếu không stream đứt
     #                                      giữa chừng ("Mất kết nối" — ảnh 04/09)
     "assistant_intent": _QWEN,
