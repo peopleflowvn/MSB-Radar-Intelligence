@@ -14631,6 +14631,54 @@ button.chip.active {
   opacity: 0.85;
 }
 
+/* Bảng biểu trong câu trả lời markdown */
+.formatted-markdown .chat-table-container {
+  width: 100%;
+  margin: 10px 0 14px 0;
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  background: var(--surface, rgba(15, 23, 42, 0.6));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.formatted-markdown .chat-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.formatted-markdown .chat-table th {
+  padding: 10px 14px;
+  font-weight: 600;
+  color: var(--text, #ffffff);
+  background: var(--surface-raised, rgba(255, 255, 255, 0.06));
+  border-bottom: 2px solid var(--border, rgba(255, 255, 255, 0.15));
+  white-space: nowrap;
+}
+
+.formatted-markdown .chat-table td {
+  padding: 9px 14px;
+  color: var(--text, #e2e8f0);
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  vertical-align: top;
+}
+
+.formatted-markdown .chat-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.formatted-markdown .chat-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.formatted-markdown .chat-table tbody tr:hover {
+  background: rgba(255, 138, 51, 0.06);
+}
+
+
 /* Chat bubble styling nâng cao */
 .chat-bubble.ai {
   background: var(--surface, #1e293b);

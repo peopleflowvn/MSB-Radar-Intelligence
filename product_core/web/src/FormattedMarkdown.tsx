@@ -75,7 +75,13 @@ function linkNames(text: string, matcher: NameMatcher, keyBase: string): React.R
     const personId = matcher.byName.get(match[0].toLowerCase());
     if (personId === undefined) continue;
 
-    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+    if (match.index > lastIndex) {
+      parts.push(
+        <React.Fragment key={`${keyBase}-txt-${match.index}`}>
+          {text.slice(lastIndex, match.index)}
+        </React.Fragment>
+      );
+    }
     parts.push(
       <Link
         key={`${keyBase}-name-${match.index}`}
@@ -90,7 +96,13 @@ function linkNames(text: string, matcher: NameMatcher, keyBase: string): React.R
   }
 
   if (parts.length === 0) return text;
-  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  if (lastIndex < text.length) {
+    parts.push(
+      <React.Fragment key={`${keyBase}-txt-tail`}>
+        {text.slice(lastIndex)}
+      </React.Fragment>
+    );
+  }
   return <>{parts}</>;
 }
 
@@ -170,6 +182,41 @@ export default function FormattedMarkdown({ content, className = "", people, onC
                 );
               }
 
+              if (sec.type === "table") {
+                return (
+                  <div key={`sec-${sIdx}`} className="chat-table-container">
+                    <table className="chat-table">
+                      <thead>
+                        <tr>
+                          {sec.headers.map((head, hIdx) => (
+                            <th
+                              key={`th-${hIdx}`}
+                              style={{ textAlign: sec.alignments[hIdx] || "left" }}
+                            >
+                              {renderInline(head, onCitation, matcher)}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sec.rows.map((row, rIdx) => (
+                          <tr key={`tr-${rIdx}`}>
+                            {row.map((cell, cIdx) => (
+                              <td
+                                key={`td-${cIdx}`}
+                                style={{ textAlign: sec.alignments[cIdx] || "left" }}
+                              >
+                                {renderInline(cell, onCitation, matcher)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              }
+
               // Đoạn văn thông thường
               return (
                 <p key={`sec-${sIdx}`} className="chat-paragraph">
@@ -217,11 +264,66 @@ function splitCodeBlocks(text: string): CodePart[] {
   return parts;
 }
 
-interface Section {
-  type: "paragraph" | "heading" | "list" | "ordered-list" | "blockquote";
+interface TableSection {
+  type: "table";
   text: string;
-  level?: number;
   items: string[];
+  headers: string[];
+  alignments: ("left" | "center" | "right")[];
+  rows: string[][];
+}
+
+type Section =
+  | {
+      type: "paragraph" | "heading" | "list" | "ordered-list" | "blockquote";
+      text: string;
+      level?: number;
+      items: string[];
+    }
+  | TableSection;
+
+function splitTableRow(line: string): string[] {
+  let trimmed = line.trim();
+  if (trimmed.startsWith("|")) trimmed = trimmed.slice(1);
+  if (trimmed.endsWith("|")) trimmed = trimmed.slice(0, -1);
+  const cells: string[] = [];
+  let current = "";
+  let escaped = false;
+  for (let i = 0; i < trimmed.length; i++) {
+    const char = trimmed[i];
+    if (char === "\\" && !escaped) {
+      escaped = true;
+      current += char;
+    } else if (char === "|" && !escaped) {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+      escaped = false;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function parseAlignment(cell: string): "left" | "center" | "right" {
+  const trimmed = cell.trim();
+  const left = trimmed.startsWith(":");
+  const right = trimmed.endsWith(":");
+  if (left && right) return "center";
+  if (right) return "right";
+  return "left";
+}
+
+function isTableSeparator(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed.includes("-") || !trimmed.includes("|")) return false;
+  let inner = trimmed;
+  if (inner.startsWith("|")) inner = inner.slice(1);
+  if (inner.endsWith("|")) inner = inner.slice(0, -1);
+  const parts = inner.split("|");
+  if (parts.length === 0) return false;
+  return parts.every((part) => /^\s*:?-+:?\s*$/.test(part));
 }
 
 function parseTextSections(raw: string): Section[] {
@@ -259,6 +361,43 @@ function parseTextSections(raw: string): Section[] {
     if (!trimmed) {
       flushParagraph();
       flushList();
+      continue;
+    }
+
+    // Bảng biểu: dòng hiện tại chứa | và dòng kế tiếp là đường phân cách (| --- | --- |)
+    if (trimmed.includes("|") && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
+      flushParagraph();
+      flushList();
+
+      const headers = splitTableRow(lines[i]);
+      const alignRow = splitTableRow(lines[i + 1]);
+      const alignments = headers.map((_, idx) =>
+        alignRow[idx] ? parseAlignment(alignRow[idx]) : "left",
+      );
+
+      const rows: string[][] = [];
+      i += 2;
+      while (i < lines.length) {
+        const rowLine = lines[i];
+        const rowTrimmed = rowLine.trim();
+        if (!rowTrimmed || !rowTrimmed.includes("|")) {
+          i--;
+          break;
+        }
+        const rawCells = splitTableRow(rowLine);
+        const row = headers.map((_, idx) => (rawCells[idx] !== undefined ? rawCells[idx] : ""));
+        rows.push(row);
+        i++;
+      }
+
+      sections.push({
+        type: "table",
+        text: "",
+        items: [],
+        headers,
+        alignments,
+        rows,
+      });
       continue;
     }
 
@@ -375,8 +514,11 @@ function renderInline(text: string, onCitation?: CiteHandler,
 
   while ((match = tokenRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push(linkNames(text.slice(lastIndex, match.index), matcher,
-                           `plain-${match.index}`));
+      parts.push(
+        <React.Fragment key={`plain-${match.index}`}>
+          {linkNames(text.slice(lastIndex, match.index), matcher, `plain-${match.index}`)}
+        </React.Fragment>
+      );
     }
 
     const token = match[0];
@@ -414,7 +556,7 @@ function renderInline(text: string, onCitation?: CiteHandler,
             ))}
           </span>
         ) : (
-          token
+          <React.Fragment key={key}>{token}</React.Fragment>
         )
       );
     } else if (token.startsWith("[") && token.includes("](")) {
@@ -432,7 +574,7 @@ function renderInline(text: string, onCitation?: CiteHandler,
           </a>
         );
       } else {
-        parts.push(token);
+        parts.push(<React.Fragment key={key}>{token}</React.Fragment>);
       }
     } else if (token.startsWith("*") && token.endsWith("*")) {
       parts.push(
@@ -441,14 +583,18 @@ function renderInline(text: string, onCitation?: CiteHandler,
         </em>
       );
     } else {
-      parts.push(token);
+      parts.push(<React.Fragment key={key}>{token}</React.Fragment>);
     }
 
     lastIndex = tokenRegex.lastIndex;
   }
 
   if (lastIndex < text.length) {
-    parts.push(linkNames(text.slice(lastIndex), matcher, `plain-${lastIndex}`));
+    parts.push(
+      <React.Fragment key={`plain-${lastIndex}`}>
+        {linkNames(text.slice(lastIndex), matcher, `plain-${lastIndex}`)}
+      </React.Fragment>
+    );
   }
 
   return parts.length === 1 ? parts[0] : parts;

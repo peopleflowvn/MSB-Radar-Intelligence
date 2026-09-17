@@ -66,3 +66,63 @@ describe("tên ứng viên trong câu trả lời", () => {
     expect(screen.getByRole("button", { name: "1" })).toBeInTheDocument();
   });
 });
+
+describe("bảng biểu trong câu trả lời (Markdown Table)", () => {
+  it("hiển thị cấu trúc table, thead, tbody, th, td đúng số cột", () => {
+    const tableMd = `
+| Ứng viên | Vị trí hiện tại | Kinh nghiệm |
+| :--- | :---: | ---: |
+| **Nguyễn An** | Chuyên viên QHKH | 5 năm |
+| **Trần Thị Lan Anh** | Trưởng nhóm Thẻ | 7 năm |
+`.trim();
+
+    show(tableMd);
+
+    const table = screen.getByRole("table");
+    expect(table).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Ứng viên" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Vị trí hiện tại" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Kinh nghiệm" })).toBeInTheDocument();
+
+    const cells = screen.getAllByRole("cell");
+    expect(cells.length).toBe(6);
+    expect(screen.getByText("Chuyên viên QHKH")).toBeInTheDocument();
+    expect(screen.getByText("7 năm")).toBeInTheDocument();
+  });
+
+  it("tên ứng viên và trích dẫn trong ô của bảng vẫn giữ tương tác liên kết và nút", () => {
+    const tableWithLinksAndCite = `
+| Ứng viên | Ghi chú |
+| --- | --- |
+| **Nguyễn An** [1] | Phù hợp vị trí QHKH |
+| **Trần Thị Lan Anh** [2] | Cần phỏng vấn thêm |
+`.trim();
+
+    render(
+      <MemoryRouter>
+        <FormattedMarkdown
+          content={tableWithLinksAndCite}
+          people={PEOPLE}
+          onCitation={() => undefined}
+        />
+      </MemoryRouter>,
+    );
+
+    // Kiểm tra tên Nguyễn An thành link tới /person/7
+    const link1 = screen.getByRole("link", { name: "Nguyễn An" });
+    expect(link1).toHaveAttribute("href", "/person/7?from=talent-ai");
+
+    // Kiểm tra citation [1] thành nút bấm
+    const cite1 = screen.getByRole("button", { name: "1" });
+    expect(cite1).toBeInTheDocument();
+
+    // Kiểm tra tên Trần Thị Lan Anh thành link tới /person/9
+    const link2 = screen.getByRole("link", { name: "Trần Thị Lan Anh" });
+    expect(link2).toHaveAttribute("href", "/person/9?from=talent-ai");
+
+    // Kiểm tra citation [2] thành nút bấm
+    const cite2 = screen.getByRole("button", { name: "2" });
+    expect(cite2).toBeInTheDocument();
+  });
+});
+

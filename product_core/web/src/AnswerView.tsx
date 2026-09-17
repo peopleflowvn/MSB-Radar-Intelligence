@@ -114,7 +114,7 @@ function Rating({ turn, question, conversationId }: {
 function getFollowUpSuggestions(turn: AnswerTurn): string[] {
   if (turn.people && turn.people.length > 1) {
     return [
-      `So sánh chi tiết các ứng viên vừa tìm được`,
+      `📊 Lập bảng so sánh chi tiết các ứng viên này`,
       `Ai trong số đó có nhiều năm kinh nghiệm nhất?`,
       `Soạn thư mời phỏng vấn cho ${turn.people[0].name}`,
     ];
