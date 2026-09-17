@@ -55,7 +55,7 @@ _SMALLTALK = frozenset((
 _SMALLTALK_PREFIXES = ("xin chao", "chao ", "hello ", "hi ", "cam on ", "thanks ")
 
 
-def _is_smalltalk(question):
+def _is_smalltalk(question, envelope=None):
     """Câu chào hỏi xã giao — KHÔNG tra kho tri thức, KHÔNG tra web.
 
     Bộ truy hồi luôn trả về top-k tài liệu bất kể câu hỏi có liên quan hay
@@ -70,7 +70,20 @@ def _is_smalltalk(question):
     text = plain_text(question)
     if not text or len(text.split()) > 4:
         return False
+    # Nếu là các từ xác nhận ("ok", "vâng", "được"...) nhưng lượt trước Radar vừa
+    # đặt câu hỏi hoặc có danh sách hồ sơ gần nhất thì đây là câu xác nhận tiếp tục,
+    # không phải chào hỏi xã giao độc lập.
+    if text in ("ok", "oke", "okay", "okie", "uh", "um", "vang", "da", "duoc", "duoc roi", "roi", "hieu roi"):
+        if envelope is not None:
+            projection = getattr(envelope, "projection", None)
+            if projection is not None:
+                turns = list(getattr(projection, "recent_turns", []) or [])
+                if turns:
+                    last_ans = str(turns[-1].get("answer") or "").strip()
+                    if "?" in last_ans or getattr(projection, "last_result_people", lambda: [])():
+                        return False
     return text in _SMALLTALK or text.startswith(_SMALLTALK_PREFIXES)
+
 
 
 def _do_web(question, wants_web):
@@ -119,7 +132,7 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
 
     # Câu chào xã giao đi thẳng tới model hội thoại: không tra kho, không tra
     # web, không phân loại ý định. Xem `_is_smalltalk`.
-    smalltalk = _is_smalltalk(question)
+    smalltalk = _is_smalltalk(question, envelope=envelope)
 
     # Tài liệu tri thức nội bộ (chính sách/quy trình công ty) được tra TRƯỚC.
     # Rẻ cho phần lớn tài khoản: `knowledge_sources` trả `[]` ngay lập tức,

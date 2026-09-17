@@ -12,9 +12,10 @@ import json
 from django.contrib.auth.models import Group, User
 from django.test import TestCase
 from django.urls import reverse
-from people.models import Person
+from people.models import Document, Interaction, Person, Relationship, Signal
 from rb.models import PRODUCT_CREDIT_CARD, ProductInterest, RBProfile
 from django.utils import timezone
+from datetime import timedelta
 
 from . import person_qa
 from .models import TalentProfile
@@ -65,6 +66,103 @@ class FactsTest(TestCase):
         TalentProfile.objects.create(person=rieng, current_title="BA")
         facts = person_qa._facts(rieng, include_recruiting=True)
         self.assertNotIn("nghiep_vu_khach_hang", facts)
+
+    def test_trich_cv_moi_nhat_duoc_dua_vao_ho_so(self):
+        """Đúng khác biệt chính so với AiSearch trước đây: Q&A giờ đọc thẳng CV,
+        không chỉ vài trường đã curate."""
+        Document.objects.create(
+            person=self.person, sha256="a" * 64, parse_status=Document.PARSE_DONE,
+            parsed_text="Đã dẫn dắt dự án migrate kho dữ liệu sang BigQuery năm 2023.",
+            observed_at=timezone.now())
+        facts = person_qa._facts(self.person, include_recruiting=True)
+        self.assertIn("BigQuery", facts["nghiep_vu_tuyen_dung"]["trich_cv_moi_nhat"])
+
+    def test_trich_cv_che_email_va_sdt(self):
+        Document.objects.create(
+            person=self.person, sha256="b" * 64, parse_status=Document.PARSE_DONE,
+            parsed_text="Liên hệ an@x.vn hoặc 0901234567 để biết thêm.",
+            observed_at=timezone.now())
+        facts = person_qa._facts(self.person, include_recruiting=True)
+        excerpt = facts["nghiep_vu_tuyen_dung"]["trich_cv_moi_nhat"]
+        self.assertNotIn("an@x.vn", excerpt)
+        self.assertNotIn("0901234567", excerpt)
+
+    def test_trich_cv_lay_ban_moi_nhat_khi_co_nhieu_ban(self):
+        Document.objects.create(
+            person=self.person, sha256="c" * 64, parse_status=Document.PARSE_DONE,
+            parsed_text="CV cũ năm 2020.", observed_at=timezone.now() - timedelta(days=900))
+        Document.objects.create(
+            person=self.person, sha256="d" * 64, parse_status=Document.PARSE_DONE,
+            parsed_text="CV mới năm 2024.", observed_at=timezone.now())
+        facts = person_qa._facts(self.person, include_recruiting=True)
+        self.assertIn("CV mới", facts["nghiep_vu_tuyen_dung"]["trich_cv_moi_nhat"])
+
+    def test_khong_co_cv_da_parse_thi_truong_la_none(self):
+        Document.objects.create(
+            person=self.person, sha256="e" * 64, parse_status=Document.PARSE_PENDING,
+            parsed_text="", observed_at=timezone.now())
+        facts = person_qa._facts(self.person, include_recruiting=True)
+        self.assertIsNone(facts["nghiep_vu_tuyen_dung"]["trich_cv_moi_nhat"])
+
+    def test_rm_thuan_khong_thay_trich_cv(self):
+        Document.objects.create(
+            person=self.person, sha256="f" * 64, parse_status=Document.PARSE_DONE,
+            parsed_text="Nội dung CV bí mật.", observed_at=timezone.now())
+        facts = person_qa._facts(self.person, include_recruiting=False)
+        self.assertNotIn("nghiep_vu_tuyen_dung", facts)
+
+    def test_quan_he_duoc_dua_vao_ho_so(self):
+        Relationship.objects.create(
+            person=self.person, domain="talent", state="interested",
+            notes="Đang cân nhắc, hẹn gọi lại tuần sau.",
+            next_action="Gọi lại", last_contact_at=timezone.now())
+        facts = person_qa._facts(self.person, include_recruiting=True)
+        row = facts["quan_he"][0]
+        self.assertEqual(row["trang_thai"], "interested")
+        self.assertIn("Gọi lại", row["viec_can_lam_tiep"])
+
+    def test_quan_he_che_lien_he_trong_ghi_chu(self):
+        Relationship.objects.create(
+            person=self.person, domain="rb", state="warm",
+            notes="Khách hẹn gọi số 0901234567 chiều nay.")
+        facts = person_qa._facts(self.person, include_recruiting=True)
+        self.assertNotIn("0901234567", facts["quan_he"][0]["ghi_chu"])
+
+    def test_quan_he_khong_bi_an_voi_rm_thuan(self):
+        """Đúng như trang Person 360: `relationships` không bị lọc theo vai trò."""
+        Relationship.objects.create(person=self.person, domain="talent", state="hot")
+        facts = person_qa._facts(self.person, include_recruiting=False)
+        self.assertIn("quan_he", facts)
+
+    def test_tin_hieu_gan_day_duoc_dua_vao_ho_so(self):
+        Signal.objects.create(
+            person=self.person, domain="rb", signal_type="salary_increase",
+            confidence=0.7, observed_at=timezone.now())
+        facts = person_qa._facts(self.person, include_recruiting=True)
+        self.assertEqual(facts["tin_hieu_gan_day"][0]["loai"], "salary_increase")
+
+    def test_dong_thoi_gian_gan_day_sap_theo_thu_tu_moi_nhat(self):
+        Interaction.objects.create(
+            person=self.person, action="viewed", actor_name="RM A",
+            occurred_at=timezone.now() - timedelta(days=2))
+        Interaction.objects.create(
+            person=self.person, action="called", actor_name="RM B",
+            occurred_at=timezone.now())
+        facts = person_qa._facts(self.person, include_recruiting=True)
+        actions = [row["hanh_dong"] for row in facts["dong_thoi_gian_gan_day"]]
+        self.assertEqual(actions[0], "called")
+
+    def test_rm_thuan_chi_thay_su_kien_rb_trong_dong_thoi_gian(self):
+        Interaction.objects.create(
+            person=self.person, action="cv_reviewed", actor_name="Recruiter",
+            detail={}, occurred_at=timezone.now())
+        Interaction.objects.create(
+            person=self.person, action="rb_note_added", actor_name="RM",
+            detail={}, occurred_at=timezone.now())
+        facts = person_qa._facts(self.person, include_recruiting=False)
+        actions = [row["hanh_dong"] for row in facts["dong_thoi_gian_gan_day"]]
+        self.assertIn("rb_note_added", actions)
+        self.assertNotIn("cv_reviewed", actions)
 
 
 class AskTest(TestCase):

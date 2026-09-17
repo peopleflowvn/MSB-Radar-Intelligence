@@ -162,7 +162,7 @@ def iter_turn(question, *, surface="talent", user=None, projection=None,
         result.steps = step
         request = ModelRequest(
             messages=list(messages), task="assistant_agent",
-            temperature=0.2, max_tokens=900, tools=tool_schema,
+            temperature=0.2, max_tokens=2500, tools=tool_schema,
             extra={"budget_seconds": 45},
             meta={"stable_prompt_version": STABLE_PROMPT_VERSION,
                   "agent_step": step})
@@ -182,7 +182,7 @@ def iter_turn(question, *, surface="talent", user=None, projection=None,
 
         if not calls:
             clean, reasoning = extract_thinking(response.text or (msg or {}).get("content") or "")
-            result.text = str(clean or "").strip()[:3000]
+            result.text = str(clean or "").strip()[:5000]
             result.reasoning = (result.reasoning + " " + reasoning).strip()[:6000]
             if result.text:
                 yield {"type": "answer", "text": result.text}
@@ -216,14 +216,14 @@ def iter_turn(question, *, surface="talent", user=None, projection=None,
         "role": "user",
         "content": "Đã đủ dữ liệu. Trả lời câu hỏi ngắn gọn bằng tiếng Việt, "
                    "không gọi thêm tool."}],
-        task="assistant_agent", temperature=0.2, max_tokens=800,
+        task="assistant_agent", temperature=0.2, max_tokens=2500,
         extra={"budget_seconds": 45})
     result.last_request = final
     try:
         response = model.complete(final)
         _accumulate(result, response)
         clean, reasoning = extract_thinking(response.text)
-        result.text = str(clean or "").strip()[:3000]
+        result.text = str(clean or "").strip()[:5000]
         result.reasoning = (result.reasoning + " " + reasoning).strip()[:6000]
     except Exception:                             # noqa: BLE001
         result.text = result.text or "Radar đã thu thập dữ liệu nhưng chưa tổng hợp được câu trả lời."
@@ -248,7 +248,7 @@ def _finish_plain(model, question, surface, user, projection, system, result):
         return
     _accumulate(result, response)
     clean, reasoning = extract_thinking(response.text)
-    result.text = str(clean or response.text or "").strip()[:3000]
+    result.text = str(clean or response.text or "").strip()[:5000]
     result.reasoning = reasoning[:6000]
     if result.text:
         yield {"type": "answer", "text": result.text}

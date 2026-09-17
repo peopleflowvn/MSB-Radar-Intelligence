@@ -2967,3 +2967,95 @@ class FtsEstimateTest(TestCase):
             facts = engine_mod._corpus_facts(plan_obj)
         self.assertEqual(facts, "")
         estimate.assert_not_called()
+
+
+class AffirmationContextTest(TestCase):
+    """Kiểm tra xử lý câu xác nhận ngắn ("có", "vâng", "ok") sau câu hỏi của Radar."""
+
+    def test_context_block_preserves_tail_of_long_answer(self):
+        from types import SimpleNamespace
+        from ai.projection import Projection
+        from talent.answer import plan as plan_mod
+
+        long_answer = "Đoạn mở đầu danh sách ứng viên.\n" + ("Nội dung chi tiết ứng viên.\n" * 100)
+        closing_q = "Anh/chị có muốn Radar ưu tiên lọc sâu hơn các ứng viên đã xác định ở Hà Nội như Giang Lê và Tạ Nguyễn Phương Minh trước không?"
+        full_answer = long_answer + "\n" + closing_q
+
+        envelope = SimpleNamespace(projection=Projection(
+            recent_turns=[{"question": "Tìm Data Analyst ở Hà Nội", "answer": full_answer}]
+        ))
+        ctx = plan_mod._context_block(envelope)
+        self.assertIn(closing_q, ctx)
+
+    def test_detect_last_proposal_and_clean(self):
+        from types import SimpleNamespace
+        from ai.projection import Projection
+        from talent.answer import plan as plan_mod
+
+        closing_q = "Anh/chị có muốn Radar ưu tiên lọc sâu hơn các ứng viên đã xác định ở Hà Nội như Giang Lê và Tạ Nguyễn Phương Minh trước không?"
+        answer_text = (
+            "Dưới đây là danh sách ứng viên Data Analyst:\n1. Khoa Lưu Trọng [1]\n\n"
+            + closing_q + "\n"
+            + "HỒ SƠ ĐƯỢC NHẮC TỚI:\nKHOA LƯU TRONG, Giang Lê, Tạ Nguyễn Phương Minh"
+        )
+        envelope = SimpleNamespace(projection=Projection(
+            recent_turns=[{"question": "Tìm Data Analyst", "answer": answer_text}]
+        ))
+        proposal = plan_mod.detect_last_proposal(envelope)
+        self.assertEqual(proposal, closing_q)
+
+        need = plan_mod.clean_proposal_to_need(proposal)
+        self.assertEqual(
+            need,
+            "Ưu tiên lọc sâu hơn các ứng viên đã xác định ở Hà Nội như Giang Lê và Tạ Nguyễn Phương Minh trước"
+        )
+
+    def test_plan_handles_short_affirmation_co(self):
+        import json
+        from types import SimpleNamespace
+        from ai.projection import Projection
+        from talent.answer import plan as plan_mod
+
+        closing_q = "Anh/chị có muốn Radar ưu tiên lọc sâu hơn các ứng viên đã xác định ở Hà Nội như Giang Lê và Tạ Nguyễn Phương Minh trước không?"
+        answer_text = (
+            "Dưới đây là các ứng viên Data Analyst:\n1. Khoa Lưu Trọng\n\n"
+            + closing_q + "\n"
+            + "HỒ SƠ ĐƯỢC NHẮC TỚI:\nGiang Lê, Tạ Nguyễn Phương Minh"
+        )
+        envelope = SimpleNamespace(projection=Projection(
+            recent_turns=[{"question": "Tìm Data Analyst", "answer": answer_text}],
+            last_result={"items": [{"id": 101, "name": "Giang Lê"}, {"id": 102, "name": "Tạ Nguyễn Phương Minh"}]}
+        ))
+
+        # Giả lập model ① sinh nhầm câu hỏi làm rõ do chỉ nhận được chữ "có"
+        def fake_complete(messages, **kwargs):
+            return SimpleNamespace(text=json.dumps({
+                "suy_luan": "Người dùng chỉ gõ có nên chưa rõ muốn gì",
+                "shape": "general",
+                "do_tin_cay": 0.2,
+                "cau_hoi_lam_ro": "Anh/chị muốn yêu cầu thêm điều gì về danh sách ứng viên vừa tìm được ạ?",
+                "search_queries": []
+            }))
+
+        query_plan = plan_mod.plan("có", envelope=envelope, complete_fn=fake_complete)
+        self.assertFalse(query_plan.wants_clarification)
+        self.assertEqual(query_plan.clarify, "")
+        self.assertIn("Hà Nội", query_plan.information_need)
+        self.assertIn(query_plan.shape, ("followup", "find_people"))
+
+    def test_chat_is_smalltalk_does_not_trap_affirmation_in_active_context(self):
+        from types import SimpleNamespace
+        from ai.projection import Projection
+        from talent.answer import chat as chat_mod
+
+        envelope = SimpleNamespace(projection=Projection(
+            recent_turns=[{"question": "Tìm DA", "answer": "Có muốn lọc tiếp ở Hà Nội không?"}]
+        ))
+        self.assertFalse(chat_mod._is_smalltalk("ok", envelope=envelope))
+        self.assertFalse(chat_mod._is_smalltalk("vâng", envelope=envelope))
+        self.assertFalse(chat_mod._is_smalltalk("được", envelope=envelope))
+
+        # Nhưng không có ngữ cảnh hội thoại thì vẫn là smalltalk bình thường
+        self.assertTrue(chat_mod._is_smalltalk("ok"))
+        self.assertTrue(chat_mod._is_smalltalk("vâng"))
+
