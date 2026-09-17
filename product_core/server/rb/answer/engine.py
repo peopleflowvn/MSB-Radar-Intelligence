@@ -14,7 +14,6 @@ soạn nháp / tạo cơ hội (`act.py`), và nhánh hội thoại chung.
 
 Chưa có, và nói rõ để không ai tưởng đã có:
 
-* **Truy hồi ngữ nghĩa** — xem `retrieve.py::coverage`.
 * **Tài liệu đính kèm** — Talent đánh giá thẳng CV được kéo vào; Growth chưa có
   loại tài liệu tương ứng đáng làm.
 """
@@ -34,6 +33,7 @@ from . import cache as cache_stage
 from . import compose as compose_stage
 from . import judge as judge_stage
 from . import plan as plan_stage
+from . import resolve as resolve_stage
 from . import retrieve as retrieve_stage
 
 log = logging.getLogger(__name__)
@@ -163,6 +163,49 @@ def _pipeline(question, *, envelope=None, user=None, complete_fn=None,
                           if p.get("id")]
         except Exception:                          # noqa: BLE001 - phụ, không hỏng lượt
             pinned_ids = []
+    # Ghim tất định — xem `resolve.py`. Thứ tự ưu tiên: cực trị toàn kho (thứ tự
+    # đã là câu trả lời), tên riêng, người lượt trước, điều kiện có cấu trúc.
+    pool = None
+    pinned_only = False
+    try:
+        # Câu đếm / tổng hợp không ghim ai: câu trả lời của chúng là số liệu toàn
+        # phạm vi, và ghim người vào đó chỉ làm lệch mẫu được đọc.
+        aggregate_shape = query_plan.shape in ("count", "analyze")
+        attr = (resolve_stage.superlative_attr(query_plan, question)
+                if query_plan.shape not in ("compare", "followup") and not aggregate_shape
+                else None)
+        if attr:
+            yield step("Quét toàn kho theo thứ tự yêu cầu")
+            limit = max(1, int(query_plan.limit or 20))
+            ids = resolve_stage.superlative_ids(query_plan, attr, user=user, limit=limit)
+            trace["superlative"] = {"attr": attr, "found": len(ids)}
+            if attr == resolve_stage.ATTR_RECENCY:
+                # ④ phải giữ đúng thứ tự "mới nhất", không xếp lại theo điểm ưu tiên.
+                query_plan = replace(query_plan, sort_by={"key": aggregate_stage.RECENCY_KEY,
+                                                          "dir": "asc"})
+            pinned_ids, pool, pinned_only = ids, max(1, len(ids)), True
+            yield step("Quét toàn kho theo thứ tự yêu cầu", "done")
+        elif not aggregate_shape:
+            named = resolve_stage.named_customers(query_plan, question)
+            if named:
+                trace["named_ids"] = len(named)
+                # "so sánh Nguyễn An và Trần Bình" so ĐÚNG hai người đó, không kéo
+                # theo cả danh sách lượt trước.
+                pinned_ids = (named if query_plan.shape == "compare"
+                              else list(dict.fromkeys(named + pinned_ids)))
+            if (pinned_ids and query_plan.shape in ("compare", "followup")
+                    and not query_plan.must_have):
+                # "so sánh A và B": đọc đúng những người được nói tới, không
+                # truy hồi thêm ai — người lạ lọt vào bài so sánh là trả lời sai.
+                pool, pinned_only = len(pinned_ids), True
+            elif not pinned_ids:
+                structured = resolve_stage.structured_pins(query_plan, user=user)
+                if structured:
+                    trace["structured_pins"] = len(structured)
+                    pinned_ids = structured
+    except Exception:                              # noqa: BLE001 - phụ, không hỏng lượt
+        log.warning("rb.answer.engine: ghim tất định hỏng, dùng truy hồi thường",
+                    exc_info=True)
     if pinned_ids:
         trace["pinned_ids"] = len(pinned_ids)
 
@@ -170,7 +213,7 @@ def _pipeline(question, *, envelope=None, user=None, complete_fn=None,
         mark = time.monotonic()
         yield step("Tìm khách hàng")
         candidates = retrieve_stage.retrieve(active_plan, user=user,
-                                             pinned_ids=pinned_ids)
+                                             pinned_ids=pinned_ids, pool=pool)
         retrieved_ms = int((time.monotonic() - mark) * 1000)
         yield step(f"Tìm thấy {len(candidates)} khách liên quan", "done")
         yield step("Đọc bằng chứng")
@@ -209,7 +252,7 @@ def _pipeline(question, *, envelope=None, user=None, complete_fn=None,
     judgements, chosen, near, stats = yield from _pass(query_plan, "pass1")
 
     over_budget = deadline is not None and time.monotonic() > deadline
-    if (not pinned_ids and not over_budget
+    if (not pinned_only and not over_budget
             and not aggregate_stage.enough(chosen, stats, query_plan)):
         widened = plan_stage.widen(query_plan)
         trace["widened"] = widened.as_dict()

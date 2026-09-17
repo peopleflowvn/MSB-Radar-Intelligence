@@ -45,6 +45,11 @@ log = logging.getLogger(__name__)
 #: danh sách rỗng không giải thích được.
 MIN_CONFIDENCE = 0.35
 
+#: Khoá sắp xếp nội bộ cho câu "mới nhất": theo tuổi bằng chứng mới nhất, KHÔNG
+#: theo thuộc tính ③ bóc được. Đặt bởi engine khi `resolve.superlative_attr`
+#: nhận ra câu cực trị theo thời gian.
+RECENCY_KEY = "__recency__"
+
 
 def _fold(text):
     from talent.vector_index import fold_text
@@ -194,7 +199,15 @@ def aggregate(query_plan, judgements, *, user=None):
 
     sort_by = dict(getattr(query_plan, "sort_by", None) or {})
     key = sort_by.get("key") or ""
-    if key:
+    if key == RECENCY_KEY:
+        # Không biết thời điểm thì xuống cuối — "không rõ" không phải "mới nhất".
+        ordered = sorted(
+            relevant,
+            key=lambda r: (r.freshest_days is None,
+                           r.freshest_days if r.freshest_days is not None else 0,
+                           -priorities.get(r.person_id, {}).get("score", 0.0), r.person_id))
+        stats["sorted_by"] = {"key": "recency", "dir": "newest_first"}
+    elif key:
         # RM nói rõ thứ tự → tôn trọng, và nói ra là đã sắp theo cái gì.
         descending = sort_by.get("dir", "desc") != "asc"
         with_value = [(r, _sortable(_match_key(r.extracted, key))) for r in relevant]

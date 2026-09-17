@@ -20,47 +20,11 @@ import re
 
 from people.normalize import normalize_name
 
-#: Từ chức năng hay lẫn vào truy vấn nhưng KHÔNG phải một phần của tên.
-_STOP = {
-    "ung", "vien", "ứng", "viên", "ho", "so", "hồ", "sơ", "nguoi", "người",
-    "candidate", "review", "danh", "gia", "đánh", "giá", "so", "sanh", "sánh",
-    "compare", "va", "và", "voi", "với", "cho", "vi", "tri", "vị", "trí",
-    "list", "profile", "cv", "the", "of", "and",
-}
-
-#: Họ Việt phổ biến — một cụm bắt đầu bằng họ thì nhiều khả năng là tên người.
-_SURNAMES = {
-    "nguyen", "tran", "le", "pham", "hoang", "huynh", "phan", "vu", "vo",
-    "dang", "bui", "do", "ho", "ngo", "duong", "ly", "dinh", "mai", "trinh",
-    "dao", "cao", "lam", "ha", "chu", "ta", "kieu", "ninh", "luu", "truong",
-}
-
-
-def _phrases(query_plan):
-    """Cụm ứng viên-là-tên: từ mỗi search_query và information_need."""
-    raw = list(getattr(query_plan, "search_queries", []) or [])
-    need = getattr(query_plan, "information_need", "") or ""
-    # "so sánh A và B" → tách theo " và ", " với ", dấu phẩy.
-    for chunk in re.split(r"\s+(?:và|voi|với|,|;)\s+", need):
-        raw.append(chunk)
-    seen, out = set(), []
-    for text in raw:
-        cleaned = re.sub(r"[^\w\sÀ-ỹ]", " ", str(text or "")).strip()
-        toks = [t for t in cleaned.split() if normalize_name(t) not in _STOP]
-        if not (2 <= len(toks) <= 5):
-            continue
-        folded = normalize_name(" ".join(toks))
-        if not folded or folded in seen:
-            continue
-        # Không phải cụm nào 2–5 từ cũng là tên: chỉ nhận khi bắt đầu bằng một
-        # họ Việt, hoặc mọi token đều viết hoa chữ đầu (kiểu người ta gõ tên).
-        first = folded.split()[0]
-        looks_name = first in _SURNAMES or all(
-            w[:1].isupper() for w in toks if w[:1].isalpha())
-        if looks_name:
-            seen.add(folded)
-            out.append(folded)
-    return out
+# Tách cụm tên dùng chung với Growth — xem `core/answer/names.py`. Giữ các tên
+# cũ vì test và tài liệu gọi theo chúng.
+from core.answer.names import STOP as _STOP  # noqa: E402,F401
+from core.answer.names import SURNAMES as _SURNAMES  # noqa: E402,F401
+from core.answer.names import phrases as _phrases  # noqa: E402
 
 
 def named_people(query_plan, *, limit=6, question=""):
