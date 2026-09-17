@@ -14,6 +14,7 @@ import {
 import { useCustomTheme } from "./CustomThemeContext";
 import { useProspectChatState, useRbFilterState } from "./searchPersistence";
 import AnswerView, { AnswerTurn } from "./AnswerView";
+import { inferFollowUpQuestions } from "./followUpInference";
 import StepTimeline from "./StepTimeline";
 import CopilotChat, { waitingHint } from "./CopilotChat";
 
@@ -414,25 +415,8 @@ export default function ProspectSearch({ initialMode = "ai" }: { initialMode?: "
 
   /** Gợi ý câu hỏi tiếp theo — ngôn ngữ "khách hàng" thay cho "ứng viên" của
    *  Talent (`AnswerView`'s `getFollowUps` mặc định). */
-  function getProspectFollowUps(turn: AnswerTurn<ProspectAnswerPerson>): string[] {
-    if (turn.people.length > 1) {
-      return [
-        "📊 Lập bảng so sánh chi tiết các khách hàng này",
-        "Khách nào có tín hiệu mới nhất, nên liên hệ trước?",
-        `Soạn tin nhắn tiếp cận cho ${turn.people[0].name}`,
-      ];
-    }
-    if (turn.people.length === 1) {
-      return [
-        `Tóm tắt lý do nên ưu tiên ${turn.people[0].name}`,
-        `Tìm thêm khách hàng tương tự ${turn.people[0].name}`,
-        "Soạn kịch bản gọi điện tiếp cận",
-      ];
-    }
-    if (turn.webSources && turn.webSources.length > 0) {
-      return ["Tóm tắt các ý chính quan trọng", "Chính sách này áp dụng thế nào tại MSB?"];
-    }
-    return ["Gợi ý thêm tiêu chí tìm kiếm mở rộng trong danh bạ", "Có khách hàng nào khác liên quan không?"];
+  function getProspectFollowUps(turn: AnswerTurn<ProspectAnswerPerson>, question?: string): string[] {
+    return inferFollowUpQuestions(turn, { domain: "rb", question });
   }
 
   function recordFilter(filters: SearchFilters) {

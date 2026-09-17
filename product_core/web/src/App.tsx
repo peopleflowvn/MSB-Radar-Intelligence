@@ -306,8 +306,7 @@ export default function App() {
     },
   })
 
-  // Tự động cuộn lên đầu trang khi đổi route
-  // (PHẢI đặt trước mọi early return để tuân thủ React Rules of Hooks)
+  // Tự động cuộn lên đầu trang khi đổi route hoặc tab param
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -316,7 +315,7 @@ export default function App() {
         // bỏ qua trong test
       }
     }
-  }, [location.pathname])
+  }, [location.pathname, location.search])
 
   if (session.isLoading) return <RadarLoadingScreen />
 
@@ -670,7 +669,7 @@ export default function App() {
               className="topbar-new-chat-btn"
               onClick={() => {
                 window.dispatchEvent(new CustomEvent('radar:new-chat'));
-                if (!location.pathname.startsWith('/talent') && !location.pathname.startsWith('/rb')) {
+                if (location.search.includes('tab=filter') || (!location.pathname.startsWith('/talent') && !location.pathname.startsWith('/rb'))) {
                   navigate('/talent?tab=talent');
                 }
               }}

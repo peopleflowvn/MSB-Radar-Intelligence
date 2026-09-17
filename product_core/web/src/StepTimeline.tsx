@@ -19,6 +19,20 @@ interface Props {
  * - Khi bước trước xong mà bước sau đang chuẩn bị (hoặc chạy ngầm): Tự động hiển thị bước chuyển tiếp kèm spinner và đếm giây, không bao giờ để đơ.
  * - Khi hoàn tất: Hiển thị "Hoàn tất trong xx giây" ngay dưới bước "✓ Viết câu trả lời".
  */
+function formatStepLabel(label: string, isDone: boolean): string {
+  if (!isDone) return label;
+  if (label.startsWith("Đang thực hiện ")) {
+    return "Đã thực hiện " + label.slice("Đang thực hiện ".length);
+  }
+  if (label === "Đang thực hiện yêu cầu") {
+    return "Đã thực hiện yêu cầu";
+  }
+  if (label.startsWith("Đang ")) {
+    return "Đã " + label.slice("Đang ".length);
+  }
+  return label;
+}
+
 export default function StepTimeline({
   steps = [],
   stage,
@@ -31,10 +45,11 @@ export default function StepTimeline({
   const [expanded, setExpanded] = useState(true);
 
   const totalCount = steps.length;
-  // Lượt đã kết thúc thì không còn bước nào "đang chạy"
+  // Khi không có steps mảng nhưng đã hoàn tất có durationMs -> tính là 1 bước tổng hợp hoàn tất
+  const effectiveTotal = totalCount || (!isPending && durationMs > 0 ? 1 : 0);
   const doneCount = isPending
     ? steps.filter((s) => s.state === "done").length
-    : totalCount;
+    : (totalCount || (!isPending && durationMs > 0 ? 1 : 0));
   const hasActiveStep = steps.some((s) => s.state === "active");
 
   // Nếu không có bước nào và không pending và không có duration thì không hiển thị
@@ -56,7 +71,7 @@ export default function StepTimeline({
             <span className="radar-steps-compact-icon">✓</span>
           )}
           <span className="radar-steps-compact-text">
-            {isPending ? "Đang xử lý" : "Quá trình xử lý"} ({doneCount}/{totalCount || 1} bước)
+            {isPending ? "Đang xử lý" : "Quá trình xử lý"} ({doneCount}/{effectiveTotal || 1} bước)
             {!isPending && durationMs > 0 ? (
               <span className="radar-steps-time"> · Hoàn tất trong {(durationMs / 1000).toFixed(1)} giây</span>
             ) : elapsedSeconds > 0 ? (
@@ -80,7 +95,7 @@ export default function StepTimeline({
             <span className="radar-steps-done-badge">✓</span>
           )}
           <span className="radar-steps-card-title">
-            {isPending ? "Đang xử lý yêu cầu" : "Quá trình xử lý"} ({doneCount}/{totalCount || 1} bước)
+            {isPending ? "Đang xử lý yêu cầu" : "Quá trình xử lý"} ({doneCount}/{effectiveTotal || 1} bước)
           </span>
         </div>
         <div className="radar-steps-header-right">
@@ -129,7 +144,7 @@ export default function StepTimeline({
 
                 <div className="radar-step-content">
                   <div className="radar-step-title-row">
-                    <span className="radar-step-name">{step.label}</span>
+                    <span className="radar-step-name">{formatStepLabel(step.label, isStepDone)}</span>
                     {isStepActive && (
                       <span className="radar-step-active-meta">
                         {elapsedSeconds > 0 && <span className="step-timer-badge">{elapsedSeconds}s</span>}

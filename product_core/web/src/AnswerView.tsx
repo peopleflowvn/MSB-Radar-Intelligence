@@ -1,6 +1,7 @@
 import { ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AnswerPerson, AnswerSource, api } from "./api";
+import { inferFollowUpQuestions } from "./followUpInference";
 import FormattedMarkdown, { LinkablePerson } from "./FormattedMarkdown";
 import SourcePreview, { SourceRef } from "./SourcePreview";
 
@@ -116,31 +117,8 @@ function Rating({ turn, question, conversationId }: {
 
 /** Mặc định dùng cho Talent (`turn.people` là `AnswerPerson[]`). Growth Radar
  *  truyền `getFollowUps` riêng vì "ứng viên" ở đây là "khách hàng". */
-function getFollowUpSuggestions(turn: AnswerTurn<any>): string[] {
-  if (turn.people && turn.people.length > 1) {
-    return [
-      `📊 Lập bảng so sánh chi tiết các ứng viên này`,
-      `Ai trong số đó có nhiều năm kinh nghiệm nhất?`,
-      `Soạn thư mời phỏng vấn cho ${turn.people[0].name}`,
-    ];
-  }
-  if (turn.people && turn.people.length === 1) {
-    return [
-      `Tóm tắt điểm mạnh nổi bật của ${turn.people[0].name}`,
-      `Tìm thêm các ứng viên tương tự ${turn.people[0].name}`,
-      `Soạn email liên hệ hẹn phỏng vấn`,
-    ];
-  }
-  if (turn.webSources && turn.webSources.length > 0) {
-    return [
-      "Tóm tắt các ý chính quan trọng",
-      "Chính sách này áp dụng thế nào tại MSB?",
-    ];
-  }
-  return [
-    "Gợi ý thêm tiêu chí tìm kiếm mở rộng trong kho",
-    "Có hồ sơ ứng viên nào khác liên quan không?",
-  ];
+function getFollowUpSuggestions(turn: AnswerTurn<any>, question?: string): string[] {
+  return inferFollowUpQuestions(turn, { domain: "talent", question });
 }
 
 export default function AnswerView<TPerson = AnswerPerson>({
@@ -168,7 +146,7 @@ export default function AnswerView<TPerson = AnswerPerson>({
    *  người/khách hàng. */
   extraBeforePeople?: ReactNode;
   /** Ghi đè gợi ý câu hỏi tiếp theo — mặc định dùng ngôn ngữ "ứng viên". */
-  getFollowUps?: (turn: AnswerTurn<TPerson>) => string[];
+  getFollowUps?: (turn: AnswerTurn<TPerson>, question?: string) => string[];
   /** `from` gắn vào link hồ sơ khi TÊN người được nhắc trong câu chữ tự thành
    *  liên kết (không phải chip cuối bài) — quyết định "← Quay lại" đúng trang
    *  trên Hồ sơ 360°. Growth Radar truyền `"rb"`. */
@@ -281,7 +259,7 @@ export default function AnswerView<TPerson = AnswerPerson>({
         <div className="answer-followup-section">
           <span className="answer-followup-title">💡 GỢI Ý CÂU HỎI TIẾP THEO:</span>
           <div className="answer-followup-chips">
-            {(getFollowUps ?? getFollowUpSuggestions)(turn).map((suggestion) => (
+            {(getFollowUps ? getFollowUps(turn, question) : getFollowUpSuggestions(turn, question)).map((suggestion) => (
               <button
                 key={suggestion}
                 type="button"
