@@ -728,9 +728,9 @@ export default function CopilotChat<TPerson>({
                           <>⚠️ <code>AI chưa hoàn tất đầy đủ</code></>
                         </span>
                       )}
-                      {msg.sender === "ai" && !msg.isPending && !fallbackTag && msg.answer?.model && (
+                      {msg.sender === "ai" && !msg.isPending && !fallbackTag && (msg.answer?.model || msg.answer?.provider) && (
                         <span className="ai-model-tag">
-                          🤖 Mô hình: <code>{msg.answer.provider ? `${msg.answer.provider}/${msg.answer.model}` : msg.answer.model}</code>
+                          🤖 Mô hình: <code>{msg.answer.provider ? `${msg.answer.provider}/${msg.answer.model || "mặc định"}` : msg.answer.model}</code>
                         </span>
                       )}
                       <span className="chat-time">{msg.timestamp}</span>

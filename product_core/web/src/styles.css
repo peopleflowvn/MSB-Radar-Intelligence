@@ -15450,13 +15450,23 @@ button.chip.active {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 1px 8px;
+  padding: 2px 8px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 11px;
   font-weight: 600;
+  line-height: 1.3;
+}
+
+.ai-model-tag code {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: transparent;
+  padding: 0;
 }
 
 .source-preview-note {
