@@ -25,6 +25,7 @@ bán lẻ — chưa được mở.
 """
 from django.conf import settings
 from django.db import models
+from pgvector.django import VectorField
 from django.utils import timezone
 
 # Nhóm sản phẩm bán lẻ. Cố ý là hằng số trong code chứ không phải một bảng: đây
@@ -570,3 +571,43 @@ class RBOpportunityStatusEvent(models.Model):
         if self.actor_id and not self.actor_name:
             self.actor_name = str(self.actor)[:150]
         return super().save(*args, **kwargs)
+
+
+class ProspectEvidenceChunk(models.Model):
+    """Một mẩu bằng chứng về khách hàng, đã lập chỉ mục để tìm theo NGHĨA.
+
+    Bản tương ứng của `talent.CVChunk` cho Growth. Không có bảng này thì ② của
+    Growth chỉ khớp chữ: "mua chung cư" không tìm ra "mua căn hộ", và khách viết
+    "cần xoay vốn" không khớp truy vấn "vay tiêu dùng".
+
+    Nội dung đến từ đúng hàm `rb.answer.evidence.gather` mà ③ đọc — nên thứ được
+    tìm thấy và thứ được đọc là một, đã che liên hệ theo cùng một cách. Không có
+    số điện thoại hay email nào đi vào `text`, `text_norm` hay vector.
+
+    Bảng này là HÀNG ĐỢI embedding của chính nó (`embedding_fingerprint` khác
+    `fingerprint` ⇒ vector cũ), cùng cơ chế với `talent.PersonSearchDocument`.
+    Chỉ mục là thứ dựng lại được bất cứ lúc nào (`rebuild_prospect_evidence_index`);
+    nguồn sự thật vẫn là các bảng gốc.
+    """
+
+    person = models.ForeignKey("people.Person", on_delete=models.CASCADE,
+                               related_name="prospect_evidence_chunks")
+    #: "socialpost:12", "signal:7"… — khoá ổn định để cập nhật tại chỗ.
+    ref = models.CharField(max_length=80, unique=True)
+    source = models.CharField(max_length=20, db_index=True)
+    text = models.TextField()
+    #: `text` bỏ dấu + hạ chữ thường; GIN `to_tsvector('simple', text_norm)`.
+    text_norm = models.TextField(blank=True, default="")
+    observed_at = models.DateTimeField(null=True, blank=True)
+    fingerprint = models.CharField(max_length=64, db_index=True)
+    embedding = VectorField(null=True, blank=True)
+    embedding_model = models.CharField(max_length=120, blank=True, default="")
+    embedding_fingerprint = models.CharField(max_length=64, blank=True, default="",
+                                             db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Bằng chứng khách hàng (chỉ mục)"
+        verbose_name_plural = "Bằng chứng khách hàng (chỉ mục)"
+        indexes = [models.Index(fields=["person", "-observed_at"],
+                                name="rb_pec_person_observed_idx")]

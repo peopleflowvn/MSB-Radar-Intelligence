@@ -6,3 +6,7 @@ class RbConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "rb"
     verbose_name = "RB Radar"
+
+    def ready(self):
+        from . import signals
+        signals.connect()

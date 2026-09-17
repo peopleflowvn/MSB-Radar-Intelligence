@@ -69,6 +69,10 @@ PER_BRANCH = 120
 #: Trọng số theo BẢN CHẤT bằng chứng, không theo độ tiện của truy vấn.
 #: Xem docstring module.
 BRANCH_WEIGHTS = {
+    # Gần NGHĨA với câu hỏi, trên chính bằng chứng khách viết/đã quan sát. Thấp
+    # hơn `social` một chút: khớp nghĩa là xấp xỉ, còn khớp chữ trên lời khách là
+    # bằng chứng trực tiếp — nhưng cao hơn mọi nhánh suy ra.
+    "semantic": 1.3,
     "social": 1.4,      # chính lời khách viết ra
     "signal": 1.2,      # tín hiệu đã xử lý, vẫn là quan sát thật
     "interest": 1.0,    # suy ra có căn cứ
@@ -276,6 +280,47 @@ def _profile_ids(allowed_ids, terms, limit):
                 .values_list("person_id", flat=True)[:limit])
 
 
+#: Số truy vấn của ① được đem đi tìm theo nghĩa — mỗi cái là một lời gọi embedding.
+SEMANTIC_QUERIES = 3
+
+
+class _DenseBranch:
+    """Nhánh vector, TẮT cho cả lượt ngay khi lỗi lần đầu.
+
+    Nhà cung cấp embedding chết mà vẫn thử đủ mọi truy vấn thì riêng phần chờ
+    timeout đã ăn hết ngân sách của lượt — cùng lý do với
+    `talent/answer/retrieve.py::_DenseBranch`.
+    """
+
+    def __init__(self):
+        self.disabled = False
+
+    def __call__(self, queries, allowed_ids, limit):
+        from rb import evidence_index
+        lists = []
+        for query in queries[:SEMANTIC_QUERIES]:
+            if self.disabled:
+                break
+            try:
+                ids = evidence_index.dense_person_ids(query, allowed_ids, limit=limit)
+            except Exception as exc:               # noqa: BLE001
+                self.disabled = True
+                log.warning("rb.answer.retrieve: tắt nhánh vector cho lượt này: %s", exc)
+                break
+            if ids:
+                lists.append(ids)
+        # Trộn xen kẽ các truy vấn thành MỘT danh sách: nhánh này là một nguồn
+        # đồng thuận trong RRF, không phải ba — ba cách nói cùng một ý không được
+        # tính là ba bằng chứng độc lập.
+        merged, index = [], 0
+        while any(index < len(ids) for ids in lists):
+            for ids in lists:
+                if index < len(ids) and ids[index] not in merged:
+                    merged.append(ids[index])
+            index += 1
+        return merged[:limit]
+
+
 def retrieve(query_plan, *, user=None, pool=None, pinned_ids=()):
     """`ProspectPlan` → danh sách `Candidate` xếp theo mức đáng xem giảm dần.
 
@@ -306,15 +351,36 @@ def retrieve(query_plan, *, user=None, pool=None, pinned_ids=()):
     terms = _terms(getattr(query_plan, "search_queries", None) or [])
     products = list(getattr(query_plan, "products", None) or [])
 
+    from rb import evidence_index
+    queries = list(getattr(query_plan, "search_queries", None) or [])
+    if evidence_index.populated() and queries:
+        # Chỉ mục có dữ liệu → cùng hai nhánh, nhưng full-text có chỉ mục GIN thay
+        # cho `icontains` quét cả bảng bài đăng. Cùng nguồn, cùng trọng số: đổi
+        # CÁCH tìm, không đổi cách TÍNH điểm, nên không đếm trùng bằng chứng.
+        joined = " ".join(queries)
+        social_ids = evidence_index.fts_person_ids(joined, allowed_ids, limit=PER_BRANCH,
+                                                   sources=("social", "comment"))
+        signal_ids = evidence_index.fts_person_ids(joined, allowed_ids, limit=PER_BRANCH,
+                                                   sources=("signal",))
+    else:
+        social_ids = _social_ids(allowed_ids, terms, PER_BRANCH)
+        signal_ids = _signal_ids(allowed_ids, terms, PER_BRANCH)
+
     branches = [
-        ("social", _social_ids(allowed_ids, terms, PER_BRANCH)),
-        ("signal", _signal_ids(allowed_ids, terms, PER_BRANCH)),
+        ("semantic", _DenseBranch()(queries, allowed_ids, PER_BRANCH)),
+        ("social", social_ids),
+        ("signal", signal_ids),
         ("interest", _interest_ids(allowed_ids, products, PER_BRANCH)),
         ("outcome", _outcome_ids(allowed_ids, PER_BRANCH)),
         ("profile", _profile_ids(allowed_ids, terms, PER_BRANCH)),
     ]
     ranked, weights = [], []
+    allowed_set = set(allowed_ids)
     for name, ids in branches:
+        # Nhánh nào trả người NGOÀI tập đã qua cổng tuân thủ thì người đó bị bỏ ở
+        # đây — bất kể nhánh đó có tự lọc hay không. Cổng DNC/phạm vi không được
+        # phụ thuộc vào việc mọi nhánh, kể cả nhánh viết sau này, nhớ tôn trọng nó.
+        ids = [pid for pid in ids if pid in allowed_set]
         # Giữ thứ tự, bỏ trùng: một người có sáu bài đăng khớp không được tính
         # sáu lần trong cùng một nhánh — đó là đếm bằng chứng, không phải đếm
         # nguồn đồng thuận, và RRF dựa vào vế sau.
@@ -372,26 +438,28 @@ def retrieve(query_plan, *, user=None, pool=None, pinned_ids=()):
 def coverage():
     """Số liệu để trace nói thật về độ phủ, không hứa suông.
 
-    ## Giới hạn đã biết (đọc trước khi tin vào recall)
+    ## Trạng thái tìm theo nghĩa (đọc trước khi tin vào recall)
 
-    Không nhánh nào ở đây là truy hồi NGỮ NGHĨA. Khớp chữ trên `content` /
-    `evidence` / `occupation` bằng `icontains`, nên "mua chung cư" không tự khớp
-    "mua căn hộ" như vector bên Talent làm được. `search_queries` nhiều cách
-    diễn đạt của ① là cách bù hiện tại, và nó chỉ bù được một phần.
+    `semantic_retrieval` nói thật trạng thái của `rb/evidence_index.py`:
 
-    Bước mở khoá phần còn lại giống hệt đường Talent đã đi: một cột chuẩn hoá có
-    chỉ mục GIN cho `SocialPost.content` (bỏ dấu, như `CVChunk.text_norm`), rồi
-    embedding cho chính cột đó. Chưa làm ở đây vì nó là một migration + một
-    worker nền, không phải một dòng trong hàm này — và ghi ra để không ai đọc
-    `coverage()` rồi tưởng đã có.
+        INDEX_EMPTY          chưa chạy `rebuild_prospect_evidence_index`
+        INDEX_NOT_EMBEDDED   có text, chưa có vector — full-text chạy, vector chưa
+        ENABLED              có vector cho ít nhất một phần chỉ mục
+
+    `chunks_embedded / chunks` là độ phủ thật. Vector chỉ chạy trên PostgreSQL +
+    pgvector; môi trường khác chỉ có các nhánh khớp chữ.
     """
     from social.models import SocialPost
     from ..models import ProductInterest, RBProfile
 
+    from rb import evidence_index
+    index = evidence_index.coverage()
     return {
+        **index,
         "profiles": RBProfile.objects.count(),
         "interests": ProductInterest.objects.count(),
         "signals": Signal.objects.filter(domain=Signal.DOMAIN_RB).count(),
         "social_posts_linked": SocialPost.objects.exclude(person__isnull=True).count(),
-        "semantic_retrieval": "NOT_IMPLEMENTED",
+        "semantic_retrieval": ("ENABLED" if index["chunks_embedded"] else
+                               "INDEX_NOT_EMBEDDED" if index["chunks"] else "INDEX_EMPTY"),
     }

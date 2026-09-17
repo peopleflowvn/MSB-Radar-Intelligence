@@ -115,7 +115,7 @@ class Candidate:
 POSTS_PER_PERSON = 6
 
 
-def _social_passages(person_ids, now):
+def _social_passages(person_ids, now, depth=1):
     from social.models import SocialComment, SocialPost
 
     # Cắt theo TỪNG NGƯỜI, không cắt trên danh sách đã trộn. Sắp toàn cục theo
@@ -128,7 +128,7 @@ def _social_passages(person_ids, now):
     out, per_person, owner_of_post = [], {}, {}
     for post in rows.iterator(chunk_size=500):
         taken = per_person.get(post.person_id, 0)
-        if taken >= POSTS_PER_PERSON:
+        if taken >= POSTS_PER_PERSON * depth:
             continue
         per_person[post.person_id] = taken + 1
         owner_of_post[post.pk] = post.person_id
@@ -142,7 +142,7 @@ def _social_passages(person_ids, now):
         per_post = {}
         for comment in comments.iterator(chunk_size=500):
             taken = per_post.get(comment.post_id, 0)
-            if taken >= 2:
+            if taken >= 2 * depth:
                 continue
             per_post[comment.post_id] = taken + 1
             out.append(Passage(owner_of_post[comment.post_id],
@@ -152,10 +152,10 @@ def _social_passages(person_ids, now):
     return out
 
 
-def _signal_passages(person_ids, now):
+def _signal_passages(person_ids, now, depth=1):
     rows = (Signal.objects.filter(person_id__in=person_ids, domain=Signal.DOMAIN_RB)
             .only("id", "person_id", "signal_type", "evidence", "observed_at", "source")
-            .order_by("-observed_at")[:len(person_ids) * 6])
+            .order_by("-observed_at")[:len(person_ids) * 6 * depth])
     out = []
     for signal in rows:
         evidence = signal.evidence if isinstance(signal.evidence, dict) else {}
@@ -172,12 +172,12 @@ def _signal_passages(person_ids, now):
     return out
 
 
-def _interest_passages(person_ids, now):
+def _interest_passages(person_ids, now, depth=1):
     from ..models import ProductInterest, PRODUCT_LABELS
 
     rows = (ProductInterest.objects.filter(profile__person_id__in=person_ids)
             .select_related("profile")
-            .order_by("-observed_at")[:len(person_ids) * 4])
+            .order_by("-observed_at")[:len(person_ids) * 4 * depth])
     out = []
     for interest in rows:
         evidence = interest.evidence if isinstance(interest.evidence, dict) else {}
@@ -192,7 +192,7 @@ def _interest_passages(person_ids, now):
     return out
 
 
-def _outcome_passages(person_ids, now):
+def _outcome_passages(person_ids, now, depth=1):
     """Chuyện THẬT đã xảy ra khi RM liên hệ — quý nhất, và hay bị bỏ quên.
 
     Không có nó thì Radar chào lại đúng người vừa nói "không quan tâm" tuần
@@ -204,7 +204,7 @@ def _outcome_passages(person_ids, now):
     rows = (OpportunityOutcome.objects
             .filter(person_id__in=person_ids)
             .select_related("opportunity")
-            .order_by("-created_at")[:len(person_ids) * 3])
+            .order_by("-created_at")[:len(person_ids) * 3 * depth])
     out = []
     for row in rows:
         label = PRODUCT_LABELS.get(row.opportunity.product, row.opportunity.product)
@@ -217,7 +217,7 @@ def _outcome_passages(person_ids, now):
     return out
 
 
-def _profile_passages(person_ids, now):
+def _profile_passages(person_ids, now, depth=1):
     """Nền tĩnh: nghề nghiệp, nơi làm việc, tóm tắt tương tác.
 
     `observed_at=None` có chủ đích — đây là dữ liệu mô tả, không phải một sự kiện
@@ -248,15 +248,25 @@ def _profile_passages(person_ids, now):
     return out
 
 
-_SOURCES = (_outcome_passages, _social_passages, _signal_passages,
-            _interest_passages, _profile_passages)
+#: TÊN hàm, tra lúc gọi — không giữ tham chiếu hàm. Giữ tham chiếu thì
+#: `mock.patch.object(evidence, "_social_passages", ...)` không bao giờ có tác
+#: dụng, và test "một nguồn hỏng không làm mù cả lượt" xanh mà chưa từng làm
+#: hỏng nguồn nào (đúng chuyện đã xảy ra trước bản sửa này).
+_SOURCES = ("_outcome_passages", "_social_passages", "_signal_passages",
+            "_interest_passages", "_profile_passages")
 
 
-def passages_for(person_ids, *, per_person=PASSAGES_PER_PERSON, now=None):
-    """`{person_id: [Passage, ...]}` — bằng chứng để ③ đọc và trích dẫn.
+def gather(person_ids, *, now=None, depth=1):
+    """`{person_id: [Passage, ...]}` — MỌI bằng chứng lấy được, chưa sắp, chưa cắt.
 
-    Sắp theo (loại nguồn, độ mới) rồi cắt: một người có 40 bài đăng không được
-    đẩy kết quả tiếp cận của chính họ ra khỏi tầm nhìn của ③.
+    Dùng chung bởi `passages_for` (③ đọc) và `rb/evidence_index.py` (lập chỉ mục
+    tìm theo nghĩa). Một hàm gom duy nhất nghĩa là thứ được tìm thấy và thứ được
+    đọc luôn là cùng một nội dung, đã che liên hệ theo cùng một cách.
+
+    `depth` nhân trần số bản ghi mỗi nguồn. ③ chỉ cần vài đoạn mới nhất
+    (`depth=1`); chỉ mục tìm theo nghĩa cần cả lịch sử, vì một nhu cầu nói ra
+    từ ba tháng trước vẫn phải tìm thấy được — việc nó đã cũ là chuyện của xếp
+    hạng, không phải của việc có tồn tại hay không.
     """
     person_ids = [int(p) for p in person_ids if p]
     if not person_ids:
@@ -264,9 +274,10 @@ def passages_for(person_ids, *, per_person=PASSAGES_PER_PERSON, now=None):
     now = now or timezone.now()
 
     gathered = []
-    for source in _SOURCES:
+    for name in _SOURCES:
+        source = globals()[name]
         try:
-            gathered.extend(source(person_ids, now))
+            gathered.extend(source(person_ids, now, depth))
         except Exception:                          # noqa: BLE001
             # Một nguồn hỏng không được làm mù cả lượt: thà trả lời với bốn
             # nguồn còn lại và nói rõ, hơn là không trả lời gì.
@@ -277,7 +288,17 @@ def passages_for(person_ids, *, per_person=PASSAGES_PER_PERSON, now=None):
     for passage in gathered:
         if passage.person_id in by_person and passage.text:
             by_person[passage.person_id].append(passage)
+    return by_person
 
+
+def passages_for(person_ids, *, per_person=PASSAGES_PER_PERSON, now=None):
+    """`{person_id: [Passage, ...]}` — bằng chứng để ③ đọc và trích dẫn.
+
+    Sắp theo (loại nguồn, độ mới) rồi cắt: một người có 40 bài đăng không được
+    đẩy kết quả tiếp cận của chính họ ra khỏi tầm nhìn của ③.
+    """
+    now = now or timezone.now()
+    by_person = gather(person_ids, now=now)
     for pid, items in by_person.items():
         items.sort(key=lambda p: (SOURCE_RANK.get(p.source, 9),
                                   p.age_days(now) if p.age_days(now) is not None else 10**6))

@@ -53,6 +53,34 @@ file, remove only the derived `index.sqlite3` and cursor, then restart the
 indexer. It will replay the authorized Product Core feed. Record the resulting
 count reconciliation in the deployment evidence.
 
+## Growth evidence index (semantic prospect search)
+
+`rb_prospectevidencechunk` is a derived, rebuildable index of customer evidence
+(social posts, RB signals, product interests, outreach outcomes, RB profile),
+already contact-redacted. It never replaces the source tables.
+
+After the migration that creates it, run once, in order:
+
+```bash
+docker exec msbradar-hub python manage.py rebuild_prospect_evidence_index
+docker exec msbradar-hub python manage.py embed_prospect_evidence --limit 0 --then-pin
+```
+
+Until the first rebuild completes without errors, Growth retrieval keeps using
+its previous `icontains` branches; only a complete run sets the backfill marker
+that switches social/signal matching to the indexed full-text path. A partial
+index must never replace the old path, or unindexed customers become invisible.
+
+After that, saves keep the text index current (`RB_EVIDENCE_INDEX_ON_SAVE`,
+default on). Vectors are filled by `embed_prospect_evidence` — run it on the same
+schedule as `embed_talent_index`. Both use the `talent_embedding` route: query and
+document vectors must come from the same model, and `pin_vector_dimensions` pins
+both indexes together. After changing the embedding model, re-embed both.
+
+Check state with the `semantic_retrieval` field in an answer trace's coverage:
+`INDEX_EMPTY`, `INDEX_NOT_EMBEDDED`, or `ENABLED`. For a bulk import, set
+`RB_EVIDENCE_INDEX_ON_SAVE=0`, import, then rerun the rebuild.
+
 ## Rollback
 
 The deployment workflow retains each release and creates a compressed PostgreSQL

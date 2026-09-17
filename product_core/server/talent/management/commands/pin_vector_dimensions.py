@@ -19,6 +19,9 @@ from django.db import connection
 TABLES = [
     ("talent_personsearchdocument", "talent_psd_embedding_hnsw"),
     ("talent_cvchunk", "talent_cvchunk_embedding_hnsw"),
+    # Chỉ mục bằng chứng khách hàng của Growth — CÙNG model embedding, nên cùng
+    # số chiều; chốt chung một lệnh để hai bên không thể lệch chiều nhau.
+    ("rb_prospectevidencechunk", "rb_pec_embedding_hnsw"),
 ]
 
 
@@ -53,7 +56,7 @@ class Command(BaseCommand):
                     if not forced:
                         self.stdout.write(self.style.WARNING(
                             f"{table}: {total} hàng, 0 vector — chạy "
-                            f"`embed_talent_index` trước (hoặc thêm --dimensions N "
+                            f"`embed_talent_index` / `embed_prospect_evidence` trước (hoặc thêm --dimensions N "
                             f"để đổi kiểu cột sẵn)."))
                         continue
                     cursor.execute(

@@ -34,7 +34,8 @@ def corpus_fingerprint():
 
     from people.models import Relationship, Signal
     from social.models import SocialPost
-    from ..models import OpportunityOutcome, ProductInterest, RBOpportunity, RBProfile
+    from ..models import (OpportunityOutcome, ProductInterest, ProspectEvidenceChunk,
+                          RBOpportunity, RBProfile)
 
     try:
         parts = {
@@ -46,6 +47,9 @@ def corpus_fingerprint():
                 n=Count("id"), at=Max("updated_at")),
             "outcomes": OpportunityOutcome.objects.aggregate(n=Count("id"), at=Max("created_at")),
             "opportunities": RBOpportunity.objects.aggregate(n=Count("id"), at=Max("updated_at")),
+            # Lập chỉ mục lại / có vector mới đổi thứ ② tìm thấy.
+            "evidence_index": ProspectEvidenceChunk.objects.aggregate(
+                n=Count("id"), at=Max("updated_at")),
             # Xem docstring: cờ DNC đổi thì mọi phán đoán về người đó phải chết.
             "relationships": Relationship.objects.filter(domain=Signal.DOMAIN_RB).aggregate(
                 n=Count("id"), at=Max("updated_at")),

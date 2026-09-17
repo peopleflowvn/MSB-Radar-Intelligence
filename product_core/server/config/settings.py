@@ -342,6 +342,9 @@ INTAKE_STAGING_ROOT = env("INTAKE_STAGING_ROOT", default=str(BASE_DIR / "var" / 
 # liệu mới tìm được ngay). TẮT khi nạp hàng loạt (import triệu bản ghi) rồi chạy
 # `rebuild_talent_vector_index` một lượt — nếu không, mỗi bản ghi bị ghi nhiều lần.
 TALENT_INDEX_ON_SAVE = env.bool("TALENT_INDEX_ON_SAVE", default=True)
+# Chỉ mục bằng chứng khách hàng của Growth (rb/evidence_index.py) — tắt khi nạp
+# hàng loạt rồi chạy `rebuild_prospect_evidence_index` một lần.
+RB_EVIDENCE_INDEX_ON_SAVE = env.bool("RB_EVIDENCE_INDEX_ON_SAVE", default=True)
 
 # Private bridge used by MSB Radar Intelligence V2. These credentials are
 # intentionally independent from user sessions and third-party AI provider keys.
