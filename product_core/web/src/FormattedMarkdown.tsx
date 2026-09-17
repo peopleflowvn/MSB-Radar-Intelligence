@@ -17,6 +17,13 @@ interface Props {
    */
   people?: LinkablePerson[];
   /**
+   * Tham số `from` gắn vào link hồ sơ được tạo từ `people` (VD: `/person/7?from=talent-ai`)
+   * — quyết định nút "← Quay lại" và tab quan hệ mặc định trên Hồ sơ 360°.
+   * Mặc định `talent-ai` để không đổi hành vi ở những chỗ gọi cũ; Growth Radar
+   * truyền `rb` vì người đọc đang ở luồng chat khách hàng, không phải ứng viên.
+   */
+  peopleLinkFrom?: string;
+  /**
    * Có hàm này thì `[n]` trong văn bản thành nút bấm được, mở đúng đoạn CV gốc.
    * Trích dẫn phải nằm NGAY trong câu chữ chứ không chỉ ở danh sách nguồn cuối
    * bài — người đọc kiểm chứng ngay tại chỗ họ đang nghi ngờ.
@@ -29,7 +36,7 @@ interface Props {
 type CiteHandler = ((n: number) => void) | undefined;
 
 /** Bộ dò tên đã dựng sẵn, luồn xuống các hàm render inline như `CiteHandler`. */
-type NameMatcher = { regex: RegExp; byName: Map<string, number> } | undefined;
+type NameMatcher = { regex: RegExp; byName: Map<string, number>; linkFrom: string } | undefined;
 
 /** Ký tự chữ (có dấu tiếng Việt) — dùng để chặn khớp giữa chừng một từ. */
 const LETTER = /\p{L}/u;
@@ -40,7 +47,7 @@ const LETTER = /\p{L}/u;
  * Tên dài xếp trước để "Nguyễn Văn An" không bị "Nguyễn Văn" nuốt mất phần đuôi
  * — `RegExp` chọn nhánh khớp đầu tiên chứ không chọn nhánh dài nhất.
  */
-function buildNameMatcher(people?: LinkablePerson[]): NameMatcher {
+function buildNameMatcher(people: LinkablePerson[] | undefined, linkFrom: string): NameMatcher {
   const byName = new Map<string, number>();
   for (const person of people ?? []) {
     const name = String(person?.name ?? "").trim();
@@ -51,7 +58,7 @@ function buildNameMatcher(people?: LinkablePerson[]): NameMatcher {
   if (byName.size === 0) return undefined;
   const names = [...byName.keys()].sort((a, b) => b.length - a.length);
   const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  return { regex: new RegExp(`(${escaped.join("|")})`, "giu"), byName };
+  return { regex: new RegExp(`(${escaped.join("|")})`, "giu"), byName, linkFrom };
 }
 
 /**
@@ -85,7 +92,7 @@ function linkNames(text: string, matcher: NameMatcher, keyBase: string): React.R
     parts.push(
       <Link
         key={`${keyBase}-name-${match.index}`}
-        to={`/person/${personId}?from=talent-ai`}
+        to={`/person/${personId}?from=${matcher.linkFrom}`}
         className="chat-person-link"
         title="Mở hồ sơ"
       >
@@ -111,9 +118,9 @@ function linkNames(text: string, matcher: NameMatcher, keyBase: string): React.R
  * Phân tích và hiển thị đẹp mắt: xuống dòng, danh sách gạch đầu dòng, chữ in đậm,
  * tiêu đề, khối mã (code block), trích dẫn và bảng biểu.
  */
-export default function FormattedMarkdown({ content, className = "", people, onCitation }: Props) {
+export default function FormattedMarkdown({ content, className = "", people, peopleLinkFrom = "talent-ai", onCitation }: Props) {
   // Đặt TRƯỚC `if (!content)`: hook không được đứng sau một nhánh return.
-  const matcher = React.useMemo(() => buildNameMatcher(people), [people]);
+  const matcher = React.useMemo(() => buildNameMatcher(people, peopleLinkFrom), [people, peopleLinkFrom]);
   if (!content) return null;
 
   const rawText = String(content || "");

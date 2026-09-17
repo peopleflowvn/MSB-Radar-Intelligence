@@ -1,6 +1,6 @@
 import { createContext, Dispatch, ReactNode, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, AssistantConversation, ProspectResponse, SearchFilters } from "./api";
+import { api, AssistantConversation, ProspectAnswerPerson, SearchFilters } from "./api";
 import { AnswerTurn } from "./AnswerView";
 
 // SearchStateProvider được mount NGOÀI <App/> (xem main.tsx) nên không bị
@@ -102,7 +102,7 @@ function readFilterState() {
       showAdvanced: Boolean(parsed.showAdvanced),
       viewMode: parsed.viewMode === "table" ? "table" as const : "cards" as const,
       page: Math.max(0, Number(parsed.page) || 0),
-      scrollY: Math.max(0, Number(parsed.scrollY) || 0),
+      scrollY: 0,
       history: Array.isArray(parsed.history) ? parsed.history.slice(0, 12) : [],
     };
   } catch {
@@ -176,6 +176,97 @@ function TalentFilterProvider({ children }: { children: ReactNode }) {
 export function useTalentFilterState(): TalentFilterState {
   const ctx = useContext(TalentFilterContext);
   if (!ctx) throw new Error("useTalentFilterState phải nằm trong SearchStateProvider");
+  return ctx;
+}
+
+const RB_FILTER_STATE_KEY = "msb-radar-rb-filter-state-v1";
+const RbFilterContext = createContext<TalentFilterState | null>(null);
+
+function readRbFilterState() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RB_FILTER_STATE_KEY) || "{}") as Partial<{
+      draft: SearchFilters; applied: SearchFilters; hasSearched: boolean;
+      showAdvanced: boolean; viewMode: "cards" | "table"; page: number;
+      scrollY: number; history: TalentFilterHistoryEntry[];
+    }>;
+    return {
+      draft: parsed.draft ?? EMPTY_FILTER,
+      applied: parsed.applied ?? EMPTY_FILTER,
+      hasSearched: Boolean(parsed.hasSearched),
+      showAdvanced: Boolean(parsed.showAdvanced),
+      viewMode: parsed.viewMode === "table" ? "table" as const : "cards" as const,
+      page: Math.max(0, Number(parsed.page) || 0),
+      scrollY: 0,
+      history: Array.isArray(parsed.history) ? parsed.history.slice(0, 12) : [],
+    };
+  } catch {
+    return { draft: EMPTY_FILTER, applied: EMPTY_FILTER, hasSearched: false,
+      showAdvanced: false, viewMode: "cards" as const, page: 0, scrollY: 0,
+      history: [] as TalentFilterHistoryEntry[] };
+  }
+}
+
+function RbFilterProvider({ children }: { children: ReactNode }) {
+  const username = useAuthUsername();
+  const initial = useState(readRbFilterState)[0];
+  const [draft, setDraft] = useState<SearchFilters>(initial.draft);
+  const [applied, setApplied] = useState<SearchFilters>(initial.applied);
+  const [hasSearched, setHasSearched] = useState(initial.hasSearched);
+  const [showAdvanced, setShowAdvanced] = useState(initial.showAdvanced);
+  const [viewMode, setViewMode] = useState<"cards" | "table">(initial.viewMode);
+  const [page, setPage] = useState(initial.page);
+  const [scrollY, setScrollY] = useState(initial.scrollY);
+  const [history, setHistory] = useState<TalentFilterHistoryEntry[]>(initial.history);
+
+  const prevUsernameRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevUsernameRef.current;
+    prevUsernameRef.current = username;
+    if (prev === undefined || prev === username) return;
+    setDraft(EMPTY_FILTER);
+    setApplied(EMPTY_FILTER);
+    setHasSearched(false);
+    setShowAdvanced(false);
+    setPage(0);
+    setScrollY(0);
+    setHistory([]);
+    try {
+      localStorage.removeItem(RB_FILTER_STATE_KEY);
+    } catch {
+      // ignore
+    }
+  }, [username]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(RB_FILTER_STATE_KEY, JSON.stringify({ draft, applied,
+        hasSearched, showAdvanced, viewMode, page, scrollY, history }));
+    } catch {
+      // ignore
+    }
+  }, [draft, applied, hasSearched, showAdvanced, viewMode, page, scrollY, history]);
+
+  const rememberFilter = useCallback((filters: SearchFilters) => {
+    const normalized = Object.fromEntries(Object.entries(filters).filter(([, value]) =>
+      value !== "" && value !== false && value !== undefined && value !== null,
+    )) as SearchFilters;
+    if (Object.keys(normalized).every((key) => key === "order")) return;
+    const signature = JSON.stringify(normalized);
+    setHistory((current) => [{ id: `${Date.now()}`, filters: normalized, createdAt: Date.now() },
+      ...current.filter((row) => JSON.stringify(row.filters) !== signature)].slice(0, 12));
+  }, []);
+  const clearHistory = useCallback(() => setHistory([]), []);
+
+  return <RbFilterContext.Provider value={{ draft, setDraft, applied, setApplied,
+    hasSearched, setHasSearched, showAdvanced, setShowAdvanced, viewMode, setViewMode,
+    page, setPage, scrollY, setScrollY, history, rememberFilter, clearHistory }}>
+    {children}
+  </RbFilterContext.Provider>;
+}
+
+export function useRbFilterState(): TalentFilterState {
+  const ctx = useContext(RbFilterContext);
+  if (!ctx) throw new Error("useRbFilterState phải nằm trong SearchStateProvider");
   return ctx;
 }
 
@@ -278,19 +369,23 @@ export function useAiChatState(): AiChatState {
   return ctx;
 }
 
-// RB "Hỏi & Tìm khách hàng với AI" từng chỉ giữ MỘT câu hỏi/MỘT câu trả lời
-// (ghi đè mỗi lần hỏi), không có hội thoại tích luỹ như Talent AiSearch —
-// khác hẳn cách mọi chatbot AI khác hoạt động. Đổi sang danh sách tin nhắn
-// giống hệt AiChatMessage để: (1) nhiều lượt hỏi/đáp cùng hiện trong một luồng
-// chat, (2) mỗi lượt AI trả lời giữ `data.criteria` — dùng làm "lịch sử" gửi
-// kèm câu hỏi tiếp theo để AI hỏi tiếp (refine) thay vì hỏi độc lập.
+// RB "Hỏi & Tìm khách hàng với AI" giờ dùng CHUNG một "cỗ máy" Answer Engine
+// với Talent AiSearch (`rbAsk`/`rbAskTurn` cùng khuôn sự kiện SSE với
+// `talentAsk`/`talentAskTurn`) — nên giữ y hệt hình dạng `AiChatMessage`/
+// `AiChatState`, chỉ khác kiểu "người" trong kết quả (khách hàng có điểm ưu
+// tiên thay vì ứng viên có trích dẫn CV).
 export interface ProspectChatMessage {
   id: string;
   sender: "user" | "ai";
   text: string;
   timestamp: string;
-  data?: ProspectResponse;
+  /** Một lượt của Growth Answer Engine — câu trả lời, kế hoạch, khách hàng. */
+  answer?: AnswerTurn<ProspectAnswerPerson>;
   isPending?: boolean;
+  /** Khoá lượt — để lấy lại kết quả nếu mobile rớt kết nối giữa chừng. */
+  clientTurnId?: string;
+  /** Mốc bắt đầu để thẻ chờ hiển thị thời gian thật. */
+  startedAt?: number;
 }
 
 interface ProspectChatState {
@@ -303,6 +398,8 @@ interface ProspectChatState {
   archiveConversation: (id: string) => Promise<void>;
   renameConversation: (id: string, title: string) => Promise<void>;
   refreshConversations: () => Promise<void>;
+  activeTurn: ActiveTalentTurn | null;
+  setActiveTurn: (turn: ActiveTalentTurn | null) => void;
 }
 
 const ProspectChatContext = createContext<ProspectChatState | null>(null);
@@ -312,6 +409,19 @@ function ProspectChatProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<ProspectChatMessage[]>([]);
   const [threadId, setThreadId] = useState(() => makeThreadId("prospect"));
   const [conversations, setConversations] = useState<AssistantConversation[]>([]);
+  const [activeTurnState, setActiveTurnState] = useState<ActiveTalentTurn | null>(() => {
+    try {
+      const raw = sessionStorage.getItem("msb-radar-prospect-active-turn");
+      return raw ? JSON.parse(raw) as ActiveTalentTurn : null;
+    } catch {
+      return null;
+    }
+  });
+  const setActiveTurn = useCallback((turn: ActiveTalentTurn | null) => {
+    setActiveTurnState(turn);
+    if (turn) sessionStorage.setItem("msb-radar-prospect-active-turn", JSON.stringify(turn));
+    else sessionStorage.removeItem("msb-radar-prospect-active-turn");
+  }, []);
   const refreshConversations = useCallback(async () => {
     const data = await api.conversations("prospect");
     setConversations(data.results);
@@ -324,9 +434,10 @@ function ProspectChatProvider({ children }: { children: ReactNode }) {
     if (prev === undefined || prev === username) return;
     setMessages([]);
     setConversations([]);
+    setActiveTurn(null);
     setThreadId(resetThreadId("prospect"));
     if (username) refreshConversations().catch(() => undefined);
-  }, [username, refreshConversations]);
+  }, [username, refreshConversations, setActiveTurn]);
   const selectConversation = async (id: string) => {
     try {
       const row = await api.conversation(id, "prospect");
@@ -334,17 +445,16 @@ function ProspectChatProvider({ children }: { children: ReactNode }) {
       setMessages((row.messages ?? []).filter((m) => m.role !== "system").map((m) => ({
         id: `saved-${m.id}`, sender: m.role === "user" ? "user" : "ai", text: m.content,
         timestamp: new Date(m.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
-        data: m.metadata ? {
-          mode: (m.metadata.mode as "search" | "conversation") || "conversation",
-          criteria: (m.metadata.criteria as any) || {},
-          criteria_from: "keyword" as const,
-          question: "",
-          error: "",
-          count: typeof m.metadata.count === "number" ? m.metadata.count : 0,
-          results: [],
+        // Lượt do AI/Answer Engine ghi: dựng lại kế hoạch/khách hàng để hội
+        // thoại cũ vẫn hiện đúng, không chỉ còn trơ mỗi đoạn văn.
+        answer: (m.role === "assistant" || m.metadata?.answer_engine) ? {
+          text: m.content,
+          sources: [],
+          people: (m.metadata?.people as ProspectAnswerPerson[]) ?? [],
+          reasoning: (m.metadata?.reasoning_trace as string) || (m.metadata?.thinking_trace as string) || undefined,
           provider: m.provider,
           model: m.model,
-          reasoning_content: (m.metadata.reasoning_content as string) || (m.metadata.thinking_trace as string) || undefined,
+          trace: m.metadata?.plan ? { plan: m.metadata.plan } : undefined,
         } : undefined,
       })));
     } catch {
@@ -362,11 +472,13 @@ function ProspectChatProvider({ children }: { children: ReactNode }) {
   };
   const resetConversation = () => {
     setMessages([]);
+    setActiveTurn(null);
     setThreadId(resetThreadId("prospect"));
   };
   return (
     <ProspectChatContext.Provider value={{ messages, setMessages, threadId, resetConversation,
-      conversations, selectConversation, archiveConversation, renameConversation, refreshConversations }}>
+      conversations, selectConversation, archiveConversation, renameConversation, refreshConversations,
+      activeTurn: activeTurnState, setActiveTurn }}>
       {children}
     </ProspectChatContext.Provider>
   );
@@ -407,7 +519,9 @@ export function SearchStateProvider({ children }: { children: ReactNode }) {
   return (
     <AiChatProvider>
       <ProspectChatProvider>
-        <TalentFilterProvider>{children}</TalentFilterProvider>
+        <TalentFilterProvider>
+          <RbFilterProvider>{children}</RbFilterProvider>
+        </TalentFilterProvider>
       </ProspectChatProvider>
     </AiChatProvider>
   );

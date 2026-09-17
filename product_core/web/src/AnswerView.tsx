@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AnswerPerson, AnswerSource, api } from "./api";
 import FormattedMarkdown, { LinkablePerson } from "./FormattedMarkdown";
@@ -20,7 +20,10 @@ export interface AnswerStep {
   state: "active" | "done";
 }
 
-export interface AnswerTurn {
+/** `TPerson` mặc định là người Talent (trích dẫn CV). Growth Radar dùng
+ *  `AnswerTurn<ProspectAnswerPerson>` — cùng khuôn sự kiện SSE, chỉ khác hình
+ *  dạng "người" trong kết quả (điểm ưu tiên thay vì trích dẫn CV). */
+export interface AnswerTurn<TPerson = AnswerPerson> {
   text: string;
   stage?: string;
   /** "Đã nhận yêu cầu — đây là cách mình định làm", hiện ngay sau khi hiểu câu
@@ -29,7 +32,7 @@ export interface AnswerTurn {
   /** Các bước đang/đã làm — để giao diện tick dần thay vì đổ token suy nghĩ. */
   steps?: AnswerStep[];
   sources: AnswerSource[];
-  people: AnswerPerson[];
+  people: TPerson[];
   /** Radar tự phát hiện lỗi trong câu trả lời và viết lại. */
   revised?: boolean;
   /** Nguồn ngoài internet khi Radar tra web để trả lời. */
@@ -84,7 +87,7 @@ function PeopleStrip({ people }: { people: AnswerPerson[] }) {
 
 /** 👍/👎 trên một câu trả lời. Gửi một lần, không cho đổi ý loạn xạ. */
 function Rating({ turn, question, conversationId }: {
-  turn: AnswerTurn; question?: string; conversationId?: string;
+  turn: AnswerTurn<any>; question?: string; conversationId?: string;
 }) {
   const [sent, setSent] = useState<"up" | "down" | null>(null);
   const [failed, setFailed] = useState(false);
@@ -111,7 +114,9 @@ function Rating({ turn, question, conversationId }: {
   );
 }
 
-function getFollowUpSuggestions(turn: AnswerTurn): string[] {
+/** Mặc định dùng cho Talent (`turn.people` là `AnswerPerson[]`). Growth Radar
+ *  truyền `getFollowUps` riêng vì "ứng viên" ở đây là "khách hàng". */
+function getFollowUpSuggestions(turn: AnswerTurn<any>): string[] {
   if (turn.people && turn.people.length > 1) {
     return [
       `📊 Lập bảng so sánh chi tiết các ứng viên này`,
@@ -138,18 +143,36 @@ function getFollowUpSuggestions(turn: AnswerTurn): string[] {
   ];
 }
 
-export default function AnswerView({
+export default function AnswerView<TPerson = AnswerPerson>({
   turn,
   isPending,
   question,
   conversationId,
   onFollowUp,
+  renderPeople,
+  extraBeforePeople,
+  getFollowUps,
+  personLinkFrom = "talent-ai",
 }: {
-  turn: AnswerTurn;
+  turn: AnswerTurn<TPerson>;
   isPending?: boolean;
   question?: string;
   conversationId?: string;
   onFollowUp?: (query: string) => void;
+  /** Ghi đè cách hiện "người" trong kết quả — mặc định là chip trích dẫn CV
+   *  (`PeopleStrip`); Growth Radar truyền lưới/bảng thẻ khách hàng có điểm
+   *  ưu tiên + nút "Tạo cơ hội". */
+  renderPeople?: (people: TPerson[]) => ReactNode;
+  /** Chỗ chèn nội dung riêng theo domain (VD: khối "Hệ thống hiểu câu hỏi của
+   *  bạn là…" của Growth Radar) — hiện ngay sau văn bản trả lời, trước phần
+   *  người/khách hàng. */
+  extraBeforePeople?: ReactNode;
+  /** Ghi đè gợi ý câu hỏi tiếp theo — mặc định dùng ngôn ngữ "ứng viên". */
+  getFollowUps?: (turn: AnswerTurn<TPerson>) => string[];
+  /** `from` gắn vào link hồ sơ khi TÊN người được nhắc trong câu chữ tự thành
+   *  liên kết (không phải chip cuối bài) — quyết định "← Quay lại" đúng trang
+   *  trên Hồ sơ 360°. Growth Radar truyền `"rb"`. */
+  personLinkFrom?: string;
 }) {
   const [preview, setPreview] = useState<SourceRef | null>(null);
   const [showSources, setShowSources] = useState(false);
@@ -169,8 +192,10 @@ export default function AnswerView({
   // sách `people`, và đúng cái tên đó mới là chỗ người đọc muốn bấm.
   const linkablePeople = useMemo<LinkablePerson[]>(() => {
     const byId = new Map<number, LinkablePerson>();
-    for (const person of turn.people) {
-      if (person.name) byId.set(person.person_id, { personId: person.person_id, name: person.name });
+    // `person_id`/`name` tồn tại trên cả AnswerPerson (Talent) lẫn
+    // ProspectAnswerPerson (RB) — ép kiểu để dùng chung logic gắn liên kết.
+    for (const person of turn.people as unknown as Array<{ person_id: number; name: string }>) {
+      if (person?.name) byId.set(person.person_id, { personId: person.person_id, name: person.name });
     }
     for (const source of turn.sources) {
       if (source.name && !byId.has(source.person_id)) {
@@ -199,10 +224,14 @@ export default function AnswerView({
 
       {turn.text && (
         <FormattedMarkdown content={turn.text} onCitation={openCitation}
-                           people={linkablePeople} />
+                           people={linkablePeople} peopleLinkFrom={personLinkFrom} />
       )}
 
-      <PeopleStrip people={turn.people} />
+      {extraBeforePeople}
+
+      {renderPeople
+        ? renderPeople(turn.people)
+        : <PeopleStrip people={turn.people as unknown as AnswerPerson[]} />}
 
       {(turn.webSources?.length ?? 0) > 0 && (
         <div className="answer-sources">
@@ -252,7 +281,7 @@ export default function AnswerView({
         <div className="answer-followup-section">
           <span className="answer-followup-title">💡 GỢI Ý CÂU HỎI TIẾP THEO:</span>
           <div className="answer-followup-chips">
-            {getFollowUpSuggestions(turn).map((suggestion) => (
+            {(getFollowUps ?? getFollowUpSuggestions)(turn).map((suggestion) => (
               <button
                 key={suggestion}
                 type="button"
