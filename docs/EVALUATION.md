@@ -100,3 +100,21 @@ Procedure (`product_core/server`):
 includes the LLM planner and is what users receive. For Growth `portfolio`
 queries pass `--as-user <rm username>`.
 
+## Growth answer checks on the live model
+
+`python manage.py prospect_answer_eval --as-user <rm username>` runs 29 Growth
+questions through the real planner, judge and writer on real customer data and
+checks what a machine can verify: citations exist in that customer's evidence
+and sit next to that customer; no raw phone/email; no do-not-contact customer;
+no recruiting applicant presented as a customer; "my customers" returns only the
+RM's own; an "exact" count equals the SQL recomputation and appears in the text;
+an estimate is labelled as one; a draft command says nothing was sent and
+creates no opportunity; aggregate answers state numbers and do not deny having
+data; no system-prompt leak. Every question runs in a transaction that is rolled
+back, so it leaves no conversation or opportunity behind (model calls still
+cost). `--gate N` exits non-zero below N passes. Business correctness still
+needs a human reader; retrieval accuracy is measured separately with
+`retrieval_eval`.
+
+Status: not yet run against production. Unit tests of Growth mock the model.
+
