@@ -40,6 +40,15 @@ services:
     init: true
     read_only: true
     command: ["python", "-m", "radar_intelligence.indexing"]
+    # Cùng image với `intelligence`, nên kế thừa HEALTHCHECK của Dockerfile
+    # (curl cổng 8081) — container này không mở cổng đó (không có HTTP), nên
+    # healthcheck kế thừa LUÔN LUÔN fail và báo "unhealthy" dù script chạy
+    # đúng. Phát hiện 17/09/2026: `docker ps` báo unhealthy, log cho thấy
+    # index_sync chạy bình thường mỗi 30s, restart_count=0, error="". Tắt hẳn
+    # — cùng lý do đã tắt cho `extraction-worker`/`embedding-worker` ở
+    # product_core/docker-compose.oracle-core.yml.
+    healthcheck:
+      disable: true
     env_file:
       - /home/ubuntu/msbradar-intelligence/runtime.env
     environment:
