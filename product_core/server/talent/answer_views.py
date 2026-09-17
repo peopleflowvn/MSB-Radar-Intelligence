@@ -188,7 +188,8 @@ def talent_ask(request):
                 elif kind == "answer":
                     yield _sse("answer", {"text": chunk.get("text") or ""})
                 elif kind == "revision":
-                    yield _sse("revision", {"text": chunk.get("text") or ""})
+                    yield _sse("revision", {"text": chunk.get("text") or "",
+                                            "ok": chunk.get("ok", True)})
                 elif kind == "error":
                     yield _sse("error", {"text": chunk.get("text") or "Lượt trả lời bị lỗi."})
                     return

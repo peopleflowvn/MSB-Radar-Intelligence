@@ -205,7 +205,8 @@ def assistant_stream(request):
                         yield _sse("answer", {"text": chunk.get("text") or ""})
                     elif kind == "revision":
                         answer_parts[:] = [chunk.get("text") or ""]
-                        yield _sse("revision", {"text": chunk.get("text") or ""})
+                        yield _sse("revision", {"text": chunk.get("text") or "",
+                                                "ok": chunk.get("ok", True)})
                     elif kind == "error":
                         failed = True
                         yield _sse("error", {"text": "Lượt trả lời không hoàn tất. Bạn có thể thử lại."})

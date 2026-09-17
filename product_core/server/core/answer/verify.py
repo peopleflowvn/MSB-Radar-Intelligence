@@ -150,13 +150,21 @@ def check(query_plan, chosen, text, sources):
     return problems
 
 
-def repair_messages(messages, problems):
+def repair_messages(messages, problems, previous_text=""):
     """Thêm một lượt chỉ ra lỗi và yêu cầu viết lại.
 
     Giữ nguyên toàn bộ ngữ cảnh của lượt đầu rồi nối thêm — model cần thấy đúng
     dữ liệu cũ để viết lại, không phải viết mù từ mô tả lỗi.
+
+    `previous_text` PHẢI được đưa vào như một lượt `assistant` thật: thiếu nó,
+    lời dặn "giữ nguyên nội dung còn lại, chỉ sửa đúng lỗi trên" là vô nghĩa vì
+    model không hề thấy bài cũ trông thế nào — nó chỉ viết mù một bài MỚI từ
+    cùng dữ liệu, và dễ mắc lại đúng lỗi cũ hoặc bịa thêm lỗi khác (đo được:
+    bài sửa vẫn trượt kiểm chứng lần hai xảy ra thường xuyên hơn hẳn xác suất
+    một model có năng lực lại lặp lại chính lỗi vừa bị chỉ ra).
     """
-    return list(messages) + [{
+    extra = [{"role": "assistant", "content": previous_text}] if previous_text else []
+    return list(messages) + extra + [{
         "role": "user",
         "content": ("Câu trả lời vừa rồi có lỗi sau:\n"
                     + "\n".join(f"- {p}" for p in problems)

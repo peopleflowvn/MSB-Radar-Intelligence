@@ -42,6 +42,9 @@ log = logging.getLogger(__name__)
 BUDGET_SECONDS = 15.0
 STREAM_MAX_TOKENS = 2500
 
+#: Số lượt tự sửa tối đa ở ⑤ khi bài viết không qua kiểm chứng tất định.
+MAX_REPAIR_ATTEMPTS = 2
+
 
 @dataclass
 class AnswerResult:
@@ -290,11 +293,15 @@ def _actions_for(chosen):
     return actions
 
 
-def _repair(messages, problems, streamer):
-    """ĐÚNG MỘT lượt viết lại khi `verify` bắt được lỗi. Hỏng thì giữ bản cũ."""
+def _repair(messages, problems, draft, streamer):
+    """Một lượt viết lại khi `verify` bắt được lỗi. Hỏng thì giữ bản cũ.
+
+    `draft` là bài vừa bị bắt lỗi — đưa vào làm lượt `assistant` thật để model
+    thấy được nó đã viết gì, xem [[core.answer.verify.repair_messages]].
+    """
     try:
         parts = []
-        for chunk in streamer(verify_stage.repair_messages(messages, problems),
+        for chunk in streamer(verify_stage.repair_messages(messages, problems, draft),
                               task=compose_stage.TASK, temperature=0.2,
                               max_tokens=STREAM_MAX_TOKENS, reasoning_effort="none"):
             if chunk.get("type") == "answer":
@@ -519,17 +526,27 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
         # Bài cụt giữa chừng không được đi ra ngoài như một câu trả lời hoàn chỉnh.
         text = compose_stage.deterministic_text(query_plan, chosen, stats, actions=actions)
         deterministic = True
-        yield {"type": "revision", "text": text}
+        # `ok: False` — đây là bỏ cuộc dùng văn bản tất định, không phải bản đã
+        # sửa. Thiếu cờ này thì giao diện hiện nhầm banner "đã tự sửa".
+        yield {"type": "revision", "text": text, "ok": False}
 
     if not deterministic:
         problems = verify_stage.check(query_plan, chosen, text, sources)
-        if problems:
+        attempts = 0
+        while problems and attempts < MAX_REPAIR_ATTEMPTS:
+            attempts += 1
             yield step("Kiểm tra và sửa câu trả lời")
-            revised = _repair(messages, problems, streamer)
-            if revised:
-                text = revised
-                yield {"type": "revision", "text": text}
-            trace["verify"] = {"problems": problems, "repaired": bool(revised)}
+            revised = _repair(messages, problems, text, streamer)
+            if not revised:
+                break
+            text = revised
+            problems = verify_stage.check(query_plan, chosen, text, sources)
+        if attempts:
+            # `ok: False` nếu sửa hết lượt vẫn còn lỗi — giao diện không được
+            # gắn nhầm banner "đã tự sửa" cho bản vẫn sai.
+            yield {"type": "revision", "text": text, "ok": not problems}
+        trace["verify"] = {"problems": problems, "repaired": bool(attempts) and not problems,
+                           "attempts": attempts}
 
     trace["ms_total"] = int((time.monotonic() - started) * 1000)
     trace["compose"] = {"provider": provider, "model": model,

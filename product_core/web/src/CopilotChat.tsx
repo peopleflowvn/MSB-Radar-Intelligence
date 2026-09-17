@@ -394,7 +394,10 @@ export default function CopilotChat<TPerson>({
           } else if (ev.event === "answer") {
             push({ text: turn.text + String(ev.data.text ?? "") });
           } else if (ev.event === "revision") {
-            push({ text: String(ev.data.text ?? ""), revised: true });
+            // `ok: false` là máy chủ đã BỎ CUỘC (câu xin lỗi/văn bản tất định),
+            // không phải bản đã sửa đúng — không gắn banner "đã tự sửa" cho nó,
+            // kẻo người đọc hiểu ngược thành "Radar vừa sửa xong, đúng rồi".
+            push({ text: String(ev.data.text ?? ""), revised: ev.data.ok !== false });
           } else if (ev.event === "citations") {
             push({ sources: (ev.data.items as AnswerTurn<TPerson>["sources"]) ?? [] });
           } else if (ev.event === "error") {

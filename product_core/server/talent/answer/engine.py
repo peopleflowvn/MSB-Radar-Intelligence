@@ -42,6 +42,9 @@ log = logging.getLogger(__name__)
 #: Trần thời gian mềm — vượt thì bỏ vòng nới, không cắt ngang chặng đang chạy.
 BUDGET_SECONDS = 15.0
 
+#: Số lượt tự sửa tối đa ở ⑤ khi bài viết không qua kiểm chứng tất định.
+MAX_REPAIR_ATTEMPTS = 2
+
 
 @dataclass
 class AnswerResult:
@@ -136,8 +139,8 @@ def _people(chosen, sources):
     } for j in chosen]
 
 
-def _answer_people(chosen, stats, sources):
-    """Giữ người đã định danh trong ngữ cảnh dù thuộc tính hỏi còn thiếu."""
+def _answer_people(chosen, stats, sources, near=None):
+    """Giữ người đã định danh và người gần đúng trong ngữ cảnh để Frontend gắn link mở hồ sơ."""
     rows = list(chosen)
     seen = {j.person_id for j in rows}
     identified = stats.get("identified_judgements", []) or []
@@ -163,6 +166,27 @@ def _answer_people(chosen, stats, sources):
                        "citations": [s["n"] for s in sources
                                      if s["person_id"] == row["person_id"]]})
         seen.add(row["person_id"])
+    if near:
+        for j in near:
+            pid = getattr(j, "person_id", None) if not isinstance(j, dict) else j.get("person_id")
+            if pid and pid not in seen:
+                name = getattr(j, "name", "") if not isinstance(j, dict) else j.get("name", "")
+                why = (getattr(j, "why", "") or getattr(j, "gap", "")) if not isinstance(j, dict) else (j.get("why") or j.get("gap") or "")
+                fact_attr = j.fact_attributes() if hasattr(j, "fact_attributes") else (j.get("attributes") or {})
+                inf_attr = j.inference_attributes() if hasattr(j, "inference_attributes") else (j.get("inferences") or {})
+                people.append({
+                    "person_id": pid,
+                    "name": name,
+                    "why": why,
+                    "attributes": fact_attr,
+                    "inferences": inf_attr,
+                    "attribute_status": getattr(j, "attribute_status", {}) if not isinstance(j, dict) else (j.get("attribute_status") or {}),
+                    "criteria": getattr(j, "criteria", []) if not isinstance(j, dict) else (j.get("criteria") or []),
+                    "judgement_status": "SUGGESTION",
+                    "confidence": (getattr(j, "confidence", 0.5) if not isinstance(j, dict) else j.get("confidence", 0.5)) or 0.5,
+                    "citations": [s["n"] for s in sources if s.get("person_id") == pid],
+                })
+                seen.add(pid)
     if not people and stats.get("exact_name_count"):
         people = [{"person_id": row["id"], "name": row["name"], "why": "Khớp thành phần tên",
                    "attributes": {}, "inferences": {}, "attribute_status": {},
@@ -579,7 +603,7 @@ def answer(question, *, envelope=None, user=None, history=None, complete_fn=None
         compose_stage.evidence_rows(chosen, stats), text, sources)
 
     return AnswerResult(text=text, sources=used, all_sources=sources,
-                        people=_answer_people(chosen, stats, sources), reasoning=meta["reasoning"],
+                        people=_answer_people(chosen, stats, sources, near=near), reasoning=meta["reasoning"],
                         provider=meta["provider"], model=meta["model"], trace=trace)
 
 
@@ -588,15 +612,17 @@ def answer(question, *, envelope=None, user=None, history=None, complete_fn=None
 NEXT_STEP_BUDGET = 60.0
 
 
-def _repair(messages, problems, streamer):
+def _repair(messages, problems, draft, streamer):
     """Một lượt viết lại khi phát hiện lỗi. Hỏng thì trả None, giữ bản cũ.
 
-    ĐÚNG MỘT lần: sửa vòng lặp sẽ đẩy độ trễ lên gấp đôi cho một lỗi có thể model
-    không sửa nổi, và bản cũ dù lệch thứ tự vẫn còn dùng được.
+    `draft` là bài vừa bị bắt lỗi, đưa vào làm lượt `assistant` thật để model
+    THẤY được nó đã viết gì — không có `draft` thì lời dặn "giữ nguyên phần
+    còn lại, chỉ sửa đúng lỗi" là mù, và model dễ viết lại một bài mới mắc
+    đúng lỗi cũ.
     """
     try:
         parts = []
-        for chunk in streamer(verify_stage.repair_messages(messages, problems),
+        for chunk in streamer(verify_stage.repair_messages(messages, problems, draft),
                               task=compose_stage.TASK, temperature=0.2,
                               max_tokens=compose_stage.STREAM_MAX_TOKENS,
                               reasoning_effort="none"):
@@ -1049,32 +1075,47 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
         trace["truncated_fallback"] = True
         compose_fallback = True
         fallback_reason = fallback_reason or "truncated"
-        yield {"type": "revision", "text": text}
+        # `ok: False` — đây là bỏ cuộc, không phải bản đã sửa. Thiếu cờ này thì
+        # giao diện hiện nhầm banner "đã tự sửa" lên trên câu xin lỗi (ảnh báo
+        # lỗi 17/09: banner "đã sửa đúng" ngồi ngay trên câu "chưa thể trả lời").
+        yield {"type": "revision", "text": text, "ok": False}
 
     # Vòng TỰ SỬA. ② đã có `widen()` khi truy hồi mỏng; ⑤ thì trước đây không có
     # gì bắt lỗi. Chỉ kiểm những thứ CODE tự khẳng định được bằng cách đối chiếu
     # với `chosen` — thứ tự, số lượng, có nguồn hay không.
+    #
+    # Tối đa HAI lượt sửa, không phải một: lượt đầu hay chỉ sửa đúng lỗi vừa nêu
+    # mà lại lệch một lỗi khác (VD gộp trích dẫn làm lệch số lượng), và bây giờ
+    # `_repair` đã cho model thấy bài cũ nên một lượt sửa thêm thường xử lý gọn.
     problems = verify_stage.check(query_plan, verified_rows, text, sources)
-    if problems:
+    attempts = 0
+    while problems and attempts < MAX_REPAIR_ATTEMPTS:
+        attempts += 1
         trace["verify"] = problems
         yield _step("Kiểm lại câu trả lời")
-        revised = _repair(messages, problems, streamer)
-        if revised and not verify_stage.check(query_plan, verified_rows, revised, sources):
-            text = revised
-            trace["revised"] = True
-            # Chữ cũ đã phát ra màn hình, không rút lại được — nên gửi bản đã sửa
-            # dưới dạng sự kiện riêng để giao diện THAY THẾ, và người dùng thấy
-            # rõ Radar đã tự sửa chứ không phải im lặng đổi bài.
-            yield {"type": "revision", "text": text}
-        else:
-            text = compose_stage.ai_unavailable_text("verification_failed")
-            trace["verify_fallback"] = True
-            compose_fallback = True
-            fallback_reason = "verification_failed"
-            yield {"type": "revision", "text": text}
+        revised = _repair(messages, problems, text, streamer)
+        if not revised:
+            break
+        text = revised
+        problems = verify_stage.check(query_plan, verified_rows, text, sources)
+
+    trace["repair_attempts"] = attempts
+    if attempts and not problems:
+        trace["revised"] = True
+        # Chữ cũ đã phát ra màn hình, không rút lại được — nên gửi bản đã sửa
+        # dưới dạng sự kiện riêng để giao diện THAY THẾ, và người dùng thấy
+        # rõ Radar đã tự sửa chứ không phải im lặng đổi bài.
+        yield {"type": "revision", "text": text, "ok": True}
+    elif problems:
+        text = compose_stage.ai_unavailable_text("verification_failed")
+        trace["verify_fallback"] = True
+        compose_fallback = True
+        fallback_reason = "verification_failed"
+        # `ok: False` — bản sửa vẫn không qua kiểm chứng, đây là bỏ cuộc.
+        yield {"type": "revision", "text": text, "ok": False}
 
     text, used = compose_stage.used_sources(text, sources)
-    people = _answer_people(chosen, stats, sources)
+    people = _answer_people(chosen, stats, sources, near=near)
 
     # Việc CÒN LẠI của cùng một câu hỏi. "Tìm ứng viên Java rồi soạn thư cho
     # người đầu" là một câu hai việc; dừng ở đây thì thư không bao giờ được soạn.
