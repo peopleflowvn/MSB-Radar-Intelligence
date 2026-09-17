@@ -1,0 +1,24 @@
+{"id": "growth-find-001", "category": "FIND_PROSPECTS", "query": "khách nào đang có nhu cầu vay mua nhà", "expected_path": "hybrid", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-find-002", "category": "FIND_PROSPECTS", "query": "ai đang tìm hiểu vay mua chung cư", "expected_path": "semantic", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-find-003", "category": "FIND_PROSPECTS", "query": "khách hỏi về vay mua ô tô trả góp", "expected_path": "hybrid", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-find-004", "category": "FIND_PROSPECTS", "query": "người cần xoay vốn kinh doanh ngắn hạn", "expected_path": "semantic", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-find-005", "category": "FIND_PROSPECTS", "query": "khách quan tâm thẻ tín dụng hoàn tiền", "expected_path": "hybrid", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-find-006", "category": "FIND_PROSPECTS", "query": "ai sắp đi du học hoặc cho con đi du học", "expected_path": "semantic", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-find-007", "category": "FIND_PROSPECTS", "query": "khách cần chuyển tiền hoặc đổi ngoại tệ ra nước ngoài", "expected_path": "semantic", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-find-008", "category": "FIND_PROSPECTS", "query": "người muốn gửi tiết kiệm lãi suất tốt", "expected_path": "hybrid", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-find-009", "category": "FIND_PROSPECTS", "query": "khách quan tâm bảo hiểm sức khoẻ cho gia đình", "expected_path": "semantic", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-find-010", "category": "FIND_PROSPECTS", "query": "chủ doanh nghiệp nhỏ cần trả lương qua ngân hàng", "expected_path": "semantic", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-find-011", "category": "FIND_PROSPECTS", "query": "khách muốn đầu tư chứng chỉ quỹ", "expected_path": "hybrid", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-find-012", "category": "FIND_PROSPECTS", "query": "người vừa kết hôn hoặc sắp sinh con", "expected_path": "semantic", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-filter-001", "category": "FILTERED", "query": "khách ở Hà Nội cần vay mua nhà, có số điện thoại", "expected_path": "structured", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-filter-002", "category": "FILTERED", "query": "khách phân khúc ưu tiên quan tâm đầu tư", "expected_path": "structured", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-filter-003", "category": "FILTERED", "query": "quản lý cấp trung ở TP.HCM có tín hiệu trong 30 ngày", "expected_path": "structured", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-recency-001", "category": "RECENCY", "query": "khách có tín hiệu vay trong tuần này", "expected_path": "hybrid", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-reactivate-001", "category": "REACTIVATION", "query": "khách từng nói để sau, giờ nên liên hệ lại", "expected_path": "hybrid", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-whitespace-001", "category": "WHITESPACE", "query": "khách nào chưa ai phụ trách mà có nhu cầu vay", "expected_path": "scoped", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-whitespace-002", "category": "WHITESPACE", "query": "khách bỏ trống ở Đà Nẵng", "expected_path": "scoped", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-portfolio-001", "category": "PORTFOLIO", "query": "khách của tôi ai nên gọi tuần này", "expected_path": "scoped", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-colloquial-001", "category": "COLLOQUIAL", "query": "có ai cần tiền gấp ko", "expected_path": "semantic", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-colloquial-002", "category": "COLLOQUIAL", "query": "ai hỏi mua nhà trả góp trên group", "expected_path": "semantic", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-noresult-001", "category": "NO_RESULT", "query": "khách muốn vay mua tàu vũ trụ", "expected_path": "hybrid", "source": "growth answer engine coverage seed — chưa có nhãn"}
+{"id": "growth-compliance-001", "category": "COMPLIANCE", "query": "liệt kê khách đã yêu cầu không liên hệ", "expected_path": "hybrid", "source": "growth answer engine coverage seed — chưa có nhãn"}

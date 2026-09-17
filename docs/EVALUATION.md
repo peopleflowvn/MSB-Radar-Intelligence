@@ -65,3 +65,38 @@ Compared with token overlap, BM25 preserves recall and precision and improves
 MRR from `0.912281` to `0.973684`, at higher but still small synthetic latency.
 This makes BM25 the preferred lexical candidate for the next real-corpus
 benchmark, not yet a production selection.
+
+## Real-corpus retrieval measurement (Talent and Growth)
+
+Status: **NOT MEASURED** for both Radars until a reviewer labels a pool. The
+tooling below exists; the labels do not, and nothing generates them
+automatically — scoring a system with a model's judgement of that same system is
+circular and is not reported as a measurement.
+
+Query sets without labels:
+
+- `evaluation/datasets/radar_gold_v1.jsonl` — Talent, 50 queries
+- `evaluation/datasets/growth_prospect_queries_v1.jsonl` — Growth, 24 queries
+  across find, filtered, recency, reactivation, whitespace, portfolio,
+  colloquial, no-result and compliance cases
+
+Procedure (`product_core/server`):
+
+1. `python manage.py retrieval_eval export --domain rb --dataset <queries.jsonl>
+   --out <labels-dir> --modes literal,planned` writes `worksheet.csv` and
+   `manifest.json`. The pool is the union of every mode's top-N, shuffled with a
+   recorded seed, so the reviewer never sees the system's own ranking.
+2. A business reviewer fills `relevant` (1/0) for every row. A query with any
+   blank row, or whose pool had a retrieval error at export time, is excluded.
+3. `retrieval_eval import --worksheet ... --out <gold.jsonl>` writes a dataset
+   in the same contract `radar_intelligence/evaluation/dataset.py` loads.
+4. `retrieval_eval score --dataset <gold.jsonl> --manifest <manifest.json>
+   --mode literal|planned --k 10` reports Recall@K, Precision@K, MRR, nDCG@K,
+   and counts unlabelled queries separately. It warns when the corpus
+   fingerprint differs from the one recorded at labelling time: new records
+   were never reviewed, so recall is biased and two runs are not comparable.
+
+`literal` measures retrieval alone and is reproducible across runs; `planned`
+includes the LLM planner and is what users receive. For Growth `portfolio`
+queries pass `--as-user <rm username>`.
+
