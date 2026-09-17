@@ -459,9 +459,13 @@ export default function Talent({
   });
   useEffect(() => {
     if (mode !== "loc" || !hasSearched || !results.data || scrollY <= 0) return;
-    const timer = window.setTimeout(() => window.scrollTo({ top: scrollY, behavior: "instant" }), 0);
+    const targetY = scrollY;
+    const timer = window.setTimeout(() => {
+      window.scrollTo({ top: targetY, behavior: "instant" });
+      setScrollY(0);
+    }, 0);
     return () => window.clearTimeout(timer);
-  }, [mode, hasSearched, results.data, scrollY]);
+  }, [mode, hasSearched, results.data, scrollY, setScrollY]);
   const hunts = useQuery({
     queryKey: ["hunts", "open-from-talent"],
     queryFn: () => api.hunts({ open: true, mine: true }),
@@ -638,98 +642,7 @@ export default function Talent({
 
         {mode === "loc" && (
           <div className="talent-filter-workspace">
-            {/* Saved Views Bar */}
-            <SavedViewsBar
-              applied={applied}
-              onApply={(filters) => {
-                reopenFilter(filters);
-              }}
-            />
-
-            {historyRows.length > 0 && (
-              <div className="saved-views-modern" aria-label="Lịch sử lọc">
-                <div className="saved-views-label"><span>🕘 Lịch sử lọc:</span></div>
-                <div className="saved-views-chips">
-                  {historyRows.map((row) => (
-                    <button key={row.id} type="button" className="filter-history-chip"
-                      title={new Date(row.createdAt).toLocaleString("vi-VN")}
-                      onClick={() => reopenFilter(row.filters)}>
-                      <span>{filterSummary(row.filters)}</span>
-                      <span className="filter-history-time">{new Date(row.createdAt).toLocaleString("vi-VN", {
-                        day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-                      })}</span>
-                    </button>
-                  ))}
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilterHistory}>Xoá lịch sử</button>
-                </div>
-              </div>
-            )}
-
-            {selectedIds.length > 0 && (
-              <div className="talent-bulk-selected-panel">
-                <div className="result-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span className="badge ok" style={{ fontSize: "13px", padding: "4px 10px" }}>
-                      Đã chọn <strong>{selectedIds.length}</strong> ứng viên tiềm năng
-                    </span>
-                  </div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setSelectedIds([])}>
-                    Bỏ chọn tất cả
-                  </button>
-                </div>
-                <p className="hint" style={{ margin: "6px 0 12px", fontSize: "13px" }}>
-                  Đưa ứng viên đã chọn vào đợt tuyển để phân công phụ trách và theo dõi tiến độ săn ngay trong studio:
-                </p>
-                <div className="search-row" style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                  <select
-                    className="config-select"
-                    style={{ minWidth: "220px" }}
-                    value={targetHunt}
-                    onChange={(event) => setTargetHunt(event.target.value)}
-                  >
-                    <option value="">Chọn đợt tuyển đang mở…</option>
-                    {(hunts.data?.results ?? []).map((hunt) => (
-                      <option key={hunt.id} value={hunt.id}>
-                        {hunt.title || hunt.hiring_need_title}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    disabled={!targetHunt || addToWorklist.isPending}
-                    onClick={() => addToWorklist.mutate()}
-                  >
-                    {addToWorklist.isPending ? "Đang thêm…" : "Thêm vào đợt tuyển"}
-                  </button>
-
-                  <span className="muted" style={{ fontSize: "12px", margin: "0 4px" }}>hoặc</span>
-
-                  <input
-                    className="search-main"
-                    style={{ minWidth: "200px" }}
-                    value={worklistTitle}
-                    onChange={(event) => setWorklistTitle(event.target.value)}
-                    placeholder="Tên đợt tuyển mới…"
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    disabled={!worklistTitle.trim() || createWorklist.isPending}
-                    onClick={() => createWorklist.mutate()}
-                  >
-                    {createWorklist.isPending ? "Đang tạo…" : "+ Tạo đợt mới"}
-                  </button>
-                </div>
-                {(createWorklist.error || addToWorklist.error) && (
-                  <p className="err-box" style={{ marginTop: "10px" }}>
-                    {String(createWorklist.error || addToWorklist.error)}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Main Search & Smart Filter Panel */}
+            {/* 1. Thanh tìm kiếm chính & Bộ lọc trực quan (Ưu tiên hiển thị trên cùng) */}
             <div className="search-filter-card">
               <form onSubmit={submit}>
                 {/* Main search bar */}
@@ -1013,50 +926,128 @@ export default function Talent({
 
                 {filterError && <p className="err-box" role="alert">{filterError}</p>}
 
-                {/* Toggles & Sắp xếp */}
+                {/* Thanh sắp xếp & Áp dụng (Đã lược bỏ các checkbox trùng lặp) */}
                 <div className="filter-bottom-bar">
-                  <div className="filter-toggles-group">
-                    <label className="checkbox-pill">
-                      <input
-                        type="checkbox"
-                        checked={!!draft.has_email}
-                        onChange={(event) =>
-                          set("has_email", event.target.checked)
-                        }
-                      />
-                      <span>Có Email</span>
-                    </label>
-                    <label className="checkbox-pill">
-                      <input
-                        type="checkbox"
-                        checked={!!draft.has_phone}
-                        onChange={(event) =>
-                          set("has_phone", event.target.checked)
-                        }
-                      />
-                      <span>Có Số điện thoại</span>
-                    </label>
-                  </div>
-
                   <div className="filter-sort-group">
                     <label className="sort-label">Sắp xếp theo:</label>
                     <select
                       className="select-dropdown"
                       value={draft.order ?? "relevance"}
-                      onChange={(event) => set("order", event.target.value)}
+                      onChange={(event) => {
+                        const nextOrder = event.target.value as SearchFilters["order"];
+                        set("order", nextOrder);
+                        if (hasSearched) {
+                          setApplied((prev) => ({ ...prev, order: nextOrder }));
+                        }
+                      }}
                     >
                       <option value="relevance">🌟 Phù hợp nhất</option>
                       <option value="newest">📅 Mới cập nhật nhất</option>
                       <option value="oldest">⏳ Cũ nhất</option>
                       <option value="name">🔤 Theo bảng chữ cái tên</option>
                     </select>
-                    <button type="submit" className="btn btn-primary" disabled={results.isFetching}>
-                      {results.isFetching ? "Đang tìm…" : "Áp dụng bộ lọc"}
-                    </button>
                   </div>
+
+                  <button type="submit" className="btn btn-primary" disabled={results.isFetching}>
+                    {results.isFetching ? "Đang tìm…" : "Áp dụng bộ lọc"}
+                  </button>
                 </div>
               </form>
             </div>
+
+            {/* 2. Tiện ích lưu trữ: Bộ lọc đã lưu & Lịch sử tìm kiếm gần đây */}
+            <div className="talent-filter-subtools" style={{ width: "100%", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <SavedViewsBar
+                applied={applied}
+                onApply={(filters) => {
+                  reopenFilter(filters);
+                }}
+              />
+
+              {historyRows.length > 0 && (
+                <div className="saved-views-modern" aria-label="Lịch sử lọc">
+                  <div className="saved-views-label"><span>🕘 Lịch sử lọc gần đây:</span></div>
+                  <div className="saved-views-chips">
+                    {historyRows.map((row) => (
+                      <button key={row.id} type="button" className="filter-history-chip"
+                        title={new Date(row.createdAt).toLocaleString("vi-VN")}
+                        onClick={() => reopenFilter(row.filters)}>
+                        <span>{filterSummary(row.filters)}</span>
+                        <span className="filter-history-time">{new Date(row.createdAt).toLocaleString("vi-VN", {
+                          day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+                        })}</span>
+                      </button>
+                    ))}
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilterHistory}>Xoá lịch sử</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Panel thao tác hàng loạt khi chọn nhiều ứng viên */}
+            {selectedIds.length > 0 && (
+              <div className="talent-bulk-selected-panel">
+                <div className="result-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span className="badge ok" style={{ fontSize: "13px", padding: "4px 10px" }}>
+                      Đã chọn <strong>{selectedIds.length}</strong> ứng viên tiềm năng
+                    </span>
+                  </div>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setSelectedIds([])}>
+                    Bỏ chọn tất cả
+                  </button>
+                </div>
+                <p className="hint" style={{ margin: "6px 0 12px", fontSize: "13px" }}>
+                  Đưa ứng viên đã chọn vào đợt tuyển để phân công phụ trách và theo dõi tiến độ săn ngay trong studio:
+                </p>
+                <div className="search-row" style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                  <select
+                    className="config-select"
+                    style={{ minWidth: "220px" }}
+                    value={targetHunt}
+                    onChange={(event) => setTargetHunt(event.target.value)}
+                  >
+                    <option value="">Chọn đợt tuyển đang mở…</option>
+                    {(hunts.data?.results ?? []).map((hunt) => (
+                      <option key={hunt.id} value={hunt.id}>
+                        {hunt.title || hunt.hiring_need_title}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={!targetHunt || addToWorklist.isPending}
+                    onClick={() => addToWorklist.mutate()}
+                  >
+                    {addToWorklist.isPending ? "Đang thêm…" : "Thêm vào đợt tuyển"}
+                  </button>
+
+                  <span className="muted" style={{ fontSize: "12px", margin: "0 4px" }}>hoặc</span>
+
+                  <input
+                    className="search-main"
+                    style={{ minWidth: "200px" }}
+                    value={worklistTitle}
+                    onChange={(event) => setWorklistTitle(event.target.value)}
+                    placeholder="Tên đợt tuyển mới…"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={!worklistTitle.trim() || createWorklist.isPending}
+                    onClick={() => createWorklist.mutate()}
+                  >
+                    {createWorklist.isPending ? "Đang tạo…" : "+ Tạo đợt mới"}
+                  </button>
+                </div>
+                {(createWorklist.error || addToWorklist.error) && (
+                  <p className="err-box" style={{ marginTop: "10px" }}>
+                    {String(createWorklist.error || addToWorklist.error)}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Trạng thái ban đầu: Chưa thực hiện tìm kiếm */}
             {!hasSearched && (
