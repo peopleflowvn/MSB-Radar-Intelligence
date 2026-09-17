@@ -93,7 +93,27 @@ def _corpus_facts(query_plan, stats=None):
         return ""
     # Search expansions are retrieval hints, never a Boolean count predicate.
     # In particular, unioning FTS results cannot implement AND or NOT.
-    return facts
+    return _with_breakdown(facts, query_plan)
+
+
+def _with_breakdown(facts, query_plan):
+    """Thêm thống kê CÓ LỌC khi câu tổng hợp nhắc một nhóm có thật trong kho.
+
+    `facts_for_prompt()` chỉ có số toàn kho; "kỹ năng phổ biến của ứng viên ở Hà
+    Nội" mà chỉ đưa số toàn kho thì ⑤ sẽ lấy nhầm nó làm câu trả lời.
+    """
+    text = " ".join([getattr(query_plan, "information_need", "") or "",
+                     *(getattr(query_plan, "must_have", []) or [])])
+    if not text.strip():
+        return facts
+    try:
+        block = corpus_stage.breakdown_for_question(text)
+    except Exception:                              # noqa: BLE001
+        log.warning("answer: không tính được thống kê có lọc", exc_info=True)
+        return facts
+    if block is None:
+        return facts
+    return "\n\n".join(part for part in (facts, corpus_stage.describe_breakdown(block)) if part)
 
 
 def _people(chosen, sources):

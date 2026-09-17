@@ -7,6 +7,10 @@ on:
         description: "Type DEPLOY_PRODUCTION to deploy Product Core and Intelligence"
         required: true
 
+env:
+  # Đặt biến repo PUBLIC_HEALTH_URL khi deploy dưới tên miền khác.
+  PUBLIC_HEALTH_URL: ${{ vars.PUBLIC_HEALTH_URL || 'https://dev-radar.tunghr.io.vn/api/v1/health/' }}
+
 concurrency:
   group: deploy-oracle-production
   cancel-in-progress: false
@@ -93,7 +97,11 @@ jobs:
           release="${platform}/releases/${RELEASE_SHA}"
           sudo install -d -o ubuntu -g ubuntu "${platform}/releases" "${platform}/runtime" "${platform}/backups" "${release}"
           if [ ! -f "${platform}/runtime/product.env" ]; then
-            test -f /home/ubuntu/msbradar/.env
+            # Host mới không có checkout cũ để kế thừa .env: dừng kèm hướng dẫn.
+            if [ ! -f /home/ubuntu/msbradar/.env ]; then
+              echo "::error::Missing ${platform}/runtime/product.env - create it from product_core/.env.example (chmod 600) and re-run."
+              exit 1
+            fi
             sudo cp /home/ubuntu/msbradar/.env "${platform}/runtime/product.env"
             sudo chown ubuntu:ubuntu "${platform}/runtime/product.env"
             chmod 600 "${platform}/runtime/product.env"
@@ -101,9 +109,14 @@ jobs:
           tar --exclude=.git --exclude=.venv --exclude=.tmp-msb-radar-bootstrap --exclude=node_modules --exclude='__pycache__' -cf - . | tar -xf - -C "${release}"
           ln -sfn "${platform}/runtime/product.env" "${release}/product_core/.env"
 
-          embedding_model=$(sudo docker exec msbradar-hub python manage.py shell -c \
-            'from talent.models import EmbeddingConfig; c=EmbeddingConfig.load(); print(c.greennode_model if c.mode == c.MODE_GREENNODE else "")' | tail -n 1)
-          printf '%s' "${embedding_model}" | grep -Eq '^[A-Za-z0-9._/-]+$'
+          # Host mới chưa có Hub đang chạy: để trống, provision giữ giá trị đã có
+          # trong intelligence.env và indexer dùng lexical fallback.
+          embedding_model=
+          if [ "$(sudo docker inspect msbradar-hub --format '{{.State.Running}}' 2>/dev/null || true)" = true ]; then
+            embedding_model=$(sudo docker exec msbradar-hub python manage.py shell -c \
+              'from talent.models import EmbeddingConfig; c=EmbeddingConfig.load(); print(c.greennode_model if c.mode == c.MODE_GREENNODE else "")' | tail -n 1)
+            printf '%s' "${embedding_model}" | grep -Eq '^[A-Za-z0-9._/-]+$'
+          fi
           python3 "${release}/scripts/provision_runtime_env.py" \
             --source "${platform}/runtime/product.env" \
             --target "${platform}/runtime/intelligence.env" \
@@ -135,7 +148,10 @@ jobs:
           RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          test "$(sudo docker inspect msbradar-db --format '{{.State.Running}}')" = true
+          if [ "$(sudo docker inspect msbradar-db --format '{{.State.Running}}' 2>/dev/null || true)" != true ]; then
+            echo "No running msbradar-db (first deploy on this host) - nothing to back up"
+            exit 0
+          fi
           sudo docker exec msbradar-db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
             | gzip > "/home/ubuntu/msb-radar-platform/backups/pre-${RELEASE_SHA}.dump.gz"
           test -s "/home/ubuntu/msb-radar-platform/backups/pre-${RELEASE_SHA}.dump.gz"
@@ -168,6 +184,12 @@ jobs:
             echo "Product Core unchanged since ${previous}; reusing running images"
           fi
           cd "${release}/product_core"
+          # Network ngoài mà compose Oracle khai báo; tạo nếu host chưa có.
+          sudo docker network inspect talentflow-core_default >/dev/null 2>&1 \
+            || sudo docker network create talentflow-core_default
+          if [ "$(sudo docker inspect msbradar-hub --format '{{.State.Running}}' 2>/dev/null || true)" != true ]; then
+            build_product_core=1
+          fi
           if [ "${build_product_core}" = 1 ]; then
             sudo docker compose -p msbradar -f docker-compose.oracle-core.yml build hub extraction-worker embedding-worker alias-resolver
           fi
@@ -207,7 +229,7 @@ jobs:
               sudo docker exec -e EXPECTED_SHA="${RELEASE_SHA}" msbradar-intelligence python -c "import json,os,urllib.request; data=json.load(urllib.request.urlopen('http://127.0.0.1:8081/health')); assert data['status']=='ok'; assert data['release_sha']==os.environ['EXPECTED_SHA']"
               test "$(sudo docker inspect msbradar-intelligence-indexer --format '{{.State.Running}}')" = true
               sudo docker inspect msbradar-intelligence --format '{{.Config.Image}}' | grep -F "${RELEASE_SHA}"
-              curl -fsS https://dev-radar.tunghr.io.vn/api/v1/health/ >/dev/null
+              curl -fsS "${PUBLIC_HEALTH_URL}" >/dev/null
               exit 0
             fi
             sleep 5
@@ -275,7 +297,7 @@ jobs:
             intelligence_health=$(sudo docker inspect msbradar-intelligence --format '{{.State.Health.Status}}' 2>/dev/null || true)
             echo "rollback-verify attempt=${attempt} hub=${hub_health:-missing} intelligence=${intelligence_health:-missing} restored_sha=${PREVIOUS_SHA}"
             if [ "${hub_health}" = healthy ] && [ "${intelligence_health}" = healthy ] \
-              && curl -fsS https://dev-radar.tunghr.io.vn/api/v1/health/ >/dev/null 2>&1; then
+              && curl -fsS "${PUBLIC_HEALTH_URL}" >/dev/null 2>&1; then
               echo "rollback: production restored to ${PREVIOUS_SHA}"
               # The job still ends FAILED (the deploy of ${RELEASE_SHA} did not
               # ship) — this only confirms production itself is healthy again.

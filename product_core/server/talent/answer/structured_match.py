@@ -227,3 +227,41 @@ def must_have_pins(query_plan):
                      .values_list("person_id", "content")}
     ranked = sorted(scores, key=lambda pid: (-scores[pid], -evidence_size.get(pid, 0), pid))
     return ranked[:MAX_STRUCTURED_PINS]
+
+
+#: Số yêu cầu tối đa một lần đối chiếu — đủ cho một JD thật, không để một câu
+#: lệnh kéo theo hàng chục truy vấn CSDL.
+MAX_REQUIREMENTS = 12
+
+
+def match_requirements(person_id, requirements):
+    """Từng câu trong `requirements` (một yêu cầu vị trí/JD) → MỘT người này có
+    khớp không. Dùng đúng luật khớp trường có cấu trúc của `must_have_pins` —
+    không viết luật khớp thứ hai cho cùng một việc "đối chiếu must_have".
+
+    Trả `[{"requirement", "status"}]`, `status` một trong:
+
+        "satisfied"  khớp được trên trường có cấu trúc.
+        "missing"    quy về được trường có cấu trúc, nhưng người này KHÔNG khớp.
+        "unknown"    câu không quy về được trường có cấu trúc nào (giống hệt lúc
+                     `must_have_pins` trả `None` cho toàn kho) — KHÔNG phải
+                     "missing". Người gọi phải nói rõ đây là "chưa xác định
+                     được", không phải "ứng viên không có".
+
+    Chỉ xét MỘT người (`universe_ids=[person_id]`) nên không cần quét toàn kho.
+    """
+    universe = [person_id]
+    rows = []
+    for requirement in requirements[:MAX_REQUIREMENTS]:
+        text = str(requirement).strip()
+        if not text:
+            continue
+        ids = _match_ids_for_phrase(text, universe)
+        if ids is None:
+            status = "unknown"
+        elif person_id in ids:
+            status = "satisfied"
+        else:
+            status = "missing"
+        rows.append({"requirement": text, "status": status})
+    return rows

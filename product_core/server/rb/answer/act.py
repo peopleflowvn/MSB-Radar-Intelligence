@@ -42,16 +42,18 @@ log = logging.getLogger(__name__)
 VERB_MESSAGE = "draft_message"
 VERB_CALL_SCRIPT = "draft_call_script"
 VERB_CREATE = "create_opportunity"
+VERB_SUGGEST_PRODUCT = "suggest_product"
 
 #: Số khách tối đa mỗi câu lệnh. Soạn nháp là một lượt gọi model mỗi khách;
 #: tạo cơ hội hàng loạt quá lớn từ một câu chat thì RM không kịp soát.
 MAX_DRAFTS = 5
 MAX_CREATE = 10
 
-SUPPORTED_TEXT = ("Mình làm được ba việc trên nhóm khách vừa tìm được: **soạn tin "
-                  "nhắn**, **soạn kịch bản gọi**, và **tạo cơ hội**. Ví dụ: \"soạn "
-                  "tin cho 3 khách đầu\", \"soạn kịch bản gọi cho khách thứ 2\", "
-                  "\"tạo cơ hội cho cả danh sách\".")
+SUPPORTED_TEXT = ("Mình làm được: **soạn tin nhắn**, **soạn kịch bản gọi**, **tạo "
+                  "cơ hội** (trên nhóm khách vừa tìm được), và **gợi ý sản phẩm** "
+                  "từ một câu mô tả nhu cầu. Ví dụ: \"soạn tin cho 3 khách đầu\", "
+                  "\"tạo cơ hội cho cả danh sách\", \"khách bảo đang tính mua ô tô "
+                  "trả góp thì gợi ý sản phẩm gì\".")
 
 
 def _fold(text):
@@ -62,11 +64,17 @@ def _fold(text):
 def detect_verb(question):
     """Động từ của câu lệnh, hoặc None. Tập đóng, quyết định bằng quy tắc.
 
-    Thứ tự kiểm tra có chủ ý: "tạo cơ hội" trước, vì "soạn" có thể xuất hiện
-    trong ghi chú ("tạo cơ hội rồi soạn sau"); "kịch bản gọi" trước "tin nhắn",
-    vì "soạn kịch bản gọi" cũng chứa chữ "soạn".
+    Thứ tự kiểm tra có chủ ý: "gợi ý sản phẩm" trước tất cả — cụm từ của nó
+    không đụng ba động từ kia nên thứ tự không quan trọng, đặt đầu cho dễ đọc;
+    "tạo cơ hội" trước, vì "soạn" có thể xuất hiện trong ghi chú ("tạo cơ hội
+    rồi soạn sau"); "kịch bản gọi" trước "tin nhắn", vì "soạn kịch bản gọi"
+    cũng chứa chữ "soạn".
     """
     text = _fold(question)
+    if (re.search(r"\b(goi y|tu van)\b.*\bsan pham\b", text)
+            or re.search(r"\bsan pham nao (?:thi )?(?:phu hop|nen chao)\b", text)
+            or re.search(r"\bnen chao (?:san pham )?gi\b", text)):
+        return VERB_SUGGEST_PRODUCT
     if re.search(r"\b(tao|mo|lap)\s+(\w+\s+)?co hoi\b", text):
         return VERB_CREATE
     if re.search(r"\bkich ban\b", text) or re.search(r"\b(soan|viet)\b.*\bgoi\b", text):
@@ -214,6 +222,11 @@ def run(question, *, envelope=None, user=None):
     if verb is None:
         return {"mode": "action_unsupported", "text": SUPPORTED_TEXT,
                 "people": [], "actions": []}
+    if verb == VERB_SUGGEST_PRODUCT:
+        # Không cần danh sách khách của lượt trước — đây là suy đoán từ một câu
+        # mô tả nhu cầu tự do (RM chép lại lời khách vừa nói), không phải hành
+        # động trên người đã tìm được.
+        return _suggest_product(question)
 
     projection = getattr(envelope, "projection", None)
     items = last_result_items(projection)
@@ -302,3 +315,32 @@ def run(question, *, envelope=None, user=None):
             "anh/chị bảo tiếp cho nhóm sau.*" if over_cap else "")
     return {"mode": verb, "text": f"{head}\n\n{body}{tail}", "people": people,
             "actions": actions}
+
+
+def _suggest_product(question):
+    """Gợi ý nhóm sản phẩm từ MỘT câu mô tả nhu cầu tự do. Tất định, không LLM.
+
+    Dùng đúng `rb.routing.suggest_products` — thuật toán dò cụm từ mà
+    `rb/agent.py` đã dùng để tự gắn `ProductInterest` khi có tín hiệu mới. Ở
+    đây là bản RM tự gõ ngay trong chat một câu khách vừa nói ("khách bảo đang
+    tính mua ô tô trả góp") để biết ngay nên chào gì, không phải đợi tín hiệu
+    tự động sinh ra rồi mới thấy trong hồ sơ.
+
+    Không cần danh sách khách của lượt trước, và không tạo/sửa gì — gợi ý
+    xong là hết việc, khác hẳn `create_opportunity`.
+    """
+    from .. import routing
+    from ..models import PRODUCT_LABELS
+
+    suggestions = routing.suggest_products(question)
+    if not suggestions:
+        text = ("Chưa thấy cụm từ nào để gợi ý sản phẩm. Anh/chị mô tả cụ thể nhu "
+                "cầu khách vừa nói giúp mình (ví dụ \"khách bảo đang tính mua ô tô "
+                "trả góp\") ạ.")
+    else:
+        lines = [f"- **{PRODUCT_LABELS.get(s.product, s.product)}** — {s.need} "
+                 f"(khớp: {', '.join(s.matched)}; tin cậy {s.confidence:.0%})"
+                 for s in suggestions]
+        text = ("Gợi ý sản phẩm dựa trên câu vừa mô tả (dò cụm từ tất định, KHÔNG "
+                "phải đánh giá tín dụng hay cam kết lãi suất):\n\n" + "\n".join(lines))
+    return {"mode": VERB_SUGGEST_PRODUCT, "text": text, "people": [], "actions": []}

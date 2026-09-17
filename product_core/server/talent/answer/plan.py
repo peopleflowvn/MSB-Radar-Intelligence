@@ -64,10 +64,27 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
   nhận xét về kho), "count" (đếm/thống kê), "compare" (so sánh), "followup"
   (hỏi tiếp về kết quả vừa rồi), "action" (người dùng bảo LÀM một việc trên
   người đã nhắc tới: soạn thư tiếp cận, ghi nhớ điều gì đó, truy nguồn gốc một
-  dữ kiện), "general" (không liên quan dữ liệu người).
+  dữ kiện, hoặc hỏi TRẠNG THÁI QUAN HỆ/LỊCH SỬ của một người đã nhắc tới — ai
+  đang phụ trách, liên hệ lần cuối khi nào, có đang cấm liên hệ không, việc cần
+  làm tiếp là gì), "general" (không liên quan dữ liệu người).
   Phân biệt "action" với phần còn lại: "action" là câu MỆNH LỆNH làm việc gì
   ("soạn thư cho 3 người đầu", "nhớ giúp tôi là chỉ tuyển ở Hà Nội", "dữ kiện
-  này lấy từ đâu ra"), không phải câu hỏi tra cứu.
+  này lấy từ đâu ra", "ai đang phụ trách người này", "đã liên hệ lần cuối khi
+  nào"), không phải câu hỏi tra cứu HỒ SƠ/CV (những câu đó là analyze/count/
+  find_people/compare) — action chỉ dành cho câu cần một CÔNG CỤ đọc dữ liệu
+  vận hành (quan hệ, dòng thời gian, nguồn gốc, ghi nhớ) chứ không đọc CV.
+
+  CẢNH BÁO về "compare" vs "action" (TẠO BẢNG / SO SÁNH):
+  - Các câu "tạo bảng đánh giá các ứng viên trên", "lập bảng so sánh", "đánh giá dạng bảng",
+    "so sánh các ứng viên vừa tìm", "tổng hợp ưu nhược điểm dạng bảng" KHÔNG PHẢI là "action".
+    Chúng là shape="compare" (hoặc "followup") — đây là tác vụ phân tích, đối chiếu hồ sơ và
+    trình bày dạng bảng của Radar, TUYỆT ĐỐI KHÔNG chọn "action".
+  - KHÁC với trên: đối chiếu MỘT ứng viên đã nhắc tới với YÊU CẦU CỦA MỘT VỊ TRÍ
+    (JD dán vào, hoặc liệt kê "cần biết X, Y, trên Z năm kinh nghiệm") — không so
+    với người khác, mà so với một danh sách yêu cầu — LÀ "action" ("ứng viên này
+    có đáp ứng JD sau không: …", "đối chiếu hồ sơ với yêu cầu vị trí: cần Java,
+    tiếng Anh, trên 3 năm"). Phân biệt bằng: đối tượng so sánh là NGƯỜI KHÁC
+    (→ compare) hay một DANH SÁCH YÊU CẦU không phải người (→ action).
 
   CẢNH BÁO về "general" — đây là chỗ hay bị chọn nhầm nhất:
   "general" CHỈ dành cho câu KHÔNG dính gì tới kho hồ sơ — chào hỏi, hỏi Radar
@@ -106,8 +123,11 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
 - "information_need": viết lại câu hỏi thành MỘT câu độc lập, đã ghép ngữ cảnh
   hội thoại, đủ nghĩa khi đọc riêng.
 - "must_have": mảng câu chữ — điều kiện BẮT BUỘC, không thoả thì loại. Rất ít.
-  Chỉ đưa vào khi người hỏi nói rõ là bắt buộc hoặc là bản chất câu hỏi
-  (ví dụ "của NEU" → "tốt nghiệp Đại học Kinh tế Quốc dân (NEU)").
+  Chỉ đưa vào khi người hỏi nói rõ là bắt buộc hoặc là bản chất vai trò cốt lõi.
+  QUY TẮC CỐT LÕI (TRÁNH LOẠI SẠCH HỒ SƠ VỀ 0):
+  - Khi người dùng nêu một câu tìm kiếm tự nhiên nhiều tiêu chí (ví dụ "Tìm Senior Data Analyst ở Hà Nội biết SQL và Python, trên 3 năm kinh nghiệm"):
+    + CHỈ đưa vai trò/chuyên môn cốt lõi vào "must_have" (ví dụ "vị trí hoặc kinh nghiệm về Data Analyst / phân tích dữ liệu").
+    + TUYỆT ĐỐI KHÔNG đưa tất cả tiêu chí vào "must_have". Hãy đưa các tiêu chí bổ trợ: cấp bậc ("Senior"), số năm kinh nghiệm ("trên 3 năm kinh nghiệm"), công cụ kỹ thuật phụ ("biết SQL", "biết Python"), địa điểm ("ở Hà Nội") vào "should_have" để hệ thống chấm điểm và xếp hạng. Đưa tất cả vào must_have sẽ khiến logic AND loại bỏ 100% ứng viên tiềm năng do CV không ghi đủ từng chữ.
 - "should_have": mảng câu chữ — tiêu chí mong muốn, dùng để xếp hạng, thiếu vẫn
   có thể lọt vào danh sách.
   Riêng câu ĐẾM: mọi điều kiện xác định nhóm cần đếm, kể cả phủ định, đều là

@@ -408,6 +408,37 @@ class AggregateRanksByWhoToCallFirstTest(TestCase):
 
 # ================================================================ ⑤ viết
 
+class PriorityBreakdownReachesComposeTest(TestCase):
+    """④ tính năm chiều + lý do bằng chữ (`rb/scoring.py`) — trước đây chỉ
+    `diem_uu_tien` (con số gộp) tới ⑤, nên "vì sao khách này ưu tiên cao" không
+    có gì để model trả lời ngoài đoán. `diem_thanh_phan` phải mang đủ cả hai."""
+
+    def test_diem_thanh_phan_mang_ca_so_lan_ly_do(self):
+        khach = _customer("Ưu Tiên Cao", phone="0900000009")
+        judgement = Judgement(person_id=khach.pk, name=khach.display_name, why="cần vay",
+                              criteria=[{
+                                  "priority_score": 82.0, "product": "mortgage",
+                                  "dimensions": {"fit": 75.0, "need": 90.0, "timing": 60.0,
+                                                "reachability": 100.0, "value": 70.0},
+                                  "why": ["Phân khúc Ưu tiên", "Nghề nghiệp cấp quản lý: Giám đốc"]}])
+        payload = compose_stage.build_payload(ProspectPlan(), [judgement], [],
+                                              {"judged": 1, "relevant": 1}, sources=[])
+        detail = payload["khach_hang"][0]["diem_thanh_phan"]
+        self.assertEqual(detail, {"phu_hop": 75.0, "nhu_cau": 90.0, "thoi_diem": 60.0,
+                                  "de_tiep_can": 100.0, "gia_tri": 70.0,
+                                  "ly_do": ["Phân khúc Ưu tiên",
+                                           "Nghề nghiệp cấp quản lý: Giám đốc"]})
+
+    def test_khong_co_dimensions_thi_tra_so_0_khong_loi(self):
+        khach = _customer("Chưa Chấm Điểm")
+        judgement = Judgement(person_id=khach.pk, name=khach.display_name, criteria=[{}])
+        payload = compose_stage.build_payload(ProspectPlan(), [judgement], [],
+                                              {"judged": 1, "relevant": 1}, sources=[])
+        detail = payload["khach_hang"][0]["diem_thanh_phan"]
+        self.assertEqual(detail["ly_do"], [])
+        self.assertEqual(detail["phu_hop"], 0.0)
+
+
 class ActionIsChosenByCodeTest(TestCase):
     """Để model chọn hành động thì khách không có số điện thoại vẫn được đề xuất "gọi ngay"."""
 
@@ -678,6 +709,33 @@ class CommandVerbIsDecidedByCodeTest(SimpleTestCase):
         plan = plan_stage.plan("soạn tin cho 3 khách đầu", complete_fn=fake_complete({
             "shape": "find_prospects", "do_tin_cay": 0.6, "suy_luan": "tìm"}))
         self.assertEqual(plan.shape, "action")
+
+    def test_nhan_dung_dong_tu_goi_y_san_pham(self):
+        cases = ("khách bảo đang tính mua ô tô trả góp thì gợi ý sản phẩm gì",
+                 "sản phẩm nào phù hợp cho khách vừa gọi",
+                 "tư vấn sản phẩm gì cho nhu cầu này",
+                 "nên chào gì")
+        for question in cases:
+            with self.subTest(question=question):
+                self.assertEqual(act_stage.detect_verb(question),
+                                 act_stage.VERB_SUGGEST_PRODUCT)
+
+
+class SuggestProductCommandTest(SimpleTestCase):
+    """Không cần danh sách khách của lượt trước — khác ba động từ kia."""
+
+    def test_goi_y_tu_cau_mo_ta_khong_can_luot_truoc(self):
+        out = act_stage.run("khách bảo đang tính mua ô tô trả góp thì gợi ý sản phẩm gì",
+                            envelope=None, user=None)
+        self.assertEqual(out["mode"], act_stage.VERB_SUGGEST_PRODUCT)
+        self.assertIn("Vay mua xe", out["text"])
+        self.assertEqual(out["people"], [])
+        self.assertEqual(out["actions"], [])
+
+    def test_khong_khop_cum_tu_nao_thi_noi_ro_khong_doan(self):
+        out = act_stage.run("gợi ý sản phẩm gì", envelope=None, user=None)
+        self.assertEqual(out["mode"], act_stage.VERB_SUGGEST_PRODUCT)
+        self.assertIn("Chưa thấy cụm từ nào", out["text"])
 
 
 class CommandNeverGuessesTargetsTest(SimpleTestCase):

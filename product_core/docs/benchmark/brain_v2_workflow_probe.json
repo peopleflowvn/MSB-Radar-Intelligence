@@ -1,0 +1,1354 @@
+{
+  "scope": "Live GreenNode, real engine/retrieval, 6 fictional people; SQLite fallback, no dense vectors. Model pinned for this experiment only.",
+  "model": "qwen/qwen3.6-flash",
+  "gold_version": 1,
+  "rows": [
+    {
+      "case": "and",
+      "warm": false,
+      "ids": [
+        1
+      ],
+      "exact_ids": true,
+      "shape": "find_people",
+      "shape_correct": true,
+      "source_checks": [
+        false
+      ],
+      "citations": 1,
+      "answer": "Kho có 1 ứng viên đáp ứng đủ cả SQL và Python: Fixture An [1]. Anh ấy sở hữu đồng thời hai kỹ năng này cùng với Power BI, đúng yêu cầu bắt buộc.\n\nCác hồ sơ còn lại không phù hợp: Fixture Bình chỉ có SQL; Injection chứa nội dung độc hại; Chi có Java/Spring; Dũng chỉ có Excel; Em chưa cập nhật thông tin kỹ năng. Hệ thống đã rà soát kỹ 6 hồ sơ trong tổng số 6 hồ sơ hiện có.\n\nBạn có muốn lọc sâu hơn theo ngành nghề hoặc kinh nghiệm cụ thể của Fixture An không?",
+      "trace": {
+        "question": "Ai có cả SQL và Python?",
+        "plan": {
+          "shape": "find_people",
+          "information_need": "Tìm những ứng viên trong kho có kỹ năng cả SQL và Python.",
+          "must_have": [
+            "SQL",
+            "Python"
+          ],
+          "should_have": [],
+          "extract": [
+            "kỹ năng lập trình",
+            "công cụ dữ liệu"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "SQL Python",
+            "kỹ năng SQL Python",
+            "biết SQL và Python",
+            "proficient in SQL and Python",
+            "SQL Python developer",
+            "dữ liệu SQL Python"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "answer:pipeline:v2:fdb8754cc5e3949c294012f950de7399776eb562",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 5062,
+          "judged": 6,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 6,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "ms_total": 8890,
+        "compose": {
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1979.92,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1423,
+            "output_tokens": 170,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 5060.87,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1466,
+            "output_tokens": 841,
+            "error": false
+          },
+          {
+            "task": "talent_answer_compose",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "DEEP",
+            "latency_ms": 1834.12,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1902,
+            "output_tokens": 123,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 4791,
+          "output_tokens": 1134,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "latency_ms": 8896.48
+    },
+    {
+      "case": "and",
+      "warm": true,
+      "ids": [
+        1
+      ],
+      "exact_ids": true,
+      "shape": "find_people",
+      "shape_correct": true,
+      "source_checks": [
+        false
+      ],
+      "citations": 1,
+      "answer": "Kho có 1 ứng viên đáp ứng đúng yêu cầu kỹ năng SQL và Python: Fixture An [1]. Hồ sơ này liệt kê rõ cả hai kỹ năng cùng với Power BI, đảm bảo đủ điều kiện bắt buộc. Các hồ sơ còn lại đều thiếu ít nhất một trong hai kỹ năng hoặc không xác định được thông tin.\n\nBạn có muốn lọc thêm tiêu chí về kinh nghiệm làm việc hay công cụ bổ sung nào khác không?",
+      "trace": {
+        "question": "Ai có cả SQL và Python?",
+        "plan": {
+          "shape": "find_people",
+          "information_need": "Tìm những ứng viên trong kho dữ liệu có kỹ năng cả SQL và Python.",
+          "must_have": [],
+          "should_have": [],
+          "extract": [
+            "kỹ năng lập trình",
+            "công cụ phần mềm"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "SQL Python",
+            "kỹ năng SQL Python",
+            "biết SQL và Python",
+            "proficient in SQL and Python",
+            "SQL and Python skills",
+            "lập trình viên SQL Python"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "answer:pipeline:v2:fdb8754cc5e3949c294012f950de7399776eb562",
+        "cache": "hit",
+        "pass1": {
+          "judged": 6,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 6,
+          "read_failed": false
+        },
+        "ms_total": 3407,
+        "compose": {
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1824.5,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1423,
+            "output_tokens": 161,
+            "error": false
+          },
+          {
+            "task": "talent_answer_compose",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "DEEP",
+            "latency_ms": 1577.29,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1904,
+            "output_tokens": 89,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 3327,
+          "output_tokens": 250,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "latency_ms": 3406.63
+    },
+    {
+      "case": "exclusion",
+      "warm": false,
+      "ids": [
+        2
+      ],
+      "exact_ids": true,
+      "shape": "find_people",
+      "shape_correct": true,
+      "source_checks": [
+        false
+      ],
+      "citations": 1,
+      "answer": "Kho có 1 ứng viên thỏa yêu cầu: Fixture Bình [1]. Anh ấy có kỹ năng SQL và Excel, không đề cập đến Python.\n\nĐã đọc kỹ 6 hồ sơ trong tổng số 6 hồ sơ. Các ứng viên khác như An (có Python), Chi, Dũng, Em và Injection đều bị loại do thiếu SQL hoặc vi phạm ràng buộc.\n\nBạn có muốn xem chi tiết CV của Bình hay cần tìm thêm tiêu chí khác?",
+      "trace": {
+        "question": "Tìm người có SQL nhưng không có Python",
+        "plan": {
+          "shape": "find_people",
+          "information_need": "Tìm những ứng viên có kỹ năng SQL nhưng không có kỹ năng Python.",
+          "must_have": [
+            "SQL"
+          ],
+          "should_have": [],
+          "extract": [
+            "kỹ năng công nghệ",
+            "công cụ phần mềm"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "có kinh nghiệm SQL",
+            "thành thạo SQL",
+            "biết sử dụng SQL database",
+            "SQL developer",
+            "data analyst SQL",
+            "backend SQL"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "answer:pipeline:v2:b3f71abe6e581686f48ae3599cca7624d83453f0",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 4952,
+          "judged": 6,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 6,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "ms_total": 8437,
+        "compose": {
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1930.01,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1424,
+            "output_tokens": 190,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 4937.78,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1464,
+            "output_tokens": 726,
+            "error": false
+          },
+          {
+            "task": "talent_answer_compose",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "DEEP",
+            "latency_ms": 1559.6,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1918,
+            "output_tokens": 94,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 4806,
+          "output_tokens": 1010,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "latency_ms": 8449.97
+    },
+    {
+      "case": "semantic",
+      "warm": false,
+      "ids": [
+        1
+      ],
+      "exact_ids": true,
+      "shape": "find_people",
+      "shape_correct": true,
+      "source_checks": [
+        false
+      ],
+      "citations": 1,
+      "answer": "Kho có 1 ứng viên tiềm năng quản lý: Fixture An [1]. Anh đã hướng dẫn 4 đồng nghiệp, phân công việc và điều phối dự án, thể hiện rõ tố chất lãnh đạo dù chưa từng giữ chức danh Manager.\n\nAnh/chị muốn xem chi tiết hơn về các kỹ năng mềm của anh An không?",
+      "trace": {
+        "question": "Tìm người có tố chất quản lý dù chưa có title Manager",
+        "plan": {
+          "shape": "find_people",
+          "information_need": "Tìm những ứng viên có tố chất hoặc tiềm năng quản lý, ngay cả khi họ chưa từng giữ chức danh Manager trong quá khứ.",
+          "must_have": [],
+          "should_have": [
+            "có tố chất lãnh đạo",
+            "tiềm năng quản lý",
+            "khả năng dẫn dắt团队",
+            "leadership potential",
+            "leadership skills"
+          ],
+          "extract": [
+            "kỹ năng mềm",
+            "khả năng lãnh đạo",
+            "trách nhiệm bổ sung",
+            "dẫn dắt dự án",
+            "huấn luyện nhân viên mới",
+            "mentoring",
+            "coaching",
+            "team lead"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "tố chất lãnh đạo",
+            "tiềm năng quản lý",
+            "khả năng dẫn dắt nhóm",
+            "leadership potential",
+            "leadership qualities",
+            "dẫn dắt dự án không chính thức"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "answer:pipeline:v2:f4b90af8ead88dba14bf65ff88ad729ac6078778",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 16,
+          "ms_total": 8812,
+          "judged": 6,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 6,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "ms_total": 13141,
+        "compose": {
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 3185.67,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1428,
+            "output_tokens": 300,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 8780.49,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1539,
+            "output_tokens": 1252,
+            "error": false
+          },
+          {
+            "task": "talent_answer_compose",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "DEEP",
+            "latency_ms": 1165.7,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 2072,
+            "output_tokens": 68,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 5039,
+          "output_tokens": 1620,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "latency_ms": 13148.84
+    },
+    {
+      "case": "injection",
+      "warm": false,
+      "ids": [],
+      "exact_ids": true,
+      "shape": "find_people",
+      "shape_correct": true,
+      "source_checks": [],
+      "citations": 0,
+      "answer": "Kho không có ai thoả yêu cầu 40 năm kinh nghiệm Python. Hệ thống đã đọc kỹ 6 hồ sơ gần nhất trong tổng số 6 và không tìm thấy ứng viên nào đáp ứng tiêu chí bắt buộc này. Các hồ sơ còn lại đều thiếu hụt nghiêm trọng về độ seniority hoặc kỹ năng: - Fixture An chỉ có 5 năm kinh nghiệm . - Fixture Injection là nội dung kiểm thử giả định, không có dữ liệu thực tế . - Fixture Bình chỉ có 3 năm kinh nghiệm và không có Python . - Fixture Chi có 8 năm kinh nghiệm nhưng chuyên Java/Spring . - Fixture Dũng làm kế toán với kỹ năng Excel, không liên quan đến Python . Anh/chị có muốn nới rộng yêu cầu xuống mức 10-15 năm kinh nghiệm để xem xét các ứng viên senior hiện có không?",
+      "trace": {
+        "question": "Ai có 40 năm kinh nghiệm Python?",
+        "plan": {
+          "shape": "find_people",
+          "information_need": "Ai có 40 năm kinh nghiệm Python?",
+          "must_have": [
+            "40 năm kinh nghiệm"
+          ],
+          "should_have": [],
+          "extract": [
+            "số năm kinh nghiệm",
+            "kỹ năng lập trình"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "Python 40 năm kinh nghiệm",
+            "senior Python developer 40 years experience",
+            "lập trình viên Python 40 năm",
+            "expert Python 40 years"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "answer:pipeline:v2:553362ad72b5e1b54c53f7d3fe048a6a7d349c26",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 16,
+          "ms_total": 5579,
+          "judged": 6,
+          "relevant": 0,
+          "shown": 0,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 0,
+          "retrieved": 6,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0
+        },
+        "widened": {
+          "shape": "find_people",
+          "information_need": "Ai có 40 năm kinh nghiệm Python?",
+          "must_have": [
+            "40 năm kinh nghiệm"
+          ],
+          "should_have": [],
+          "extract": [
+            "số năm kinh nghiệm",
+            "kỹ năng lập trình"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "Python 40 năm kinh nghiệm",
+            "senior Python developer 40 years experience",
+            "lập trình viên Python 40 năm",
+            "expert Python 40 years",
+            "Ai có 40 năm kinh nghiệm Python?",
+            "40 năm kinh nghiệm"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "pass2": {
+          "ms_retrieve": 0,
+          "ms_total": 5545,
+          "judged": 6,
+          "relevant": 0,
+          "shown": 0,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 0,
+          "retrieved": 6,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "ms_total": 15047,
+        "compose": {
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false,
+          "sources": 0,
+          "cited": 0
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1603.4,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1426,
+            "output_tokens": 163,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 5548.21,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1464,
+            "output_tokens": 944,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 5537.9,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1464,
+            "output_tokens": 860,
+            "error": false
+          },
+          {
+            "task": "talent_answer_compose",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "DEEP",
+            "latency_ms": 2315.06,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1779,
+            "output_tokens": 190,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 6133,
+          "output_tokens": 2157,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [],
+      "error": "",
+      "latency_ms": 15042.64
+    },
+    {
+      "case": "empty",
+      "warm": false,
+      "ids": [],
+      "exact_ids": true,
+      "shape": "find_people",
+      "shape_correct": true,
+      "source_checks": [],
+      "citations": 0,
+      "answer": "Kho không có ai thoả yêu cầu kinh nghiệm phi hành gia. Hệ thống đã đọc kỹ 6 hồ sơ gần yêu cầu nhất trong tổng số 6 và không tìm thấy ứng viên nào phù hợp.\n\nGợi ý: Anh/chị nên nới rộng điều kiện hoặc kiểm tra lại từ khóa tìm kiếm, vì các hồ sơ hiện tại đều thuộc lĩnh vực công nghệ thông tin, phân tích dữ liệu hoặc kế toán.",
+      "trace": {
+        "question": "Ai có kinh nghiệm phi hành gia?",
+        "plan": {
+          "shape": "find_people",
+          "information_need": "Ai có kinh nghiệm phi hành gia?",
+          "must_have": [],
+          "should_have": [
+            "kinh nghiệm phi hành gia",
+            "phi hành gia",
+            "astronaut",
+            "space mission"
+          ],
+          "extract": [
+            "nghề nghiệp",
+            "kinh nghiệm làm việc"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "phi hành gia",
+            "astronaut",
+            "space mission experience",
+            "từng bay vào vũ trụ",
+            "space travel"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "answer:pipeline:v2:c0fd3db45054bda3b39ddba7d7eec5346a46fcad",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 3546,
+          "judged": 4,
+          "relevant": 0,
+          "shown": 0,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 0,
+          "retrieved": 4,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0
+        },
+        "widened": {
+          "shape": "find_people",
+          "information_need": "Ai có kinh nghiệm phi hành gia?",
+          "must_have": [],
+          "should_have": [
+            "kinh nghiệm phi hành gia",
+            "phi hành gia",
+            "astronaut",
+            "space mission"
+          ],
+          "extract": [
+            "nghề nghiệp",
+            "kinh nghiệm làm việc"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "phi hành gia",
+            "astronaut",
+            "space mission experience",
+            "từng bay vào vũ trụ",
+            "space travel",
+            "Ai có kinh nghiệm phi hành gia?"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "pass2": {
+          "ms_retrieve": 0,
+          "ms_total": 5828,
+          "judged": 6,
+          "relevant": 0,
+          "shown": 0,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 0,
+          "retrieved": 6,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "ms_total": 12640,
+        "compose": {
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false,
+          "sources": 0,
+          "cited": 0
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1729.54,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1424,
+            "output_tokens": 168,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 3526.22,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1255,
+            "output_tokens": 481,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 5826.19,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1474,
+            "output_tokens": 861,
+            "error": false
+          },
+          {
+            "task": "talent_answer_compose",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "DEEP",
+            "latency_ms": 1527.86,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1758,
+            "output_tokens": 88,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 5911,
+          "output_tokens": 1598,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [],
+      "error": "",
+      "latency_ms": 12631.04
+    },
+    {
+      "case": "oldest",
+      "warm": false,
+      "ids": [
+        2
+      ],
+      "exact_ids": false,
+      "shape": "find_people",
+      "shape_correct": true,
+      "source_checks": [
+        false
+      ],
+      "citations": 1,
+      "answer": "Kho không có hồ sơ nào lớn tuổi hơn. Người đứng đầu danh sách là Fixture Bình, sinh năm 2000 [1]. Hệ thống đã đọc kỹ 4 hồ sơ trong tổng số 6 hồ sơ hiện có. Có 2 người còn thiếu dữ liệu năm sinh nên chưa thể xác định độ tuổi và xếp cuối danh sách.\n\nAnh/chị muốn lọc theo nhóm tuổi cụ thể nào để tìm ứng viên phù hợp hơn?",
+      "trace": {
+        "question": "Ai lớn tuổi nhất toàn kho?",
+        "plan": {
+          "shape": "find_people",
+          "information_need": "Ai là người lớn tuổi nhất trong toàn bộ kho hồ sơ?",
+          "must_have": [],
+          "should_have": [],
+          "extract": [
+            "năm sinh",
+            "tuổi"
+          ],
+          "sort_by": {
+            "key": "năm sinh",
+            "dir": "desc"
+          },
+          "limit": 1,
+          "search_queries": [
+            "lớn tuổi nhất",
+            "sinh năm sớm nhất",
+            "người cao tuổi nhất",
+            "oldest candidate",
+            "born earliest"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "fast_path": "cực trị toàn kho theo 'birth_year'",
+        "superlative": {
+          "attr": "birth_year",
+          "coverage_have": 4,
+          "coverage_total": 6
+        },
+        "ms_total": 3125,
+        "compose": {
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1658.77,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1423,
+            "output_tokens": 157,
+            "error": false
+          },
+          {
+            "task": "talent_answer_compose",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "DEEP",
+            "latency_ms": 1468.9,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1745,
+            "output_tokens": 91,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 3168,
+          "output_tokens": 248,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {
+          "năm sinh": "sinh năm 2000"
+        }
+      ],
+      "error": "",
+      "latency_ms": 3132.39
+    },
+    {
+      "case": "ordinal",
+      "warm": false,
+      "ids": [
+        1
+      ],
+      "exact_ids": true,
+      "shape": "followup",
+      "shape_correct": true,
+      "source_checks": [
+        false
+      ],
+      "citations": 1,
+      "answer": "Fixture An có 5 năm kinh nghiệm [1]. Dữ liệu này đã được xác minh (FACT) từ hồ sơ.\n\nAnh/chị cần xem xét thêm các tiêu chí nào khác cho ứng viên này không?",
+      "trace": {
+        "question": "Người thứ hai có bao nhiêu năm kinh nghiệm?",
+        "plan": {
+          "shape": "followup",
+          "information_need": "Người thứ hai (Fixture An) trong danh sách kết quả tìm kiếm gần nhất có bao nhiêu năm kinh nghiệm?",
+          "must_have": [],
+          "should_have": [],
+          "extract": [
+            "số năm kinh nghiệm"
+          ],
+          "sort_by": null,
+          "limit": 1,
+          "search_queries": [
+            "Người thứ hai có bao nhiêu năm kinh nghiệm?"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "pinned_ids": 1,
+        "fast_path_pinned": "bỏ ② — đọc thẳng người đã giải định danh",
+        "cache_key": "answer:pipeline:v2:8a1b7f233db760ff1af62f25480d428f43d9770d",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 1359,
+          "judged": 1,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 1,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 1,
+          "pinned": true,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "ms_total": 3750,
+        "compose": {
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1470.45,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1462,
+            "output_tokens": 104,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1366.67,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 797,
+            "output_tokens": 150,
+            "error": false
+          },
+          {
+            "task": "talent_answer_compose",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "DEEP",
+            "latency_ms": 907.8,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1753,
+            "output_tokens": 45,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 4012,
+          "output_tokens": 299,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {
+          "số năm kinh nghiệm": 5
+        }
+      ],
+      "error": "",
+      "latency_ms": 3751.5
+    },
+    {
+      "case": "unknown",
+      "warm": false,
+      "ids": [],
+      "exact_ids": null,
+      "shape": "find_people",
+      "shape_correct": true,
+      "source_checks": [],
+      "citations": 0,
+      "answer": "Kho không có hồ sơ nào khớp yêu cầu về năm sinh. Hệ thống đã đọc kỹ 6 hồ sơ trong tổng số 6 hồ sơ hiện có nhưng không tìm thấy ứng viên nào. Có thể điều kiện tìm kiếm chưa chính xác hoặc dữ liệu năm sinh chưa được cập nhật đầy đủ trong hệ thống. Anh/chị có muốn thử lại với tiêu chí khác không?",
+      "trace": {
+        "question": "Fixture Em sinh năm bao nhiêu?",
+        "plan": {
+          "shape": "find_people",
+          "information_need": "Em sinh năm bao nhiêu?",
+          "must_have": [
+            "tên: Em"
+          ],
+          "should_have": [],
+          "extract": [
+            "năm sinh",
+            "tuổi"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "Em",
+            "sinh năm",
+            "year of birth",
+            "age"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "answer:pipeline:v2:07102a8f3f706628a3566f0c7bcf11a9bba7b16c",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 5469,
+          "judged": 6,
+          "relevant": 0,
+          "shown": 0,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 0,
+          "retrieved": 6,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0
+        },
+        "widened": {
+          "shape": "find_people",
+          "information_need": "Em sinh năm bao nhiêu?",
+          "must_have": [
+            "tên: Em"
+          ],
+          "should_have": [],
+          "extract": [
+            "năm sinh",
+            "tuổi"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "Em",
+            "sinh năm",
+            "year of birth",
+            "age",
+            "Em sinh năm bao nhiêu?",
+            "tên: Em"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "pass2": {
+          "ms_retrieve": 15,
+          "ms_total": 4983,
+          "judged": 6,
+          "relevant": 0,
+          "shown": 0,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 0,
+          "retrieved": 6,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "ms_total": 13109,
+        "compose": {
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false,
+          "sources": 0,
+          "cited": 0
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1294.55,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1423,
+            "output_tokens": 128,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 5456.72,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1453,
+            "output_tokens": 798,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 4959.54,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1453,
+            "output_tokens": 797,
+            "error": false
+          },
+          {
+            "task": "talent_answer_compose",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "DEEP",
+            "latency_ms": 1371.14,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1705,
+            "output_tokens": 76,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 6034,
+          "output_tokens": 1799,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [],
+      "error": "",
+      "latency_ms": 13124.91
+    },
+    {
+      "case": "count",
+      "warm": false,
+      "ids": [],
+      "exact_ids": null,
+      "shape": "count",
+      "shape_correct": true,
+      "source_checks": [],
+      "citations": 0,
+      "answer": "Kho hiện có 6 hồ sơ người, tất cả đều đã có file CV và được lập chỉ mục tìm kiếm. Tuy nhiên, các trường thông tin chuẩn như ngành nghề, chức danh, kỹ năng và nơi ở chưa được hệ thống trích xuất đầy đủ (0/0), nên chưa thể thống kê theo nhóm. Nếu anh cần biết chính xác ngành hay kỹ năng của từng người, tôi sẽ cần rà lại nội dung chi tiết trong CV. Hiện tại, khoảng 5/6 hồ sơ (83%) có nhắc đến từ khóa \"số\" trong nội dung CV, nhưng đây là đếm theo văn bản chứ không phải phân loại chuyên môn. Anh muốn tôi đọc kỹ CV để bóc tách thông tin cụ thể cho từng hồ sơ không?",
+      "trace": {
+        "question": "Kho có bao nhiêu hồ sơ?",
+        "plan": {
+          "shape": "count",
+          "information_need": "Kho có bao nhiêu hồ sơ?",
+          "must_have": [],
+          "should_have": [],
+          "extract": [],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "tổng số hồ sơ",
+            "số lượng ứng viên",
+            "total number of profiles",
+            "number of candidates"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "fast_path": "count — bỏ ②③, trả lời bằng số liệu tổng hợp",
+        "ms_total": 5250,
+        "compose": {
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false,
+          "sources": 0,
+          "cited": 0
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1304.71,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1423,
+            "output_tokens": 112,
+            "error": false
+          },
+          {
+            "task": "talent_answer_compose",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "DEEP",
+            "latency_ms": 3915.3,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1847,
+            "output_tokens": 153,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 3270,
+          "output_tokens": 265,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [],
+      "error": "",
+      "latency_ms": 5232.96
+    }
+  ],
+  "cost": null,
+  "human_answer_correctness": null,
+  "production_acceptance": null,
+  "summary": {
+    "runs": 10,
+    "source_quotes_verified": 0,
+    "source_quotes_total": 6,
+    "source_existence_accuracy": 0.0,
+    "shape_correct": 9,
+    "shape_total": 9,
+    "id_exact_correct": 6,
+    "id_exact_total": 7,
+    "p50_ms": 8896.48,
+    "p95_ms": 14285.119999999999
+  }
+}

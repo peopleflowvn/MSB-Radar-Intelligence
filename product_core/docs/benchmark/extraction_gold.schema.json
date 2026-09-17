@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Talent extraction gold label — một dòng worksheet.jsonl",
+  "description": "Xem docs/benchmark/README.md §1. Khoá 'gold' do người gán nhãn điền; null = chưa xem, \"\" = đã xem và CV không có.",
+  "type": "object",
+  "required": ["person_id", "document_id", "cv_text", "gold"],
+  "properties": {
+    "person_id": { "type": "integer" },
+    "document_id": { "type": "integer" },
+    "filename": { "type": "string" },
+    "observed_at": { "type": ["string", "null"], "format": "date-time" },
+    "current_derived": {
+      "type": "object",
+      "description": "Ảnh Hub suy ra hiện tại — chỉ để đối chiếu, KHÔNG sửa.",
+      "additionalProperties": true
+    },
+    "cv_text": { "type": "string" },
+    "gold": {
+      "type": "object",
+      "description": "Giá trị đúng do người gán nhãn điền.",
+      "additionalProperties": { "type": ["string", "number", "null"] },
+      "properties": {
+        "full_name": { "type": ["string", "null"] },
+        "email": { "type": ["string", "null"] },
+        "phone": { "type": ["string", "null"] },
+        "gender": { "type": ["string", "null"], "enum": ["nam", "nữ", "", null] },
+        "date_of_birth": { "type": ["string", "null"], "description": "YYYY-MM-DD hoặc YYYY" },
+        "city": { "type": ["string", "null"], "description": "Tên thành phố/tỉnh như CV viết; chuẩn hoá code là việc của Canonical Registry" },
+        "current_address": { "type": ["string", "null"] },
+        "current_title": { "type": ["string", "null"] },
+        "current_company": { "type": ["string", "null"] },
+        "years_experience": { "type": ["number", "string", "null"] },
+        "seniority": { "type": ["string", "null"] },
+        "education_level": { "type": ["string", "null"], "description": "vd: Cử nhân, Thạc sĩ, Cao đẳng" },
+        "university": { "type": ["string", "null"] },
+        "major": { "type": ["string", "null"] },
+        "graduation_year": { "type": ["string", "number", "null"] },
+        "gpa": { "type": ["string", "number", "null"] },
+        "skills": { "type": ["string", "null"], "description": "phân tách bằng ';'" },
+        "languages": { "type": ["string", "null"], "description": "phân tách bằng ';'" },
+        "certifications": { "type": ["string", "null"], "description": "phân tách bằng ';'" },
+        "expected_salary": { "type": ["string", "null"] },
+        "notice_period": { "type": ["string", "null"] },
+        "location_interest": { "type": ["string", "null"] },
+        "job_title_interest": { "type": ["string", "null"] },
+        "applied_position": { "type": ["string", "null"], "description": "Thường KHÔNG có trong CV — lấy từ SourceRecord Edge" },
+        "applied_date": { "type": ["string", "null"], "description": "YYYY-MM-DD; từ SourceRecord, không phải ngày Hub nhận" },
+        "requisition_id": { "type": ["string", "null"] },
+        "source": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

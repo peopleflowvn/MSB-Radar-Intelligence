@@ -1,0 +1,97 @@
+{
+  "suite": "deterministic_contracts",
+  "gold_version": 1,
+  "measurement_scope": "local real business functions; no live model or retrieval quality claim",
+  "passed": 14,
+  "total": 14,
+  "cases": [
+    {
+      "case": "widen_preserves_hard_constraints",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.026
+    },
+    {
+      "case": "widen_preserves_next_steps",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.012
+    },
+    {
+      "case": "ordinal_cache_order",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.023
+    },
+    {
+      "case": "json_false_is_not_true",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.074
+    },
+    {
+      "case": "boolean_id_is_not_integer_id",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.02
+    },
+    {
+      "case": "unverified_cannot_qualify",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.03
+    },
+    {
+      "case": "nan_confidence_not_high",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.002
+    },
+    {
+      "case": "infinite_confidence_not_high",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.001
+    },
+    {
+      "case": "duplicate_judge_ids",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.05
+    },
+    {
+      "case": "malformed_extraction_safe",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.028
+    },
+    {
+      "case": "malformed_citations_safe",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.011
+    },
+    {
+      "case": "unknown_citation_detected",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.366
+    },
+    {
+      "case": "partial_batch_detected",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.156
+    },
+    {
+      "case": "malformed_next_steps_safe",
+      "passed": true,
+      "error": "",
+      "latency_ms": 0.003
+    }
+  ],
+  "live_quality": null,
+  "input_tokens": null,
+  "output_tokens": null,
+  "cost_per_query": null
+}

@@ -1,0 +1,97 @@
+{
+  "suite": "deterministic_contracts",
+  "gold_version": 1,
+  "measurement_scope": "local real business functions; no live model or retrieval quality claim",
+  "passed": 0,
+  "total": 14,
+  "cases": [
+    {
+      "case": "widen_preserves_hard_constraints",
+      "passed": false,
+      "error": "",
+      "latency_ms": 0.013
+    },
+    {
+      "case": "widen_preserves_next_steps",
+      "passed": false,
+      "error": "",
+      "latency_ms": 0.003
+    },
+    {
+      "case": "ordinal_cache_order",
+      "passed": false,
+      "error": "",
+      "latency_ms": 0.014
+    },
+    {
+      "case": "json_false_is_not_true",
+      "passed": false,
+      "error": "",
+      "latency_ms": 0.092
+    },
+    {
+      "case": "boolean_id_is_not_integer_id",
+      "passed": false,
+      "error": "",
+      "latency_ms": 0.034
+    },
+    {
+      "case": "unverified_cannot_qualify",
+      "passed": false,
+      "error": "",
+      "latency_ms": 0.019
+    },
+    {
+      "case": "nan_confidence_not_high",
+      "passed": false,
+      "error": "",
+      "latency_ms": 0.002
+    },
+    {
+      "case": "infinite_confidence_not_high",
+      "passed": false,
+      "error": "",
+      "latency_ms": 0.003
+    },
+    {
+      "case": "duplicate_judge_ids",
+      "passed": false,
+      "error": "",
+      "latency_ms": 0.046
+    },
+    {
+      "case": "malformed_extraction_safe",
+      "passed": false,
+      "error": "AttributeError",
+      "latency_ms": 0.025
+    },
+    {
+      "case": "malformed_citations_safe",
+      "passed": false,
+      "error": "TypeError",
+      "latency_ms": 0.009
+    },
+    {
+      "case": "unknown_citation_detected",
+      "passed": false,
+      "error": "",
+      "latency_ms": 0.1
+    },
+    {
+      "case": "partial_batch_detected",
+      "passed": false,
+      "error": "",
+      "latency_ms": 0.5
+    },
+    {
+      "case": "malformed_next_steps_safe",
+      "passed": false,
+      "error": "TypeError",
+      "latency_ms": 0.004
+    }
+  ],
+  "live_quality": null,
+  "input_tokens": null,
+  "output_tokens": null,
+  "cost_per_query": null
+}

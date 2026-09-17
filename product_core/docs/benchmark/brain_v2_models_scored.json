@@ -1,0 +1,5367 @@
+{
+  "scorer_version": 2,
+  "sources": [
+    "brain_v2_models_probe.json",
+    "brain_v2_conversation_probe.json",
+    "brain_v2_new_models_probe.json",
+    "brain_v2_tool_calls.json"
+  ],
+  "corrections": [
+    "Original conversation harness passed a tuple instead of ModelRequest; rerun replaces all seven invalid probes.",
+    "Fallback plan is not model intent success. Incomplete judge is not no-result success.",
+    "Contract success also requires no failed/truncated attempts; source quote existence is not semantic entailment."
+  ],
+  "summary": [
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task": "compose",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 6056.54,
+      "p95_ms": 6056.54,
+      "known_input_tokens": 1730,
+      "known_output_tokens": 67,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task": "conversation",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 11624.09,
+      "p95_ms": 11624.09,
+      "known_input_tokens": 289,
+      "known_output_tokens": 190,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task": "extraction",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 6255.71,
+      "p95_ms": 6255.71,
+      "known_input_tokens": 369,
+      "known_output_tokens": 90,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task": "intent",
+      "n": 2,
+      "contract_success": 2,
+      "attempts": 2,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 10068.73,
+      "p95_ms": 11929.5,
+      "known_input_tokens": 524,
+      "known_output_tokens": 355,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task": "judge",
+      "n": 4,
+      "contract_success": 4,
+      "attempts": 6,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 20218.15,
+      "p95_ms": 32517.58,
+      "known_input_tokens": 6179,
+      "known_output_tokens": 2798,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task": "outreach",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 7582.41,
+      "p95_ms": 7582.41,
+      "known_input_tokens": 58,
+      "known_output_tokens": 130,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task": "plan",
+      "n": 4,
+      "contract_success": 4,
+      "attempts": 4,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 7780.4,
+      "p95_ms": 9284.91,
+      "known_input_tokens": 6079,
+      "known_output_tokens": 633,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task": "tool_call",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 4007.44,
+      "p95_ms": 4007.44,
+      "known_input_tokens": 269,
+      "known_output_tokens": 43,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task": "vision",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 658.07,
+      "p95_ms": 658.07,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task": "compose",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 2408.93,
+      "p95_ms": 2408.93,
+      "known_input_tokens": 1637,
+      "known_output_tokens": 71,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task": "conversation",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 4379.82,
+      "p95_ms": 4379.82,
+      "known_input_tokens": 276,
+      "known_output_tokens": 185,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task": "extraction",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 2878.23,
+      "p95_ms": 2878.23,
+      "known_input_tokens": 342,
+      "known_output_tokens": 103,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task": "intent",
+      "n": 2,
+      "contract_success": 2,
+      "attempts": 2,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 12543.22,
+      "p95_ms": 15694.5,
+      "known_input_tokens": 498,
+      "known_output_tokens": 1354,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task": "judge",
+      "n": 4,
+      "contract_success": 4,
+      "attempts": 4,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 13750.94,
+      "p95_ms": 15184.15,
+      "known_input_tokens": 4296,
+      "known_output_tokens": 3018,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task": "outreach",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 1994.84,
+      "p95_ms": 1994.84,
+      "known_input_tokens": 61,
+      "known_output_tokens": 72,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task": "plan",
+      "n": 4,
+      "contract_success": 4,
+      "attempts": 4,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 3847.05,
+      "p95_ms": 4377.81,
+      "known_input_tokens": 5738,
+      "known_output_tokens": 672,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task": "tool_call",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 1700.32,
+      "p95_ms": 1700.32,
+      "known_input_tokens": 383,
+      "known_output_tokens": 28,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task": "vision",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 2079.89,
+      "p95_ms": 2079.89,
+      "known_input_tokens": 137,
+      "known_output_tokens": 14,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task": "compose",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 1084.08,
+      "p95_ms": 1084.08,
+      "known_input_tokens": 1637,
+      "known_output_tokens": 52,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task": "conversation",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 5428.68,
+      "p95_ms": 5428.68,
+      "known_input_tokens": 276,
+      "known_output_tokens": 283,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task": "extraction",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 1069.0,
+      "p95_ms": 1069.0,
+      "known_input_tokens": 342,
+      "known_output_tokens": 103,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task": "intent",
+      "n": 2,
+      "contract_success": 2,
+      "attempts": 2,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 5482.01,
+      "p95_ms": 6294.78,
+      "known_input_tokens": 498,
+      "known_output_tokens": 1010,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task": "judge",
+      "n": 4,
+      "contract_success": 4,
+      "attempts": 4,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 5390.93,
+      "p95_ms": 5455.03,
+      "known_input_tokens": 4296,
+      "known_output_tokens": 3444,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task": "outreach",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 1457.92,
+      "p95_ms": 1457.92,
+      "known_input_tokens": 61,
+      "known_output_tokens": 76,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task": "plan",
+      "n": 4,
+      "contract_success": 4,
+      "attempts": 4,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 1937.24,
+      "p95_ms": 2257.95,
+      "known_input_tokens": 5738,
+      "known_output_tokens": 741,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task": "tool_call",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 604.27,
+      "p95_ms": 604.27,
+      "known_input_tokens": 383,
+      "known_output_tokens": 28,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task": "vision",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 2005.57,
+      "p95_ms": 2005.57,
+      "known_input_tokens": 137,
+      "known_output_tokens": 14,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task": "compose",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 203.98,
+      "p95_ms": 203.98,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task": "conversation",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 144.94,
+      "p95_ms": 144.94,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task": "extraction",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 224.0,
+      "p95_ms": 224.0,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task": "intent",
+      "n": 2,
+      "contract_success": 2,
+      "attempts": 2,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 738.89,
+      "p95_ms": 787.41,
+      "known_input_tokens": 525,
+      "known_output_tokens": 89,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task": "judge",
+      "n": 4,
+      "contract_success": 0,
+      "attempts": 12,
+      "errors": 12,
+      "truncated": 0,
+      "p50_ms": 487.78,
+      "p95_ms": 496.07,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 12
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task": "outreach",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 166.98,
+      "p95_ms": 166.98,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task": "plan",
+      "n": 4,
+      "contract_success": 0,
+      "attempts": 4,
+      "errors": 4,
+      "truncated": 0,
+      "p50_ms": 167.19,
+      "p95_ms": 184.36,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 4
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task": "tool_call",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 139.05,
+      "p95_ms": 139.05,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task": "vision",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 159.49,
+      "p95_ms": 159.49,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task": "compose",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 1205.68,
+      "p95_ms": 1205.68,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task": "conversation",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 3968.97,
+      "p95_ms": 3968.97,
+      "known_input_tokens": 276,
+      "known_output_tokens": 180,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task": "extraction",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 185.93,
+      "p95_ms": 185.93,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task": "intent",
+      "n": 2,
+      "contract_success": 2,
+      "attempts": 2,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 12739.3,
+      "p95_ms": 14129.93,
+      "known_input_tokens": 498,
+      "known_output_tokens": 1391,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task": "judge",
+      "n": 4,
+      "contract_success": 4,
+      "attempts": 4,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 14513.86,
+      "p95_ms": 15484.96,
+      "known_input_tokens": 4296,
+      "known_output_tokens": 3128,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task": "outreach",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 154.56,
+      "p95_ms": 154.56,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task": "plan",
+      "n": 4,
+      "contract_success": 4,
+      "attempts": 4,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 4486.08,
+      "p95_ms": 4938.87,
+      "known_input_tokens": 5738,
+      "known_output_tokens": 729,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task": "tool_call",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 1936.43,
+      "p95_ms": 1936.43,
+      "known_input_tokens": 383,
+      "known_output_tokens": 53,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task": "vision",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 161.69,
+      "p95_ms": 161.69,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task": "compose",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 5476.75,
+      "p95_ms": 5476.75,
+      "known_input_tokens": 2258,
+      "known_output_tokens": 484,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task": "conversation",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 5415.55,
+      "p95_ms": 5415.55,
+      "known_input_tokens": 403,
+      "known_output_tokens": 481,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task": "extraction",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 4479.97,
+      "p95_ms": 4479.97,
+      "known_input_tokens": 463,
+      "known_output_tokens": 423,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task": "intent",
+      "n": 2,
+      "contract_success": 2,
+      "attempts": 2,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 2173.59,
+      "p95_ms": 2196.1,
+      "known_input_tokens": 689,
+      "known_output_tokens": 298,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task": "judge",
+      "n": 4,
+      "contract_success": 3,
+      "attempts": 6,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 21889.54,
+      "p95_ms": 45455.46,
+      "known_input_tokens": 6355,
+      "known_output_tokens": 9027,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task": "outreach",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 1,
+      "p50_ms": 7633.48,
+      "p95_ms": 7633.48,
+      "known_input_tokens": 79,
+      "known_output_tokens": 701,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task": "plan",
+      "n": 4,
+      "contract_success": 1,
+      "attempts": 4,
+      "errors": 0,
+      "truncated": 3,
+      "p50_ms": 8863.54,
+      "p95_ms": 9179.47,
+      "known_input_tokens": 7982,
+      "known_output_tokens": 3539,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task": "tool_call",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 2130.83,
+      "p95_ms": 2130.83,
+      "known_input_tokens": 425,
+      "known_output_tokens": 141,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task": "vision",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 1627.97,
+      "p95_ms": 1627.97,
+      "known_input_tokens": 13,
+      "known_output_tokens": 70,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "compose",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 8604.18,
+      "p95_ms": 8604.18,
+      "known_input_tokens": 2258,
+      "known_output_tokens": 453,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "conversation",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 10000.8,
+      "p95_ms": 10000.8,
+      "known_input_tokens": 403,
+      "known_output_tokens": 589,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "extraction",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 8167.84,
+      "p95_ms": 8167.84,
+      "known_input_tokens": 463,
+      "known_output_tokens": 478,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "intent",
+      "n": 2,
+      "contract_success": 1,
+      "attempts": 2,
+      "errors": 0,
+      "truncated": 1,
+      "p50_ms": 4235.44,
+      "p95_ms": 4300.52,
+      "known_input_tokens": 689,
+      "known_output_tokens": 343,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "judge",
+      "n": 4,
+      "contract_success": 1,
+      "attempts": 10,
+      "errors": 6,
+      "truncated": 0,
+      "p50_ms": 66757.57,
+      "p95_ms": 72447.82,
+      "known_input_tokens": 4766,
+      "known_output_tokens": 5039,
+      "unknown_usage_attempts": 6
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "outreach",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 1,
+      "p50_ms": 12433.15,
+      "p95_ms": 12433.15,
+      "known_input_tokens": 79,
+      "known_output_tokens": 701,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "plan",
+      "n": 4,
+      "contract_success": 0,
+      "attempts": 4,
+      "errors": 0,
+      "truncated": 4,
+      "p50_ms": 14944.07,
+      "p95_ms": 16101.04,
+      "known_input_tokens": 7982,
+      "known_output_tokens": 3604,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "tool_call",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 2793.63,
+      "p95_ms": 2793.63,
+      "known_input_tokens": 425,
+      "known_output_tokens": 100,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "vision",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 1,
+      "p50_ms": 9712.36,
+      "p95_ms": 9712.36,
+      "known_input_tokens": 13,
+      "known_output_tokens": 501,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "compose",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 135.5,
+      "p95_ms": 135.5,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "conversation",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 381.75,
+      "p95_ms": 381.75,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "extraction",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 131.51,
+      "p95_ms": 131.51,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "intent",
+      "n": 2,
+      "contract_success": 0,
+      "attempts": 2,
+      "errors": 2,
+      "truncated": 0,
+      "p50_ms": 132.42,
+      "p95_ms": 139.83,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 2
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "judge",
+      "n": 4,
+      "contract_success": 0,
+      "attempts": 12,
+      "errors": 12,
+      "truncated": 0,
+      "p50_ms": 720.22,
+      "p95_ms": 1111.19,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 12
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "outreach",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 117.38,
+      "p95_ms": 117.38,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "plan",
+      "n": 4,
+      "contract_success": 0,
+      "attempts": 4,
+      "errors": 4,
+      "truncated": 0,
+      "p50_ms": 410.64,
+      "p95_ms": 684.05,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 4
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "tool_call",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 424.74,
+      "p95_ms": 424.74,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "vision",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 251.66,
+      "p95_ms": 251.66,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "compose",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 5444.55,
+      "p95_ms": 5444.55,
+      "known_input_tokens": 1827,
+      "known_output_tokens": 252,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "conversation",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 1,
+      "p50_ms": 11883.38,
+      "p95_ms": 11883.38,
+      "known_input_tokens": 295,
+      "known_output_tokens": 600,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "extraction",
+      "n": 1,
+      "contract_success": 1,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 11653.23,
+      "p95_ms": 11653.23,
+      "known_input_tokens": 428,
+      "known_output_tokens": 800,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "intent",
+      "n": 2,
+      "contract_success": 0,
+      "attempts": 2,
+      "errors": 0,
+      "truncated": 2,
+      "p50_ms": 4087.57,
+      "p95_ms": 4272.04,
+      "known_input_tokens": 630,
+      "known_output_tokens": 360,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "judge",
+      "n": 4,
+      "contract_success": 3,
+      "attempts": 6,
+      "errors": 2,
+      "truncated": 0,
+      "p50_ms": 18160.18,
+      "p95_ms": 46358.92,
+      "known_input_tokens": 4415,
+      "known_output_tokens": 4241,
+      "unknown_usage_attempts": 2
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "outreach",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 1,
+      "p50_ms": 11287.59,
+      "p95_ms": 11287.59,
+      "known_input_tokens": 64,
+      "known_output_tokens": 700,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "plan",
+      "n": 4,
+      "contract_success": 4,
+      "attempts": 4,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 7038.57,
+      "p95_ms": 8865.65,
+      "known_input_tokens": 6383,
+      "known_output_tokens": 1720,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "tool_call",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 0,
+      "truncated": 0,
+      "p50_ms": 5415.82,
+      "p95_ms": 5415.82,
+      "known_input_tokens": 269,
+      "known_output_tokens": 42,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "vision",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 653.43,
+      "p95_ms": 653.43,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    },
+    {
+      "model": "baai/bge-m3",
+      "task": "conversation",
+      "n": 1,
+      "contract_success": 0,
+      "attempts": 1,
+      "errors": 1,
+      "truncated": 0,
+      "p50_ms": 127.08,
+      "p95_ms": 127.08,
+      "known_input_tokens": 0,
+      "known_output_tokens": 0,
+      "unknown_usage_attempts": 1
+    }
+  ],
+  "rows": [
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "plan",
+      "case": "unaccented",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 1506,
+          "output_tokens": 137,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 7748.17
+        }
+      ],
+      "latency_ms": 7752.49
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "plan",
+      "case": "not",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 1508,
+          "output_tokens": 164,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 7804.68
+        }
+      ],
+      "latency_ms": 7808.32
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "plan",
+      "case": "ordinal",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "followup"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 1552,
+          "output_tokens": 128,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 7001.4
+        }
+      ],
+      "latency_ms": 7004.1
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "plan",
+      "case": "multi",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": true,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 1513,
+          "output_tokens": 204,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 9543.36
+        }
+      ],
+      "latency_ms": 9545.49
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "judge",
+      "case": "semantic",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 1113,
+          "output_tokens": 617,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 18079.49
+        }
+      ],
+      "latency_ms": 18082.64
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "judge",
+      "case": "and",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 1112,
+          "output_tokens": 263,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 11310.02
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 888,
+          "output_tokens": 263,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 10821.06
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 831,
+          "output_tokens": 274,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 12517.97
+        }
+      ],
+      "latency_ms": 34652.74
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "judge",
+      "case": "injection",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": true,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 1128,
+          "output_tokens": 720,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 20415.67
+        }
+      ],
+      "latency_ms": 20418.33
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "intent",
+      "case": "mixed",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 261,
+          "output_tokens": 101,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 7999.31
+        }
+      ],
+      "latency_ms": 8001.2
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "judge",
+      "case": "empty",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": true,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 1107,
+          "output_tokens": 661,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 20015.86
+        }
+      ],
+      "latency_ms": 20017.97
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "extraction",
+      "case": "extraction",
+      "repeat": 0,
+      "checks": {
+        "sql_extracted": true,
+        "parse_failed": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "candidate_extraction",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 369,
+          "output_tokens": 90,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 6253.39
+        }
+      ],
+      "latency_ms": 6255.71
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "intent",
+      "case": "web",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 263,
+          "output_tokens": 254,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 12133.84
+        }
+      ],
+      "latency_ms": 12136.25
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "compose",
+      "case": "compose",
+      "repeat": 0,
+      "checks": {
+        "cited": true,
+        "names_expected_person": true,
+        "fallback": false,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_compose",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 1730,
+          "output_tokens": 67,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 6039.21
+        }
+      ],
+      "latency_ms": 6056.54
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "vision",
+      "case": "vision",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMError",
+      "calls": [
+        {
+          "task": "cv_ocr",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 421.11
+        }
+      ],
+      "latency_ms": 658.07
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "outreach",
+      "case": "outreach",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "workflow_acceptance": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_outreach",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 58,
+          "output_tokens": 130,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 7580.47
+        }
+      ],
+      "latency_ms": 7582.41
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "plan",
+      "case": "unaccented",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 1423,
+          "output_tokens": 155,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 3531.5
+        }
+      ],
+      "latency_ms": 3533.47
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "plan",
+      "case": "not",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 1425,
+          "output_tokens": 208,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 4413.23
+        }
+      ],
+      "latency_ms": 4416.13
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "plan",
+      "case": "ordinal",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "followup"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 1462,
+          "output_tokens": 103,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 2475.17
+        }
+      ],
+      "latency_ms": 2478.23
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "plan",
+      "case": "multi",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": true,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 1428,
+          "output_tokens": 206,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 4158.93
+        }
+      ],
+      "latency_ms": 4160.63
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "judge",
+      "case": "and",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 1071,
+          "output_tokens": 717,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 13207.85
+        }
+      ],
+      "latency_ms": 13210.03
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "judge",
+      "case": "semantic",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 1071,
+          "output_tokens": 780,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 14289.67
+        }
+      ],
+      "latency_ms": 14291.84
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "judge",
+      "case": "injection",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": true,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 1088,
+          "output_tokens": 854,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 15339.06
+        }
+      ],
+      "latency_ms": 15341.62
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "judge",
+      "case": "empty",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": true,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 1066,
+          "output_tokens": 667,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 12139.75
+        }
+      ],
+      "latency_ms": 12141.89
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "intent",
+      "case": "mixed",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 248,
+          "output_tokens": 470,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 9039.72
+        }
+      ],
+      "latency_ms": 9041.81
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "extraction",
+      "case": "extraction",
+      "repeat": 0,
+      "checks": {
+        "sql_extracted": true,
+        "parse_failed": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "candidate_extraction",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 342,
+          "output_tokens": 103,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 2876.48
+        }
+      ],
+      "latency_ms": 2878.23
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "compose",
+      "case": "compose",
+      "repeat": 0,
+      "checks": {
+        "cited": true,
+        "names_expected_person": true,
+        "fallback": false,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_compose",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 1637,
+          "output_tokens": 71,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 2405.39
+        }
+      ],
+      "latency_ms": 2408.93
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "outreach",
+      "case": "outreach",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "workflow_acceptance": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_outreach",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 61,
+          "output_tokens": 72,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 1993.65
+        }
+      ],
+      "latency_ms": 1994.84
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "intent",
+      "case": "web",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 250,
+          "output_tokens": 884,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 16041.26
+        }
+      ],
+      "latency_ms": 16044.64
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "vision",
+      "case": "vision",
+      "repeat": 0,
+      "checks": {
+        "ocr_exact_fields": true,
+        "scanned_cv_acceptance": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "cv_ocr",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 137,
+          "output_tokens": 14,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 2075.24
+        }
+      ],
+      "latency_ms": 2079.89
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "plan",
+      "case": "unaccented",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 1423,
+          "output_tokens": 168,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 1706.36
+        }
+      ],
+      "latency_ms": 1708.27
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "plan",
+      "case": "not",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 1425,
+          "output_tokens": 213,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 2162.4
+        }
+      ],
+      "latency_ms": 2166.22
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "plan",
+      "case": "ordinal",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "followup"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 1462,
+          "output_tokens": 137,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 1214.78
+        }
+      ],
+      "latency_ms": 1216.83
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "plan",
+      "case": "multi",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": true,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 1428,
+          "output_tokens": 223,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 2271.74
+        }
+      ],
+      "latency_ms": 2274.14
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "judge",
+      "case": "and",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 1071,
+          "output_tokens": 870,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5189.09
+        }
+      ],
+      "latency_ms": 5192.6
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "judge",
+      "case": "semantic",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 1071,
+          "output_tokens": 809,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5374.19
+        }
+      ],
+      "latency_ms": 5376.46
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "judge",
+      "case": "injection",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": true,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 1088,
+          "output_tokens": 907,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5457.65
+        }
+      ],
+      "latency_ms": 5463.79
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "judge",
+      "case": "empty",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": true,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 1066,
+          "output_tokens": 858,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5403.0
+        }
+      ],
+      "latency_ms": 5405.4
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "intent",
+      "case": "mixed",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 248,
+          "output_tokens": 423,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 4576.17
+        }
+      ],
+      "latency_ms": 4578.94
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "extraction",
+      "case": "extraction",
+      "repeat": 0,
+      "checks": {
+        "sql_extracted": true,
+        "parse_failed": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "candidate_extraction",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 342,
+          "output_tokens": 103,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 1056.3
+        }
+      ],
+      "latency_ms": 1069.0
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "compose",
+      "case": "compose",
+      "repeat": 0,
+      "checks": {
+        "cited": true,
+        "names_expected_person": true,
+        "fallback": false,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_compose",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 1637,
+          "output_tokens": 52,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 972.87
+        }
+      ],
+      "latency_ms": 1084.08
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "outreach",
+      "case": "outreach",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "workflow_acceptance": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_outreach",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 61,
+          "output_tokens": 76,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 1444.24
+        }
+      ],
+      "latency_ms": 1457.92
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "intent",
+      "case": "web",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 250,
+          "output_tokens": 587,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 6383.1
+        }
+      ],
+      "latency_ms": 6385.09
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "plan",
+      "case": "unaccented",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people",
+        "pipeline_shape_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 157.2
+        }
+      ],
+      "latency_ms": 161.34
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "plan",
+      "case": "not",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people",
+        "pipeline_shape_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 181.86
+        }
+      ],
+      "latency_ms": 186.36
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "plan",
+      "case": "ordinal",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people",
+        "pipeline_shape_correct": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 168.19
+        }
+      ],
+      "latency_ms": 173.03
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "plan",
+      "case": "multi",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "fallback": true,
+        "next_step_correct": false,
+        "shape": "find_people",
+        "pipeline_shape_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 152.8
+        }
+      ],
+      "latency_ms": 157.42
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "judge",
+      "case": "and",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": 0.0,
+        "precision_at_k": null,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 174.19
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 154.88
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 150.32
+        }
+      ],
+      "latency_ms": 486.19
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "vision",
+      "case": "vision",
+      "repeat": 0,
+      "checks": {
+        "ocr_exact_fields": true,
+        "scanned_cv_acceptance": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "cv_ocr",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 137,
+          "output_tokens": 14,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 1994.1
+        }
+      ],
+      "latency_ms": 2005.57
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "judge",
+      "case": "semantic",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": 0.0,
+        "precision_at_k": null,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 144.69
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 171.89
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 175.73
+        }
+      ],
+      "latency_ms": 497.25
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "judge",
+      "case": "injection",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": false,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 139.65
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 139.49
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 158.34
+        }
+      ],
+      "latency_ms": 442.13
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "judge",
+      "case": "empty",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": false,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 149.72
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 182.47
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 152.39
+        }
+      ],
+      "latency_ms": 489.38
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "intent",
+      "case": "mixed",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": 261,
+          "output_tokens": 48,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 788.55
+        }
+      ],
+      "latency_ms": 792.8
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "intent",
+      "case": "web",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": 264,
+          "output_tokens": 41,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 680.41
+        }
+      ],
+      "latency_ms": 684.98
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "extraction",
+      "case": "extraction",
+      "repeat": 0,
+      "checks": {
+        "sql_extracted": false,
+        "parse_failed": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "candidate_extraction",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 201.3
+        }
+      ],
+      "latency_ms": 224.0
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "compose",
+      "case": "compose",
+      "repeat": 0,
+      "checks": {
+        "cited": true,
+        "names_expected_person": true,
+        "fallback": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_compose",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 167.13
+        }
+      ],
+      "latency_ms": 203.98
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "outreach",
+      "case": "outreach",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMError",
+      "calls": [
+        {
+          "task": "assistant_outreach",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 164.75
+        }
+      ],
+      "latency_ms": 166.98
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "vision",
+      "case": "vision",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMError",
+      "calls": [
+        {
+          "task": "cv_ocr",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 149.22
+        }
+      ],
+      "latency_ms": 159.49
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "plan",
+      "case": "unaccented",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 1423,
+          "output_tokens": 190,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 4448.66
+        }
+      ],
+      "latency_ms": 4452.86
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "plan",
+      "case": "not",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 1425,
+          "output_tokens": 223,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5004.73
+        }
+      ],
+      "latency_ms": 5012.91
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "plan",
+      "case": "ordinal",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "followup"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 1462,
+          "output_tokens": 109,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 2577.33
+        }
+      ],
+      "latency_ms": 2585.14
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "plan",
+      "case": "multi",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": true,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 1428,
+          "output_tokens": 207,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 4510.41
+        }
+      ],
+      "latency_ms": 4519.3
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "judge",
+      "case": "and",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 1071,
+          "output_tokens": 754,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 13986.5
+        }
+      ],
+      "latency_ms": 13997.59
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "judge",
+      "case": "semantic",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 1071,
+          "output_tokens": 857,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 15556.77
+        }
+      ],
+      "latency_ms": 15565.22
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "judge",
+      "case": "injection",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": true,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 1088,
+          "output_tokens": 815,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 15026.95
+        }
+      ],
+      "latency_ms": 15030.13
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "judge",
+      "case": "empty",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": true,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 1066,
+          "output_tokens": 702,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 12907.12
+        }
+      ],
+      "latency_ms": 12909.34
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "intent",
+      "case": "web",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 250,
+          "output_tokens": 609,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 11190.44
+        }
+      ],
+      "latency_ms": 11194.16
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "extraction",
+      "case": "extraction",
+      "repeat": 0,
+      "checks": {
+        "sql_extracted": false,
+        "parse_failed": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "candidate_extraction",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 183.3
+        }
+      ],
+      "latency_ms": 185.93
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "intent",
+      "case": "mixed",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 248,
+          "output_tokens": 782,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 14281.63
+        }
+      ],
+      "latency_ms": 14284.44
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "outreach",
+      "case": "outreach",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMUnavailable",
+      "calls": [
+        {
+          "task": "assistant_outreach",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 152.54
+        }
+      ],
+      "latency_ms": 154.56
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "vision",
+      "case": "vision",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMUnavailable",
+      "calls": [
+        {
+          "task": "cv_ocr",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 151.61
+        }
+      ],
+      "latency_ms": 161.69
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "compose",
+      "case": "compose",
+      "repeat": 0,
+      "checks": {
+        "cited": true,
+        "names_expected_person": true,
+        "fallback": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_compose",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 1201.05
+        }
+      ],
+      "latency_ms": 1205.68
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "plan",
+      "case": "unaccented",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 1976,
+          "output_tokens": 836,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 8158.45
+        }
+      ],
+      "latency_ms": 8161.39
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "plan",
+      "case": "not",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people",
+        "pipeline_shape_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 1984,
+          "output_tokens": 901,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 8664.97
+        }
+      ],
+      "latency_ms": 8670.16
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "plan",
+      "case": "ordinal",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people",
+        "pipeline_shape_correct": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 2034,
+          "output_tokens": 901,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 9197.84
+        }
+      ],
+      "latency_ms": 9201.1
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "plan",
+      "case": "multi",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "fallback": true,
+        "next_step_correct": false,
+        "shape": "find_people",
+        "pipeline_shape_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 1988,
+          "output_tokens": 901,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 9052.58
+        }
+      ],
+      "latency_ms": 9056.92
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "judge",
+      "case": "and",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 1391,
+          "output_tokens": 1975,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 17776.57
+        }
+      ],
+      "latency_ms": 17780.99
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "judge",
+      "case": "semantic",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 1397,
+          "output_tokens": 2412,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 22353.63
+        }
+      ],
+      "latency_ms": 22358.07
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "judge",
+      "case": "injection",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": true,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 1413,
+          "output_tokens": 2215,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 21412.62
+        }
+      ],
+      "latency_ms": 21421.01
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "intent",
+      "case": "mixed",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 342,
+          "output_tokens": 148,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 2145.94
+        }
+      ],
+      "latency_ms": 2148.57
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "intent",
+      "case": "web",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 347,
+          "output_tokens": 150,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 2193.21
+        }
+      ],
+      "latency_ms": 2198.6
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "extraction",
+      "case": "extraction",
+      "repeat": 0,
+      "checks": {
+        "sql_extracted": true,
+        "parse_failed": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "candidate_extraction",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 463,
+          "output_tokens": 423,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 4476.06
+        }
+      ],
+      "latency_ms": 4479.97
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "compose",
+      "case": "compose",
+      "repeat": 0,
+      "checks": {
+        "cited": true,
+        "names_expected_person": true,
+        "fallback": false,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_compose",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 2258,
+          "output_tokens": 484,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5447.93
+        }
+      ],
+      "latency_ms": 5476.75
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "outreach",
+      "case": "outreach",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "workflow_acceptance": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_outreach",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 79,
+          "output_tokens": 701,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 7632.48
+        }
+      ],
+      "latency_ms": 7633.48
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "vision",
+      "case": "vision",
+      "repeat": 0,
+      "checks": {
+        "ocr_exact_fields": false,
+        "scanned_cv_acceptance": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "cv_ocr",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 13,
+          "output_tokens": 70,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 1617.53
+        }
+      ],
+      "latency_ms": 1627.97
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "judge",
+      "case": "empty",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": true,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 25102.07
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 1113,
+          "output_tokens": 813,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 8293.91
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 1041,
+          "output_tokens": 1612,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 16130.04
+        }
+      ],
+      "latency_ms": 49531.47
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "plan",
+      "case": "unaccented",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people",
+        "pipeline_shape_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 1976,
+          "output_tokens": 901,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 14579.63
+        }
+      ],
+      "latency_ms": 14586.78
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "plan",
+      "case": "not",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people",
+        "pipeline_shape_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 1984,
+          "output_tokens": 901,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 16265.32
+        }
+      ],
+      "latency_ms": 16269.56
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "plan",
+      "case": "ordinal",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people",
+        "pipeline_shape_correct": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 2034,
+          "output_tokens": 901,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 15140.04
+        }
+      ],
+      "latency_ms": 15146.07
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "plan",
+      "case": "multi",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "fallback": true,
+        "next_step_correct": false,
+        "shape": "find_people",
+        "pipeline_shape_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 1988,
+          "output_tokens": 901,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 14736.07
+        }
+      ],
+      "latency_ms": 14742.07
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "judge",
+      "case": "and",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 25093.3
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 1117,
+          "output_tokens": 1419,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 22729.8
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 25225.43
+        }
+      ],
+      "latency_ms": 73055.27
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "judge",
+      "case": "semantic",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 25103.82
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 1123,
+          "output_tokens": 1236,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 18787.24
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 25108.72
+        }
+      ],
+      "latency_ms": 69005.58
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "judge",
+      "case": "empty",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": true,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 1387,
+          "output_tokens": 1491,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 23414.52
+        }
+      ],
+      "latency_ms": 23418.89
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "intent",
+      "case": "mixed",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 342,
+          "output_tokens": 181,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 4155.66
+        }
+      ],
+      "latency_ms": 4163.13
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "intent",
+      "case": "web",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": true
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 347,
+          "output_tokens": 162,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 4303.62
+        }
+      ],
+      "latency_ms": 4307.75
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "extraction",
+      "case": "extraction",
+      "repeat": 0,
+      "checks": {
+        "sql_extracted": true,
+        "parse_failed": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "candidate_extraction",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 463,
+          "output_tokens": 478,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 8160.47
+        }
+      ],
+      "latency_ms": 8167.84
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "compose",
+      "case": "compose",
+      "repeat": 0,
+      "checks": {
+        "cited": true,
+        "names_expected_person": true,
+        "fallback": false,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_compose",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 2258,
+          "output_tokens": 453,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 8584.63
+        }
+      ],
+      "latency_ms": 8604.18
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "judge",
+      "case": "injection",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": false,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 25306.84
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 1139,
+          "output_tokens": 893,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 14084.83
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 25105.89
+        }
+      ],
+      "latency_ms": 64509.55
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "outreach",
+      "case": "outreach",
+      "repeat": 0,
+      "checks": {
+        "has_answer": false,
+        "workflow_acceptance": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_outreach",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 79,
+          "output_tokens": 701,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 12430.85
+        }
+      ],
+      "latency_ms": 12433.15
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "vision",
+      "case": "vision",
+      "repeat": 0,
+      "checks": {
+        "ocr_exact_fields": false,
+        "scanned_cv_acceptance": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "cv_ocr",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 13,
+          "output_tokens": 501,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 9700.93
+        }
+      ],
+      "latency_ms": 9712.36
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {},
+      "error": "ModelError",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 368.34
+        }
+      ],
+      "latency_ms": 381.75
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 276,
+          "output_tokens": 185,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 4378.01
+        }
+      ],
+      "latency_ms": 4379.82
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 276,
+          "output_tokens": 283,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5425.63
+        }
+      ],
+      "latency_ms": 5428.68
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 289,
+          "output_tokens": 190,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 11622.64
+        }
+      ],
+      "latency_ms": 11624.09
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {},
+      "error": "ModelError",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 142.03
+        }
+      ],
+      "latency_ms": 144.94
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 276,
+          "output_tokens": 180,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 3966.23
+        }
+      ],
+      "latency_ms": 3968.97
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 403,
+          "output_tokens": 481,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5413.15
+        }
+      ],
+      "latency_ms": 5415.55
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 295,
+          "output_tokens": 600,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 11880.88
+        }
+      ],
+      "latency_ms": 11883.38
+    },
+    {
+      "model": "baai/bge-m3",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {},
+      "error": "ModelError",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "baai/bge-m3",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 124.6
+        }
+      ],
+      "latency_ms": 127.08
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 403,
+          "output_tokens": 589,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 9998.55
+        }
+      ],
+      "latency_ms": 10000.8
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "plan",
+      "case": "unaccented",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "pipeline_shape_correct": false,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 435.37
+        }
+      ],
+      "latency_ms": 437.5
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "plan",
+      "case": "not",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "pipeline_shape_correct": false,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 725.49
+        }
+      ],
+      "latency_ms": 727.56
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "plan",
+      "case": "ordinal",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "pipeline_shape_correct": false,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 381.46
+        }
+      ],
+      "latency_ms": 383.79
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "plan",
+      "case": "multi",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "pipeline_shape_correct": false,
+        "fallback": true,
+        "next_step_correct": false,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 326.67
+        }
+      ],
+      "latency_ms": 329.07
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "judge",
+      "case": "and",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": 0.0,
+        "precision_at_k": null,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 500.52
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 317.13
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 305.79
+        }
+      ],
+      "latency_ms": 1126.49
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "judge",
+      "case": "semantic",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": 0.0,
+        "precision_at_k": null,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 310.98
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 295.69
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 414.74
+        }
+      ],
+      "latency_ms": 1024.46
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "judge",
+      "case": "injection",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": false,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 152.05
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 121.89
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 138.49
+        }
+      ],
+      "latency_ms": 415.97
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "judge",
+      "case": "empty",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": false,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 141.77
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 120.43
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 125.17
+        }
+      ],
+      "latency_ms": 390.52
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "intent",
+      "case": "mixed",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMUnavailable",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 122.34
+        }
+      ],
+      "latency_ms": 124.19
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "intent",
+      "case": "web",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMUnavailable",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 138.32
+        }
+      ],
+      "latency_ms": 140.65
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "extraction",
+      "case": "extraction",
+      "repeat": 0,
+      "checks": {
+        "sql_extracted": false,
+        "parse_failed": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "candidate_extraction",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 126.22
+        }
+      ],
+      "latency_ms": 131.51
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "outreach",
+      "case": "outreach",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMUnavailable",
+      "calls": [
+        {
+          "task": "assistant_outreach",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 115.03
+        }
+      ],
+      "latency_ms": 117.38
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "compose",
+      "case": "compose",
+      "repeat": 0,
+      "checks": {
+        "cited": true,
+        "names_expected_person": true,
+        "fallback": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_compose",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 110.59
+        }
+      ],
+      "latency_ms": 135.5
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "vision",
+      "case": "vision",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMUnavailable",
+      "calls": [
+        {
+          "task": "cv_ocr",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 119.64
+        }
+      ],
+      "latency_ms": 251.66
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "plan",
+      "case": "unaccented",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "pipeline_shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1582,
+          "output_tokens": 361,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 6321.17
+        }
+      ],
+      "latency_ms": 6322.87
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "plan",
+      "case": "not",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "pipeline_shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1584,
+          "output_tokens": 494,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 7751.79
+        }
+      ],
+      "latency_ms": 7754.28
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "plan",
+      "case": "ordinal",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "pipeline_shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "followup"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1628,
+          "output_tokens": 303,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5102.13
+        }
+      ],
+      "latency_ms": 5104.26
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "plan",
+      "case": "multi",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "pipeline_shape_correct": true,
+        "fallback": false,
+        "next_step_correct": true,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1589,
+          "output_tokens": 562,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 9059.89
+        }
+      ],
+      "latency_ms": 9061.77
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "judge",
+      "case": "and",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1171,
+          "output_tokens": 871,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 11830.69
+        }
+      ],
+      "latency_ms": 11836.25
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "judge",
+      "case": "semantic",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1172,
+          "output_tokens": 1453,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 19604.72
+        }
+      ],
+      "latency_ms": 19610.38
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "judge",
+      "case": "empty",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": true,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1166,
+          "output_tokens": 1170,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 16707.46
+        }
+      ],
+      "latency_ms": 16709.98
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "intent",
+      "case": "mixed",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 314,
+          "output_tokens": 180,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 4290.77
+        }
+      ],
+      "latency_ms": 4292.54
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "intent",
+      "case": "web",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 316,
+          "output_tokens": 180,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 3880.23
+        }
+      ],
+      "latency_ms": 3882.61
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "extraction",
+      "case": "extraction",
+      "repeat": 0,
+      "checks": {
+        "sql_extracted": true,
+        "parse_failed": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "candidate_extraction",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 428,
+          "output_tokens": 800,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 11649.93
+        }
+      ],
+      "latency_ms": 11653.23
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "judge",
+      "case": "injection",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": false,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 20098.93
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 20200.88
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 906,
+          "output_tokens": 747,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 10774.24
+        }
+      ],
+      "latency_ms": 51079.25
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "compose",
+      "case": "compose",
+      "repeat": 0,
+      "checks": {
+        "cited": true,
+        "names_expected_person": true,
+        "fallback": false,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_compose",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1827,
+          "output_tokens": 252,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5436.85
+        }
+      ],
+      "latency_ms": 5444.55
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "vision",
+      "case": "vision",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMError",
+      "calls": [
+        {
+          "task": "cv_ocr",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 642.05
+        }
+      ],
+      "latency_ms": 653.43
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "outreach",
+      "case": "outreach",
+      "repeat": 0,
+      "checks": {
+        "has_answer": false,
+        "workflow_acceptance": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_outreach",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 64,
+          "output_tokens": 700,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 11285.38
+        }
+      ],
+      "latency_ms": 11287.59
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": true,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 383,
+          "output_tokens": 28,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 1698.87
+        }
+      ],
+      "latency_ms": 1700.32
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": true,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 383,
+          "output_tokens": 28,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 602.09
+        }
+      ],
+      "latency_ms": 604.27
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMError",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 136.78
+        }
+      ],
+      "latency_ms": 139.05
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": true,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 269,
+          "output_tokens": 43,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 4004.93
+        }
+      ],
+      "latency_ms": 4007.44
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": true,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 383,
+          "output_tokens": 53,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 1934.52
+        }
+      ],
+      "latency_ms": 1936.43
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": true,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 425,
+          "output_tokens": 141,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 2128.38
+        }
+      ],
+      "latency_ms": 2130.83
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMError",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 422.87
+        }
+      ],
+      "latency_ms": 424.74
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": true,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 425,
+          "output_tokens": 100,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 2790.34
+        }
+      ],
+      "latency_ms": 2793.63
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": false,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 269,
+          "output_tokens": 42,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5413.4
+        }
+      ],
+      "latency_ms": 5415.82
+    }
+  ],
+  "cost": null,
+  "human_acceptance": null
+}

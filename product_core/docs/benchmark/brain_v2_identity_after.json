@@ -1,0 +1,400 @@
+{
+  "scope": "Live GreenNode, real engine/retrieval, 6 fictional people; SQLite fallback, no dense vectors. Model pinned for this experiment only.",
+  "model": "qwen/qwen3.6-flash",
+  "gold_version": 1,
+  "rows": [
+    {
+      "case": "unknown",
+      "warm": false,
+      "ids": [],
+      "exact_ids": null,
+      "shape": "find_people",
+      "shape_correct": true,
+      "source_checks": [],
+      "sources": [],
+      "citations": 0,
+      "answer": "Có hồ sơ Fixture Em trong kho, nhưng bằng chứng đã đọc chưa đủ để trả lời hoặc xác nhận đầy đủ yêu cầu.",
+      "trace": {
+        "question": "Fixture Em sinh năm bao nhiêu?",
+        "plan": {
+          "shape": "find_people",
+          "information_need": "Em sinh năm bao nhiêu?",
+          "must_have": [
+            "tên Em"
+          ],
+          "should_have": [],
+          "extract": [
+            "năm sinh",
+            "tuổi"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "Em",
+            "sinh năm",
+            "year of birth",
+            "age"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "pinned_ids": 1,
+        "fast_path_pinned": "bỏ ② — đọc thẳng người đã giải định danh",
+        "cache_key": "answer:pipeline:v2:dbfe416883f6b485336a43460715a07cf23f284b",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 1342,
+          "judged": 1,
+          "relevant": 0,
+          "shown": 0,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 0,
+          "retrieved": 1,
+          "pinned": true,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 1,
+          "judge_reused": 0,
+          "identified_people": [
+            "Fixture Em"
+          ],
+          "scope": "explicit_people",
+          "scope_size": 1
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "ms_total": 2890,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 0,
+          "cited": 0,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1541.05,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1440,
+            "output_tokens": 127,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1330.49,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 677,
+            "output_tokens": 139,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 2117,
+          "output_tokens": 266,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [],
+      "error": "",
+      "unknown_fact_correct": true,
+      "latency_ms": 2881.05
+    },
+    {
+      "case": "unknown",
+      "warm": false,
+      "ids": [],
+      "exact_ids": null,
+      "shape": "find_people",
+      "shape_correct": true,
+      "source_checks": [],
+      "sources": [],
+      "citations": 0,
+      "answer": "Có hồ sơ Fixture Em trong kho, nhưng bằng chứng đã đọc chưa đủ để trả lời hoặc xác nhận đầy đủ yêu cầu.",
+      "trace": {
+        "question": "Fixture Em sinh năm bao nhiêu?",
+        "plan": {
+          "shape": "find_people",
+          "information_need": "Em sinh năm bao nhiêu?",
+          "must_have": [
+            "tên: Em"
+          ],
+          "should_have": [],
+          "extract": [
+            "năm sinh",
+            "tuổi"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "Em",
+            "sinh năm",
+            "year of birth",
+            "dob"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "pinned_ids": 1,
+        "fast_path_pinned": "bỏ ② — đọc thẳng người đã giải định danh",
+        "cache_key": "answer:pipeline:v2:dbfe416883f6b485336a43460715a07cf23f284b",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 1531,
+          "judged": 1,
+          "relevant": 0,
+          "shown": 0,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 0,
+          "retrieved": 1,
+          "pinned": true,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 1,
+          "judge_reused": 0,
+          "identified_people": [
+            "Fixture Em"
+          ],
+          "scope": "explicit_people",
+          "scope_size": 1
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "ms_total": 2782,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 0,
+          "cited": 0,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1246.59,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1440,
+            "output_tokens": 128,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1526.51,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 678,
+            "output_tokens": 141,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 2118,
+          "output_tokens": 269,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [],
+      "error": "",
+      "unknown_fact_correct": true,
+      "latency_ms": 2779.84
+    },
+    {
+      "case": "unknown",
+      "warm": false,
+      "ids": [],
+      "exact_ids": null,
+      "shape": "find_people",
+      "shape_correct": true,
+      "source_checks": [],
+      "sources": [],
+      "citations": 0,
+      "answer": "Có hồ sơ Fixture Em trong kho, nhưng bằng chứng đã đọc chưa đủ để trả lời hoặc xác nhận đầy đủ yêu cầu.",
+      "trace": {
+        "question": "Fixture Em sinh năm bao nhiêu?",
+        "plan": {
+          "shape": "find_people",
+          "information_need": "Fixture Em sinh năm bao nhiêu?",
+          "must_have": [
+            "tên Fixture Em"
+          ],
+          "should_have": [],
+          "extract": [
+            "năm sinh",
+            "tuổi"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "Fixture Em",
+            "Em Fixture",
+            "tên Fixture Em"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "pinned_ids": 1,
+        "fast_path_pinned": "bỏ ② — đọc thẳng người đã giải định danh",
+        "cache_key": "answer:pipeline:v2:dbfe416883f6b485336a43460715a07cf23f284b",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 1515,
+          "judged": 1,
+          "relevant": 0,
+          "shown": 0,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 0,
+          "retrieved": 1,
+          "pinned": true,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 1,
+          "judge_reused": 0,
+          "identified_people": [
+            "Fixture Em"
+          ],
+          "scope": "explicit_people",
+          "scope_size": 1
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "ms_total": 3092,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 0,
+          "cited": 0,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1564.2,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1440,
+            "output_tokens": 126,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1513.5,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 679,
+            "output_tokens": 167,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 2119,
+          "output_tokens": 293,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [],
+      "error": "",
+      "unknown_fact_correct": true,
+      "latency_ms": 3084.55
+    }
+  ],
+  "cost": null,
+  "human_answer_correctness": null,
+  "production_acceptance": null,
+  "started_at": "2026-09-07T18:11:47.244321+00:00",
+  "runtime_sha256": {
+    "talent\\answer\\__init__.py": "23b0f8d1a161af2a7e90d3eb98cf054b0e043219e832c0cc2a35372352c022d1",
+    "talent\\answer\\act.py": "93d6f398973e57741c5116d3184372a6cc6b56a8c19895030f9f5eb43366ea46",
+    "talent\\answer\\aggregate.py": "4c3fc3258416e67115e1d6c796898cfcb004fbecb0a3a10f682a1048fde3da69",
+    "talent\\answer\\cache.py": "8c9f1bfda589d86ce422444e9b212a4deddef1be1366bff6e0b53a5a6e9da335",
+    "talent\\answer\\chat.py": "501d4ee5684037c922966f4d04ce53331786d01092e641eb9756c59a97e3edb2",
+    "talent\\answer\\compose.py": "2f6b0d3ee496ec276a0ec315acffe780d609a30e73f63a42729efc22942741de",
+    "talent\\answer\\corpus.py": "b38e875fdd7efca5741a1fbe93cecf8173d63223c3c72d232ec741eafa7288b5",
+    "talent\\answer\\engine.py": "198ab1069640036afa517dd7bd2fc874ab81786349ffd51879a7fcc13c5a13de",
+    "talent\\answer\\judge.py": "f296f2cc56405c68cab171a22f5b7b6d495eaa5dcc7ef458160ddaa0dedb8a0a",
+    "talent\\answer\\plan.py": "7be286cc2ebb10718c8ba9344a510f03686020dbd4003d9850d5f824bb4ae277",
+    "talent\\answer\\resolve.py": "c59b5fcb1bfb82dcb1de748c89fc7b6362b4531778f10116e5b2fc18c3b0d928",
+    "talent\\answer\\retrieve.py": "dd4abbaa70c78c7c164a0924b172f03e1601032fb7af1455126d18d129212787",
+    "talent\\answer\\runner.py": "6542f061a9c87643f990c6560283fcb8150fab296f3ade63079dc5a4f90243a0",
+    "talent\\answer\\structured_match.py": "def19fe101158f98621c1c64da8604cecdc00d1c1f1dd19f33555812b4fe359d",
+    "talent\\answer\\superlative.py": "4d8c1cc12222cea30fc4f35cb606d198c22d37f04f8b07944f998b5dec97ec25",
+    "talent\\answer\\verify.py": "f36b5ffa85f8d2bdd9e0cf140b781e57edd20b92c7d2e795becd88f7604aee3f"
+  },
+  "summary": {
+    "runs": 3,
+    "source_quotes_verified": 0,
+    "source_quotes_total": 0,
+    "source_existence_accuracy": null,
+    "shape_correct": 3,
+    "shape_total": 3,
+    "id_exact_correct": 0,
+    "id_exact_total": 0,
+    "p50_ms": 2881.05,
+    "p95_ms": 3064.2000000000003
+  }
+}

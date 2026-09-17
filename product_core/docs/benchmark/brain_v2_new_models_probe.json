@@ -1,0 +1,1033 @@
+{
+  "scorer_version": 2,
+  "scope": "Live task probes on synthetic fixture v1; not production/human acceptance. Outreach and vision are isolated template probes.",
+  "models_discovered": [
+    "z-ai/glm-5.3-flash-thirdparty",
+    "z-ai/glm-5.2-hackathon",
+    "qwen/qwen3.6-plus",
+    "qwen/qwen3.6-flash",
+    "z-ai/glm-5.2-thirdparty",
+    "google/gemma-4-31b-it",
+    "qwen/qwen3.7-plus",
+    "deepseek/deepseek-v4-flash",
+    "deepseek/deepseek-v4-pro",
+    "baai/bge-m3"
+  ],
+  "repeats": 1,
+  "saved_routes_changed": false,
+  "cost": null,
+  "rows": [
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "plan",
+      "case": "unaccented",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "pipeline_shape_correct": true,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 435.37
+        }
+      ],
+      "latency_ms": 437.5
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "plan",
+      "case": "not",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "pipeline_shape_correct": true,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 725.49
+        }
+      ],
+      "latency_ms": 727.56
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "plan",
+      "case": "ordinal",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "pipeline_shape_correct": false,
+        "fallback": true,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 381.46
+        }
+      ],
+      "latency_ms": 383.79
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "plan",
+      "case": "multi",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": false,
+        "pipeline_shape_correct": true,
+        "fallback": true,
+        "next_step_correct": false,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 326.67
+        }
+      ],
+      "latency_ms": 329.07
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "judge",
+      "case": "and",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": 0.0,
+        "precision_at_k": null,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 500.52
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 317.13
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 305.79
+        }
+      ],
+      "latency_ms": 1126.49
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "judge",
+      "case": "semantic",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": 0.0,
+        "precision_at_k": null,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 310.98
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 295.69
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 414.74
+        }
+      ],
+      "latency_ms": 1024.46
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "judge",
+      "case": "injection",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": false,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 152.05
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 121.89
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 138.49
+        }
+      ],
+      "latency_ms": 415.97
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "judge",
+      "case": "empty",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": false,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 141.77
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 120.43
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 125.17
+        }
+      ],
+      "latency_ms": 390.52
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "intent",
+      "case": "mixed",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMUnavailable",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 122.34
+        }
+      ],
+      "latency_ms": 124.19
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "intent",
+      "case": "web",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMUnavailable",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 138.32
+        }
+      ],
+      "latency_ms": 140.65
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "extraction",
+      "case": "extraction",
+      "repeat": 0,
+      "checks": {
+        "sql_extracted": false,
+        "parse_failed": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "candidate_extraction",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 126.22
+        }
+      ],
+      "latency_ms": 131.51
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "outreach",
+      "case": "outreach",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMUnavailable",
+      "calls": [
+        {
+          "task": "assistant_outreach",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 115.03
+        }
+      ],
+      "latency_ms": 117.38
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "compose",
+      "case": "compose",
+      "repeat": 0,
+      "checks": {
+        "cited": true,
+        "names_expected_person": true,
+        "fallback": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_compose",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 110.59
+        }
+      ],
+      "latency_ms": 135.5
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "vision",
+      "case": "vision",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMUnavailable",
+      "calls": [
+        {
+          "task": "cv_ocr",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 119.64
+        }
+      ],
+      "latency_ms": 251.66
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "plan",
+      "case": "unaccented",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "pipeline_shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1582,
+          "output_tokens": 361,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 6321.17
+        }
+      ],
+      "latency_ms": 6322.87
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "plan",
+      "case": "not",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "pipeline_shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1584,
+          "output_tokens": 494,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 7751.79
+        }
+      ],
+      "latency_ms": 7754.28
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "plan",
+      "case": "ordinal",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "pipeline_shape_correct": true,
+        "fallback": false,
+        "next_step_correct": null,
+        "shape": "followup"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1628,
+          "output_tokens": 303,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5102.13
+        }
+      ],
+      "latency_ms": 5104.26
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "plan",
+      "case": "multi",
+      "repeat": 0,
+      "checks": {
+        "shape_correct": true,
+        "pipeline_shape_correct": true,
+        "fallback": false,
+        "next_step_correct": true,
+        "shape": "find_people"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_plan",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1589,
+          "output_tokens": 562,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 9059.89
+        }
+      ],
+      "latency_ms": 9061.77
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "judge",
+      "case": "and",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1171,
+          "output_tokens": 871,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 11830.69
+        }
+      ],
+      "latency_ms": 11836.25
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "judge",
+      "case": "semantic",
+      "repeat": 0,
+      "checks": {
+        "ids": [
+          1
+        ],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": 1.0,
+        "precision_at_k": 1.0,
+        "no_result_correct": null,
+        "duplicates": 0,
+        "verified_source_quotes": 1,
+        "evidence_count": 1
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1172,
+          "output_tokens": 1453,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 19604.72
+        }
+      ],
+      "latency_ms": 19610.38
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "judge",
+      "case": "empty",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": true,
+        "read_incomplete": false,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": true,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1166,
+          "output_tokens": 1170,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 16707.46
+        }
+      ],
+      "latency_ms": 16709.98
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "intent",
+      "case": "mixed",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 314,
+          "output_tokens": 180,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 4290.77
+        }
+      ],
+      "latency_ms": 4292.54
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "intent",
+      "case": "web",
+      "repeat": 0,
+      "checks": {
+        "intent_correct": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_intent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 316,
+          "output_tokens": 180,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 3880.23
+        }
+      ],
+      "latency_ms": 3882.61
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "extraction",
+      "case": "extraction",
+      "repeat": 0,
+      "checks": {
+        "sql_extracted": true,
+        "parse_failed": false
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "candidate_extraction",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 428,
+          "output_tokens": 800,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 11649.93
+        }
+      ],
+      "latency_ms": 11653.23
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "judge",
+      "case": "injection",
+      "repeat": 0,
+      "checks": {
+        "ids": [],
+        "exact_ids": false,
+        "read_incomplete": true,
+        "recall_at_k": null,
+        "precision_at_k": null,
+        "no_result_correct": false,
+        "duplicates": 0,
+        "verified_source_quotes": 0,
+        "evidence_count": 0
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 20098.93
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMUnavailable",
+          "ok": false,
+          "latency_ms": 20200.88
+        },
+        {
+          "task": "talent_answer_judge",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 906,
+          "output_tokens": 747,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 10774.24
+        }
+      ],
+      "latency_ms": 51079.25
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "compose",
+      "case": "compose",
+      "repeat": 0,
+      "checks": {
+        "cited": true,
+        "names_expected_person": true,
+        "fallback": false,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "talent_answer_compose",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 1827,
+          "output_tokens": 252,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5436.85
+        }
+      ],
+      "latency_ms": 5444.55
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "vision",
+      "case": "vision",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMError",
+      "calls": [
+        {
+          "task": "cv_ocr",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 642.05
+        }
+      ],
+      "latency_ms": 653.43
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "outreach",
+      "case": "outreach",
+      "repeat": 0,
+      "checks": {
+        "has_answer": false,
+        "workflow_acceptance": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_outreach",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 64,
+          "output_tokens": 700,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 11285.38
+        }
+      ],
+      "latency_ms": 11287.59
+    }
+  ],
+  "summary": [
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "compose",
+      "n": 1,
+      "attempts": 1,
+      "errors": 1,
+      "p50_ms": 135.5,
+      "p95_ms": 135.5,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "extraction",
+      "n": 1,
+      "attempts": 1,
+      "errors": 1,
+      "p50_ms": 131.51,
+      "p95_ms": 131.51,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "intent",
+      "n": 2,
+      "attempts": 2,
+      "errors": 2,
+      "p50_ms": 132.42000000000002,
+      "p95_ms": 139.827,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "judge",
+      "n": 4,
+      "attempts": 12,
+      "errors": 12,
+      "p50_ms": 720.215,
+      "p95_ms": 1111.1855,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "outreach",
+      "n": 1,
+      "attempts": 1,
+      "errors": 1,
+      "p50_ms": 117.38,
+      "p95_ms": 117.38,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "plan",
+      "n": 4,
+      "attempts": 4,
+      "errors": 4,
+      "p50_ms": 410.645,
+      "p95_ms": 684.0509999999998,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "vision",
+      "n": 1,
+      "attempts": 1,
+      "errors": 1,
+      "p50_ms": 251.66,
+      "p95_ms": 251.66,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "compose",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 5444.55,
+      "p95_ms": 5444.55,
+      "input_tokens": 1827,
+      "output_tokens": 252
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "extraction",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 11653.23,
+      "p95_ms": 11653.23,
+      "input_tokens": 428,
+      "output_tokens": 800
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "intent",
+      "n": 2,
+      "attempts": 2,
+      "errors": 0,
+      "p50_ms": 4087.575,
+      "p95_ms": 4272.0435,
+      "input_tokens": 630,
+      "output_tokens": 360
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "judge",
+      "n": 4,
+      "attempts": 6,
+      "errors": 2,
+      "p50_ms": 18160.18,
+      "p95_ms": 46358.91949999999,
+      "input_tokens": 4415,
+      "output_tokens": 4241
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "outreach",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 11287.59,
+      "p95_ms": 11287.59,
+      "input_tokens": 64,
+      "output_tokens": 700
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "plan",
+      "n": 4,
+      "attempts": 4,
+      "errors": 0,
+      "p50_ms": 7038.575,
+      "p95_ms": 8865.646499999999,
+      "input_tokens": 6383,
+      "output_tokens": 1720
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "vision",
+      "n": 1,
+      "attempts": 1,
+      "errors": 1,
+      "p50_ms": 653.43,
+      "p95_ms": 653.43,
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  ]
+}

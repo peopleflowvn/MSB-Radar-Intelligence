@@ -1,0 +1,371 @@
+{
+  "scorer_version": 2,
+  "scope": "Live task probes on synthetic fixture v1; not production/human acceptance. Outreach and vision are isolated template probes.",
+  "models_discovered": [
+    "z-ai/glm-5.3-flash-thirdparty",
+    "z-ai/glm-5.2-hackathon",
+    "qwen/qwen3.6-plus",
+    "qwen/qwen3.6-flash",
+    "z-ai/glm-5.2-thirdparty",
+    "google/gemma-4-31b-it",
+    "qwen/qwen3.7-plus",
+    "deepseek/deepseek-v4-flash",
+    "deepseek/deepseek-v4-pro",
+    "baai/bge-m3"
+  ],
+  "repeats": 1,
+  "saved_routes_changed": false,
+  "cost": null,
+  "rows": [
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {},
+      "error": "ModelError",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 368.34
+        }
+      ],
+      "latency_ms": 381.75
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 276,
+          "output_tokens": 185,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 4378.01
+        }
+      ],
+      "latency_ms": 4379.82
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 276,
+          "output_tokens": 283,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5425.63
+        }
+      ],
+      "latency_ms": 5428.68
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 289,
+          "output_tokens": 190,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 11622.64
+        }
+      ],
+      "latency_ms": 11624.09
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {},
+      "error": "ModelError",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 142.03
+        }
+      ],
+      "latency_ms": 144.94
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 276,
+          "output_tokens": 180,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 3966.23
+        }
+      ],
+      "latency_ms": 3968.97
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 403,
+          "output_tokens": 481,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5413.15
+        }
+      ],
+      "latency_ms": 5415.55
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 295,
+          "output_tokens": 600,
+          "error": "",
+          "truncated": true,
+          "ok": true,
+          "latency_ms": 11880.88
+        }
+      ],
+      "latency_ms": 11883.38
+    },
+    {
+      "model": "baai/bge-m3",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {},
+      "error": "ModelError",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "baai/bge-m3",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 124.6
+        }
+      ],
+      "latency_ms": 127.08
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "conversation",
+      "case": "conversation",
+      "repeat": 0,
+      "checks": {
+        "has_answer": true,
+        "answer_correctness": null
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_conversation",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 403,
+          "output_tokens": 589,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 9998.55
+        }
+      ],
+      "latency_ms": 10000.8
+    }
+  ],
+  "summary": [
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "conversation",
+      "n": 1,
+      "attempts": 1,
+      "errors": 1,
+      "p50_ms": 381.75,
+      "p95_ms": 381.75,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task": "conversation",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 11624.09,
+      "p95_ms": 11624.09,
+      "input_tokens": 289,
+      "output_tokens": 190
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task": "conversation",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 4379.82,
+      "p95_ms": 4379.82,
+      "input_tokens": 276,
+      "output_tokens": 185
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task": "conversation",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 5428.68,
+      "p95_ms": 5428.68,
+      "input_tokens": 276,
+      "output_tokens": 283
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "conversation",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 11883.38,
+      "p95_ms": 11883.38,
+      "input_tokens": 295,
+      "output_tokens": 600
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task": "conversation",
+      "n": 1,
+      "attempts": 1,
+      "errors": 1,
+      "p50_ms": 144.94,
+      "p95_ms": 144.94,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task": "conversation",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 3968.97,
+      "p95_ms": 3968.97,
+      "input_tokens": 276,
+      "output_tokens": 180
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task": "conversation",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 5415.55,
+      "p95_ms": 5415.55,
+      "input_tokens": 403,
+      "output_tokens": 481
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "conversation",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 10000.8,
+      "p95_ms": 10000.8,
+      "input_tokens": 403,
+      "output_tokens": 589
+    },
+    {
+      "model": "baai/bge-m3",
+      "task": "conversation",
+      "n": 1,
+      "attempts": 1,
+      "errors": 1,
+      "p50_ms": 127.08,
+      "p95_ms": 127.08,
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  ]
+}

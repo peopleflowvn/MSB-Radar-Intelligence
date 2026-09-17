@@ -20,6 +20,8 @@ gây hiểu nhầm.
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
 from collections import Counter
 
 from django.db.models import Count, Q
@@ -142,6 +144,181 @@ def overview():
             "phan_bo": buckets,
         },
     }
+
+
+#: Trường thống kê được: tên trường TalentProfile -> (nhãn, là danh sách JSON?).
+#: Danh sách đóng — tên trường đến từ model/tool call nên không được đi thẳng vào ORM.
+BREAKDOWN_FIELDS = {
+    "skills": ("Kỹ năng", True),
+    "industries": ("Ngành từng làm", True),
+    "current_title": ("Chức danh hiện tại", False),
+    "current_company": ("Công ty hiện tại", False),
+    "location": ("Nơi ở", False),
+    "desired_location": ("Nơi làm việc mong muốn", False),
+    "seniority": ("Cấp bậc", False),
+}
+BREAKDOWN_MAX_LIMIT = 30
+BREAKDOWN_MAX_FILTERS = 3
+
+
+def _as_values(raw, is_list):
+    if is_list:
+        if isinstance(raw, str):
+            raw = [raw]
+        if not isinstance(raw, list):
+            return []
+        return list(dict.fromkeys(" ".join(v.split()) for v in raw
+                                  if isinstance(v, str) and v.strip()))
+    text = " ".join(str(raw or "").split())
+    return [text] if text else []
+
+
+def _value_matches(values, needle):
+    """Khớp nguyên cụm đã bỏ dấu — "java" không được khớp "javascript"."""
+    target = f" {needle} "
+    return any(target in f" {_fold_plain(v)} " for v in values)
+
+
+def _fold_plain(text):
+    folded = unicodedata.normalize("NFD", str(text or "").casefold())
+    folded = "".join(ch for ch in folded if unicodedata.category(ch) != "Mn")
+    return " ".join(re.sub(r"[^\w+#.]+", " ", folded.replace("đ", "d")).split())
+
+
+def breakdown(field, *, filters=None, limit=TOP_N):
+    """Phân bố giá trị của MỘT trường, trên nhóm hồ sơ thoả `filters`. Tất định.
+
+    `overview()` chỉ trả lời được toàn kho; câu "kỹ năng phổ biến nhất của ứng
+    viên ở Hà Nội" cần lọc trước rồi mới đếm. Lọc bằng khớp nguyên cụm đã bỏ dấu
+    trên chính các trường có cấu trúc — không dùng LLM, không dùng truy hồi —
+    và báo riêng độ phủ của trường lọc: hồ sơ để trống "nơi ở" KHÔNG phải là
+    người ở ngoài Hà Nội, chỉ là không biết.
+
+    Ném `ValueError` khi tên trường/giá trị lọc không hợp lệ.
+    """
+    from talent.models import TalentProfile
+
+    if field not in BREAKDOWN_FIELDS:
+        raise ValueError(f"trường không thống kê được: {field}")
+    clean_filters = {}
+    for name, value in dict(filters or {}).items():
+        if name not in BREAKDOWN_FIELDS:
+            raise ValueError(f"trường lọc không hợp lệ: {name}")
+        needle = _fold_plain(value)
+        if needle:
+            clean_filters[name] = needle
+    if len(clean_filters) > BREAKDOWN_MAX_FILTERS:
+        raise ValueError(f"tối đa {BREAKDOWN_MAX_FILTERS} điều kiện lọc")
+    limit = max(1, min(int(limit or TOP_N), BREAKDOWN_MAX_LIMIT))
+
+    columns = list(dict.fromkeys([field, *clean_filters]))
+    profiles = TalentProfile.objects.filter(person__merged_into__isnull=True,
+                                            person__is_applicant=True)
+    total = profiles.count()
+    filter_filled = {name: 0 for name in clean_filters}
+    population = filled = 0
+    counter = Counter()
+    for row in profiles.values_list(*columns).iterator(chunk_size=500):
+        by_name = dict(zip(columns, row))
+        matched = True
+        for name, needle in clean_filters.items():
+            values = _as_values(by_name[name], BREAKDOWN_FIELDS[name][1])
+            if values:
+                filter_filled[name] += 1
+            if not _value_matches(values, needle):
+                matched = False
+        if not matched:
+            continue
+        population += 1
+        values = _as_values(by_name[field], BREAKDOWN_FIELDS[field][1])
+        if values:
+            filled += 1
+            counter.update(values)
+
+    block = _block(BREAKDOWN_FIELDS[field][0], counter.most_common(limit), filled, population)
+    block.update({
+        "field": field,
+        "filters": [{"field": name, "label": BREAKDOWN_FIELDS[name][0],
+                     "value": dict(filters)[name], "filled": filter_filled[name],
+                     "total": total}
+                    for name in clean_filters],
+        "store_total": total,
+    })
+    return block
+
+
+def describe_breakdown(block):
+    """Một đoạn văn gọn, đủ độ phủ, để nhét vào prompt."""
+    scope = "toàn kho"
+    if block["filters"]:
+        scope = " và ".join(f"{f['label'].lower()} khớp \"{f['value']}\"" for f in block["filters"])
+    lines = [f"THỐNG KÊ CÓ LỌC ({block['label']}, nhóm hồ sơ có {scope}; tính tất định trên "
+             "trường có cấu trúc):",
+             f"- Nhóm thoả điều kiện: {block['total']}/{block['store_total']} hồ sơ."]
+    for f in block["filters"]:
+        lines.append(f"- Chỉ {f['filled']}/{f['total']} hồ sơ có điền {f['label'].lower()}; "
+                     "hồ sơ để trống không được tính vào nhóm, KHÔNG có nghĩa là không thoả.")
+    if block["meaningful"]:
+        top = ", ".join(f"{item['value']} ({item['count']})" for item in block["top"])
+        lines.append(f"- {block['label']} (có ở {block['filled']}/{block['total']} hồ sơ "
+                     f"trong nhóm): {top}.")
+    else:
+        lines.append(f"- {block['label']}: chỉ {block['filled']}/{block['total']} hồ sơ trong "
+                     "nhóm có trường này nên chưa đủ để xếp hạng.")
+    return "\n".join(lines)
+
+
+#: Từ khoá (đã bỏ dấu) -> trường người dùng muốn xếp hạng.
+_TARGET_WORDS = (
+    ("ky nang", "skills"), ("skill", "skills"), ("nganh", "industries"),
+    ("chuc danh", "current_title"), ("vi tri", "current_title"),
+    ("cong ty", "current_company"), ("noi lam viec mong muon", "desired_location"),
+    ("noi o", "location"), ("dia diem", "location"), ("tinh thanh", "location"),
+    ("cap bac", "seniority"),
+)
+#: Trường mà một giá trị nhắc trong câu hỏi có thể dùng làm điều kiện lọc.
+_FILTER_FIELDS = ("location", "industries", "current_title", "skills", "current_company")
+_MIN_FILTER_LEN = 3
+#: Từ của chính câu hỏi — trùng một giá trị rác trong kho ("Kho", "Nhân sự")
+#: cũng không được biến thành điều kiện lọc.
+_QUESTION_WORDS = {"kho", "ho so", "ung vien", "cv", "nguoi", "nhat", "nhieu",
+                   "pho bien", "top", "thong ke", "trong", "cua", "nhung", "nhan su"}
+
+
+def breakdown_for_question(text):
+    """Nhận ra câu "<trường> phổ biến … của nhóm <giá trị có thật trong kho>".
+
+    Chỉ trả block khi CẢ HAI chắc chắn: có từ khoá trường cần xếp hạng, và câu
+    hỏi chứa nguyên cụm một giá trị ĐÃ CÓ trong kho ở trường khác. Không đoán —
+    không khớp thì trả None và câu hỏi đi đường `overview()` như cũ.
+    """
+    from talent.models import TalentProfile
+
+    folded = f" {_fold_plain(text)} "
+    target = next((name for word, name in _TARGET_WORDS if f" {word} " in folded), None)
+    if target is None:
+        return None
+    profiles = TalentProfile.objects.filter(person__merged_into__isnull=True,
+                                            person__is_applicant=True)
+    best = None
+    for name in _FILTER_FIELDS:
+        if name == target:
+            continue
+        is_list = BREAKDOWN_FIELDS[name][1]
+        if is_list:
+            pairs, _ = _top_from_json_list(profiles, name, limit=200)
+        else:
+            pairs, _ = _top_from_char(profiles, name, limit=200)
+        for value, _count in pairs:
+            needle = _fold_plain(value)
+            if (len(needle) >= _MIN_FILTER_LEN and needle not in _QUESTION_WORDS
+                    and f" {needle} " in folded):
+                # Cụm dài nhất thắng: "ho chi minh" hơn "minh".
+                if best is None or len(needle) > len(best[2]):
+                    best = (name, value, needle)
+    if best is None:
+        return None
+    return breakdown(target, filters={best[0]: best[1]})
 
 
 def fts_estimate(queries, *, cap=800):

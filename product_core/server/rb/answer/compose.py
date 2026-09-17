@@ -72,6 +72,14 @@ Quy tắc bắt buộc:
      không tự đề xuất hành động khác — hành động đã được tính từ trạng thái liên
      hệ và lịch sử tiếp cận mà bạn không nhìn thấy đầy đủ.
 
+3b. Nếu RM hỏi RIÊNG vì sao MỘT khách được ưu tiên cao/thấp hơn người khác
+    (không phải câu hỏi liệt kê cả danh sách): dùng ĐÚNG "ly_do" trong
+    "diem_thanh_phan" của khách đó — đây là lý do CSDL đã tính điểm (nghề
+    nghiệp, phân khúc, kênh liên hệ, độ mới của tín hiệu…), tách bạch năm
+    chiều phu_hop/nhu_cau/thoi_diem/de_tiep_can/gia_tri. Lý do này đến từ hồ
+    sơ có cấu trúc, KHÔNG phải trích CV/bài đăng, nên KHÔNG cần [n]. Không tự
+    bịa lý do khác ngoài "ly_do" đã cho, và không đổi con số điểm.
+
 4. **Mỗi khẳng định về một khách phải có [n]**, và [n] phải là nguồn CỦA CHÍNH
    khách đó. Không có nguồn thì không khẳng định.
 
@@ -165,6 +173,7 @@ def build_payload(query_plan, chosen, near_misses, stats, sources, *, actions=No
     for judgement in chosen:
         detail = (judgement.criteria or [{}])[0]
         code = actions.get(judgement.person_id, "WAIT")
+        dims = detail.get("dimensions") or {}
         customers.append({
             "ten": judgement.name,
             "san_pham": detail.get("product", ""),
@@ -174,6 +183,18 @@ def build_payload(query_plan, chosen, near_misses, stats, sources, *, actions=No
             "bang_chung_moi_nhat_cach_day_ngay": judgement.freshest_days,
             "nguon": by_person.get(judgement.person_id, []),
             "hanh_dong": {"ma": code, "nhan": ACTION_LABELS.get(code, code)},
+            # ④ đã tính năm chiều này (`rb/scoring.py`) nhưng trước đây chỉ
+            # `diem_uu_tien` (con số gộp) tới được ⑤ — RM hỏi "vì sao ưu tiên
+            # khách này" thì model không có gì để trả lời ngoài đoán. Đưa cả
+            # điểm từng chiều lẫn lý do bằng chữ (xem quy tắc 3b) sang đây.
+            "diem_thanh_phan": {
+                "phu_hop": round(dims.get("fit", 0.0), 1),
+                "nhu_cau": round(dims.get("need", 0.0), 1),
+                "thoi_diem": round(dims.get("timing", 0.0), 1),
+                "de_tiep_can": round(dims.get("reachability", 0.0), 1),
+                "gia_tri": round(dims.get("value", 0.0), 1),
+                "ly_do": list(detail.get("why") or []),
+            },
         })
     return {
         "cau_hoi": getattr(query_plan, "information_need", ""),

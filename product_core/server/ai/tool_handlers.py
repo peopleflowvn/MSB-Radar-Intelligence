@@ -180,6 +180,137 @@ def canonical_lookup(args, *, user, surface, context):
     }
 
 
+def aggregate_corpus(args, *, user, surface, context):
+    """Thống kê toàn kho có lọc — `talent.answer.corpus.breakdown`, tất định.
+
+    Trả số đếm, không trả tên người: thống kê không phải đường vòng để liệt kê
+    hồ sơ, nên không mở rộng bề mặt lộ dữ liệu cá nhân so với `overview()`.
+    """
+    _require(user, roles.MODULE_TALENT)
+    from talent.answer import corpus
+
+    filters = args.get("filters") or {}
+    if not isinstance(filters, dict):
+        raise ToolError("'filters' phải là object {tên trường: giá trị}")
+    try:
+        block = corpus.breakdown(str(args.get("field") or ""),
+                                 filters={str(k): str(v) for k, v in filters.items()},
+                                 limit=_int(args.get("limit") or corpus.TOP_N, "limit"))
+    except ValueError as exc:
+        raise ToolError(str(exc))
+    block["note"] = ("Chỉ tính trên trường có cấu trúc; hồ sơ để trống trường lọc "
+                     "không được tính vào nhóm. Nêu độ phủ khi trả lời.")
+    return block
+
+
+def match_candidate_job(args, *, user, surface, context):
+    """Đối chiếu MỘT ứng viên với danh sách yêu cầu của một vị trí/JD.
+
+    Dùng đúng luật khớp `must_have` trên trường có cấu trúc
+    (`talent.answer.structured_match`) — không viết luật khớp thứ hai. Tất
+    định: mỗi yêu cầu chỉ có ba khả năng ("satisfied"/"missing"/"unknown"),
+    không có mức "gần đúng" mờ.
+    """
+    _require(user, roles.MODULE_TALENT)
+    from people.models import Person
+    from talent.answer import structured_match
+
+    pid = _int(args.get("person_id"), "person_id")
+    person = Person.objects.filter(pk=pid, merged_into__isnull=True).first()
+    if person is None:
+        raise ToolError(f"không có Person #{pid} (hoặc đã hợp nhất)")
+    requirements = [str(r).strip() for r in (args.get("requirements") or []) if str(r).strip()]
+    if not requirements:
+        raise ToolError("cần ít nhất 1 'requirements'")
+    rows = structured_match.match_requirements(pid, requirements)
+    missing = [r["requirement"] for r in rows if r["status"] == "missing"]
+    unknown = [r["requirement"] for r in rows if r["status"] == "unknown"]
+    return {
+        "person_id": pid, "display_name": person.display_name or f"Person #{pid}",
+        "role_title": str(args.get("role_title") or "")[:200],
+        "matches": rows,
+        "satisfied_count": sum(1 for r in rows if r["status"] == "satisfied"),
+        "total": len(rows),
+        "missing": missing,
+        "note": (f"{len(unknown)} yêu cầu KHÔNG quy về được trường có cấu trúc "
+                 "(status='unknown') — nghĩa là chưa xác định được qua dữ liệu đã "
+                 "bóc, KHÔNG PHẢI ứng viên không đáp ứng; đọc CV trực tiếp mới "
+                 "biết chắc." if unknown else ""),
+    }
+
+
+def _activity_domains(user):
+    """Nghiệp vụ mà tài khoản được đọc hoạt động — không rộng hơn Person 360.
+
+    RM thuần chỉ thấy phần bán lẻ (đúng `talent.views._rm_only`). Recruiter
+    không có module RB thì KHÔNG thấy hoạt động bán lẻ — chặt hơn màn hình một
+    chút, có chủ đích: câu trả lời của agent dễ bị chép đi hơn một dòng timeline.
+    """
+    from talent.views import _rm_only
+
+    domains = set()
+    if roles.can_access(user, roles.MODULE_TALENT) and not _rm_only(user):
+        domains.add("talent")
+    if roles.can_access(user, roles.MODULE_RB):
+        domains.add("rb")
+    return domains
+
+
+def _short_text(value, limit=200):
+    from accounts import privacy
+    return privacy.redact_contacts(" ".join(str(value or "").split()))[:limit]
+
+
+def person_activity(args, *, user, surface, context):
+    """Trạng thái quan hệ + dòng thời gian gần đây của MỘT Person."""
+    _require(user, roles.MODULE_TALENT)
+    from people.models import Person
+
+    pid = _int(args.get("person_id"), "person_id")
+    limit = max(1, min(_int(args.get("limit") or 15, "limit"), 30))
+    person = Person.objects.filter(pk=pid, merged_into__isnull=True).first()
+    if person is None:
+        raise ToolError(f"không có Person #{pid} (hoặc đã hợp nhất)")
+    domains = _activity_domains(user)
+    wanted = str(args.get("domain") or "").strip()
+    if wanted:
+        if wanted not in domains:
+            raise ToolError("tài khoản không được xem hoạt động của nghiệp vụ này")
+        domains = {wanted}
+
+    relationships = [{
+        "domain": r.domain, "state": r.state, "owner": r.owner,
+        "interest_level": r.interest_level, "last_contact_at": r.last_contact_at,
+        "next_action": _short_text(r.next_action), "next_action_at": r.next_action_at,
+        "do_not_contact": r.do_not_contact, "reason": _short_text(r.reason),
+    } for r in person.relationships.filter(domain__in=domains)]
+
+    events = [{"kind": "interaction", "domain": row.domain, "action": row.action,
+               "actor": row.actor_name, "at": row.occurred_at}
+              for row in person.interactions.filter(domain__in=domains)
+              .exclude(action="viewed").order_by("-occurred_at")[:limit]]
+    events += [{"kind": "signal", "domain": row.domain, "action": row.signal_type,
+                "source": row.source, "confidence": round(row.confidence, 2),
+                "status": row.status, "at": row.observed_at}
+               for row in person.signals.filter(domain__in=domains)
+               .order_by("-observed_at")[:limit]]
+    events.sort(key=lambda e: e["at"], reverse=True)
+    for event in events:
+        event["at"] = event["at"].isoformat() if event["at"] else None
+    for rel in relationships:
+        for key in ("last_contact_at", "next_action_at"):
+            rel[key] = rel[key].isoformat() if rel[key] else None
+    return {
+        "person_id": pid,
+        "display_name": person.display_name or f"Person #{pid}",
+        "domains": sorted(domains),
+        "relationships": relationships,
+        "timeline": events[:limit],
+        "note": ("Lượt 'đã xem' hồ sơ bị lược bỏ. do_not_contact=true nghĩa là KHÔNG "
+                 "được đề xuất liên hệ người này."),
+    }
+
+
 def fact_provenance(args, *, user, surface, context):
     _require(user, roles.MODULE_TALENT)
     from intel.models import ExtractedFact
@@ -323,6 +454,9 @@ HANDLERS = {
     "compare_candidates": compare_candidates,
     "canonical_lookup": canonical_lookup,
     "fact_provenance": fact_provenance,
+    "aggregate_corpus": aggregate_corpus,
+    "match_candidate_job": match_candidate_job,
+    "person_activity": person_activity,
     "draft_outreach": draft_outreach,
     "enrich_company_from_web": enrich_company_from_web,
 }

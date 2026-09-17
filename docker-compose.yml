@@ -1,0 +1,254 @@
+# MSB Radar — stack ĐỘC LẬP, toàn bộ nền tảng từ một repo, một lệnh.
+#
+#   python scripts/init_standalone_env.py      # sinh .env (khoá bí mật ngẫu nhiên)
+#   docker compose up -d --build               # Hub + UI + worker + Postgres
+#   docker compose --profile intelligence up -d --build   # thêm Intelligence V2
+#
+# Không cần repo MSB-Radar khác, không cần network Docker có sẵn (TalentFlow,
+# msbradar_default), không cần container/.env cũ trên máy. Dùng ĐÚNG các thành
+# phần production đang chạy:
+#   - product_core/server   (Django Hub, cùng Dockerfile, migrate khi khởi động)
+#   - product_core/web      (UI React, build trong container `web-build`)
+#   - product_core/Caddyfile (cùng quy tắc định tuyến)
+#   - pgvector/pgvector:pg16 (cùng CSDL, cùng migration)
+#   - radar_intelligence    (cùng Dockerfile gốc repo)
+#
+# Stack production trên Oracle (product_core/docker-compose.oracle-core.yml +
+# docker-compose.oracle.yml + workflow deploy-oracle) KHÔNG bị thay đổi.
+
+x-hub-env: &hub-env
+  DEBUG: "False"
+  SECRET_KEY: ${SECRET_KEY:?chay scripts/init_standalone_env.py de tao .env}
+  DATABASE_URL: postgres://${POSTGRES_USER:-msbradar}:${POSTGRES_PASSWORD:?can POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-msbradar}
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-msbradar}
+      POSTGRES_USER: ${POSTGRES_USER:-msbradar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?can POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-msbradar} -d ${POSTGRES_DB:-msbradar}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # Build UI rồi chép dist vào volume `web_dist`, chạy xong thì thoát.
+  web-build:
+    build:
+      context: ./product_core/web
+    image: msb-radar-web-build:local
+    volumes:
+      - web_dist:/out
+    restart: "no"
+
+  # Volume mới do Docker tạo thuộc root; Hub chạy bằng uid 10001 (Dockerfile).
+  volume-init:
+    image: alpine:3.20
+    command: ["sh", "-c", "chown -R 10001:10001 /filestore /intake-staging"]
+    volumes:
+      - filestore:/filestore
+      - intake_staging:/intake-staging
+    restart: "no"
+
+  hub:
+    build:
+      context: ./product_core/server
+    image: msb-radar-hub:local
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      web-build:
+        condition: service_completed_successfully
+      volume-init:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      <<: *hub-env
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      # Caddy lo TLS ở vòng ngoài; bật ở đây sẽ thành vòng lặp chuyển hướng.
+      SECURE_SSL_REDIRECT: "False"
+      FILE_STORAGE_BACKEND: ${FILE_STORAGE_BACKEND:-local}
+      FILE_STORAGE_ROOT: /var/lib/msbradar/filestore
+      INTELLIGENCE_BASE_URL: http://intelligence:8081
+      WEB_DIST_DIR: /srv/web
+      INTAKE_STAGING_ROOT: /app/intake-staging
+    volumes:
+      - staticfiles:/app/staticfiles
+      - filestore:/var/lib/msbradar/filestore
+      - intake_staging:/app/intake-staging
+      - web_dist:/srv/web:ro
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/api/v1/health/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  extraction-worker:
+    image: msb-radar-hub:local
+    restart: unless-stopped
+    depends_on:
+      hub:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      <<: *hub-env
+    volumes:
+      - filestore:/var/lib/msbradar/filestore
+    command: ["python", "manage.py", "run_extraction_worker", "--batch", "5"]
+    healthcheck:
+      disable: true
+
+  embedding-worker:
+    image: msb-radar-hub:local
+    restart: unless-stopped
+    depends_on:
+      hub:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      <<: *hub-env
+    command: ["python", "manage.py", "embed_talent_index", "--loop", "--limit", "0", "--batch-size", "25", "--sleep", "2"]
+    healthcheck:
+      disable: true
+
+  alias-resolver:
+    image: msb-radar-hub:local
+    restart: unless-stopped
+    depends_on:
+      hub:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      <<: *hub-env
+    command: ["python", "manage.py", "auto_resolve_aliases", "--apply", "--loop",
+             "--sleep", "${ALIAS_AUTO_RESOLVE_SLEEP:-300}",
+             "--threshold", "${ALIAS_AUTO_RESOLVE_THRESHOLD:-0.90}"]
+    healthcheck:
+      disable: true
+
+  web:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      hub:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      # ":80" = HTTP thuần; đặt tên miền thật thì Caddy tự xin chứng chỉ TLS.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./product_core/Caddyfile:/etc/caddy/Caddyfile:ro
+      - web_dist:/srv/web:ro
+      - staticfiles:/srv/static:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # ---- Intelligence V2 (tuỳ chọn): cần khoá GreenNode trong .env ----
+  intelligence:
+    profiles: ["intelligence"]
+    build:
+      context: .
+    image: msb-radar-intelligence:local
+    restart: unless-stopped
+    init: true
+    environment: &intelligence-env
+      INTELLIGENCE_BIND_HOST: "0.0.0.0"
+      INTELLIGENCE_PORT: "8081"
+      HAYSTACK_TELEMETRY_ENABLED: "false"
+      RADAR_BASE_URL: http://hub:8000
+      RADAR_SERVICE_TOKEN: ${INTELLIGENCE_SERVICE_TOKEN:?can INTELLIGENCE_SERVICE_TOKEN}
+      RADAR_INDEX_SCOPE_TOKEN: ${INTELLIGENCE_INDEX_SCOPE_TOKEN:?can INTELLIGENCE_INDEX_SCOPE_TOKEN}
+      GREENNODE_BASE_URL: ${MSB_AI_GREENNODE_BASE_URL:-}
+      GREENNODE_API_KEY: ${MSB_AI_GREENNODE_API_KEY:-}
+      GREENNODE_MODEL_FAST: ${GREENNODE_MODEL_FAST:-${MSB_AI_GREENNODE_MODEL:-}}
+      GREENNODE_MODEL_DEEP: ${GREENNODE_MODEL_DEEP:-${MSB_AI_GREENNODE_MODEL:-}}
+      GREENNODE_MODEL_VISION: ${GREENNODE_MODEL_VISION:-${MSB_AI_GREENNODE_MODEL:-}}
+      GREENNODE_MODEL_EMBEDDING: ${GREENNODE_MODEL_EMBEDDING:-}
+      INTELLIGENCE_INDEX_DB: /var/lib/radar-intelligence/index.sqlite3
+    volumes:
+      - intelligence_state:/var/lib/radar-intelligence
+    expose:
+      - "8081"
+    depends_on:
+      hub:
+        condition: service_healthy
+
+  intelligence-indexer:
+    profiles: ["intelligence"]
+    image: msb-radar-intelligence:local
+    restart: unless-stopped
+    init: true
+    command: ["python", "-m", "radar_intelligence.indexing"]
+    # Không mở cổng 8081 (không có HTTP) nên healthcheck kế thừa từ Dockerfile
+    # (curl 127.0.0.1:8081/health) luôn fail — tắt hẳn. Xem docker-compose.oracle.yml.
+    healthcheck:
+      disable: true
+    environment:
+      <<: *intelligence-env
+      INTELLIGENCE_SYNC_INTERVAL_SECONDS: "30"
+      INTELLIGENCE_FEED_PAGE_SIZE: "100"
+      INTELLIGENCE_EMBEDDING_BATCH_SIZE: "1"
+      INTELLIGENCE_EMBEDDING_MIN_INTERVAL_SECONDS: "5"
+      INTELLIGENCE_ALLOW_LEXICAL_FALLBACK: "1"
+    volumes:
+      - intelligence_state:/var/lib/radar-intelligence
+    depends_on:
+      intelligence:
+        condition: service_healthy
+
+  # ---- Tuỳ chọn khác, giống production ----
+  searxng:
+    profiles: ["searxng"]
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-changeme-set-in-env}
+      SEARXNG_SEARCH_FORMATS: "html,json"
+    volumes:
+      - searxng_data:/etc/searxng
+    expose:
+      - "8080"
+
+  ollama:
+    profiles: ["selfhost-embed"]
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: "5m"
+      OLLAMA_CONTEXT_LENGTH: "1024"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - ollama_models:/root/.ollama
+    expose:
+      - "11434"
+
+volumes:
+  pgdata:
+  filestore:
+  staticfiles:
+  intake_staging:
+  web_dist:
+  caddy_data:
+  caddy_config:
+  intelligence_state:
+  searxng_data:
+  ollama_models:

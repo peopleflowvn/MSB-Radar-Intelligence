@@ -94,6 +94,11 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
   "action"         — MỆNH LỆNH làm một việc trên người đã nhắc tới: soạn thư
                      tiếp cận, tạo cơ hội, ghi nhớ một điều kiện. Không phải câu
                      tra cứu.
+                     CŨNG LÀ "action": nhờ gợi ý sản phẩm từ một câu mô tả nhu
+                     cầu khách vừa nói ("khách bảo đang tính mua ô tô trả góp
+                     thì gợi ý sản phẩm gì", "nên chào sản phẩm gì") — dù không
+                     nhắc tới người cụ thể nào, đây vẫn là MỘT VIỆC cần làm
+                     ngay bằng công cụ, không phải tìm kiếm trong kho.
   "general"        — không liên quan dữ liệu khách hàng.
 
   CẢNH BÁO về "general" — chỗ hay chọn nhầm nhất:

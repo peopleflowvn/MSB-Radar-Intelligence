@@ -1,0 +1,9 @@
+# Không bao giờ đưa bí mật vào image: image được push lên registry, và ai đọc
+# được registry thì đọc được mọi layer.
+.env
+.env.*
+*.md
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/

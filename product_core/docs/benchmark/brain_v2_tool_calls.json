@@ -1,0 +1,339 @@
+{
+  "scorer_version": 2,
+  "scope": "Live task probes on synthetic fixture v1; not production/human acceptance. Outreach and vision are isolated template probes.",
+  "models_discovered": [
+    "z-ai/glm-5.3-flash-thirdparty",
+    "z-ai/glm-5.2-hackathon",
+    "qwen/qwen3.6-plus",
+    "qwen/qwen3.6-flash",
+    "z-ai/glm-5.2-thirdparty",
+    "google/gemma-4-31b-it",
+    "qwen/qwen3.7-plus",
+    "deepseek/deepseek-v4-flash",
+    "deepseek/deepseek-v4-pro",
+    "baai/bge-m3"
+  ],
+  "repeats": 1,
+  "saved_routes_changed": false,
+  "cost": null,
+  "rows": [
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": true,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-plus",
+          "input_tokens": 383,
+          "output_tokens": 28,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 1698.87
+        }
+      ],
+      "latency_ms": 1700.32
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": true,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "input_tokens": 383,
+          "output_tokens": 28,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 602.09
+        }
+      ],
+      "latency_ms": 604.27
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMError",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "google/gemma-4-31b-it",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 136.78
+        }
+      ],
+      "latency_ms": 139.05
+    },
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": true,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-hackathon",
+          "input_tokens": 269,
+          "output_tokens": 43,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 4004.93
+        }
+      ],
+      "latency_ms": 4007.44
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": true,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "qwen/qwen3.7-plus",
+          "input_tokens": 383,
+          "output_tokens": 53,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 1934.52
+        }
+      ],
+      "latency_ms": 1936.43
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": true,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-flash",
+          "input_tokens": 425,
+          "output_tokens": 141,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 2128.38
+        }
+      ],
+      "latency_ms": 2130.83
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {},
+      "error": "LLMError",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.3-flash-thirdparty",
+          "input_tokens": null,
+          "output_tokens": null,
+          "error": "LLMError",
+          "ok": false,
+          "latency_ms": 422.87
+        }
+      ],
+      "latency_ms": 424.74
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": true,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "deepseek/deepseek-v4-pro",
+          "input_tokens": 425,
+          "output_tokens": 100,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 2790.34
+        }
+      ],
+      "latency_ms": 2793.63
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task_probe": "tool_call",
+      "case": "tool_call",
+      "repeat": 0,
+      "checks": {
+        "tool_call_correct": false,
+        "scope": "protocol and ordinal only; no tool execution"
+      },
+      "error": "",
+      "calls": [
+        {
+          "task": "assistant_agent",
+          "provider": "greennode",
+          "model": "z-ai/glm-5.2-thirdparty",
+          "input_tokens": 269,
+          "output_tokens": 42,
+          "error": "",
+          "truncated": false,
+          "ok": true,
+          "latency_ms": 5413.4
+        }
+      ],
+      "latency_ms": 5415.82
+    }
+  ],
+  "summary": [
+    {
+      "model": "z-ai/glm-5.2-hackathon",
+      "task": "tool_call",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 4007.44,
+      "p95_ms": 4007.44,
+      "input_tokens": 269,
+      "output_tokens": 43
+    },
+    {
+      "model": "qwen/qwen3.6-plus",
+      "task": "tool_call",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 1700.32,
+      "p95_ms": 1700.32,
+      "input_tokens": 383,
+      "output_tokens": 28
+    },
+    {
+      "model": "qwen/qwen3.6-flash",
+      "task": "tool_call",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 604.27,
+      "p95_ms": 604.27,
+      "input_tokens": 383,
+      "output_tokens": 28
+    },
+    {
+      "model": "google/gemma-4-31b-it",
+      "task": "tool_call",
+      "n": 1,
+      "attempts": 1,
+      "errors": 1,
+      "p50_ms": 139.05,
+      "p95_ms": 139.05,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    {
+      "model": "qwen/qwen3.7-plus",
+      "task": "tool_call",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 1936.43,
+      "p95_ms": 1936.43,
+      "input_tokens": 383,
+      "output_tokens": 53
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "task": "tool_call",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 2130.83,
+      "p95_ms": 2130.83,
+      "input_tokens": 425,
+      "output_tokens": 141
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "tool_call",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 2793.63,
+      "p95_ms": 2793.63,
+      "input_tokens": 425,
+      "output_tokens": 100
+    },
+    {
+      "model": "z-ai/glm-5.3-flash-thirdparty",
+      "task": "tool_call",
+      "n": 1,
+      "attempts": 1,
+      "errors": 1,
+      "p50_ms": 424.74,
+      "p95_ms": 424.74,
+      "input_tokens": 0,
+      "output_tokens": 0
+    },
+    {
+      "model": "z-ai/glm-5.2-thirdparty",
+      "task": "tool_call",
+      "n": 1,
+      "attempts": 1,
+      "errors": 0,
+      "p50_ms": 5415.82,
+      "p95_ms": 5415.82,
+      "input_tokens": 269,
+      "output_tokens": 42
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+# Mẫu — thay bằng truy vấn thật của recruiter/RM (xem README §2).
+# Mỗi dòng: {"id": "...", "q": "...", "note": "..."}. Dòng bắt đầu bằng # bị bỏ qua.
+{"id": "q01", "q": "data analyst 3 năm kinh nghiệm Power BI ở TP HCM", "note": "kỹ năng + địa điểm + số năm"}
+{"id": "q02", "q": "kỹ sư backend Python từng làm fintech", "note": "chức danh + ngành"}
+{"id": "q03", "q": "nhân viên tín dụng ngân hàng khu vực Hà Nội", "note": "RB — nghề nghiệp + địa điểm"}
+{"id": "q04", "q": "product manager nói được tiếng Nhật", "note": "ngôn ngữ"}
+{"id": "q05", "q": "fresh graduate ngành marketing", "note": "seniority thấp"}
+{"id": "q06", "q": "trưởng phòng kinh doanh bảo hiểm nhân thọ", "note": "chức danh quản lý + sản phẩm"}
+{"id": "q07", "q": "DevOps AWS Kubernetes senior", "note": "kỹ năng công nghệ + cấp bậc"}
+{"id": "q08", "q": "kế toán trưởng có chứng chỉ ACCA", "note": "chứng chỉ"}
+{"id": "q09", "q": "ứng viên ở Đà Nẵng làm về logistics", "note": "địa điểm tỉnh + ngành"}
+{"id": "q10", "q": "lập trình viên React mức lương mong muốn dưới 30 triệu", "note": "kỹ năng + lương"}
+{"id": "q11", "q": "chuyên viên phân tích dữ liệu SQL Python", "note": "song ngữ data / dữ liệu"}
+{"id": "q12", "q": "giám đốc chi nhánh ngân hàng 10 năm kinh nghiệm", "note": "số năm lớn + quản lý"}
+{"id": "q13", "q": "nhân sự tuyển dụng mảng IT", "note": "chức danh + lĩnh vực phụ trách"}
+{"id": "q14", "q": "kỹ sư QA automation Selenium", "note": "kỹ năng ngách"}
+{"id": "q15", "q": "khách hàng tiềm năng quan tâm vay mua nhà ở Bình Dương", "note": "RB — sản phẩm + địa điểm"}

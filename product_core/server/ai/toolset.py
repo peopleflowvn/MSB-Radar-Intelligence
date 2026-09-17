@@ -130,6 +130,74 @@ TOOLS = {
             "required": ["person_id", "field"],
         },
     },
+    "aggregate_corpus": {
+        "module": roles.MODULE_TALENT,
+        "surfaces": ("talent", "general"),
+        "tier": 2,
+        "description": "Thống kê TOÀN kho ứng viên (tất định, không phải vài hồ sơ mẫu): "
+                       "các giá trị phổ biến nhất của một trường, có thể lọc theo nhóm "
+                       "(vd kỹ năng phổ biến của người ở Hà Nội). Luôn kèm độ phủ — "
+                       "phải nêu độ phủ khi trả lời.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "field": {"type": "string",
+                          "enum": ["skills", "industries", "current_title", "current_company",
+                                   "location", "desired_location", "seniority"]},
+                "filters": {"type": "object",
+                            "description": "tối đa 3 điều kiện {tên trường: giá trị}, "
+                                           "cùng tập tên trường như 'field'"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 30},
+            },
+            "required": ["field"],
+        },
+    },
+    "match_candidate_job": {
+        "module": roles.MODULE_TALENT,
+        "surfaces": ("talent", "general"),
+        "tier": 2,
+        "description": "Đối chiếu MỘT ứng viên đã nhắc tới với danh sách yêu cầu của một "
+                       "vị trí/JD (mỗi phần tử của 'requirements' là MỘT câu ngắn, ví dụ "
+                       "'biết Python', 'trên 3 năm kinh nghiệm', 'TOEIC 750', 'làm việc tại "
+                       "Hà Nội'). Khớp tất định trên trường có cấu trúc — trạng thái "
+                       "'unknown' nghĩa là CHƯA XÁC ĐỊNH ĐƯỢC qua dữ liệu đã bóc, không "
+                       "phải ứng viên thiếu. Không dùng cho việc so sánh NHIỀU ứng viên "
+                       "với NHAU (đó là shape 'compare', không phải tool này).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "person_id": {"type": "integer"},
+                "requirements": {"type": "array", "items": {"type": "string"},
+                                 "description": "mỗi phần tử MỘT yêu cầu ngắn gọn, tối đa 12"},
+                "role_title": {"type": "string",
+                               "description": "tên vị trí, để hiển thị — không ảnh hưởng khớp"},
+            },
+            "required": ["person_id", "requirements"],
+        },
+    },
+    "person_activity": {
+        "module": roles.MODULE_TALENT,
+        # CHỈ "talent"/"general". Growth có act.py CODE-driven riêng
+        # (`rb/answer/act.py`) không đi qua sổ đăng ký tool này — đăng ký cho
+        # "prospect" ở đây sẽ không bao giờ được gọi tới, gây hiểu nhầm là đã
+        # dùng được trên Growth trong khi thực ra chưa có đường nào gọi tới.
+        "surfaces": ("talent", "general"),
+        "tier": 1,
+        "description": "Trạng thái quan hệ (ai phụ trách, mức quan tâm, lần liên hệ cuối, "
+                       "việc cần làm tiếp, có được liên hệ không) và dòng thời gian gần "
+                       "đây (tương tác, tín hiệu) của một Person. Chỉ phần nghiệp vụ tài "
+                       "khoản được xem.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "person_id": {"type": "integer"},
+                "domain": {"type": "string", "enum": ["talent", "rb"],
+                           "description": "để trống = mọi nghiệp vụ được xem"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 30},
+            },
+            "required": ["person_id"],
+        },
+    },
     # --- Tier 3: sinh nội dung / tra ngoài. Bật riêng bằng ASSISTANT_TOOLS_TIER3.
     #     KHÔNG gửi / đăng gì — chỉ trả bản nháp để người dùng tự dùng.
     "draft_outreach": {
@@ -219,6 +287,9 @@ LABELS = {
     "compare_candidates": "So sánh ứng viên",
     "canonical_lookup": "Chuẩn hoá giá trị",
     "fact_provenance": "Truy nguồn gốc dữ liệu",
+    "aggregate_corpus": "Thống kê toàn kho",
+    "match_candidate_job": "Đối chiếu ứng viên với JD",
+    "person_activity": "Xem hoạt động và quan hệ",
     "draft_outreach": "Soạn nháp tiếp cận",
     "enrich_company_from_web": "Tra thông tin công ty (web)",
 }
@@ -232,6 +303,7 @@ def label_of(name, fallback=""):
 #: (tier 0) KHÔNG nằm ở đây — chúng là nhánh định tuyến, không phải tool trong lượt.
 _AGENT_TOOLS = {"read_allowed_evidence", "remember_proposal", "feedback",
                 "compare_candidates", "canonical_lookup", "fact_provenance",
+                "aggregate_corpus", "match_candidate_job", "person_activity",
                 "draft_outreach", "enrich_company_from_web"}
 _TIER3_TOOLS = {"draft_outreach", "enrich_company_from_web"}
 
@@ -264,7 +336,8 @@ def dispatch(name, arguments, *, user, surface, context=None):
         return ToolResult(error="tài khoản không có quyền dùng tool này")
     selected = (context or {}).get("selected_person_ids")
     if selected is not None and name in {
-            "draft_outreach", "read_allowed_evidence", "fact_provenance", "compare_candidates"}:
+            "draft_outreach", "read_allowed_evidence", "fact_provenance", "compare_candidates",
+            "person_activity", "match_candidate_job"}:
         args = arguments if isinstance(arguments, dict) else {}
         targets = args.get("person_ids") if name == "compare_candidates" else [args.get("person_id")]
         if (not isinstance(targets, list) or not targets

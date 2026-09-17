@@ -1,0 +1,6 @@
+# Cố ý mỏng: agent chạy trên AgentBase và tính phí theo thời gian container
+# sống, nên mỗi phụ thuộc thừa là tiền Ví Tổng trả cho thứ không dùng.
+fastapi==0.115.6
+uvicorn==0.34.0
+httpx==0.28.1
+pydantic==2.10.4

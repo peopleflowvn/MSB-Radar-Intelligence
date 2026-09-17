@@ -1,0 +1,1860 @@
+{
+  "scope": "Live GreenNode, real engine/retrieval, 6 fictional people; SQLite fallback, no dense vectors. Model pinned for this experiment only.",
+  "model": "qwen/qwen3.6-flash",
+  "gold_version": 1,
+  "rows": [
+    {
+      "case": "count_and",
+      "warm": false,
+      "ids": [
+        1
+      ],
+      "exact_ids": true,
+      "shape": "count",
+      "shape_correct": true,
+      "source_checks": [
+        true
+      ],
+      "sources": [
+        {
+          "n": 1,
+          "person_id": 1,
+          "name": "Fixture An",
+          "document_id": 1,
+          "ordinal": 0,
+          "snippet": "Kỹ năng SQL, Python, Power BI."
+        }
+      ],
+      "citations": 1,
+      "answer": "Đã đánh giá bằng chứng của 4/6 hồ sơ trong kho ứng viên.\nCó 1 hồ sơ được đánh giá phù hợp với yêu cầu trong phần đã đọc.\nĐây là đánh giá trên bằng chứng đã đọc; số hồ sơ thực sự đáp ứng trong toàn bộ phạm vi chưa xác định. Thiếu bằng chứng không có nghĩa là không đáp ứng.\nHiển thị 1 hồ sơ được đánh giá phù hợp:\n- Fixture An [1]",
+      "trace": {
+        "question": "Có bao nhiêu ứng viên biết cả SQL và Python?",
+        "plan": {
+          "shape": "count",
+          "information_need": "Có bao nhiêu ứng viên biết cả SQL và Python?",
+          "must_have": [],
+          "should_have": [],
+          "extract": [
+            "kỹ năng lập trình",
+            "công cụ dữ liệu"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "SQL",
+            "Python",
+            "biết SQL và Python",
+            "sử dụng SQL Python",
+            "programming skills SQL Python"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "(tắt)",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 3531,
+          "judged": 4,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 4,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 4,
+          "judge_reused": 0,
+          "identified_people": []
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "count": {
+          "method": "evidence_review",
+          "status": "INFERENCE",
+          "exact": false,
+          "scope": "applicant_store",
+          "scope_total": 6,
+          "reviewed": 4,
+          "not_reviewed": 2,
+          "matched": 1,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unresolved_reviewed": 3
+        },
+        "ms_total": 5172,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1612.09,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1444,
+            "output_tokens": 139,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 3544.26,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1300,
+            "output_tokens": 509,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 2744,
+          "output_tokens": 648,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "review_count_correct": true,
+      "latency_ms": 5177.19
+    },
+    {
+      "case": "count_not",
+      "warm": false,
+      "ids": [
+        3
+      ],
+      "exact_ids": true,
+      "shape": "count",
+      "shape_correct": true,
+      "source_checks": [
+        true,
+        true
+      ],
+      "sources": [
+        {
+          "n": 1,
+          "person_id": 3,
+          "name": "Fixture Chi",
+          "document_id": 3,
+          "ordinal": 0,
+          "snippet": "Kỹ năng Java"
+        },
+        {
+          "n": 2,
+          "person_id": 3,
+          "name": "Fixture Chi",
+          "document_id": 3,
+          "ordinal": 0,
+          "snippet": "Chưa từng làm trong ngành ngân hàng."
+        }
+      ],
+      "citations": 2,
+      "answer": "Đã đánh giá bằng chứng của 6/6 hồ sơ trong kho ứng viên.\nCó 1 hồ sơ được đánh giá phù hợp với yêu cầu trong phần đã đọc.\nĐây là đánh giá trên bằng chứng đã đọc; số hồ sơ thực sự đáp ứng trong toàn bộ phạm vi chưa xác định. Thiếu bằng chứng không có nghĩa là không đáp ứng.\nHiển thị 1 hồ sơ được đánh giá phù hợp:\n- Fixture Chi [1] [2]",
+      "trace": {
+        "question": "Có bao nhiêu ứng viên biết Java và chưa từng làm ngân hàng?",
+        "plan": {
+          "shape": "count",
+          "information_need": "Đếm số lượng ứng viên có kỹ năng Java và chưa từng làm việc trong lĩnh vực ngân hàng.",
+          "must_have": [
+            "Java"
+          ],
+          "should_have": [
+            "chưa từng làm ngân hàng",
+            "không có kinh nghiệm ngân hàng",
+            "không làm bank"
+          ],
+          "extract": [
+            "kỹ năng lập trình",
+            "kinh nghiệm làm việc",
+            "ngành nghề trước đây"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "Java developer",
+            "lập trình viên Java",
+            "biết Java",
+            "chưa làm ngân hàng",
+            "không kinh nghiệm ngân hàng",
+            "background not banking"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "(tắt)",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 15,
+          "ms_total": 5750,
+          "judged": 6,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 6,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 6,
+          "judge_reused": 0,
+          "identified_people": []
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "count": {
+          "method": "evidence_review",
+          "status": "INFERENCE",
+          "exact": false,
+          "scope": "applicant_store",
+          "scope_total": 6,
+          "reviewed": 6,
+          "not_reviewed": 0,
+          "matched": 1,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unresolved_reviewed": 5
+        },
+        "ms_total": 8000,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 2,
+          "cited": 2,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 2225.7,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1447,
+            "output_tokens": 208,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 5740.4,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1584,
+            "output_tokens": 1005,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 3031,
+          "output_tokens": 1213,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "review_count_correct": true,
+      "latency_ms": 7995.18
+    },
+    {
+      "case": "count_missing",
+      "warm": false,
+      "ids": [
+        2
+      ],
+      "exact_ids": false,
+      "shape": "count",
+      "shape_correct": true,
+      "source_checks": [
+        true
+      ],
+      "sources": [
+        {
+          "n": 1,
+          "person_id": 2,
+          "name": "Fixture Bình",
+          "document_id": 2,
+          "ordinal": 0,
+          "snippet": "Kỹ năng SQL, Excel."
+        }
+      ],
+      "citations": 1,
+      "answer": "Đã đánh giá bằng chứng của 6/6 hồ sơ trong kho ứng viên.\nCó 1 hồ sơ được đánh giá phù hợp với yêu cầu trong phần đã đọc.\nĐây là đánh giá trên bằng chứng đã đọc; số hồ sơ thực sự đáp ứng trong toàn bộ phạm vi chưa xác định. Thiếu bằng chứng không có nghĩa là không đáp ứng.\nHiển thị 1 hồ sơ được đánh giá phù hợp:\n- Fixture Bình [1]",
+      "trace": {
+        "question": "Có bao nhiêu ứng viên biết SQL và không biết Python?",
+        "plan": {
+          "shape": "count",
+          "information_need": "Đếm số lượng ứng viên có kỹ năng SQL nhưng không có kỹ năng Python.",
+          "must_have": [
+            "có kỹ năng SQL"
+          ],
+          "should_have": [
+            "không có kỹ năng Python"
+          ],
+          "extract": [
+            "kỹ năng lập trình",
+            "công cụ và ngôn ngữ lập trình"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "SQL database query",
+            "Python programming language",
+            "kỹ năng SQL",
+            "biết SQL",
+            "không biết Python",
+            "thiếu kỹ năng Python"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "(tắt)",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 15,
+          "ms_total": 5109,
+          "judged": 6,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 6,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 6,
+          "judge_reused": 0,
+          "identified_people": []
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "count": {
+          "method": "evidence_review",
+          "status": "INFERENCE",
+          "exact": false,
+          "scope": "applicant_store",
+          "scope_total": 6,
+          "reviewed": 6,
+          "not_reviewed": 0,
+          "matched": 1,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unresolved_reviewed": 5
+        },
+        "ms_total": 7219,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 2104.44,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1445,
+            "output_tokens": 180,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 5094.77,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1564,
+            "output_tokens": 791,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 3009,
+          "output_tokens": 971,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "review_count_correct": false,
+      "latency_ms": 7224.77
+    },
+    {
+      "case": "count_subset",
+      "warm": false,
+      "ids": [
+        2
+      ],
+      "exact_ids": true,
+      "shape": "count",
+      "shape_correct": true,
+      "source_checks": [
+        true
+      ],
+      "sources": [
+        {
+          "n": 1,
+          "person_id": 2,
+          "name": "Fixture Bình",
+          "document_id": 2,
+          "ordinal": 0,
+          "snippet": "Kỹ năng SQL, Excel."
+        }
+      ],
+      "citations": 1,
+      "answer": "Đã đánh giá bằng chứng của 2/2 hồ sơ trong nhóm hồ sơ đang xét.\nCó 1 hồ sơ được đánh giá phù hợp với yêu cầu trong phần đã đọc.\nĐây là đánh giá trên bằng chứng đã đọc; số hồ sơ thực sự đáp ứng trong toàn bộ phạm vi chưa xác định. Thiếu bằng chứng không có nghĩa là không đáp ứng.\nHiển thị 1 hồ sơ được đánh giá phù hợp:\n- Fixture Bình [1]",
+      "trace": {
+        "question": "Trong số này có bao nhiêu người biết SQL?",
+        "plan": {
+          "shape": "count",
+          "information_need": "Trong số các ứng viên Fixture Chi và Fixture Bình, có bao nhiêu người biết SQL?",
+          "must_have": [
+            "Fixture Chi",
+            "Fixture Bình"
+          ],
+          "should_have": [],
+          "extract": [
+            "kỹ năng SQL",
+            "kiến thức SQL"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "SQL",
+            "Structured Query Language",
+            "biết SQL",
+            "sử dụng SQL"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "pinned_ids": 2,
+        "fast_path_pinned": "bỏ ② — đọc thẳng người đã giải định danh",
+        "cache_key": "(tắt)",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 15,
+          "ms_total": 2015,
+          "judged": 2,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 2,
+          "pinned": true,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 2,
+          "judge_reused": 0,
+          "identified_people": [
+            "Fixture Chi",
+            "Fixture Bình"
+          ],
+          "scope": "previous_result",
+          "scope_size": 2
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "count": {
+          "method": "evidence_review",
+          "status": "INFERENCE",
+          "exact": false,
+          "scope": "previous_result",
+          "scope_total": 2,
+          "reviewed": 2,
+          "not_reviewed": 0,
+          "matched": 1,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unresolved_reviewed": 1
+        },
+        "ms_total": 3437,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1426.1,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1473,
+            "output_tokens": 151,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1994.58,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 970,
+            "output_tokens": 258,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 2443,
+          "output_tokens": 409,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "review_count_correct": true,
+      "latency_ms": 3427.58
+    },
+    {
+      "case": "count_and",
+      "warm": false,
+      "ids": [
+        1
+      ],
+      "exact_ids": true,
+      "shape": "count",
+      "shape_correct": true,
+      "source_checks": [
+        true
+      ],
+      "sources": [
+        {
+          "n": 1,
+          "person_id": 1,
+          "name": "Fixture An",
+          "document_id": 1,
+          "ordinal": 0,
+          "snippet": "Kỹ năng SQL, Python, Power BI."
+        }
+      ],
+      "citations": 1,
+      "answer": "Đã đánh giá bằng chứng của 4/6 hồ sơ trong kho ứng viên.\nCó 1 hồ sơ được đánh giá phù hợp với yêu cầu trong phần đã đọc.\nĐây là đánh giá trên bằng chứng đã đọc; số hồ sơ thực sự đáp ứng trong toàn bộ phạm vi chưa xác định. Thiếu bằng chứng không có nghĩa là không đáp ứng.\nHiển thị 1 hồ sơ được đánh giá phù hợp:\n- Fixture An [1]",
+      "trace": {
+        "question": "Có bao nhiêu ứng viên biết cả SQL và Python?",
+        "plan": {
+          "shape": "count",
+          "information_need": "Có bao nhiêu ứng viên biết cả SQL và Python?",
+          "must_have": [],
+          "should_have": [],
+          "extract": [
+            "kỹ năng công nghệ",
+            "công cụ phần mềm"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "SQL",
+            "Python",
+            "biết SQL và Python",
+            "sử dụng SQL Python",
+            "programming skills SQL Python"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "(tắt)",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 3532,
+          "judged": 4,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 4,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 4,
+          "judge_reused": 0,
+          "identified_people": []
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "count": {
+          "method": "evidence_review",
+          "status": "INFERENCE",
+          "exact": false,
+          "scope": "applicant_store",
+          "scope_total": 6,
+          "reviewed": 4,
+          "not_reviewed": 2,
+          "matched": 1,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unresolved_reviewed": 3
+        },
+        "ms_total": 4952,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1400.95,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1444,
+            "output_tokens": 139,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 3518.25,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1300,
+            "output_tokens": 574,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 2744,
+          "output_tokens": 713,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "review_count_correct": true,
+      "latency_ms": 4943.95
+    },
+    {
+      "case": "count_not",
+      "warm": false,
+      "ids": [
+        3
+      ],
+      "exact_ids": true,
+      "shape": "count",
+      "shape_correct": true,
+      "source_checks": [
+        true,
+        true
+      ],
+      "sources": [
+        {
+          "n": 1,
+          "person_id": 3,
+          "name": "Fixture Chi",
+          "document_id": 3,
+          "ordinal": 0,
+          "snippet": "Kỹ năng Java"
+        },
+        {
+          "n": 2,
+          "person_id": 3,
+          "name": "Fixture Chi",
+          "document_id": 3,
+          "ordinal": 0,
+          "snippet": "Chưa từng làm trong ngành ngân hàng."
+        }
+      ],
+      "citations": 2,
+      "answer": "Đã đánh giá bằng chứng của 6/6 hồ sơ trong kho ứng viên.\nCó 1 hồ sơ được đánh giá phù hợp với yêu cầu trong phần đã đọc.\nĐây là đánh giá trên bằng chứng đã đọc; số hồ sơ thực sự đáp ứng trong toàn bộ phạm vi chưa xác định. Thiếu bằng chứng không có nghĩa là không đáp ứng.\nHiển thị 1 hồ sơ được đánh giá phù hợp:\n- Fixture Chi [1] [2]",
+      "trace": {
+        "question": "Có bao nhiêu ứng viên biết Java và chưa từng làm ngân hàng?",
+        "plan": {
+          "shape": "count",
+          "information_need": "Đếm số lượng ứng viên có kỹ năng Java và chưa từng có kinh nghiệm làm việc trong ngành ngân hàng.",
+          "must_have": [
+            "Java",
+            "chưa từng làm ngân hàng",
+            "không có kinh nghiệm ngân hàng"
+          ],
+          "should_have": [],
+          "extract": [
+            "kỹ năng lập trình",
+            "kinh nghiệm làm việc",
+            "ngành nghề trước đây"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "Java developer",
+            "lập trình viên Java",
+            "Java programmer",
+            "no banking experience",
+            "không kinh nghiệm ngân hàng",
+            "chưa làm ngân hàng"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "(tắt)",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 5469,
+          "judged": 6,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 6,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 6,
+          "judge_reused": 0,
+          "identified_people": []
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "count": {
+          "method": "evidence_review",
+          "status": "INFERENCE",
+          "exact": false,
+          "scope": "applicant_store",
+          "scope_total": 6,
+          "reviewed": 6,
+          "not_reviewed": 0,
+          "matched": 1,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unresolved_reviewed": 5
+        },
+        "ms_total": 7484,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 2,
+          "cited": 2,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1998.7,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1447,
+            "output_tokens": 199,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 5466.88,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1582,
+            "output_tokens": 961,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 3029,
+          "output_tokens": 1160,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "review_count_correct": true,
+      "latency_ms": 7482.27
+    },
+    {
+      "case": "count_missing",
+      "warm": false,
+      "ids": [
+        2
+      ],
+      "exact_ids": false,
+      "shape": "count",
+      "shape_correct": true,
+      "source_checks": [
+        true
+      ],
+      "sources": [
+        {
+          "n": 1,
+          "person_id": 2,
+          "name": "Fixture Bình",
+          "document_id": 2,
+          "ordinal": 0,
+          "snippet": "Kỹ năng SQL, Excel."
+        }
+      ],
+      "citations": 1,
+      "answer": "Đã đánh giá bằng chứng của 3/6 hồ sơ trong kho ứng viên.\nCó 1 hồ sơ được đánh giá phù hợp với yêu cầu trong phần đã đọc.\nĐây là đánh giá trên bằng chứng đã đọc; số hồ sơ thực sự đáp ứng trong toàn bộ phạm vi chưa xác định. Thiếu bằng chứng không có nghĩa là không đáp ứng.\nHiển thị 1 hồ sơ được đánh giá phù hợp:\n- Fixture Bình [1]",
+      "trace": {
+        "question": "Có bao nhiêu ứng viên biết SQL và không biết Python?",
+        "plan": {
+          "shape": "count",
+          "information_need": "Có bao nhiêu ứng viên biết SQL và không biết Python?",
+          "must_have": [
+            "biết SQL"
+          ],
+          "should_have": [
+            "không biết Python"
+          ],
+          "extract": [
+            "kỹ năng lập trình",
+            "công cụ dữ liệu"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "SQL",
+            "Structured Query Language",
+            "Python"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "(tắt)",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 32,
+          "ms_total": 2844,
+          "judged": 3,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 3,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 3,
+          "judge_reused": 0,
+          "identified_people": []
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "count": {
+          "method": "evidence_review",
+          "status": "INFERENCE",
+          "exact": false,
+          "scope": "applicant_store",
+          "scope_total": 6,
+          "reviewed": 3,
+          "not_reviewed": 3,
+          "matched": 1,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unresolved_reviewed": 2
+        },
+        "ms_total": 4234,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1377.19,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1445,
+            "output_tokens": 141,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 2823.84,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1186,
+            "output_tokens": 432,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 2631,
+          "output_tokens": 573,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "review_count_correct": false,
+      "latency_ms": 4244.9
+    },
+    {
+      "case": "count_subset",
+      "warm": false,
+      "ids": [
+        2
+      ],
+      "exact_ids": true,
+      "shape": "count",
+      "shape_correct": true,
+      "source_checks": [
+        true
+      ],
+      "sources": [
+        {
+          "n": 1,
+          "person_id": 2,
+          "name": "Fixture Bình",
+          "document_id": 2,
+          "ordinal": 0,
+          "snippet": "Kỹ năng SQL, Excel."
+        }
+      ],
+      "citations": 1,
+      "answer": "Đã đánh giá bằng chứng của 2/2 hồ sơ trong nhóm hồ sơ đang xét.\nCó 1 hồ sơ được đánh giá phù hợp với yêu cầu trong phần đã đọc.\nĐây là đánh giá trên bằng chứng đã đọc; số hồ sơ thực sự đáp ứng trong toàn bộ phạm vi chưa xác định. Thiếu bằng chứng không có nghĩa là không đáp ứng.\nHiển thị 1 hồ sơ được đánh giá phù hợp:\n- Fixture Bình [1]",
+      "trace": {
+        "question": "Trong số này có bao nhiêu người biết SQL?",
+        "plan": {
+          "shape": "count",
+          "information_need": "Trong số các ứng viên Fixture Chi và Fixture Bình, có bao nhiêu người biết SQL?",
+          "must_have": [
+            "Fixture Chi",
+            "Fixture Bình"
+          ],
+          "should_have": [],
+          "extract": [
+            "kỹ năng SQL",
+            "kiến thức SQL"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "SQL",
+            "Structured Query Language",
+            "biết SQL",
+            "có kỹ năng SQL"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "pinned_ids": 2,
+        "fast_path_pinned": "bỏ ② — đọc thẳng người đã giải định danh",
+        "cache_key": "(tắt)",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 1797,
+          "judged": 2,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 2,
+          "pinned": true,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 2,
+          "judge_reused": 0,
+          "identified_people": [
+            "Fixture Chi",
+            "Fixture Bình"
+          ],
+          "scope": "previous_result",
+          "scope_size": 2
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "count": {
+          "method": "evidence_review",
+          "status": "INFERENCE",
+          "exact": false,
+          "scope": "previous_result",
+          "scope_total": 2,
+          "reviewed": 2,
+          "not_reviewed": 0,
+          "matched": 1,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unresolved_reviewed": 1
+        },
+        "ms_total": 3219,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1441.95,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1473,
+            "output_tokens": 151,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1791.31,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 970,
+            "output_tokens": 257,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 2443,
+          "output_tokens": 408,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "review_count_correct": true,
+      "latency_ms": 3240.91
+    },
+    {
+      "case": "count_and",
+      "warm": false,
+      "ids": [
+        1
+      ],
+      "exact_ids": true,
+      "shape": "count",
+      "shape_correct": true,
+      "source_checks": [
+        true
+      ],
+      "sources": [
+        {
+          "n": 1,
+          "person_id": 1,
+          "name": "Fixture An",
+          "document_id": 1,
+          "ordinal": 0,
+          "snippet": "Kỹ năng SQL, Python, Power BI."
+        }
+      ],
+      "citations": 1,
+      "answer": "Đã đánh giá bằng chứng của 4/6 hồ sơ trong kho ứng viên.\nCó 1 hồ sơ được đánh giá phù hợp với yêu cầu trong phần đã đọc.\nĐây là đánh giá trên bằng chứng đã đọc; số hồ sơ thực sự đáp ứng trong toàn bộ phạm vi chưa xác định. Thiếu bằng chứng không có nghĩa là không đáp ứng.\nHiển thị 1 hồ sơ được đánh giá phù hợp:\n- Fixture An [1]",
+      "trace": {
+        "question": "Có bao nhiêu ứng viên biết cả SQL và Python?",
+        "plan": {
+          "shape": "count",
+          "information_need": "Có bao nhiêu ứng viên biết cả SQL và Python?",
+          "must_have": [],
+          "should_have": [],
+          "extract": [
+            "kỹ năng lập trình",
+            "công cụ phần mềm"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "SQL",
+            "Python",
+            "biết SQL và Python",
+            "sử dụng SQL Python",
+            "programming skills SQL Python"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "(tắt)",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 15,
+          "ms_total": 3828,
+          "judged": 4,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 4,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 4,
+          "judge_reused": 0,
+          "identified_people": []
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "count": {
+          "method": "evidence_review",
+          "status": "INFERENCE",
+          "exact": false,
+          "scope": "applicant_store",
+          "scope_total": 6,
+          "reviewed": 4,
+          "not_reviewed": 2,
+          "matched": 1,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unresolved_reviewed": 3
+        },
+        "ms_total": 5266,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1439.76,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1444,
+            "output_tokens": 139,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 3823.57,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1300,
+            "output_tokens": 580,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 2744,
+          "output_tokens": 719,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "review_count_correct": true,
+      "latency_ms": 5276.26
+    },
+    {
+      "case": "count_not",
+      "warm": false,
+      "ids": [
+        3
+      ],
+      "exact_ids": true,
+      "shape": "count",
+      "shape_correct": true,
+      "source_checks": [
+        true,
+        true
+      ],
+      "sources": [
+        {
+          "n": 1,
+          "person_id": 3,
+          "name": "Fixture Chi",
+          "document_id": 3,
+          "ordinal": 0,
+          "snippet": "Kỹ năng Java"
+        },
+        {
+          "n": 2,
+          "person_id": 3,
+          "name": "Fixture Chi",
+          "document_id": 3,
+          "ordinal": 0,
+          "snippet": "Chưa từng làm trong ngành ngân hàng."
+        }
+      ],
+      "citations": 2,
+      "answer": "Đã đánh giá bằng chứng của 3/6 hồ sơ trong kho ứng viên.\nCó 1 hồ sơ được đánh giá phù hợp với yêu cầu trong phần đã đọc.\nĐây là đánh giá trên bằng chứng đã đọc; số hồ sơ thực sự đáp ứng trong toàn bộ phạm vi chưa xác định. Thiếu bằng chứng không có nghĩa là không đáp ứng.\nHiển thị 1 hồ sơ được đánh giá phù hợp:\n- Fixture Chi [1] [2]",
+      "trace": {
+        "question": "Có bao nhiêu ứng viên biết Java và chưa từng làm ngân hàng?",
+        "plan": {
+          "shape": "count",
+          "information_need": "Có bao nhiêu ứng viên biết Java và chưa từng làm ngân hàng?",
+          "must_have": [],
+          "should_have": [
+            "chưa từng làm ngân hàng",
+            "không có kinh nghiệm tại các tổ chức tài chính/ngân hàng"
+          ],
+          "extract": [
+            "kỹ năng lập trình",
+            "kinh nghiệm làm việc",
+            "tên công ty trước đây",
+            "ngành nghề đã làm"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "Java developer",
+            "lập trình viên Java",
+            "Java programmer",
+            "backend Java",
+            "Spring Boot Java",
+            "not banking experience"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "(tắt)",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 16,
+          "ms_total": 3875,
+          "judged": 3,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 3,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 3,
+          "judge_reused": 0,
+          "identified_people": []
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "count": {
+          "method": "evidence_review",
+          "status": "INFERENCE",
+          "exact": false,
+          "scope": "applicant_store",
+          "scope_total": 6,
+          "reviewed": 3,
+          "not_reviewed": 3,
+          "matched": 1,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unresolved_reviewed": 2
+        },
+        "ms_total": 6109,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 2,
+          "cited": 2,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 2206.26,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1447,
+            "output_tokens": 221,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 3877.44,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1149,
+            "output_tokens": 552,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 2596,
+          "output_tokens": 773,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "review_count_correct": true,
+      "latency_ms": 6100.45
+    },
+    {
+      "case": "count_missing",
+      "warm": false,
+      "ids": [
+        2
+      ],
+      "exact_ids": false,
+      "shape": "count",
+      "shape_correct": true,
+      "source_checks": [
+        true
+      ],
+      "sources": [
+        {
+          "n": 1,
+          "person_id": 2,
+          "name": "Fixture Bình",
+          "document_id": 2,
+          "ordinal": 0,
+          "snippet": "Kỹ năng SQL, Excel."
+        }
+      ],
+      "citations": 1,
+      "answer": "Đã đánh giá bằng chứng của 3/6 hồ sơ trong kho ứng viên.\nCó 1 hồ sơ được đánh giá phù hợp với yêu cầu trong phần đã đọc.\nĐây là đánh giá trên bằng chứng đã đọc; số hồ sơ thực sự đáp ứng trong toàn bộ phạm vi chưa xác định. Thiếu bằng chứng không có nghĩa là không đáp ứng.\nHiển thị 1 hồ sơ được đánh giá phù hợp:\n- Fixture Bình [1]",
+      "trace": {
+        "question": "Có bao nhiêu ứng viên biết SQL và không biết Python?",
+        "plan": {
+          "shape": "count",
+          "information_need": "Có bao nhiêu ứng viên biết SQL và không biết Python?",
+          "must_have": [
+            "biết SQL"
+          ],
+          "should_have": [
+            "không biết Python"
+          ],
+          "extract": [
+            "kỹ năng lập trình",
+            "công cụ phần mềm"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "SQL",
+            "Structured Query Language",
+            "Python"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "cache_key": "(tắt)",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 3203,
+          "judged": 3,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 3,
+          "pinned": false,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 3,
+          "judge_reused": 0,
+          "identified_people": []
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "count": {
+          "method": "evidence_review",
+          "status": "INFERENCE",
+          "exact": false,
+          "scope": "applicant_store",
+          "scope_total": 6,
+          "reviewed": 3,
+          "not_reviewed": 3,
+          "matched": 1,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unresolved_reviewed": 2
+        },
+        "ms_total": 4609,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1409.09,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1445,
+            "output_tokens": 141,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 3192.21,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1186,
+            "output_tokens": 460,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 2631,
+          "output_tokens": 601,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "review_count_correct": false,
+      "latency_ms": 4614.26
+    },
+    {
+      "case": "count_subset",
+      "warm": false,
+      "ids": [
+        2
+      ],
+      "exact_ids": true,
+      "shape": "count",
+      "shape_correct": true,
+      "source_checks": [
+        true
+      ],
+      "sources": [
+        {
+          "n": 1,
+          "person_id": 2,
+          "name": "Fixture Bình",
+          "document_id": 2,
+          "ordinal": 0,
+          "snippet": "Kỹ năng SQL, Excel."
+        }
+      ],
+      "citations": 1,
+      "answer": "Đã đánh giá bằng chứng của 2/2 hồ sơ trong nhóm hồ sơ đang xét.\nCó 1 hồ sơ được đánh giá phù hợp với yêu cầu trong phần đã đọc.\nĐây là đánh giá trên bằng chứng đã đọc; số hồ sơ thực sự đáp ứng trong toàn bộ phạm vi chưa xác định. Thiếu bằng chứng không có nghĩa là không đáp ứng.\nHiển thị 1 hồ sơ được đánh giá phù hợp:\n- Fixture Bình [1]",
+      "trace": {
+        "question": "Trong số này có bao nhiêu người biết SQL?",
+        "plan": {
+          "shape": "count",
+          "information_need": "Trong số các ứng viên Fixture Chi và Fixture Bình, có bao nhiêu người biết SQL?",
+          "must_have": [
+            "Fixture Chi",
+            "Fixture Bình"
+          ],
+          "should_have": [],
+          "extract": [
+            "kỹ năng SQL",
+            "kiến thức cơ sở dữ liệu"
+          ],
+          "sort_by": null,
+          "limit": 10,
+          "search_queries": [
+            "SQL",
+            "Structured Query Language",
+            "cơ sở dữ liệu database",
+            "truy vấn dữ liệu"
+          ],
+          "next_steps": [],
+          "provider": "greennode",
+          "model": "qwen/qwen3.6-flash",
+          "fallback": false
+        },
+        "ms_plan": 0,
+        "pinned_ids": 2,
+        "fast_path_pinned": "bỏ ② — đọc thẳng người đã giải định danh",
+        "cache_key": "(tắt)",
+        "cache": "miss",
+        "pass1": {
+          "ms_retrieve": 0,
+          "ms_total": 2140,
+          "judged": 2,
+          "relevant": 1,
+          "shown": 1,
+          "truncated": 0,
+          "limit": 10,
+          "sorted_by": null,
+          "missing_sort_value": 0,
+          "cited": 1,
+          "retrieved": 2,
+          "pinned": true,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unread": 0,
+          "judge_sent": 2,
+          "judge_reused": 0,
+          "identified_people": [
+            "Fixture Chi",
+            "Fixture Bình"
+          ],
+          "scope": "previous_result",
+          "scope_size": 2
+        },
+        "coverage": {
+          "profiles": 6,
+          "profiles_embedded": 0,
+          "chunks": 6,
+          "chunks_embedded": 0
+        },
+        "count": {
+          "method": "evidence_review",
+          "status": "INFERENCE",
+          "exact": false,
+          "scope": "previous_result",
+          "scope_total": 2,
+          "reviewed": 2,
+          "not_reviewed": 0,
+          "matched": 1,
+          "read_failed": false,
+          "read_incomplete": false,
+          "unresolved_reviewed": 1
+        },
+        "ms_total": 3765,
+        "compose": {
+          "provider": "",
+          "model": "",
+          "fallback": false,
+          "sources": 1,
+          "cited": 1,
+          "deterministic": true
+        },
+        "llm_calls": [
+          {
+            "task": "talent_answer_plan",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 1629.37,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 1473,
+            "output_tokens": 158,
+            "error": false
+          },
+          {
+            "task": "talent_answer_judge",
+            "provider": "greennode",
+            "model": "qwen/qwen3.6-flash",
+            "capability": "FAST",
+            "latency_ms": 2134.48,
+            "ok": true,
+            "route_reason": "benchmark_override",
+            "input_tokens": 973,
+            "output_tokens": 261,
+            "error": false
+          }
+        ],
+        "usage": {
+          "input_tokens": 2446,
+          "output_tokens": 419,
+          "failed_attempts": 0,
+          "tokens_complete": true,
+          "usage_scope": "reported tokens only; unreported attempt usage remains unknown"
+        }
+      },
+      "numeric_attributes": [
+        {}
+      ],
+      "error": "",
+      "review_count_correct": true,
+      "latency_ms": 3769.79
+    }
+  ],
+  "cost": null,
+  "human_answer_correctness": null,
+  "production_acceptance": null,
+  "started_at": "2026-09-08T00:56:16.623914+00:00",
+  "extra_case_definitions": [
+    {
+      "id": "count_and",
+      "q": "Có bao nhiêu ứng viên biết cả SQL và Python?",
+      "shape": "count",
+      "expected_ids": [
+        1
+      ],
+      "review_count": 1,
+      "scope_total": 6
+    },
+    {
+      "id": "count_not",
+      "q": "Có bao nhiêu ứng viên biết Java và chưa từng làm ngân hàng?",
+      "shape": "count",
+      "expected_ids": [
+        3
+      ],
+      "review_count": 1,
+      "scope_total": 6
+    },
+    {
+      "id": "count_missing",
+      "q": "Có bao nhiêu ứng viên biết SQL và không biết Python?",
+      "shape": "count",
+      "expected_ids": [],
+      "review_count": 0,
+      "scope_total": 6
+    },
+    {
+      "id": "count_subset",
+      "q": "Trong số này có bao nhiêu người biết SQL?",
+      "shape": "count",
+      "context_ids": [
+        3,
+        2
+      ],
+      "expected_ids": [
+        2
+      ],
+      "review_count": 1,
+      "scope_total": 2
+    }
+  ],
+  "runtime_sha256": {
+    "talent\\answer\\__init__.py": "23b0f8d1a161af2a7e90d3eb98cf054b0e043219e832c0cc2a35372352c022d1",
+    "talent\\answer\\act.py": "93d6f398973e57741c5116d3184372a6cc6b56a8c19895030f9f5eb43366ea46",
+    "talent\\answer\\aggregate.py": "4c3fc3258416e67115e1d6c796898cfcb004fbecb0a3a10f682a1048fde3da69",
+    "talent\\answer\\cache.py": "8c9f1bfda589d86ce422444e9b212a4deddef1be1366bff6e0b53a5a6e9da335",
+    "talent\\answer\\chat.py": "501d4ee5684037c922966f4d04ce53331786d01092e641eb9756c59a97e3edb2",
+    "talent\\answer\\compose.py": "6e4d98c69916c75fbc56dbb0def605c2f1d173b5423fb2fadc1055cbe21ac0d2",
+    "talent\\answer\\corpus.py": "6f7b91ad93d1437470f425ead20bb917854c8b0421d40d33814af77a5bc10ca3",
+    "talent\\answer\\engine.py": "251651ebbb399fb5a7d71daf6638cbc5d78967be8d3892ca69d9359efaf4ac21",
+    "talent\\answer\\judge.py": "d3da9cf70260c6ef80e44ebe784a132dd69a912c54fe3fedb8110451d77a09a8",
+    "talent\\answer\\plan.py": "7be286cc2ebb10718c8ba9344a510f03686020dbd4003d9850d5f824bb4ae277",
+    "talent\\answer\\resolve.py": "c59b5fcb1bfb82dcb1de748c89fc7b6362b4531778f10116e5b2fc18c3b0d928",
+    "talent\\answer\\retrieve.py": "dd4abbaa70c78c7c164a0924b172f03e1601032fb7af1455126d18d129212787",
+    "talent\\answer\\runner.py": "6542f061a9c87643f990c6560283fcb8150fab296f3ade63079dc5a4f90243a0",
+    "talent\\answer\\structured_match.py": "def19fe101158f98621c1c64da8604cecdc00d1c1f1dd19f33555812b4fe359d",
+    "talent\\answer\\superlative.py": "4d8c1cc12222cea30fc4f35cb606d198c22d37f04f8b07944f998b5dec97ec25",
+    "talent\\answer\\verify.py": "f36b5ffa85f8d2bdd9e0cf140b781e57edd20b92c7d2e795becd88f7604aee3f"
+  },
+  "summary": {
+    "runs": 12,
+    "source_quotes_verified": 15,
+    "source_quotes_total": 15,
+    "source_existence_accuracy": 1.0,
+    "shape_correct": 12,
+    "shape_total": 12,
+    "id_exact_correct": 9,
+    "id_exact_total": 12,
+    "p50_ms": 5060.57,
+    "p95_ms": 7713.0795
+  }
+}
