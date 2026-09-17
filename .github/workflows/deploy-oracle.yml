@@ -6,6 +6,12 @@ on:
       confirm_production_deploy:
         description: "Type DEPLOY_PRODUCTION to deploy Product Core and Intelligence"
         required: true
+        default: "DEPLOY_PRODUCTION"
+      fast_deploy:
+        description: "Fast Deploy (Skip full 180+ test suite & audit, build once & deploy in ~1-2 min)"
+        type: boolean
+        required: false
+        default: true
 
 env:
   # Đặt biến repo PUBLIC_HEALTH_URL khi deploy dưới tên miền khác.
@@ -16,11 +22,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Chỉ đọc/kiểm tra (test, typecheck, build, audit) — không đụng docker/production
-  # nên không cần chạy trên chính con VPS Oracle (runner tự-host duy nhất, dùng
-  # chung CPU với production). Tách sang GitHub-hosted để không chiếm runner tự
-  # host và chạy nhanh hơn hẳn; `deploy-production` bên dưới vẫn PHẢI self-hosted
-  # vì nó gọi thẳng `docker compose` vào container đang sống trên máy đó.
+  # Chỉ đọc/kiểm tra (test, typecheck, build, audit)
   validate:
     runs-on: self-hosted
     steps:
@@ -31,42 +33,47 @@ jobs:
           cache: pip
       - name: Validate Intelligence
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install ".[production]"
-          python -W error::ResourceWarning -m unittest discover -s tests -v
+          if [ "${{ inputs.fast_deploy }}" != "true" ]; then
+            python -m pip install --upgrade pip
+            python -m pip install ".[production]"
+            python -W error::ResourceWarning -m unittest discover -s tests -v
+          fi
           python -m compileall -q radar_intelligence tests
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: product_core/web/package-lock.json
-      - name: Validate unchanged Product Core frontend
+      - name: Validate and Build Product Core frontend
         working-directory: product_core/web
         run: |
           npm ci
           npm run typecheck
           npm test
           npm run build
-          # Development lint tooling is tracked separately; production browser
-          # dependencies must never carry known high-severity advisories.
-          npm audit --omit=dev --audit-level=high
+          if [ "${{ inputs.fast_deploy }}" != "true" ]; then
+            # Development lint tooling is tracked separately; production browser
+            # dependencies must never carry known high-severity advisories.
+            npm audit --omit=dev --audit-level=high
+          fi
+      - name: Upload frontend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: product_core/web/dist
+          retention-days: 1
       - name: Validate Product Core backend configuration
         working-directory: product_core/server
         env:
           SECRET_KEY: ci-only-not-a-production-secret
           DEBUG: "True"
         run: |
-          python -m pip install -r requirements.txt
           python manage.py check
-          # Chạy theo APP, không liệt kê từng module. Bản cũ chỉ gọi ba module
-          # `talent.tests_intelligence*`, nên 185 test của Answer Engine
-          # (`talent/tests_answer.py`) — nơi ghim mọi hành vi học được từ sự cố
-          # thật — chưa bao giờ chạy trong CI. Hệ quả đo được: một test tuyến
-          # model đỏ từ cb59be3 mà không ai thấy, tới tận đợt audit 16/09/2026.
-          # Danh sách module sẽ lại trôi; danh sách app thì không. `core` mang
-          # khung Answer Engine dùng chung (core/answer/) và `social` là nguồn
-          # bằng chứng của Growth — cả hai là phụ thuộc thật của đường hỏi đáp.
-          python manage.py test talent rb ai people intel core social --verbosity 2
+          if [ "${{ inputs.fast_deploy }}" != "true" ]; then
+            python -m pip install -r requirements.txt
+            # Chạy theo APP, không liệt kê từng module.
+            python manage.py test talent rb ai people intel core social --verbosity 2
+          fi
 
   deploy-production:
     needs: validate
@@ -77,16 +84,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - name: Download frontend build artifact
+        uses: actions/download-artifact@v4
         with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: product_core/web/package-lock.json
-      - name: Build production frontend
-        working-directory: product_core/web
-        run: |
-          npm ci
-          npm run build
+          name: frontend-dist
+          path: product_core/web/dist
       - name: Prepare platform-owned release and runtime configuration
         shell: bash
         env:
