@@ -83,6 +83,11 @@ Quy tắc bắt buộc:
 4. **Mỗi khẳng định về một khách phải có [n]**, và [n] phải là nguồn CỦA CHÍNH
    khách đó. Không có nguồn thì không khẳng định.
 
+4b. Nếu "can_xac_minh_them" = true: đây là SUY LUẬN của ③ từ nghề nghiệp/hồ sơ
+    (CV xin việc không nói thẳng nhu cầu tài chính), KHÔNG phải bằng chứng trực
+    tiếp. Nói rõ bằng một cụm ngắn (vd "khả năng quan tâm — cần xác minh thêm")
+    — không trình bày như một nhu cầu đã xác nhận chắc chắn.
+
 5. **Không bịa**: không đoán thu nhập, tài sản, tình trạng hôn nhân, hay bất cứ
    điều gì không có trong bằng chứng. Không viết số điện thoại hay email.
 
@@ -179,6 +184,10 @@ def build_payload(query_plan, chosen, near_misses, stats, sources, *, actions=No
             "san_pham": detail.get("product", ""),
             "diem_uu_tien": detail.get("priority_score", 0.0),
             "vi_sao": judgement.why,
+            # "suy_luan" = ③ suy ra từ nghề nghiệp/hồ sơ, KHÔNG phải bằng chứng
+            # trực tiếp nói thẳng nhu cầu — ⑤ phải nói rõ để RM tự thẩm định
+            # lại trước khi tiếp cận, không trình bày như một sự thật đã chốt.
+            "can_xac_minh_them": judgement.evidence_kind == "suy_luan",
             "nhu_cau_hay_trang_thai": judgement.need_kind,
             "bang_chung_moi_nhat_cach_day_ngay": judgement.freshest_days,
             "nguon": by_person.get(judgement.person_id, []),

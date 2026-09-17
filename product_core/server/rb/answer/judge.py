@@ -70,8 +70,29 @@ Bạn nhận: một NHU CẦU TÌM KIẾM và một DANH SÁCH khách hàng, m�
 
 Với TỪNG khách hàng, quyết định dựa DUY NHẤT trên đoạn được cấp:
 
-1. Người này có thoả nhu cầu tìm kiếm không? Ràng buộc trong "bat_buoc" mà không
-   có bằng chứng thì KHÔNG thoả — không suy đoán, không cho qua vì "có vẻ hợp".
+1. Người này có thoả nhu cầu tìm kiếm không? Có HAI loại ràng buộc trong
+   "bat_buoc", xử lý khác nhau:
+
+   - **Thuộc tính định danh cụ thể** (chức danh, khu vực, kênh liên hệ, nhân
+     khẩu học đã ghi rõ số/chữ): bằng chứng phải NÊU TRỰC TIẾP. Không suy đoán,
+     không cho qua vì "có vẻ hợp".
+   - **Nhu cầu / mức quan tâm sản phẩm tài chính**: một CV xin việc gần như
+     KHÔNG BAO GIỜ nói thẳng "tôi muốn mở thẻ tín dụng" — đòi bằng chứng trực
+     tiếp cho loại này là tự đảm bảo luôn ra "không ai thoả". Ở đây được phép
+     **SUY LUẬN có căn cứ** từ tín hiệu nghề nghiệp thật trong [profile]/[signal]
+     (chức danh, ngành, thâm niên, quy mô công ty, giai đoạn sự nghiệp). Khi
+     suy luận: trích nguyên văn đoạn CĂN CỨ (câu ghi chức danh/nghề nghiệp thật
+     trong hồ sơ) chứ không trích câu kết luận — kết luận là suy luận của bạn,
+     không phải chữ có sẵn trong hồ sơ — và đặt "loai_bang_chung": "suy_luan".
+     Chỉ cần đây là MỘT CƠ HỘI ĐÁNG XEM XÉT là đủ để đánh "thoa": true; không
+     cần chắc chắn tuyệt đối — RM sẽ tự thẩm định lại trước khi tiếp cận. Để
+     "do_tin" phản ánh đúng mức tin của suy luận (thường vừa phải, vd 0.4-0.6),
+     đừng chấm cao như bằng chứng trực tiếp.
+
+   TUYỆT ĐỐI: suy luận chỉ áp dụng cho nhu cầu/quan tâm sản phẩm. KHÔNG suy
+   luận thu nhập, tài sản, tình trạng hôn nhân hay tình trạng tài chính cụ thể
+   của khách — kể cả khi "có vẻ hợp lý" từ chức danh. Đây là ranh giới tuân thủ
+   không được nới.
 
 2. **Cân nhắc THỜI GIAN.** Mỗi đoạn ghi rõ cách đây bao nhiêu ngày. Nhu cầu tài
    chính hết hạn: một người hỏi vay mua nhà 5 ngày trước đang cần thật; hỏi 400
@@ -100,12 +121,14 @@ Chỉ trả JSON:
   "id": <id khách hàng>,
   "thoa": true|false,
   "do_tin": 0.0-1.0,
+  "loai_bang_chung": "truc_tiep"|"suy_luan",
   "da_tu_choi": true|false,
   "nhu_cau_hay_trang_thai": "nhu_cau"|"trang_thai"|"khong_ro",
   "vi_sao": "<2-4 câu MỘT DÒNG (không xuống dòng trong chuỗi JSON): đọc được
     CỤ THỂ điều gì, cách đây bao lâu, khớp với điều kiện nào — hoặc vì sao loại.
-    Không viết chung chung kiểu 'có nhu cầu tài chính' mà không nói rõ nhu cầu
-    gì và căn cứ ở đâu>",
+    Nếu là suy luận, nói rõ đây LÀ suy luận và suy từ đâu. Không viết chung
+    chung kiểu 'có nhu cầu tài chính' mà không nói rõ nhu cầu gì và căn cứ ở
+    đâu>",
   "trich_dan": [{"doan": <số thứ tự đoạn>, "nguyen_van": "<copy đúng chữ>"}],
   "boc_duoc": {"<tên thuộc tính>": <giá trị hoặc null>},
   "con_thieu": "<điều chưa rõ, để trống nếu không>"
@@ -139,11 +162,16 @@ class Judgement:
     #: Ngày của bằng chứng MỚI NHẤT. ④ dùng cho chiều `timing`.
     freshest_days: object = None
     criteria: list = field(default_factory=list)
+    #: "truc_tiep" | "suy_luan" — xem prompt mục 1. ⑤ dùng để nói rõ với RM đây
+    #: là suy luận từ nghề nghiệp/hồ sơ, cần tự xác minh trước khi tiếp cận,
+    #: không phải một sự thật đã xác nhận.
+    evidence_kind: str = "truc_tiep"
 
     def as_dict(self):
         return {"person_id": self.person_id, "name": self.name,
                 "relevant": self.relevant, "confidence": self.confidence,
                 "why": self.why, "evidence": self.evidence,
+                "evidence_kind": self.evidence_kind,
                 "extracted": self.extracted, "gap": self.gap,
                 "declined": self.declined, "need_kind": self.need_kind,
                 "freshest_days": self.freshest_days, "criteria": self.criteria}
@@ -159,7 +187,8 @@ def from_row(row):
         declined=row.get("declined", False),
         need_kind=row.get("need_kind", "khong_ro"),
         freshest_days=row.get("freshest_days"),
-        criteria=row.get("criteria") or [])
+        criteria=row.get("criteria") or [],
+        evidence_kind=row.get("evidence_kind", "truc_tiep"))
 
 
 class JudgeReport(list):
@@ -322,6 +351,7 @@ def _parse_batch(text, batch, query_plan):
                 extracted[name] = value
 
         need_kind = row.get("nhu_cau_hay_trang_thai")
+        evidence_kind = row.get("loai_bang_chung")
         out.append(Judgement(
             person_id=person_id,
             name=candidate.name,
@@ -335,6 +365,8 @@ def _parse_batch(text, batch, query_plan):
             need_kind=(need_kind if need_kind in ("nhu_cau", "trang_thai", "khong_ro")
                        else "khong_ro"),
             freshest_days=min(ages) if ages else candidate.freshest_days(),
+            evidence_kind=(evidence_kind if evidence_kind in ("truc_tiep", "suy_luan")
+                          else "truc_tiep"),
         ))
     return out
 

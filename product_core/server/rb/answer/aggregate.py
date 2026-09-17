@@ -43,7 +43,12 @@ log = logging.getLogger(__name__)
 #: Ngưỡng tin cậy tối thiểu để một người được coi là "thoả". Dưới mức này vẫn
 #: được giữ làm `near_miss` — RM cần thấy "có mấy người gần đúng" thay vì một
 #: danh sách rỗng không giải thích được.
-MIN_CONFIDENCE = 0.35
+#:
+#: Hạ từ 0.35: ③ giờ được phép SUY LUẬN nhu cầu/quan tâm sản phẩm từ nghề
+#: nghiệp (dữ liệu Growth phần lớn là hồ sơ CV, không phải tín hiệu mua hàng
+#: trực tiếp) và được dặn chấm "do_tin" vừa phải cho suy luận, không cao như
+#: bằng chứng trực tiếp — ngưỡng cũ sẽ loại đúng những cơ hội suy luận đó.
+MIN_CONFIDENCE = 0.3
 
 #: Khoá sắp xếp nội bộ cho câu "mới nhất": theo tuổi bằng chứng mới nhất, KHÔNG
 #: theo thuộc tính ③ bóc được. Đặt bởi engine khi `resolve.superlative_attr`
