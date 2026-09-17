@@ -139,8 +139,20 @@ def _people(chosen, sources):
     } for j in chosen]
 
 
-def _answer_people(chosen, stats, sources, near=None):
-    """Giữ người đã định danh và người gần đúng trong ngữ cảnh để Frontend gắn link mở hồ sơ."""
+def _answer_people(chosen, stats, sources, near=None, shape=""):
+    """Giữ người đã định danh và người gần đúng trong ngữ cảnh để Frontend gắn link mở hồ sơ.
+
+    `near` (người "gần đúng" — có độ tin > 0 hoặc có "vì sao" nhưng KHÔNG thoả
+    must_have) bị bỏ qua khi `shape == "count"`. Lý do: `aggregate.aggregate()`
+    đưa MỌI judgement có `confidence > 0` (kể cả người `relevant=False`) vào
+    `near` — với câu đếm, "confidence" là độ tin mô hình đọc đúng hồ sơ, không
+    phải độ tin đã thoả điều kiện đếm. Trộn near-miss vào `result.people` của
+    một câu đếm khiến số người trả về NHIỀU HƠN chính con số vừa công bố
+    (`count["matched"]`) — bắt được ở `talent/tests_brain_counts.py::
+    CountScopeTest`, nơi câu đếm phủ định ("không biết Python") lẫn cả người
+    KHÔNG biết trạng thái Python (UNKNOWN, do_tin=0.9 từ model) vào danh sách,
+    dù họ chưa hề được xác nhận thoả điều kiện.
+    """
     rows = list(chosen)
     seen = {j.person_id for j in rows}
     identified = stats.get("identified_judgements", []) or []
@@ -166,7 +178,7 @@ def _answer_people(chosen, stats, sources, near=None):
                        "citations": [s["n"] for s in sources
                                      if s["person_id"] == row["person_id"]]})
         seen.add(row["person_id"])
-    if near:
+    if near and shape != "count":
         for j in near:
             pid = getattr(j, "person_id", None) if not isinstance(j, dict) else j.get("person_id")
             if pid and pid not in seen:
@@ -603,7 +615,9 @@ def answer(question, *, envelope=None, user=None, history=None, complete_fn=None
         compose_stage.evidence_rows(chosen, stats), text, sources)
 
     return AnswerResult(text=text, sources=used, all_sources=sources,
-                        people=_answer_people(chosen, stats, sources, near=near), reasoning=meta["reasoning"],
+                        people=_answer_people(chosen, stats, sources, near=near,
+                                              shape=query_plan.shape),
+                        reasoning=meta["reasoning"],
                         provider=meta["provider"], model=meta["model"], trace=trace)
 
 
@@ -1115,7 +1129,7 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
         yield {"type": "revision", "text": text, "ok": False}
 
     text, used = compose_stage.used_sources(text, sources)
-    people = _answer_people(chosen, stats, sources, near=near)
+    people = _answer_people(chosen, stats, sources, near=near, shape=query_plan.shape)
 
     # Việc CÒN LẠI của cùng một câu hỏi. "Tìm ứng viên Java rồi soạn thư cho
     # người đầu" là một câu hai việc; dừng ở đây thì thư không bao giờ được soạn.
