@@ -42,6 +42,15 @@ log = logging.getLogger(__name__)
 #: Trần thời gian mềm — vượt thì bỏ vòng nới, không cắt ngang chặng đang chạy.
 BUDGET_SECONDS = 15.0
 
+#: Trần thời gian CỨNG của chặng ③ đọc sâu, tính từ lúc vào pipeline.
+#:
+#: `core/answer/runner.py` cắt cả lượt ở 150 giây. Số lô của ③ đi theo số ứng
+#: viên ② trả về, nên kho lớn hoặc xếp hạng kém là ③ tự phình: 89 hồ sơ thành 12
+#: lô, 4 luồng là 3 đợt, mỗi đợt tới 70 giây — vượt trần và người dùng mất trắng
+#: câu trả lời dù gần hết hồ sơ đã đọc xong. Chốt ở 90 giây để còn dư cho ⑤ viết
+#: bài (một lượt gọi model nữa) trong 150 giây đó.
+READ_BUDGET_SECONDS = 90.0
+
 #: Số lượt tự sửa tối đa ở ⑤ khi bài viết không qua kiểm chứng tất định.
 MAX_REPAIR_ATTEMPTS = 2
 
@@ -497,13 +506,15 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         yield _step("Đọc hồ sơ")
         keys = {c.person_id: judge_stage.dossier_key(active_plan, c) for c in candidates}
         unread = [c for c in candidates if keys[c.person_id] not in reusable_judgements]
-        fresh = judge_stage.judge(active_plan, unread, complete_fn=complete_fn)
+        fresh = judge_stage.judge(active_plan, unread, complete_fn=complete_fn,
+                                  deadline=started + READ_BUDGET_SECONDS)
         for row in fresh:
             reusable_judgements[keys[row.person_id]] = row
         judgements = judge_stage.JudgeReport(
             [reusable_judgements[keys[c.person_id]] for c in candidates
              if keys[c.person_id] in reusable_judgements],
-            batches=getattr(fresh, "batches", 0), failed=getattr(fresh, "failed", 0))
+            batches=getattr(fresh, "batches", 0), failed=getattr(fresh, "failed", 0),
+            skipped=getattr(fresh, "skipped", 0))
         chosen, near, stats = aggregate_stage.aggregate(active_plan, judgements)
         # ② tìm được người mà ③ không đọc nổi ⇒ KHÔNG được kết luận "kho không
         # có ai". Đánh dấu để ⑤ nói đúng chuyện đã xảy ra.

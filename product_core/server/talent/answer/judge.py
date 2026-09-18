@@ -21,7 +21,8 @@ import hashlib
 import logging
 import math
 import re
-from concurrent.futures import ThreadPoolExecutor
+import time
+from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 
 from ai.jsonx import extract_json
@@ -444,21 +445,29 @@ class JudgeReport(list):
     ai" trong khi thực ra ② đã tìm được 40 hồ sơ mà ③ chết vì tràn token.
     """
 
-    def __init__(self, items=(), *, batches=0, failed=0, provider="", model=""):
+    def __init__(self, items=(), *, batches=0, failed=0, skipped=0,
+                 provider="", model=""):
         super().__init__(items)
         self.batches = batches
         self.failed = failed
+        #: Số lô bị BỎ vì hết ngân sách thời gian — khác `failed` (lô có chạy
+        #: nhưng hỏng). Tách ra để ⑤ nói đúng "chưa đọc hết" thay vì "đọc hỏng".
+        self.skipped = skipped
         self.provider = provider or (items[0].provider if items and hasattr(items[0], "provider") else "")
         self.model = model or (items[0].model if items and hasattr(items[0], "model") else "")
 
     @property
     def broken(self):
-        """Mọi lô đều hỏng ⇒ chặng đọc gãy, không phải kho rỗng."""
-        return self.failed > 0 and not self
+        """Không đọc nổi hồ sơ nào ⇒ chặng đọc gãy, KHÔNG phải kho rỗng.
+
+        Hết giờ mà chưa lô nào về cũng tính là gãy: kết luận "kho không có ai"
+        khi thực ra chưa đọc được gì là đúng cái sai mà lớp này sinh ra để chặn.
+        """
+        return (self.failed > 0 or self.skipped > 0) and not self
 
     @property
     def incomplete(self):
-        return self.failed > 0
+        return self.failed > 0 or self.skipped > 0
 
 
 def _read_batch(query_plan, batch, caller):
@@ -520,27 +529,57 @@ def _read_with_retry(query_plan, batch, caller):
 
 
 def judge(query_plan, candidates, *, complete_fn=None, batch_size=BATCH,
-          workers=WORKERS):
-    """Trả `JudgeReport` cho mọi ứng viên được cấp.
+          workers=WORKERS, deadline=None):
+    """Trả `JudgeReport` cho các ứng viên được cấp.
 
     Các lô chạy SONG SONG. Đo trên kho thật: 40 hồ sơ = 5 lô tuần tự mất ~48
     giây, gần trọn thời gian chờ của một lượt hỏi. Các lô độc lập hoàn toàn với
     nhau và chỉ gọi mạng (không đụng ORM trong luồng), nên chạy song song là
     thay đổi nhỏ mà rút được phần lớn thời gian đó.
+
+    `deadline` (mốc `time.monotonic()`) chặn trần thời gian của cả chặng đọc:
+    hết giờ thì thôi chờ các lô còn lại và trả về những gì đã đọc xong, đếm phần
+    bỏ dở vào `skipped`. Không có nó, số lô đi thẳng theo số ứng viên ② trả về —
+    89 hồ sơ thành 12 lô, 4 luồng là 3 đợt, mỗi đợt tới 70 giây, tức vượt trần
+    150 giây của `core/answer/runner.py` và người dùng MẤT TRẮNG câu trả lời dù
+    phần lớn hồ sơ đã đọc xong. Đọc thiếu mà nói rõ là thiếu thì vẫn dùng được;
+    hết giờ rồi ném lỗi thì không.
     """
     if not candidates:
         return JudgeReport()
     caller = complete_fn or complete
     batches = [candidates[i:i + batch_size]
                for i in range(0, len(candidates), batch_size)]
+    skipped = 0
 
     if len(batches) == 1 or workers <= 1:
-        outcomes = [_read_with_retry(query_plan, b, caller) for b in batches]
+        outcomes = []
+        for batch in batches:
+            # Lô đầu luôn chạy: về tay trắng thì ⑤ không có gì để nói.
+            if outcomes and deadline is not None and time.monotonic() >= deadline:
+                skipped = len(batches) - len(outcomes)
+                break
+            outcomes.append(_read_with_retry(query_plan, batch, caller))
     else:
-        with ThreadPoolExecutor(max_workers=min(workers, len(batches))) as pool:
+        pool = ThreadPoolExecutor(max_workers=min(workers, len(batches)))
+        try:
             from ai.telemetry import submit
-            futures = [submit(pool, _read_with_retry, query_plan, batch, caller) for batch in batches]
-            outcomes = [future.result() for future in futures]
+            futures = [submit(pool, _read_with_retry, query_plan, batch, caller)
+                       for batch in batches]
+            if deadline is None:
+                outcomes = [future.result() for future in futures]
+            else:
+                wait(futures, timeout=max(0.0, deadline - time.monotonic()))
+                outcomes = [future.result() for future in futures
+                            if future.done() and not future.cancelled()]
+                skipped = len(futures) - len(outcomes)
+        finally:
+            # `wait=False`: không chặn lối ra để chờ đúng những lô vừa bỏ.
+            pool.shutdown(wait=False, cancel_futures=True)
+
+    if skipped:
+        log.info("answer.judge: bỏ %d/%d lô vì hết ngân sách thời gian",
+                 skipped, len(batches))
 
     results, failed = [], 0
     provider, model = "", ""
@@ -555,4 +594,4 @@ def judge(query_plan, candidates, *, complete_fn=None, batch_size=BATCH,
                     provider = getattr(r, "provider", "")
                     break
     return JudgeReport(results, batches=len(batches), failed=failed,
-                       provider=provider, model=model)
+                       skipped=skipped, provider=provider, model=model)

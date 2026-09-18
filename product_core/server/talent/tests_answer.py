@@ -40,6 +40,28 @@ class FakeCompletion:
         self.model = model
 
 
+def _many_candidates(count):
+    """`count` ứng viên tối thiểu để chia thành nhiều lô (`judge.BATCH`)."""
+    rows = []
+    for index in range(count):
+        person = Person.objects.create(display_name=f"Ứng viên {index}")
+        rows.append(retrieve_stage.Candidate(
+            person_id=person.pk, name=person.display_name,
+            passages=[retrieve_stage.Passage(person.pk, 1, 1, "Kinh doanh 5 năm.")]))
+    return rows
+
+
+def _reader(seen):
+    """`complete_fn` giả đọc trọn lô: ghi lại cỡ mỗi lô đã thực sự gửi đi."""
+    def _call(messages, task="", **kwargs):
+        payload = json.loads(messages[-1]["content"])
+        seen.append(len(payload["ho_so"]))
+        return FakeCompletion(json.dumps({"ket_qua": [
+            {"id": i + 1, "thoa": False, "do_tin": 0.1, "vi_sao": "không thoả"}
+            for i in range(len(payload["ho_so"]))]}, ensure_ascii=False))
+    return _call
+
+
 def replies(mapping):
     """`complete_fn` giả: trả theo task, ghi lại prompt để soi."""
     seen = []
@@ -342,6 +364,43 @@ class JudgeTest(TestCase):
         self.assertIn("Tốt nghiệp Cao đẳng Kinh tế Đối ngoại", quote)
         self.assertNotIn("GPA 3.8", quote)
         self.assertIn(quote, self.candidate.passages[0].text)
+
+    def test_het_ngan_sach_thoi_gian_thi_bo_lo_con_lai_va_bao_chua_day_du(self):
+        """Hết giờ phải trả phần đã đọc, không kéo cả lượt quá trần 150s của runner."""
+        seen = []
+        report = judge_stage.judge(
+            self.query_plan, _many_candidates(16), complete_fn=_reader(seen),
+            workers=1, deadline=time.monotonic() - 1)
+        self.assertEqual(len(seen), 1)          # lô đầu vẫn chạy, lô sau bị bỏ
+        self.assertEqual(report.skipped, 1)
+        self.assertTrue(report.incomplete)
+        self.assertFalse(report.broken)         # đọc được 8 hồ sơ ⇒ không phải gãy
+
+    def test_khong_dat_han_gio_thi_van_doc_het_nhu_cu(self):
+        seen = []
+        report = judge_stage.judge(self.query_plan, _many_candidates(16),
+                                   complete_fn=_reader(seen), workers=1)
+        self.assertEqual(len(seen), 2)
+        self.assertEqual(report.skipped, 0)
+        self.assertFalse(report.incomplete)
+
+    def test_het_gio_khi_chua_lo_nao_ve_thi_bao_gay_chu_khong_bao_kho_rong(self):
+        """Đúng cái sai lớp này sinh ra để chặn: chưa đọc được gì ≠ kho không có ai."""
+        block = threading.Event()
+
+        def _call(messages, task="", **kwargs):
+            block.wait(5)
+            return FakeCompletion("{}")
+
+        try:
+            report = judge_stage.judge(self.query_plan, _many_candidates(16),
+                                       complete_fn=_call, workers=2,
+                                       deadline=time.monotonic() + 0.2)
+        finally:
+            block.set()
+        self.assertEqual(list(report), [])
+        self.assertTrue(report.skipped > 0)
+        self.assertTrue(report.broken)
 
     def test_lo_hong_thi_chia_doi_thu_lai(self):
         calls = []
