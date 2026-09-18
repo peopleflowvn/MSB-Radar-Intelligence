@@ -137,6 +137,43 @@ function SavedViewsBar({
   );
 }
 
+function maskString(str?: string | null, type: "email" | "phone" = "phone"): string {
+  if (!str) return "";
+  if (type === "email") {
+    const parts = str.split("@");
+    if (parts.length < 2) return str;
+    return `${parts[0].slice(0, 2)}***@${parts[1]}`;
+  }
+  if (str.length < 7) return str;
+  return `${str.slice(0, 4)}***${str.slice(-3)}`;
+}
+
+function getSeniorityBadge(years?: number | null) {
+  if (years == null) return null;
+  if (years >= 5) return <span className="seniority-badge lead">Lead / Senior ({years}y+)</span>;
+  if (years >= 2) return <span className="seniority-badge mid">Mid-level ({years}y)</span>;
+  return <span className="seniority-badge junior">Junior ({years}y)</span>;
+}
+
+/** Ứng viên đang nằm trong đợt tuyển nào, ai xử lý — và cảnh báo khi trùng người. */
+function WorklistBadges({ person }: { person: TalentCard }) {
+  if (!person.active_worklists?.length) return null;
+  const owners = new Set(
+    person.active_worklists.map((row) => row.assigned_to_name).filter(Boolean),
+  );
+  return (
+    <div className="chips">
+      {owners.size > 1 && <span className="badge err">⚠ Nhiều người đang xử lý</span>}
+      {person.active_worklists.slice(0, 3).map((row) => (
+        <span key={row.hunt_id} className={`chip rel rel-${row.state}`} title={row.note || undefined}>
+          {row.title}: <strong>{row.state_label}</strong>
+          {row.assigned_to_name && ` · ${row.assigned_to_name}`}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function Field({
   label,
   hint,
@@ -189,6 +226,9 @@ export default function SearchFilterWorkspace({
   const [createdMsg, setCreatedMsg] = useState<string | null>(null);
 
   const personFrom = personLinkFrom(perspective, "filter");
+  //: Giữ đúng cỡ trang cũ của từng bên: bộ lọc ứng viên vốn duyệt 50 hồ sơ một
+  //: trang, bộ lọc khách hàng 30 — gộp về một số là đổi nhịp duyệt của cả hai.
+  const pageSize = isProspect ? 30 : 50;
 
   const facets = useQuery({
     queryKey: ["talent-facets"],
@@ -214,7 +254,7 @@ export default function SearchFilterWorkspace({
 
   const searchResults = useQuery({
     queryKey: ["search-filter-results", appliedFilters, page],
-    queryFn: () => api.talentSearch(appliedFilters, 30, page * 30),
+    queryFn: () => api.talentSearch(appliedFilters, pageSize, page * pageSize),
     enabled: hasSearched,
     retry: false,
   });
@@ -461,6 +501,14 @@ export default function SearchFilterWorkspace({
       {(createdMsg || successMsg) && (
         <div className="talent-success-banner" style={{ marginBottom: "16px" }}>
           <span>{createdMsg || successMsg}</span>
+          {/* Phân hệ Tìm kiếm không có bảng công việc — đưa thẳng sang nơi xử lý
+              tiếp ở Radar tương ứng, thay vì bắt người dùng tự mò trong menu. */}
+          <Link
+            className="btn btn-primary btn-sm"
+            to={isProspect ? "/rb?tab=tasks" : "/talent?tab=tasks"}
+          >
+            👉 {isProspect ? "Sang Cơ hội & Việc cần xử lý" : "Sang Nhiệm vụ săn"} →
+          </Link>
         </div>
       )}
 
@@ -520,39 +568,79 @@ export default function SearchFilterWorkspace({
             >
               📍 TP. Hồ Chí Minh
             </button>
-            <button
-              type="button"
-              className={`quick-tag-btn ${draft.min_years === "5" ? "active" : ""}`}
-              onClick={() =>
-                applyQuickFilter({
-                  min_years: draft.min_years === "5" ? undefined : "5",
-                })
-              }
-            >
-              💼 VIP / Priority
-            </button>
-            <button
-              type="button"
-              className={`quick-tag-btn ${draft.product === "credit_card" ? "active" : ""}`}
-              onClick={() =>
-                applyQuickFilter({
-                  product: draft.product === "credit_card" ? "" : "credit_card",
-                })
-              }
-            >
-              💳 Thẻ tín dụng
-            </button>
-            <button
-              type="button"
-              className={`quick-tag-btn ${draft.product === "mortgage" ? "active" : ""}`}
-              onClick={() =>
-                applyQuickFilter({
-                  product: draft.product === "mortgage" ? "" : "mortgage",
-                })
-              }
-            >
-              🏡 Vay mua nhà
-            </button>
+            {isProspect ? (
+              <>
+                <button
+                  type="button"
+                  className={`quick-tag-btn ${draft.min_years === "5" ? "active" : ""}`}
+                  onClick={() =>
+                    applyQuickFilter({
+                      min_years: draft.min_years === "5" ? undefined : "5",
+                    })
+                  }
+                >
+                  💼 VIP / Priority
+                </button>
+                <button
+                  type="button"
+                  className={`quick-tag-btn ${draft.product === "credit_card" ? "active" : ""}`}
+                  onClick={() =>
+                    applyQuickFilter({
+                      product: draft.product === "credit_card" ? "" : "credit_card",
+                    })
+                  }
+                >
+                  💳 Thẻ tín dụng
+                </button>
+                <button
+                  type="button"
+                  className={`quick-tag-btn ${draft.product === "mortgage" ? "active" : ""}`}
+                  onClick={() =>
+                    applyQuickFilter({
+                      product: draft.product === "mortgage" ? "" : "mortgage",
+                    })
+                  }
+                >
+                  🏡 Vay mua nhà
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={`quick-tag-btn ${draft.min_years === "5" ? "active" : ""}`}
+                  onClick={() =>
+                    applyQuickFilter({
+                      min_years: draft.min_years === "5" ? undefined : "5",
+                    })
+                  }
+                >
+                  ⏳ Từ 5 năm KN
+                </button>
+                <button
+                  type="button"
+                  className={`quick-tag-btn ${draft.min_years === "8" ? "active" : ""}`}
+                  onClick={() =>
+                    applyQuickFilter({
+                      min_years: draft.min_years === "8" ? undefined : "8",
+                    })
+                  }
+                >
+                  ⏳ Từ 8 năm KN
+                </button>
+                <button
+                  type="button"
+                  className={`quick-tag-btn ${draft.relationship === "new" ? "active" : ""}`}
+                  onClick={() =>
+                    applyQuickFilter({
+                      relationship: draft.relationship === "new" ? "" : "new",
+                    })
+                  }
+                >
+                  🤝 Mới trong kho
+                </button>
+              </>
+            )}
             <button
               type="button"
               className={`quick-tag-btn ${draft.has_phone ? "active" : ""}`}
@@ -606,6 +694,7 @@ export default function SearchFilterWorkspace({
               <Field
                 label="Kỹ năng / Nghề nghiệp"
                 icon="🛠️"
+                hint="Hỗ trợ OR, AND, NOT (VD: React OR Vue)"
                 placeholder="VD: Kinh doanh OR Quản lý OR IT"
                 value={draft.skills ?? ""}
                 onChange={(event) => setDraft((prev) => ({ ...prev, skills: event.target.value }))}
@@ -1129,7 +1218,7 @@ export default function SearchFilterWorkspace({
                   {isProspect ? "khách hàng tiềm năng" : "ứng viên phù hợp"}
                 </span>
               )}
-              {searchResults.data && searchResults.data.count > 30 && (
+              {searchResults.data && searchResults.data.count > pageSize && (
                 <nav className="pagination" aria-label="Phân trang kết quả">
                   <button
                     type="button"
@@ -1140,12 +1229,12 @@ export default function SearchFilterWorkspace({
                     ← Trang trước
                   </button>
                   <span>
-                    Trang {page + 1} / {Math.ceil(searchResults.data.count / 30)}
+                    Trang {page + 1} / {Math.ceil(searchResults.data.count / pageSize)}
                   </span>
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
-                    disabled={(page + 1) * 30 >= searchResults.data.count || searchResults.isFetching}
+                    disabled={(page + 1) * pageSize >= searchResults.data.count || searchResults.isFetching}
                     onClick={() => setPage((value) => value + 1)}
                   >
                     Trang sau →
@@ -1206,29 +1295,76 @@ export default function SearchFilterWorkspace({
                         {(card.display_name || "K")[0]?.toUpperCase()}
                       </div>
                       <div>
-                        <Link
-                          to={`/person/${card.id}?from=${personFrom}`}
-                          onClick={() => setScrollY(window.scrollY)}
-                          style={{ fontWeight: 700, fontSize: "15px", color: "var(--text)", textDecoration: "none" }}
-                        >
-                          {card.display_name || `Person #${card.id}`}
-                        </Link>
+                        <div className="talent-name">
+                          <Link
+                            to={`/person/${card.id}?from=${personFrom}`}
+                            onClick={() => setScrollY(window.scrollY)}
+                            style={{ fontWeight: 700, fontSize: "15px", color: "var(--text)", textDecoration: "none" }}
+                          >
+                            {card.display_name || `Person #${card.id}`}
+                          </Link>
+                          {!isProspect && getSeniorityBadge(card.talent?.years_experience)}
+                          {!isProspect && card.needs_review && (
+                            <span className="badge err" title="Có xung đột định danh cần giải quyết">
+                              Cần xem lại
+                            </span>
+                          )}
+                          {!isProspect && (
+                            <span className="source-count-badge">📦 {card.source_count} nguồn</span>
+                          )}
+                        </div>
                         <div className="talent-title" style={{ marginTop: "2px" }}>
-                          <span className="title-text">{card.headline || "Khách hàng cá nhân"}</span>
+                          <span className="title-text">
+                            {card.talent?.current_title || card.headline
+                              || (isProspect ? "Khách hàng cá nhân" : "Chưa cập nhật chức danh")}
+                          </span>
+                          {!isProspect && card.talent?.current_company && (
+                            <span className="company-text"> @ {card.talent.current_company}</span>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <div className="talent-meta" style={{ marginTop: "8px" }}>
-                    {card.location && <span className="meta-item">📍 {card.location}</span>}
+                    {(card.talent?.location || card.location) && (
+                      <span className="meta-item">📍 {card.talent?.location || card.location}</span>
+                    )}
+                    {!isProspect && card.talent?.years_experience != null && (
+                      <span className="meta-item">⏳ {card.talent.years_experience} năm KN</span>
+                    )}
+                    {!isProspect && card.talent?.owner_name && (
+                      <span className="meta-item">👤 Phụ trách: {card.talent.owner_name}</span>
+                    )}
+                    {!isProspect && card.talent?.last_source_at && (
+                      <span className="meta-item">
+                        📅 Cập nhật {new Date(card.talent.last_source_at).toLocaleDateString("vi-VN")}
+                      </span>
+                    )}
                     {card.primary_phone && (
-                      <span className="meta-item">📞 {maskSensitiveData ? `${card.primary_phone.slice(0, 4)}***` : card.primary_phone}</span>
+                      <span className="meta-item">
+                        📞 {maskSensitiveData ? maskString(card.primary_phone, "phone") : card.primary_phone}
+                      </span>
                     )}
                     {card.primary_email && (
-                      <span className="meta-item">✉️ {maskSensitiveData ? `${card.primary_email.slice(0, 2)}***` : card.primary_email}</span>
+                      <span className="meta-item">
+                        ✉️ {maskSensitiveData ? maskString(card.primary_email, "email") : card.primary_email}
+                      </span>
                     )}
                   </div>
+
+                  {!isProspect && <WorklistBadges person={card} />}
+
+                  {!isProspect && (card.talent?.skills?.length ?? 0) > 0 && (
+                    <div className="chips" style={{ marginTop: "8px" }}>
+                      {card.talent!.skills.slice(0, 8).map((skill: string) => (
+                        <span key={skill} className="chip skill-chip">{skill}</span>
+                      ))}
+                      {card.talent!.skills.length > 8 && (
+                        <span className="chip more">+{card.talent!.skills.length - 8} kỹ năng</span>
+                      )}
+                    </div>
+                  )}
 
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid var(--border)", paddingTop: "10px", marginTop: "12px", width: "100%" }}>
                     <Link
@@ -1290,7 +1426,9 @@ export default function SearchFilterWorkspace({
                     </th>
                     <th>{isProspect ? "Khách hàng" : "Ứng viên"}</th>
                     <th>Chức danh / Nghề nghiệp</th>
-                    <th>Khu vực &amp; Liên hệ</th>
+                    <th>{isProspect ? "Khu vực & Liên hệ" : "Khu vực & Kinh nghiệm"}</th>
+                    {!isProspect && <th>Kỹ năng</th>}
+                    {!isProspect && <th>Liên hệ</th>}
                     <th style={{ textAlign: "right", width: "140px" }}>Thao tác</th>
                   </tr>
                 </thead>
@@ -1329,13 +1467,47 @@ export default function SearchFilterWorkspace({
                           </div>
                         </div>
                       </td>
-                      <td>
-                        <span>{card.headline || "—"}</span>
+                      <td className="table-col-title">
+                        <div>{card.talent?.current_title || card.headline || "—"}</div>
+                        {!isProspect && (
+                          <small className="muted">{card.talent?.current_company || "—"}</small>
+                        )}
                       </td>
                       <td className="table-col-meta">
-                        <div>{card.location || "—"}</div>
-                        <small className="muted">{card.primary_phone || card.primary_email || "—"}</small>
+                        <div>{card.talent?.location || card.location || "—"}</div>
+                        <small className="muted">
+                          {isProspect
+                            ? (card.primary_phone || card.primary_email || "—")
+                            : (card.talent?.years_experience != null
+                                ? `${card.talent.years_experience} năm KN` : "—")}
+                        </small>
                       </td>
+                      {!isProspect && (
+                        <td className="table-col-skills">
+                          <div className="chips-compact">
+                            {(card.talent?.skills ?? []).slice(0, 3).map((skill: string) => (
+                              <span key={skill} className="chip-mini">{skill}</span>
+                            ))}
+                            {(card.talent?.skills?.length ?? 0) > 3 && (
+                              <span className="chip-mini more">+{card.talent!.skills.length - 3}</span>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                      {!isProspect && (
+                        <td className="table-col-contact">
+                          <div className="small">
+                            {card.primary_email
+                              ? (maskSensitiveData ? maskString(card.primary_email, "email") : card.primary_email)
+                              : "—"}
+                          </div>
+                          <div className="small muted">
+                            {card.primary_phone
+                              ? (maskSensitiveData ? maskString(card.primary_phone, "phone") : card.primary_phone)
+                              : "—"}
+                          </div>
+                        </td>
+                      )}
                       <td style={{ textAlign: "right" }}>
                         {isProspect ? (
                           <button
