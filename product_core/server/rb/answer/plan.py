@@ -152,20 +152,26 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
   nghiệp", "chức danh", "kết quả tiếp cận gần nhất").
 
 - "search_queries": 3–6 cách diễn đạt và TỪ KHOÁ TƯ DUY KINH DOANH để tìm trong bằng chứng.
-  BẢN CHẤT DỮ LIỆU: Kho dữ liệu là hồ sơ nghề nghiệp / CV ứng viên kèm bài đăng và tín hiệu.
-  TƯ DUY KINH DOANH: Hãy dịch nhu cầu sản phẩm tài chính sang CHÂN DUNG NGHỀ NGHIỆP & TỪ KHOÁ CV:
-  * Vay mua nhà (mortgage): tìm quản lý, trưởng phòng, manager, kỹ sư, senior, thâm niên >5 năm, đã kết hôn...
-    ["trưởng phòng", "manager", "kỹ sư", "senior", "vay mua nhà", "mua chung cư"]
-  * Thẻ tín dụng VIP / chi tiêu (credit_card): tìm quản lý, giám đốc, tech lead, sales, marketing...
-    ["quản lý", "giám đốc", "tech lead", "thẻ tín dụng", "credit card"]
-  * Vay kinh doanh / Vốn SME (business): tìm chủ doanh nghiệp, founder, ceo, giám đốc, kế toán trưởng...
-    ["founder", "giám đốc", "ceo", "chủ doanh nghiệp", "vốn kinh doanh", "kế toán trưởng"]
-  * Gửi tiết kiệm / Đầu tư / Khách ưu tiên (savings, investment): tìm giám đốc, bác sĩ, luật sư, chuyên gia >10 năm...
-    ["giám đốc", "bác sĩ", "chuyên gia", "tiết kiệm", "đầu tư", "quản lý tài sản"]
-  * Tài khoản chi lương (payroll): tìm nhân sự, hr manager, kế toán trưởng, giám đốc...
-    ["hr manager", "trưởng phòng nhân sự", "kế toán trưởng", "chi lương", "payroll"]
-  * Ngoại tệ (fx): tìm xuất nhập khẩu, logistics quốc tế, công ty đa quốc gia, remote...
-    ["xuất nhập khẩu", "logistics", "ngoại tệ", "chuyển tiền quốc tế"]
+  BẢN CHẤT DỮ LIỆU: Kho dữ liệu là hồ sơ nghề nghiệp / CV ứng viên (chức danh, công ty, thâm niên, kỹ năng, ngoại ngữ, ngành nghề, hình thức làm việc, sở thích & đặc thù công việc) kèm bài đăng và tín hiệu.
+  TƯ DUY KINH DOANH: Hãy dịch nhu cầu sản phẩm hoặc mô tả tự nhiên của RM sang TỪ KHOÁ CV & CHÂN DUNG NGHỀ NGHIỆP:
+  * Nhu cầu theo sở thích & phong cách sống:
+    - Du lịch, golf, tennis, nghỉ dưỡng, thể thao -> ["du lịch", "golf", "tennis", "thẻ tín dụng", "nghỉ dưỡng"] (gợi ý san_pham: ["credit_card"])
+  * Nhu cầu theo đặc thù công việc & hình thức làm việc:
+    - Remote, làm việc từ xa, freelancer, IT -> ["remote", "từ xa", "freelance", "kỹ sư", "ngoại tệ"] (gợi ý san_pham: ["fx", "credit_card"])
+    - Xuất nhập khẩu, logistics, thương mại -> ["xuất nhập khẩu", "logistics", "vốn kinh doanh", "ngoại tệ"] (gợi ý san_pham: ["fx", "consumer_loan"])
+    - Cty nước ngoài, FDI, ngoại ngữ tiếng Nhật/Anh/Hàn/Trung -> ["tiếng nhật", "tiếng anh", "fdi", "chuyển tiền", "ngoại tệ"] (gợi ý san_pham: ["fx", "credit_card"])
+  * Vay mua nhà (mortgage):
+    - Quản lý, trưởng phòng, kỹ sư, thâm niên >3-5 năm, đã kết hôn -> ["trưởng phòng", "manager", "kỹ sư", "kết hôn", "vay mua nhà", "an cư"] (gợi ý san_pham: ["mortgage"])
+  * Thẻ tín dụng VIP / Chi tiêu (credit_card):
+    - Quản lý, giám đốc, tech lead, sales, marketing, du lịch -> ["quản lý", "giám đốc", "tech lead", "marketing", "thẻ tín dụng"] (gợi ý san_pham: ["credit_card"])
+  * Vay kinh doanh / Vốn SME (consumer_loan):
+    - Founder, ceo, chủ doanh nghiệp, kế toán trưởng -> ["founder", "giám đốc", "ceo", "chủ doanh nghiệp", "vốn kinh doanh"] (gợi ý san_pham: ["consumer_loan"])
+  * Gửi tiết kiệm / Đầu tư / Khách ưu tiên (savings, investment):
+    - Giám đốc, bác sĩ, chuyên gia thâm niên cao -> ["giám đốc", "bác sĩ", "chuyên gia", "tiết kiệm", "đầu tư"] (gợi ý san_pham: ["savings", "investment"])
+  * Tài khoản chi lương (payroll):
+    - Trưởng phòng nhân sự, hr manager, kế toán trưởng -> ["hr manager", "trưởng phòng nhân sự", "kế toán trưởng", "chi lương", "payroll"] (gợi ý san_pham: ["payroll"])
+  * Bảo hiểm & An toàn tài chính gia đình (insurance):
+    - Đã kết hôn, có gia đình, trụ cột kinh tế -> ["kết hôn", "gia đình", "bảo hiểm", "bảo vệ"] (gợi ý san_pham: ["insurance"])
 
 - "san_pham": mảng mã sản phẩm, CHỈ chọn trong credit_card, mortgage, auto_loan,
   consumer_loan, savings, investment, insurance, fx, payroll. Chọn sản phẩm mà câu hỏi

@@ -292,14 +292,27 @@ def _profile_ids(allowed_ids, terms, limit):
 
     # 2. Tìm trong hồ sơ CV (Person & TalentProfile)
     if terms and len(p_ids) < limit:
+        from django.db.models import TextField
+        from django.db.models.functions import Cast
+
         where_cv = Q()
         for term in terms:
             where_cv |= Q(headline__icontains=term)
             where_cv |= Q(talent_profile__current_title__icontains=term)
             where_cv |= Q(talent_profile__current_company__icontains=term)
             where_cv |= Q(talent_profile__seniority__icontains=term)
+            where_cv |= Q(talent_profile__education__icontains=term)
+            where_cv |= Q(talent_profile__foreign_language__icontains=term)
+            where_cv |= Q(talent_profile__job_type__icontains=term)
+            where_cv |= Q(talent_profile__marital_status__icontains=term)
             where_cv |= Q(talent_profile__summary__icontains=term)
-        cv_ids = list(Person.objects.filter(pk__in=allowed_ids).filter(where_cv)
+            where_cv |= Q(_skills_text__icontains=term)
+            where_cv |= Q(_ind_text__icontains=term)
+
+        annotated_cv = (Person.objects.filter(pk__in=allowed_ids)
+                        .annotate(_skills_text=Cast("talent_profile__skills", TextField()),
+                                  _ind_text=Cast("talent_profile__industries", TextField())))
+        cv_ids = list(annotated_cv.filter(where_cv)
                       .order_by("-updated_at").values_list("pk", flat=True)[:limit])
         p_ids.extend(cv_ids)
 

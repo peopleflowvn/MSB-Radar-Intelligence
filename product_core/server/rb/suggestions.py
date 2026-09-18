@@ -58,7 +58,8 @@ def build_suggestion(person, product, interest=None, signals=(), need_summary=""
         observed = max(s.observed_at for s in signals)
     elif interest is not None:
         observed = interest.observed_at
-    timing, timing_why = scoring.score_timing(observed, now=now)
+    timing, timing_why = scoring.score_timing(observed, now=now,
+                                              talent_profile=getattr(person, "talent_profile", None))
 
     reach, reach_why = scoring.score_reachability(person, profile=profile,
                                                   relationship=relationship)

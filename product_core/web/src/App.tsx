@@ -232,7 +232,6 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: '/talent', label: 'Talent Radar', module: 'talent', icon: <IconHunts />, category: 'Phân hệ Radar', roles: ['recruiter', 'rb_sales', 'manager', 'admin'] },
       { to: '/rb', label: 'Growth Radar', module: 'rb', icon: <IconRB />, category: 'Phân hệ Radar', roles: ['rb_sales', 'manager', 'admin'] },
-      { to: '/social', label: 'Social Radar', module: 'social', icon: <IconSocial />, category: 'Phân hệ Radar' },
     ],
   },
   {

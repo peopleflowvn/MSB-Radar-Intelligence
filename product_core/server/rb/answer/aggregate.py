@@ -140,7 +140,8 @@ def priority_for(judgement, query_plan, *, person_cache=None):
         observed = timezone.now() - timezone.timedelta(days=int(judgement.freshest_days))
     elif interest is not None:
         observed = interest.observed_at
-    timing, timing_why = scoring.score_timing(observed)
+    timing, timing_why = scoring.score_timing(observed,
+                                              talent_profile=getattr(person, "talent_profile", None))
 
     reach, reach_why = scoring.score_reachability(person, profile=profile,
                                                   relationship=relationship)

@@ -249,18 +249,39 @@ TIMING_BANDS = [
 ]
 
 
-def score_timing(observed_at, now=None):
+def score_timing(observed_at, now=None, talent_profile=None):
     """Bây giờ có phải lúc nên tiếp cận không? → (0..100, lý do)."""
-    if observed_at is None:
-        return 30.0, ["Không rõ thời điểm phát sinh nhu cầu"]
-
     now = now or timezone.now()
-    age_days = max(0, (now - observed_at).days)
 
-    for limit, score, label in TIMING_BANDS:
-        if age_days <= limit:
-            return score, [f"{label} ({age_days} ngày trước)"]
-    return 10.0, [f"Tín hiệu đã {age_days} ngày — nhiều khả năng đã nguội"]
+    # 1. Nếu có mốc thời gian quan sát trực tiếp (từ bài đăng social, tín hiệu, hoặc mốc ghi nhận)
+    if observed_at is not None:
+        age_days = max(0, (now - observed_at).days)
+        for limit, score, label in TIMING_BANDS:
+            if age_days <= limit:
+                return score, [f"{label} ({age_days} ngày trước)"]
+        return 10.0, [f"Tín hiệu đã {age_days} ngày — nhiều khả năng đã nguội"]
+
+    # 2. Nếu là hồ sơ CV (observed_at là None): phán đoán thời điểm qua biến chuyển CV
+    if talent_profile is not None:
+        last_source = getattr(talent_profile, "last_source_at", None)
+        if last_source is not None:
+            age_days = max(0, (now - last_source).days)
+            if age_days <= 30:
+                return 80.0, [f"Hồ sơ CV mới cập nhật ({age_days} ngày trước) — ứng viên đang có biến chuyển nghề nghiệp, thời điểm vàng tiếp cận"]
+            if age_days <= 90:
+                return 65.0, [f"Hồ sơ CV cập nhật trong 90 ngày ({age_days} ngày trước) — sẵn sàng đón nhận cơ hội tài chính mới"]
+            if age_days <= 180:
+                return 50.0, [f"Hồ sơ CV cập nhật {age_days} ngày trước"]
+
+        years_exp = getattr(talent_profile, "years_experience", None)
+        if years_exp is not None and float(years_exp) >= 3:
+            return 60.0, [f"Thâm niên ổn định ({years_exp} năm kinh nghiệm) — thời điểm chín muồi để an cư và tích luỹ tài chính"]
+
+        seniority = str(getattr(talent_profile, "seniority", "") or "").lower()
+        if any(s in seniority for s in ("trưởng phòng", "giám đốc", "lead", "manager", "quản lý", "head")):
+            return 60.0, ["Cấp bậc quản lý có sự nghiệp ổn định — thời điểm phù hợp cho các giải pháp tài chính giá trị cao"]
+
+    return 30.0, ["Không rõ thời điểm phát sinh nhu cầu"]
 
 
 # ---------------------------------------------------------------- REACHABILITY

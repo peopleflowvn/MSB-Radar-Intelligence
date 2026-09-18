@@ -401,11 +401,15 @@ export default function AnswerView<TPerson = AnswerPerson>({
             );
           })()}
           <div className="answer-footer-meta">
-            {turn.durationMs ? (
-              <span className="answer-duration muted small" title="Thời gian xử lý câu trả lời">
-                ⏱️ {(turn.durationMs / 1000).toFixed(1)}s
-              </span>
-            ) : null}
+            {(() => {
+              const dur = turn.durationMs || Number((turn.trace as any)?.ms_total || 0);
+              if (!dur) return null;
+              return (
+                <span className="answer-duration muted small" title="Thời gian xử lý câu trả lời">
+                  ⏱️ {(dur / 1000).toFixed(1)}s
+                </span>
+              );
+            })()}
             <button
               type="button"
               className="answer-copy-btn"

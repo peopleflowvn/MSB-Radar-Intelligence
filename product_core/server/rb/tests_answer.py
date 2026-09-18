@@ -1024,3 +1024,117 @@ class BusinessProspectingReasoningTest(TestCase):
         found = retrieve_stage._profile_ids([person.pk], ["tài", "chính", "trưởng", "phòng"], limit=10)
         self.assertIn(person.pk, found)
 
+    def test_cv_profile_evidence_passages_with_hobbies_and_skills(self):
+        """Bằng chứng trích xuất trọn vẹn kỹ năng, ngoại ngữ, hình thức làm việc, sở thích và last_source_at."""
+        from talent.models import TalentProfile
+        from .answer import evidence as evidence_stage
+
+        now = timezone.now()
+        person = _customer("Hoàng Chuyên Gia", location="Đà Nẵng")
+        tp = TalentProfile.objects.create(
+            person=person,
+            current_title="Senior Cloud Architect",
+            current_company="Tech Global",
+            years_experience=8,
+            foreign_language="Tiếng Anh IELTS 8.0, Tiếng Nhật N3",
+            job_type="Làm việc từ xa (Remote)",
+            skills=["AWS", "Kubernetes", "DevOps", "Microservices"],
+            industries=["Công nghệ thông tin", "Fintech"],
+            summary="Đam mê công nghệ điện toán đám mây. Sở thích chơi golf cuối tuần và du lịch trải nghiệm.",
+            last_source_at=now - timezone.timedelta(days=15),
+        )
+        passages = evidence_stage._cv_profile_passages([person.pk], now)
+        self.assertEqual(len(passages), 1)
+        p = passages[0]
+        self.assertEqual(p.observed_at, tp.last_source_at)
+        text = p.text
+        self.assertIn("Senior Cloud Architect", text)
+        self.assertIn("Tiếng Anh IELTS 8.0", text)
+        self.assertIn("Làm việc từ xa", text)
+        self.assertIn("AWS", text)
+        self.assertIn("Fintech", text)
+        self.assertIn("chơi golf", text)
+
+    def test_score_timing_derived_from_talent_profile(self):
+        """score_timing đánh giá thời điểm tiếp cận dựa vào mốc cập nhật CV hoặc thâm niên nghề nghiệp."""
+        from talent.models import TalentProfile
+        from . import scoring
+
+        now = timezone.now()
+        person = _customer("Phạm Ứng Viên")
+        tp_recent = TalentProfile.objects.create(
+            person=person,
+            current_title="Product Manager",
+            last_source_at=now - timezone.timedelta(days=10),
+        )
+        # CV mới cập nhật 10 ngày -> 80 điểm (thời điểm vàng khi ứng viên chuyển đổi nghề nghiệp)
+        score, reasons = scoring.score_timing(None, now=now, talent_profile=tp_recent)
+        self.assertEqual(score, 80.0)
+        self.assertIn("thời điểm vàng", reasons[0])
+
+        # Không có last_source_at nhưng thâm niên 5 năm -> 60 điểm (thời điểm an cư ổn định)
+        tp_senior = TalentProfile(years_experience=5)
+        score2, reasons2 = scoring.score_timing(None, now=now, talent_profile=tp_senior)
+        self.assertEqual(score2, 60.0)
+        self.assertIn("chín muồi", reasons2[0])
+
+    def test_retrieve_profile_ids_matches_skills_and_hobbies(self):
+        """_profile_ids truy hồi được ứng viên qua kỹ năng (skills), ngoại ngữ và sở thích."""
+        from talent.models import TalentProfile
+        from .answer import retrieve as retrieve_stage
+
+        person_golf = _customer("Ngô Đam Mê Golf")
+        TalentProfile.objects.create(
+            person=person_golf,
+            current_title="Giám đốc Điều hành",
+            summary="Sở thích thể thao, đặc biệt là chơi golf và tennis giao lưu đối tác.",
+        )
+
+        person_aws = _customer("Đỗ Lập Trình Viên")
+        TalentProfile.objects.create(
+            person=person_aws,
+            current_title="Software Engineer",
+            skills=["Python", "AWS", "Docker"],
+            foreign_language="Tiếng Nhật N2",
+        )
+
+        # Tìm người chơi golf
+        found_golf = retrieve_stage._profile_ids([person_golf.pk, person_aws.pk], ["golf"], limit=5)
+        self.assertIn(person_golf.pk, found_golf)
+
+        # Tìm người có kỹ năng AWS hoặc ngoại ngữ tiếng Nhật
+        found_aws = retrieve_stage._profile_ids([person_golf.pk, person_aws.pk], ["aws"], limit=5)
+        self.assertIn(person_aws.pk, found_aws)
+
+        found_japanese = retrieve_stage._profile_ids([person_golf.pk, person_aws.pk], ["nhật"], limit=5)
+        self.assertIn(person_aws.pk, found_japanese)
+
+    def test_outreach_facts_includes_cv_details(self):
+        """_facts trong outreach.py tận dụng trọn vẹn thông tin CV để tạo sales hook."""
+        from talent.models import TalentProfile
+        from .models import RBOpportunity
+        from . import outreach
+
+        person = _customer("Vũ Doanh Nhân")
+        TalentProfile.objects.create(
+            person=person,
+            current_title="Co-Founder & CTO",
+            current_company="Startup AI",
+            years_experience=9,
+            skills=["AI", "Big Data"],
+            foreign_language="Tiếng Anh trôi chảy",
+            summary="Thích du lịch nước ngoài và đầu tư công nghệ mới.",
+        )
+        opp = RBOpportunity.objects.create(
+            person=person,
+            product="credit_card",
+            need="Cần thẻ thanh toán quốc tế và tích điểm phòng chờ",
+        )
+        facts = outreach._facts(opp)
+        facts_str = " ".join(facts)
+        self.assertIn("Co-Founder & CTO", facts_str)
+        self.assertIn("Startup AI", facts_str)
+        self.assertIn("AI", facts_str)
+        self.assertIn("Tiếng Anh", facts_str)
+        self.assertIn("du lịch nước ngoài", facts_str)
+

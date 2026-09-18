@@ -35,15 +35,19 @@ Quy tắc TUYỆT ĐỐI:
 - CHỈ dùng những dữ kiện được liệt kê trong phần "Dữ kiện". Không suy đoán số
   tiền, mục đích cụ thể, hay hoàn cảnh tài chính nào ngoài danh sách đó.
 - KHÔNG hứa lãi suất, hạn mức, hay điều khoản cụ thể — RM chốt việc đó trực tiếp.
-- KHÔNG nhắc rằng thông tin đến từ việc "theo dõi mạng xã hội" — nói như thể RM
-  chủ động liên hệ vì đúng nhu cầu của khách, không nói lộ nguồn.
+- KHÔNG nhắc rằng thông tin đến từ việc "theo dõi mạng xã hội" hay "đọc CV" —
+  nói tự nhiên như thể RM chủ động liên hệ vì MSB có chính sách/gói tài chính
+  chuyên biệt dành riêng cho vị trí/ngành nghề hoặc đặc thù của khách hàng.
 - Xưng hô lịch sự, gọi bằng "anh/chị" kèm tên nếu có.
 
-Văn phong:
-- Ngắn, đi thẳng vào ĐÚNG nhu cầu khách đang có, không giới thiệu lan man về MSB.
-- Kết bằng một câu hỏi dễ trả lời (đồng ý cho gọi lại, hoặc hẹn giờ), không phải
-  lời mời chào chung chung.
-- Không dùng sáo ngữ ("ưu đãi hấp dẫn", "giải pháp tối ưu").
+Văn phong & Kỹ năng bán hàng (Sales Acumen):
+- Tận dụng tinh tế chức danh, đơn vị công tác, ngoại ngữ, kỹ năng hoặc đặc thù công việc
+  từ dữ kiện để mở đầu thân tình (ice-breaker) và tạo lý do tiếp cận thuyết phục.
+  Ví dụ: cán bộ quản lý -> gói an cư/thẻ hạn mức cao; nhân sự công nghệ/remote -> thẻ hoàn tiền dịch vụ số/nhận lương ngoại tệ;
+  người thường xuyên đi lại/công tác -> thẻ dặm bay/phí ngoại tệ ưu đãi.
+- Ngắn, đi thẳng vào ĐÚNG nhu cầu hoặc cơ hội phù hợp, không giới thiệu lan man về ngân hàng.
+- Kết bằng một câu hỏi dễ trả lời (xin phép gửi thông tin qua Zalo, hẹn trao đổi 2 phút hoặc giờ gọi thuận tiện).
+- Không dùng sáo ngữ ("ưu đãi cực khủng", "giải pháp tối ưu đỉnh cao").
 
 Chỉ trả về nội dung, không giải thích, không thêm tiêu đề mục."""
 
@@ -58,7 +62,7 @@ MIN_CHARS = 40
 
 
 def _facts(opportunity):
-    """Những gì ta THẬT SỰ biết — từ cơ hội và hồ sơ bán lẻ, không hơn."""
+    """Những gì ta THẬT SỰ biết — từ cơ hội, hồ sơ bán lẻ và hồ sơ CV, không hơn."""
     facts = [f"Nhu cầu: {opportunity.need}"] if opportunity.need else []
 
     evidence = opportunity.evidence or {}
@@ -77,6 +81,33 @@ def _facts(opportunity):
             facts.append(line)
         elif profile.employer:
             facts.append(f"Đơn vị công tác: {profile.employer}")
+
+    # Khai thác dữ kiện phong phú từ hồ sơ nghề nghiệp & CV
+    tp = getattr(opportunity.person, "talent_profile", None)
+    if tp:
+        title = getattr(tp, "current_title", "") or getattr(opportunity.person, "headline", "")
+        company = getattr(tp, "current_company", "")
+        if title and company:
+            facts.append(f"Chức danh & công ty: {title} tại {company}")
+        elif title:
+            facts.append(f"Chức danh: {title}")
+        elif company:
+            facts.append(f"Đơn vị công tác: {company}")
+
+        if tp.years_experience:
+            facts.append(f"Thâm niên: {tp.years_experience} năm kinh nghiệm")
+        if tp.foreign_language:
+            facts.append(f"Ngoại ngữ: {tp.foreign_language}")
+        if tp.job_type:
+            facts.append(f"Hình thức làm việc: {tp.job_type}")
+        if tp.skills and isinstance(tp.skills, list):
+            skills = [str(s) for s in tp.skills[:5] if str(s).strip()]
+            if skills:
+                facts.append(f"Chuyên môn/kỹ năng: {', '.join(skills)}")
+        if tp.marital_status:
+            facts.append(f"Tình trạng hôn nhân: {tp.marital_status}")
+        if tp.summary:
+            facts.append(f"Đặc thù công việc & sở thích từ CV: {tp.summary[:200]}")
 
     return facts
 

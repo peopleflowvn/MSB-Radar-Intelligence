@@ -367,7 +367,7 @@ def search(criteria, user=None):
     biết hôm nay nó chưa phải một ranh giới quyền.
     """
     queryset = (Person.objects.filter(merged_into__isnull=True)
-                .select_related("rb_profile")
+                .select_related("rb_profile", "talent_profile")
                 .prefetch_related("relationships"))
 
     if criteria.get("location"):
@@ -452,22 +452,30 @@ def _score(person, products):
     product = (products[0] if products
                else _best_interest(profile) or "consumer_loan")
 
+    tp = getattr(person, "talent_profile", None)
     fit, fit_why = scoring.score_fit(person, product, profile=profile)
     interest = _interest_for(profile, product)
     need, need_why = scoring.score_need(interest=interest)
     observed = interest.observed_at if interest is not None else None
-    timing, timing_why = scoring.score_timing(observed)
+    timing, timing_why = scoring.score_timing(observed, talent_profile=tp)
     reach, reach_why = scoring.score_reachability(person, profile=profile,
                                                   relationship=relationship)
     value, value_why, strategic = scoring.score_value(product)
     priority = scoring.priority_score(fit, need, timing, reach, value,
                                       strategic_weight=strategic)
 
+    occupation = (getattr(profile, "occupation", "") or
+                  getattr(tp, "current_title", "") or
+                  person.headline or "")
+    employer = (getattr(profile, "employer", "") or
+                getattr(tp, "current_company", "") or "")
+
     return {
         "person_id": person.pk,
         "display_name": person.display_name,
         "location": person.location,
-        "occupation": getattr(profile, "occupation", "") or "",
+        "occupation": occupation,
+        "employer": employer,
         "product": product,
         "priority_score": priority,
         "scores": {"fit": fit, "need": need, "timing": timing,

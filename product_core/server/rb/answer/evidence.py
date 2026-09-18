@@ -250,10 +250,12 @@ def _profile_passages(person_ids, now, depth=1):
 
 def _cv_profile_passages(person_ids, now, depth=1):
     """Hồ sơ nghề nghiệp và CV ứng viên: chức danh, công ty, thâm niên, học vấn,
-    hôn nhân, mức lương, tóm tắt sự nghiệp.
+    hôn nhân, mức lương, ngoại ngữ, kỹ năng, ngành nghề, hình thức làm việc,
+    đặc thù công việc và sở thích cá nhân.
 
     Đây là nguồn dữ liệu cốt lõi giúp AI phán đoán cơ hội sản phẩm ngân hàng
-    (vay mua nhà, thẻ tín dụng, vay kinh doanh, tiết kiệm, bảo hiểm) với tư duy kinh doanh.
+    (vay mua nhà, thẻ tín dụng, vay kinh doanh, tiết kiệm, bảo hiểm, ngoại tệ, chi lương)
+    với tư duy kinh doanh và phát hiện combo bán chéo.
     """
     from people.models import Person
 
@@ -265,12 +267,15 @@ def _cv_profile_passages(person_ids, now, depth=1):
                     "talent_profile__years_experience", "talent_profile__seniority",
                     "talent_profile__education", "talent_profile__current_salary",
                     "talent_profile__expected_salary", "talent_profile__marital_status",
-                    "talent_profile__summary"))
+                    "talent_profile__foreign_language", "talent_profile__job_type",
+                    "talent_profile__skills", "talent_profile__industries",
+                    "talent_profile__summary", "talent_profile__last_source_at"))
     for p in people:
         parts = [f"Hồ sơ CV: {p.display_name}"]
         tp = getattr(p, "talent_profile", None)
         title = (getattr(tp, "current_title", "") or p.headline or "").strip()
         company = (getattr(tp, "current_company", "") or "").strip()
+        observed_time = getattr(tp, "last_source_at", None) if tp else None
         if title:
             parts.append(f"vị trí/chức danh: {title}")
         if company:
@@ -280,6 +285,18 @@ def _cv_profile_passages(person_ids, now, depth=1):
                 parts.append(f"thâm niên {tp.years_experience} năm kinh nghiệm")
             if tp.seniority:
                 parts.append(f"cấp bậc {tp.seniority}")
+            if tp.foreign_language:
+                parts.append(f"ngoại ngữ: {tp.foreign_language}")
+            if tp.job_type:
+                parts.append(f"hình thức làm việc: {tp.job_type}")
+            if tp.skills and isinstance(tp.skills, list):
+                top_skills = [str(s) for s in tp.skills[:6] if str(s).strip()]
+                if top_skills:
+                    parts.append(f"kỹ năng chuyên môn: {', '.join(top_skills)}")
+            if tp.industries and isinstance(tp.industries, list):
+                top_inds = [str(i) for i in tp.industries[:4] if str(i).strip()]
+                if top_inds:
+                    parts.append(f"ngành từng làm: {', '.join(top_inds)}")
             if tp.education:
                 parts.append(f"học vấn {tp.education}")
             if tp.marital_status:
@@ -291,14 +308,14 @@ def _cv_profile_passages(person_ids, now, depth=1):
             if p.location:
                 parts.append(f"địa bàn: {p.location}")
             if tp.summary:
-                parts.append(f"tóm tắt năng lực: {tp.summary[:200]}")
+                parts.append(f"đặc thù CV & sở thích: {tp.summary[:350]}")
         elif p.location:
             parts.append(f"địa bàn: {p.location}")
 
         if len(parts) > 1:
             text = ", ".join(parts)
             out.append(Passage(p.id, clean_passage(text), "profile",
-                               observed_at=None, ref=f"cv:{p.id}"))
+                               observed_at=observed_time, ref=f"cv:{p.id}"))
     return out
 
 
