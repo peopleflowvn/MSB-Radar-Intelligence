@@ -121,6 +121,106 @@ function getFollowUpSuggestions(turn: AnswerTurn<any>, question?: string): strin
   return inferFollowUpQuestions(turn, { domain: "talent", question });
 }
 
+export interface WorkflowModelItem {
+  role: string;
+  provider?: string;
+  model?: string;
+  icon?: string;
+}
+
+export function extractWorkflowModels<TPerson>(turn: AnswerTurn<TPerson>): WorkflowModelItem[] {
+  const trace = turn.trace as any;
+  if (Array.isArray(trace?.workflow_models) && trace.workflow_models.length > 0) {
+    return trace.workflow_models
+      .map((item: any) => ({
+        role: item.role || item.stage || "Mô hình",
+        provider: item.provider,
+        model: item.model,
+        icon:
+          item.icon ||
+          (item.stage === "plan"
+            ? "🎯"
+            : item.stage === "judge"
+            ? "⚖️"
+            : item.stage === "compose"
+            ? "✍️"
+            : item.stage === "action"
+            ? "⚡"
+            : item.stage === "chat"
+            ? "💬"
+            : item.stage === "assess_doc"
+            ? "📄"
+            : "🤖"),
+      }))
+      .filter((m: WorkflowModelItem) => Boolean(m.model || m.provider));
+  }
+
+  const items: WorkflowModelItem[] = [];
+
+  // Lập kế hoạch (Plan)
+  const plan = trace?.plan;
+  if (plan && (plan.model || plan.provider)) {
+    items.push({
+      role: "Lập kế hoạch",
+      provider: plan.provider,
+      model: plan.model,
+      icon: "🎯",
+    });
+  }
+
+  // Sàng lọc & Đánh giá (Judge)
+  const pass1 = trace?.pass1;
+  const pass2 = trace?.pass2;
+  const judge = trace?.judge;
+  const judgeModel = judge?.model || pass1?.model || pass2?.model;
+  const judgeProvider = judge?.provider || pass1?.provider || pass2?.provider;
+  if (judgeModel || judgeProvider) {
+    items.push({
+      role: "Sàng lọc & Đánh giá",
+      provider: judgeProvider,
+      model: judgeModel,
+      icon: "⚖️",
+    });
+  }
+
+  // Tổng hợp & Trả lời (Compose)
+  const compose = trace?.compose;
+  const composeModel = compose?.model || turn.model;
+  const composeProvider = compose?.provider || turn.provider;
+  const isFallback = Boolean((compose as { fallback?: boolean } | undefined)?.fallback);
+
+  if (!isFallback && (composeModel || composeProvider)) {
+    const isChat = trace?.mode === "chat";
+    const isAction = trace?.mode === "action";
+    const isAssessDoc = trace?.mode === "assess_doc";
+    const role = isChat
+      ? "Hội thoại"
+      : isAction
+      ? "Thực thi tác vụ"
+      : isAssessDoc
+      ? "Đọc & Phân tích tệp"
+      : "Tổng hợp & Trả lời";
+    const icon = isChat ? "💬" : isAction ? "⚡" : isAssessDoc ? "📄" : "✍️";
+    items.push({
+      role,
+      provider: composeProvider,
+      model: composeModel,
+      icon,
+    });
+  }
+
+  if (items.length === 0 && !isFallback && (turn.model || turn.provider)) {
+    items.push({
+      role: "Mô hình xử lý",
+      provider: turn.provider,
+      model: turn.model,
+      icon: "🤖",
+    });
+  }
+
+  return items;
+}
+
 export default function AnswerView<TPerson = AnswerPerson>({
   turn,
   isPending,
@@ -276,12 +376,31 @@ export default function AnswerView<TPerson = AnswerPerson>({
 
       {!isPending && turn.text && (
         <div className="answer-footer-row">
+          {(() => {
+            const workflowModels = extractWorkflowModels(turn);
+            if (!workflowModels.length) return null;
+            return (
+              <div className="answer-workflow-models" title="Các mô hình AI tham gia trong quy trình xử lý">
+                <span className="workflow-models-title">🤖 Mô hình quy trình ({workflowModels.length}):</span>
+                <div className="workflow-models-badges">
+                  {workflowModels.map((item, idx) => (
+                    <span
+                      key={idx}
+                      className="workflow-model-pill"
+                      title={`${item.role}: ${item.provider ? `${item.provider}/` : ""}${item.model || "mặc định"}`}
+                    >
+                      <span className="workflow-model-icon">{item.icon}</span>
+                      <span className="workflow-model-role">{item.role}:</span>
+                      <code className="workflow-model-name">
+                        {item.provider ? `${item.provider}/${item.model || "mặc định"}` : item.model}
+                      </code>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           <div className="answer-footer-meta">
-            {!Boolean((turn.trace?.compose as { fallback?: boolean } | undefined)?.fallback) && (turn.model || turn.provider) ? (
-              <span className="ai-model-tag" title="Mô hình AI xử lý câu trả lời này">
-                🤖 Mô hình: <code>{turn.provider ? `${turn.provider}/${turn.model || "mặc định"}` : turn.model}</code>
-              </span>
-            ) : null}
             {turn.durationMs ? (
               <span className="answer-duration muted small" title="Thời gian xử lý câu trả lời">
                 ⏱️ {(turn.durationMs / 1000).toFixed(1)}s

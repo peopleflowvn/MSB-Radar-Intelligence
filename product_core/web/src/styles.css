@@ -13818,7 +13818,12 @@ button.chip.active {
   .hub-main-content {
     width: 100%;
     min-width: 0;
-    overflow-x: hidden;
+    overflow-x: clip;
+  }
+
+  /* Redundant small subheader hidden on mobile */
+  .copilot-stream-header {
+    display: none !important;
   }
 
   .hub-page-body {
@@ -15656,20 +15661,26 @@ button.chip.active {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  max-width: 100%;
 }
 
 .answer-followup-chip {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 7px;
-  padding: 6px 13px;
-  border-radius: 999px;
+  padding: 6px 12px;
+  border-radius: 12px;
   background: var(--surface-raised, rgba(0, 0, 0, 0.03));
   border: 1px solid var(--border);
   color: var(--text);
   font-size: 12.5px;
+  line-height: 1.4;
   font-weight: 500;
   cursor: pointer;
+  text-align: left;
+  max-width: 100%;
+  white-space: normal;
+  word-break: break-word;
   transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
@@ -15690,6 +15701,92 @@ button.chip.active {
 .answer-followup-chip .followup-icon {
   font-size: 13px;
   opacity: 0.9;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.answer-followup-chip .followup-text {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Workflow Models Breakdown in Answer Footer */
+.answer-workflow-models {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.workflow-models-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted, #64748b);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.workflow-models-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.workflow-model-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--surface-raised, rgba(0, 0, 0, 0.03));
+  border: 1px solid var(--border);
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text);
+  max-width: 100%;
+  white-space: normal;
+  word-break: break-word;
+}
+
+:root[data-theme="dark"] .workflow-model-pill {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.workflow-model-pill .workflow-model-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.workflow-model-pill .workflow-model-role {
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+  flex-shrink: 0;
+}
+
+:root[data-theme="dark"] .workflow-model-pill .workflow-model-role {
+  color: var(--text-muted, #94a3b8);
+}
+
+.workflow-model-pill .workflow-model-name {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+:root[data-theme="dark"] .workflow-model-pill .workflow-model-name {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* Answer Footer Row & Copy Button */
@@ -15707,6 +15804,7 @@ button.chip.active {
 .answer-footer-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
 }
 

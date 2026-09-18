@@ -20,6 +20,15 @@ const BANKING_KEYWORDS = [
   "Vận hành", "Thu hồi nợ", "Core Banking", "T24", "Thẻ"
 ];
 
+const LOCATION_KEYWORDS = [
+  "Hà Nội", "Hà nội", "HN", "TP.HCM", "TPHCM", "Hồ Chí Minh", "Sài Gòn", "Đà Nẵng",
+  "Hải Phòng", "Cần Thơ", "Bình Dương", "Đồng Nai"
+];
+
+const SENIORITY_KEYWORDS = [
+  "Senior", "Lead", "Trưởng nhóm", "Trưởng phòng", "Giám đốc", "Manager", "Tech Lead", "Principal", "Junior", "Fresher"
+];
+
 const RB_PRODUCT_KEYWORDS = [
   { key: "loan", label: "Vay mua nhà/kinh doanh", terms: ["vay", "mua nhà", "thế chấp", "kinh doanh", "thấu chi", "giải ngân", "lãi suất vay", "hạn mức vay"] },
   { key: "card", label: "Thẻ tín dụng", terms: ["thẻ", "credit", "tín dụng", "cashback", "hoàn tiền", "hạn mức thẻ", "chi tiêu thẻ"] },
@@ -97,17 +106,27 @@ export function inferFollowUpQuestions<TPerson = any>(
 
   // --- TẬP LUẬT CHO TALENT SEARCH (TUYỂN DỤNG & NHÂN TÀI) ---
   if (domain === "talent") {
+    const skills = extractMatchingKeywords(question + " " + answerText, [...SKILL_KEYWORDS, ...BANKING_KEYWORDS]);
+    const locations = extractMatchingKeywords(question + " " + answerText, LOCATION_KEYWORDS);
+    const seniorities = extractMatchingKeywords(question, SENIORITY_KEYWORDS);
+
     // 1. Kết quả trống / Không tìm thấy ứng viên phù hợp
     if (emptyResult) {
-      const skills = extractMatchingKeywords(question, [...SKILL_KEYWORDS, ...BANKING_KEYWORDS]);
+      const qSkills = extractMatchingKeywords(question, [...SKILL_KEYWORDS, ...BANKING_KEYWORDS]);
       const suggestions: string[] = [];
-      if (skills.length > 0) {
-        suggestions.push(`Tìm ứng viên có kỹ năng tương đương hoặc chuyển đổi sang ${skills[0]}`);
+      if (qSkills.length > 0 && locations.length > 0) {
+        suggestions.push(`Tìm ứng viên có kỹ năng tương đương hoặc chuyển đổi sang ${qSkills[0]}`);
+        suggestions.push(`Nới lỏng tiêu chí số năm kinh nghiệm để tìm thêm ứng viên tiềm năng`);
+        suggestions.push(`Tìm ứng viên ${qSkills[0]} tại các địa bàn lân cận hoặc chấp nhận làm việc linh hoạt`);
+      } else if (qSkills.length > 0) {
+        suggestions.push(`Tìm ứng viên có kỹ năng tương đương hoặc chuyển đổi sang ${qSkills[0]}`);
+        suggestions.push("Nới lỏng tiêu chí số năm kinh nghiệm để tìm thêm ứng viên tiềm năng");
+        suggestions.push("Mở rộng tìm kiếm sang các vị trí/chức danh công việc tương tự");
       } else {
         suggestions.push("Nới lỏng tiêu chí số năm kinh nghiệm để tìm thêm ứng viên tiềm năng");
+        suggestions.push("Mở rộng tìm kiếm sang các vị trí/chức danh công việc tương tự");
+        suggestions.push("Đề xuất điều chỉnh bộ tiêu chí tuyển dụng dựa trên dữ liệu hiện có trong kho");
       }
-      suggestions.push("Mở rộng tìm kiếm sang các vị trí/chức danh công việc tương tự");
-      suggestions.push("Đề xuất điều chỉnh bộ tiêu chí tuyển dụng dựa trên dữ liệu hiện có trong kho");
       return suggestions.slice(0, 3);
     }
 
@@ -151,28 +170,31 @@ export function inferFollowUpQuestions<TPerson = any>(
 
     // 5. Tìm thấy nhiều ứng viên (>= 2)
     if (peopleCount > 1) {
-      const skills = extractMatchingKeywords(question + " " + answerText, [...SKILL_KEYWORDS, ...BANKING_KEYWORDS]);
       const suggestions: string[] = [];
 
-      // So sánh
+      // So sánh: nêu tên cụ thể nếu có
       if (p1Name && p2Name) {
         suggestions.push(`📊 Lập bảng so sánh chi tiết giữa ${p1Name} và ${p2Name}`);
       } else {
         suggestions.push("📊 Lập bảng so sánh chi tiết các ứng viên này");
       }
 
-      // Đào sâu tiêu chí chuyên môn
-      if (skills.length > 0) {
+      // Đào sâu chuyên môn / địa bàn / cấp bậc
+      if (locations.length > 0) {
+        suggestions.push(`Ai trong số các ứng viên này đang ở khu vực ${locations[0]}?`);
+      } else if (skills.length > 0) {
         suggestions.push(`Ai trong số đó có kinh nghiệm ${skills[0]} thực chiến sâu nhất?`);
+      } else if (seniorities.length > 0) {
+        suggestions.push(`Ai có năng lực đảm nhiệm vị trí ${seniorities[0]} tốt hơn?`);
       } else if (qLower.includes("ngân hàng") || aLower.includes("ngân hàng")) {
         suggestions.push("Ai trong số đó từng làm việc tại các Ngân hàng lớn?");
       } else {
         suggestions.push("Ai trong số đó có nhiều năm kinh nghiệm quản lý/lead team nhất?");
       }
 
-      // Hành động tiếp theo
+      // Hành động tiếp theo linh hoạt
       if (p1Name) {
-        suggestions.push(`Soạn thư mời phỏng vấn cho ${p1Name}`);
+        suggestions.push(`Soạn bộ câu hỏi phỏng vấn kỹ thuật cho ${p1Name}`);
       } else {
         suggestions.push("Soạn thư mời phỏng vấn cho ứng viên phù hợp nhất");
       }
@@ -200,9 +222,13 @@ export function inferFollowUpQuestions<TPerson = any>(
 
     // Mặc định cho Talent
     return [
-      "Gợi ý thêm tiêu chí tìm kiếm mở rộng trong kho",
-      "Có hồ sơ ứng viên nào khác liên quan không?",
-      "Thống kê số lượng ứng viên theo từng khu vực",
+      skills.length > 0
+        ? `Có hồ sơ ứng viên ${skills[0]} nào khác liên quan không?`
+        : "Gợi ý thêm tiêu chí tìm kiếm mở rộng trong kho",
+      locations.length > 0
+        ? `Thống kê số lượng ứng viên tại ${locations[0]}`
+        : "Thống kê số lượng ứng viên theo từng khu vực",
+      "Đề xuất bộ câu hỏi phỏng vấn đánh giá năng lực cho vị trí này",
     ];
   }
 

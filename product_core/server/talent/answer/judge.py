@@ -97,13 +97,16 @@ class Judgement:
     gap: str = ""
     attribute_status: dict = field(default_factory=dict)
     criteria: list = field(default_factory=list)
+    provider: str = ""
+    model: str = ""
 
     def as_dict(self):
         return {"person_id": self.person_id, "name": self.name,
                 "relevant": self.relevant, "confidence": self.confidence,
                 "why": self.why, "evidence": self.evidence,
                 "extracted": self.extracted, "gap": self.gap,
-                "attribute_status": self.attribute_status, "criteria": self.criteria}
+                "attribute_status": self.attribute_status, "criteria": self.criteria,
+                "provider": self.provider, "model": self.model}
 
     def fact_attributes(self):
         # Deterministic callers (whole-store aggregate) construct their facts
@@ -441,10 +444,12 @@ class JudgeReport(list):
     ai" trong khi thực ra ② đã tìm được 40 hồ sơ mà ③ chết vì tràn token.
     """
 
-    def __init__(self, items=(), *, batches=0, failed=0):
+    def __init__(self, items=(), *, batches=0, failed=0, provider="", model=""):
         super().__init__(items)
         self.batches = batches
         self.failed = failed
+        self.provider = provider or (items[0].provider if items and hasattr(items[0], "provider") else "")
+        self.model = model or (items[0].model if items and hasattr(items[0], "model") else "")
 
     @property
     def broken(self):
@@ -486,6 +491,11 @@ def _read_batch(query_plan, batch, caller):
         return [], False
 
     rows = _parse_batch(response.text, batch, query_plan)
+    resp_provider = getattr(response, "provider", "") or ""
+    resp_model = getattr(response, "model", "") or ""
+    for r in rows:
+        r.provider = resp_provider
+        r.model = resp_model
     if len(rows) != len(batch):
         log.warning("answer.judge: only %s/%s dossiers read (model=%s)",
                     len(rows), len(batch), getattr(response, "model", ""))
@@ -533,8 +543,16 @@ def judge(query_plan, candidates, *, complete_fn=None, batch_size=BATCH,
             outcomes = [future.result() for future in futures]
 
     results, failed = [], 0
+    provider, model = "", ""
     for rows, ok in outcomes:
         results.extend(rows)
         if not ok:
             failed += 1
-    return JudgeReport(results, batches=len(batches), failed=failed)
+        if not model:
+            for r in rows:
+                if getattr(r, "model", ""):
+                    model = r.model
+                    provider = getattr(r, "provider", "")
+                    break
+    return JudgeReport(results, batches=len(batches), failed=failed,
+                       provider=provider, model=model)

@@ -137,27 +137,39 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
   hội thoại, đủ nghĩa khi đọc riêng.
 
 - "must_have": mảng câu chữ — điều kiện BẮT BUỘC, không thoả thì loại. Rất ít.
-  Viết bằng lời tự nhiên, KHÔNG phải mã sản phẩm:
-    "có tín hiệu đang tìm hiểu vay mua nhà"
-    "đang làm chủ doanh nghiệp"
-  Riêng câu ĐẾM: mọi điều kiện xác định nhóm cần đếm, kể cả phủ định, đều là
-  must_have.
+  LƯU Ý QUAN TRỌNG: Dữ liệu thực tế gồm CV xin việc (kinh nghiệm, vị trí, công ty...)
+  kèm bài đăng và tín hiệu. Ứng viên KHÔNG BAO GIỜ ghi trong CV là "tôi muốn vay mua nhà".
+  Do đó, TUYỆT ĐỐI KHÔNG đưa điều kiện "phải nói rõ cần vay" vào must_have vì sẽ loại
+  sạch mọi khách tiềm năng. Chỉ dùng must_have cho ràng buộc cứng như địa bàn nếu RM yêu cầu.
+  Riêng câu ĐẾM: mọi điều kiện xác định nhóm cần đếm, kể cả phủ định, đều là must_have.
 
-- "should_have": mảng câu chữ — tiêu chí mong muốn, dùng để xếp hạng.
+- "should_have": mảng câu chữ — tiêu chí mong muốn, dùng để xếp hạng và định hướng
+  tìm kiếm (ví dụ "cấp quản lý hoặc chuyên môn cao", "thâm niên trên 5 năm", "đã kết hôn",
+  "làm việc tại công ty uy tín").
 
 - "extract": mảng tên thuộc tính cần BÓC RA TỪ BẰNG CHỨNG để trả lời được câu
   hỏi (ví dụ "sản phẩm đang quan tâm", "thời điểm phát sinh nhu cầu", "nghề
-  nghiệp", "kết quả tiếp cận gần nhất").
+  nghiệp", "chức danh", "kết quả tiếp cận gần nhất").
 
-- "search_queries": 2–6 cách diễn đạt khác nhau để tìm trong bằng chứng. Viết cả
-  tiếng Việt lẫn tiếng Anh, cả lời trang trọng lẫn lời khách thật sự hay dùng.
-  Đây là điểm bộ cũ hỏng nặng nhất: khách viết "có ai cho vay mua chung cư ko
-  ạ", chứ không viết "nhu cầu tín dụng bất động sản". Truy vấn phải phủ được
-  cách nói của KHÁCH, không chỉ cách nói của ngân hàng.
+- "search_queries": 3–6 cách diễn đạt và TỪ KHOÁ TƯ DUY KINH DOANH để tìm trong bằng chứng.
+  BẢN CHẤT DỮ LIỆU: Kho dữ liệu là hồ sơ nghề nghiệp / CV ứng viên kèm bài đăng và tín hiệu.
+  TƯ DUY KINH DOANH: Hãy dịch nhu cầu sản phẩm tài chính sang CHÂN DUNG NGHỀ NGHIỆP & TỪ KHOÁ CV:
+  * Vay mua nhà (mortgage): tìm quản lý, trưởng phòng, manager, kỹ sư, senior, thâm niên >5 năm, đã kết hôn...
+    ["trưởng phòng", "manager", "kỹ sư", "senior", "vay mua nhà", "mua chung cư"]
+  * Thẻ tín dụng VIP / chi tiêu (credit_card): tìm quản lý, giám đốc, tech lead, sales, marketing...
+    ["quản lý", "giám đốc", "tech lead", "thẻ tín dụng", "credit card"]
+  * Vay kinh doanh / Vốn SME (business): tìm chủ doanh nghiệp, founder, ceo, giám đốc, kế toán trưởng...
+    ["founder", "giám đốc", "ceo", "chủ doanh nghiệp", "vốn kinh doanh", "kế toán trưởng"]
+  * Gửi tiết kiệm / Đầu tư / Khách ưu tiên (savings, investment): tìm giám đốc, bác sĩ, luật sư, chuyên gia >10 năm...
+    ["giám đốc", "bác sĩ", "chuyên gia", "tiết kiệm", "đầu tư", "quản lý tài sản"]
+  * Tài khoản chi lương (payroll): tìm nhân sự, hr manager, kế toán trưởng, giám đốc...
+    ["hr manager", "trưởng phòng nhân sự", "kế toán trưởng", "chi lương", "payroll"]
+  * Ngoại tệ (fx): tìm xuất nhập khẩu, logistics quốc tế, công ty đa quốc gia, remote...
+    ["xuất nhập khẩu", "logistics", "ngoại tệ", "chuyển tiền quốc tế"]
 
 - "san_pham": mảng mã sản phẩm, CHỈ chọn trong credit_card, mortgage, auto_loan,
-  consumer_loan, savings, investment, insurance, fx, payroll. Bỏ trống nếu câu
-  hỏi không nói tới sản phẩm nào. ĐỪNG đoán.
+  consumer_loan, savings, investment, insurance, fx, payroll. Chọn sản phẩm mà câu hỏi
+  hướng tới hoặc sản phẩm phù hợp nhất với chân dung khách RM đang tìm.
 
 - "bo_loc": object các bộ lọc khớp thẳng cột dữ liệu. Chỉ điền khoá nào suy ra
   CHẮC CHẮN được, bỏ qua phần còn lại:

@@ -951,3 +951,76 @@ class CustomerPopulationTest(TestCase):
                               signal_type="loan", observed_at=timezone.now())
         ids = set(customers().values_list("pk", flat=True))
         self.assertTrue({chi_bai.pk, chi_tin_hieu.pk} <= ids)
+
+
+class BusinessProspectingReasoningTest(TestCase):
+    """Kiểm tra trí tuệ phán đoán và suy luận kinh doanh từ dữ liệu CV cho RB."""
+
+    def test_cv_profile_evidence_passages(self):
+        """Bằng chứng trích xuất từ CV/TalentProfile cung cấp đủ bối cảnh cho AI suy luận."""
+        from talent.models import TalentProfile
+        from .answer import evidence as evidence_stage
+
+        person = _customer("Trần Văn Quản Lý", location="Hà Nội")
+        TalentProfile.objects.create(
+            person=person,
+            current_title="Trưởng phòng Kỹ thuật",
+            current_company="Tập đoàn FPT",
+            years_experience=7.5,
+            seniority="manager",
+            education="Đại học Bách Khoa",
+            marital_status="Đã kết hôn",
+            current_salary="40 triệu",
+        )
+        passages = evidence_stage._cv_profile_passages([person.pk], timezone.now())
+        self.assertEqual(len(passages), 1)
+        text = passages[0].text
+        self.assertIn("Trưởng phòng Kỹ thuật", text)
+        self.assertIn("Tập đoàn FPT", text)
+        self.assertIn("7.5", text)
+        self.assertIn("manager", text)
+        self.assertIn("Đã kết hôn", text)
+
+    def test_score_fit_fallback_to_talent_profile(self):
+        """score_fit đọc được chức danh và thâm niên từ TalentProfile khi RBProfile trống."""
+        from talent.models import TalentProfile
+        from . import scoring
+
+        person = Person.objects.create(display_name="Lê Giám Đốc", is_applicant=False)
+        TalentProfile.objects.create(
+            person=person,
+            current_title="Giám đốc Kinh doanh",
+            current_company="VinCommerce",
+            years_experience=10,
+            seniority="executive",
+        )
+        score, reasons = scoring.score_fit(person, scoring.PRODUCT_MORTGAGE)
+        # 50 base + 25 senior + 10 yoe >= 5 + 5 employer = 90
+        self.assertGreaterEqual(score, 75.0)
+        reasons_text = " ".join(reasons)
+        self.assertIn("Giám đốc Kinh doanh", reasons_text)
+        self.assertIn("Thâm niên 10", reasons_text)
+
+    def test_score_need_with_judgement_confidence(self):
+        """score_need lượng hoá điểm cho cơ hội suy luận có căn cứ từ AI thay vì trả 0."""
+        from . import scoring
+
+        # Không có interest, không có signal nhưng AI suy luận confidence=0.65
+        score, reasons = scoring.score_need(judgement_confidence=0.65)
+        self.assertEqual(score, 65.0)
+        self.assertIn("AI suy luận cơ hội", reasons[0])
+
+    def test_retrieve_profile_ids_matches_cv_title(self):
+        """_profile_ids tìm ra người khớp chức danh trong TalentProfile."""
+        from talent.models import TalentProfile
+        from .answer import retrieve as retrieve_stage
+
+        person = _customer("Nguyễn Trưởng Phòng")
+        TalentProfile.objects.create(
+            person=person,
+            current_title="Trưởng phòng Tài chính",
+            current_company="Masan Group",
+        )
+        found = retrieve_stage._profile_ids([person.pk], ["tài", "chính", "trưởng", "phòng"], limit=10)
+        self.assertIn(person.pk, found)
+

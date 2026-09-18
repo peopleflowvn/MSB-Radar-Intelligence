@@ -108,7 +108,7 @@ def priority_for(judgement, query_plan, *, person_cache=None):
     person = cache.get(judgement.person_id)
     if person is None:
         person = (Person.objects.filter(pk=judgement.person_id)
-                  .select_related("rb_profile")
+                  .select_related("rb_profile", "talent_profile")
                   .prefetch_related("relationships", "rb_profile__interests").first())
         cache[judgement.person_id] = person
     if person is None:
@@ -130,7 +130,8 @@ def priority_for(judgement, query_plan, *, person_cache=None):
                          if row.domain == Signal.DOMAIN_RB), None)
 
     fit, fit_why = scoring.score_fit(person, product, profile=profile)
-    need, need_why = scoring.score_need(interest=interest)
+    need, need_why = scoring.score_need(interest=interest,
+                                        judgement_confidence=getattr(judgement, "confidence", None))
 
     # `timing` từ bằng chứng ③ vừa đọc, không từ `interest.observed_at`: ③ thấy
     # được cả những tín hiệu chưa kịp sinh ra `ProductInterest`. Xem docstring.

@@ -171,6 +171,9 @@ def eligible_people(query_plan, *, user=None):
         where = Q()
         for hint in hints:
             where |= Q(rb_profile__occupation__icontains=hint)
+            where |= Q(headline__icontains=hint)
+            where |= Q(talent_profile__current_title__icontains=hint)
+            where |= Q(talent_profile__seniority__icontains=hint)
         queryset = queryset.filter(where)
     if filters.get("loai_co_hoi_dang_mo"):
         queryset = queryset.exclude(
@@ -196,10 +199,10 @@ def eligible_people(query_plan, *, user=None):
         queryset = queryset.filter(signals__domain=Signal.DOMAIN_RB,
                                    signals__observed_at__gte=since)
 
-    # `RBProfile` không bắt buộc: một người mới bắt được từ mạng xã hội chưa có
-    # hồ sơ bán lẻ vẫn là khách tiềm năng — và thường là khách tiềm năng NHẤT.
-    # Chỉ đòi có hồ sơ khi câu hỏi thật sự cần một trường của nó.
-    if shape == "portfolio" or any(k in filters for k in ("phan_khuc", "cap_bac")):
+    # `RBProfile` không bắt buộc: một người có hồ sơ CV (TalentProfile) hoặc mới
+    # bắt được từ mạng xã hội chưa có hồ sơ bán lẻ vẫn là khách tiềm năng.
+    # Chỉ đòi có RBProfile khi câu hỏi thật sự cần phân khúc bán lẻ cụ thể.
+    if shape == "portfolio" or any(k in filters for k in ("phan_khuc",)):
         queryset = queryset.filter(rb_profile__isnull=False)
     return queryset.distinct()
 
@@ -272,7 +275,10 @@ def _outcome_ids(allowed_ids, limit):
 
 def _profile_ids(allowed_ids, terms, limit):
     from ..models import RBProfile
+    from people.models import Person
 
+    p_ids = []
+    # 1. Tìm trong RBProfile
     queryset = RBProfile.objects.filter(person_id__in=allowed_ids)
     if terms:
         where = Q()
@@ -281,8 +287,23 @@ def _profile_ids(allowed_ids, terms, limit):
             where |= Q(employer__icontains=term)
             where |= Q(interaction_summary__icontains=term)
         queryset = queryset.filter(where)
-    return list(queryset.order_by("-updated_at")
-                .values_list("person_id", flat=True)[:limit])
+    p_ids.extend(list(queryset.order_by("-updated_at")
+                     .values_list("person_id", flat=True)[:limit]))
+
+    # 2. Tìm trong hồ sơ CV (Person & TalentProfile)
+    if terms and len(p_ids) < limit:
+        where_cv = Q()
+        for term in terms:
+            where_cv |= Q(headline__icontains=term)
+            where_cv |= Q(talent_profile__current_title__icontains=term)
+            where_cv |= Q(talent_profile__current_company__icontains=term)
+            where_cv |= Q(talent_profile__seniority__icontains=term)
+            where_cv |= Q(talent_profile__summary__icontains=term)
+        cv_ids = list(Person.objects.filter(pk__in=allowed_ids).filter(where_cv)
+                      .order_by("-updated_at").values_list("pk", flat=True)[:limit])
+        p_ids.extend(cv_ids)
+
+    return list(dict.fromkeys(p_ids))[:limit]
 
 
 #: Số truy vấn của ① được đem đi tìm theo nghĩa — mỗi cái là một lời gọi embedding.

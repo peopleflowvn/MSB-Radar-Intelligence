@@ -248,12 +248,66 @@ def _profile_passages(person_ids, now, depth=1):
     return out
 
 
+def _cv_profile_passages(person_ids, now, depth=1):
+    """Hồ sơ nghề nghiệp và CV ứng viên: chức danh, công ty, thâm niên, học vấn,
+    hôn nhân, mức lương, tóm tắt sự nghiệp.
+
+    Đây là nguồn dữ liệu cốt lõi giúp AI phán đoán cơ hội sản phẩm ngân hàng
+    (vay mua nhà, thẻ tín dụng, vay kinh doanh, tiết kiệm, bảo hiểm) với tư duy kinh doanh.
+    """
+    from people.models import Person
+
+    out = []
+    people = (Person.objects.filter(pk__in=person_ids)
+              .select_related("talent_profile")
+              .only("id", "display_name", "headline", "location",
+                    "talent_profile__current_title", "talent_profile__current_company",
+                    "talent_profile__years_experience", "talent_profile__seniority",
+                    "talent_profile__education", "talent_profile__current_salary",
+                    "talent_profile__expected_salary", "talent_profile__marital_status",
+                    "talent_profile__summary"))
+    for p in people:
+        parts = [f"Hồ sơ CV: {p.display_name}"]
+        tp = getattr(p, "talent_profile", None)
+        title = (getattr(tp, "current_title", "") or p.headline or "").strip()
+        company = (getattr(tp, "current_company", "") or "").strip()
+        if title:
+            parts.append(f"vị trí/chức danh: {title}")
+        if company:
+            parts.append(f"tại {company}")
+        if tp:
+            if tp.years_experience is not None:
+                parts.append(f"thâm niên {tp.years_experience} năm kinh nghiệm")
+            if tp.seniority:
+                parts.append(f"cấp bậc {tp.seniority}")
+            if tp.education:
+                parts.append(f"học vấn {tp.education}")
+            if tp.marital_status:
+                parts.append(f"tình trạng hôn nhân: {tp.marital_status}")
+            if tp.current_salary:
+                parts.append(f"mức thu nhập/lương hiện tại: {tp.current_salary}")
+            elif tp.expected_salary:
+                parts.append(f"mức lương kỳ vọng: {tp.expected_salary}")
+            if p.location:
+                parts.append(f"địa bàn: {p.location}")
+            if tp.summary:
+                parts.append(f"tóm tắt năng lực: {tp.summary[:200]}")
+        elif p.location:
+            parts.append(f"địa bàn: {p.location}")
+
+        if len(parts) > 1:
+            text = ", ".join(parts)
+            out.append(Passage(p.id, clean_passage(text), "profile",
+                               observed_at=None, ref=f"cv:{p.id}"))
+    return out
+
+
 #: TÊN hàm, tra lúc gọi — không giữ tham chiếu hàm. Giữ tham chiếu thì
 #: `mock.patch.object(evidence, "_social_passages", ...)` không bao giờ có tác
 #: dụng, và test "một nguồn hỏng không làm mù cả lượt" xanh mà chưa từng làm
 #: hỏng nguồn nào (đúng chuyện đã xảy ra trước bản sửa này).
 _SOURCES = ("_outcome_passages", "_social_passages", "_signal_passages",
-            "_interest_passages", "_profile_passages")
+            "_interest_passages", "_profile_passages", "_cv_profile_passages")
 
 
 def gather(person_ids, *, now=None, depth=1):

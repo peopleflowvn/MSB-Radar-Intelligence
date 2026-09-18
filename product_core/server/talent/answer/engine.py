@@ -46,6 +46,45 @@ BUDGET_SECONDS = 15.0
 MAX_REPAIR_ATTEMPTS = 2
 
 
+def _collect_workflow_models(trace, default_provider="", default_model=""):
+    """Gom mọi mô hình AI đã tham gia xử lý qua từng vai trò/chặng."""
+    models = []
+    seen = set()
+
+    def _add(stage, role, p, m, icon="🤖"):
+        key = (stage, p, m)
+        if (p or m) and key not in seen:
+            seen.add(key)
+            models.append({"stage": stage, "role": role, "provider": p, "model": m, "icon": icon})
+
+    plan = trace.get("plan")
+    if isinstance(plan, dict):
+        _add("plan", "Lập kế hoạch & Phân tích", plan.get("provider", ""), plan.get("model", ""), "🎯")
+
+    for label in ("pass1", "pass2", "judge"):
+        info = trace.get(label)
+        if isinstance(info, dict):
+            _add("judge", "Sàng lọc & Đánh giá hồ sơ", info.get("provider", ""), info.get("model", ""), "⚖️")
+
+    compose = trace.get("compose")
+    mode = trace.get("mode")
+    if isinstance(compose, dict):
+        _add("compose", "Tổng hợp & Phản hồi", compose.get("provider", "") or default_provider,
+             compose.get("model", "") or default_model, "✍️")
+    elif mode == "chat":
+        _add("chat", "Hội thoại trực tiếp", default_provider, default_model, "💬")
+    elif mode == "action":
+        _add("action", "Thực thi tác vụ", default_provider, default_model, "⚡")
+    elif mode == "assess_doc":
+        _add("assess_doc", "Đọc & Phân tích tệp", default_provider, default_model, "📄")
+    elif mode == "clarify":
+        pass
+    elif default_model or default_provider:
+        _add("main", "Mô hình xử lý", default_provider, default_model, "🤖")
+
+    return models
+
+
 @dataclass
 class AnswerResult:
     text: str = ""
@@ -60,6 +99,12 @@ class AnswerResult:
     provider: str = ""
     model: str = ""
     trace: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        if self.trace is not None and isinstance(self.trace, dict):
+            if "workflow_models" not in self.trace:
+                self.trace["workflow_models"] = _collect_workflow_models(
+                    self.trace, self.provider, self.model)
 
     def as_dict(self):
         return {"answer": self.text, "sources": self.sources,
@@ -482,6 +527,8 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
             stats.update(scope=scope_kind, scope_size=len(referenced_ids))
         trace[label] = {"ms_retrieve": retrieved_ms,
                         "retrieval_engine": retrieval_engine,
+                        "provider": getattr(judgements, "provider", ""),
+                        "model": getattr(judgements, "model", ""),
                         "ms_total": int((time.monotonic() - mark) * 1000), **stats}
         if pinned_only:
             read_label = f"Đã đọc {stats.get('judged', 0)} hồ sơ được hỏi đích danh"

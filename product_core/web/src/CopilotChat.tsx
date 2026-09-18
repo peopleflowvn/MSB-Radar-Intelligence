@@ -701,7 +701,9 @@ export default function CopilotChat<TPerson>({
 
           <div className="copilot-chat-stream">
             {messages.map((msg, mi) => {
-              const elapsedSeconds = Math.max(0, Math.floor((now - (msg.startedAt ?? now)) / 1000));
+              const elapsedSeconds = msg.isPending
+                ? Math.max(0, Math.floor((now - (msg.startedAt ?? now)) / 1000))
+                : 0;
               const fallbackTag = (msg.answer?.trace?.compose as { fallback?: boolean } | undefined)?.fallback;
               return (
                 <div key={msg.id}
@@ -726,11 +728,6 @@ export default function CopilotChat<TPerson>({
                       {msg.sender === "ai" && fallbackTag && (
                         <span className="ai-model-tag">
                           <>⚠️ <code>AI chưa hoàn tất đầy đủ</code></>
-                        </span>
-                      )}
-                      {msg.sender === "ai" && !msg.isPending && !fallbackTag && (msg.answer?.model || msg.answer?.provider) && (
-                        <span className="ai-model-tag">
-                          🤖 Mô hình: <code>{msg.answer.provider ? `${msg.answer.provider}/${msg.answer.model || "mặc định"}` : msg.answer.model}</code>
                         </span>
                       )}
                       <span className="chat-time">{msg.timestamp}</span>

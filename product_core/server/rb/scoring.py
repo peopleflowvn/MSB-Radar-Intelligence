@@ -118,23 +118,47 @@ def score_fit(person, product, profile=None):
     employer = (getattr(profile, "employer", "") or "").lower()
     segment = getattr(profile, "segment", "") or ""
 
+    # Fallback dữ liệu từ hồ sơ CV (TalentProfile & Person)
+    tp = getattr(person, "talent_profile", None)
+    if not occupation:
+        cv_title = getattr(tp, "current_title", "") or getattr(person, "headline", "") or ""
+        occupation = cv_title.lower()
+    if not employer and tp:
+        employer = (getattr(tp, "current_company", "") or "").lower()
+
     required = PRODUCT_SENIORITY_FIT.get(product, "any")
     is_senior = any(hint in occupation for hint in SENIOR_HINTS)
+    if not is_senior and tp and getattr(tp, "seniority", "").lower() in ("manager", "director", "executive", "c-level", "lead"):
+        is_senior = True
     is_professional = is_senior or any(hint in occupation for hint in PROFESSIONAL_HINTS)
+    if not is_professional and tp and (getattr(tp, "years_experience", 0) or 0) >= 3:
+        is_professional = True
+
+    display_occ = getattr(profile, "occupation", "") or (getattr(tp, "current_title", "") if tp else "") or getattr(person, "headline", "")
+    display_emp = getattr(profile, "employer", "") or (getattr(tp, "current_company", "") if tp else "")
 
     if is_senior:
         score += 25
-        reasons.append(f"Nghề nghiệp cấp quản lý: {profile.occupation}")
+        reasons.append(f"Vị trí cấp quản lý: {display_occ}")
     elif is_professional:
         score += 15
-        reasons.append(f"Nghề nghiệp chuyên môn: {profile.occupation}")
+        reasons.append(f"Vị trí chuyên môn: {display_occ}")
     elif occupation:
-        reasons.append(f"Nghề nghiệp: {profile.occupation}")
+        reasons.append(f"Vị trí: {display_occ}")
     else:
         # Không biết nghề nghiệp là một khoảng trống thật, phải nói ra chứ không
         # được lẳng lặng cho điểm trung bình rồi để RM tưởng là đã kiểm tra.
         score -= 10
         reasons.append("Chưa biết nghề nghiệp — cần hỏi thêm")
+
+    # Cộng điểm thâm niên kinh nghiệm từ CV
+    if tp and getattr(tp, "years_experience", None) is not None:
+        yoe = tp.years_experience
+        if yoe >= 5:
+            score += 10
+            reasons.append(f"Thâm niên {yoe} năm kinh nghiệm")
+        elif yoe >= 2:
+            score += 5
 
     if required == "senior" and not is_senior:
         score -= 20
@@ -150,20 +174,21 @@ def score_fit(person, product, profile=None):
         score += 10
         reasons.append("Phân khúc Khá giả")
 
-    if employer:
+    if display_emp:
         score += 5
-        reasons.append(f"Nơi làm việc: {profile.employer}")
+        reasons.append(f"Nơi làm việc: {display_emp}")
 
     return _clamp(score), reasons
 
 
 # ---------------------------------------------------------------- NEED
 
-def score_need(interest=None, signals=(), evidence=None):
+def score_need(interest=None, signals=(), evidence=None, judgement_confidence=None):
     """Có bằng chứng người này đang cần không? → (0..100, lý do).
 
     Nguồn bằng chứng mạnh nhất là chính lời khách nói ra (tín hiệu xã hội, câu
-    hỏi trực tiếp). Suy luận từ hồ sơ yếu hơn hẳn, và phải hiện ra là suy luận.
+    hỏi trực tiếp). Suy luận từ hồ sơ nghề nghiệp CV được lượng hoá qua
+    `judgement_confidence` của AI với tư duy kinh doanh.
     """
     reasons = []
     score = 0.0
@@ -198,6 +223,11 @@ def score_need(interest=None, signals=(), evidence=None):
             # hôm nay» — không che ở đây thì hạn mức mở khoá bị đi vòng qua
             # bằng một đường không ai nghĩ tới mà đi kiểm.
             reasons.append(f"Trích: “{privacy.redact_contacts(excerpt)[:120]}”")
+
+    # Lượng hoá cơ hội suy luận có căn cứ từ AI phán đoán qua CV
+    if score == 0.0 and judgement_confidence is not None and float(judgement_confidence) > 0:
+        score = min(85.0, float(judgement_confidence) * 100.0)
+        reasons.append(f"AI suy luận cơ hội từ chân dung nghề nghiệp CV (độ tin cậy {round(float(judgement_confidence) * 100)}%)")
 
     if not reasons:
         reasons.append("Chưa có bằng chứng nhu cầu rõ ràng")

@@ -74,7 +74,7 @@ export default function StepTimeline({
             {isPending ? "Đang xử lý" : "Quá trình xử lý"} ({doneCount}/{effectiveTotal || 1} bước)
             {!isPending && durationMs > 0 ? (
               <span className="radar-steps-time"> · Hoàn tất trong {(durationMs / 1000).toFixed(1)} giây</span>
-            ) : elapsedSeconds > 0 ? (
+            ) : isPending && elapsedSeconds > 0 ? (
               <span className="radar-steps-time"> · {elapsedSeconds}s</span>
             ) : null}
           </span>
@@ -99,11 +99,15 @@ export default function StepTimeline({
           </span>
         </div>
         <div className="radar-steps-header-right">
-          {elapsedSeconds > 0 && (
-            <span className={`step-timer-badge ${isPending ? "timer-ticking" : "timer-static"}`}>
+          {isPending && elapsedSeconds > 0 ? (
+            <span className="step-timer-badge timer-ticking">
               ⏱ {elapsedSeconds}s
             </span>
-          )}
+          ) : !isPending && durationMs > 0 ? (
+            <span className="step-timer-badge timer-static">
+              ⏱ {(durationMs / 1000).toFixed(1)}s
+            </span>
+          ) : null}
           {compact && (totalCount > 0 || durationMs > 0) && (
             <button
               type="button"

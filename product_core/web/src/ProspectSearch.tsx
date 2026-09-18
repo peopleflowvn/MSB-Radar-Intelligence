@@ -28,24 +28,24 @@ import CopilotChat, { waitingHint } from "./CopilotChat";
 
 const GOI_Y_RB = [
   {
-    icon: "💳",
-    title: "Thẻ tín dụng VIP",
-    text: "Tìm 20 quản lý ở Hà Nội có contact, quan tâm thẻ tín dụng",
+    icon: "🏡",
+    title: "Vay mua nhà & An cư",
+    text: "Tìm quản lý hoặc chuyên gia từ 5 năm kinh nghiệm có thể tiếp cận vay mua nhà",
   },
   {
-    icon: "🏡",
-    title: "Vay mua nhà & BĐS",
-    text: "Ai đang có nhu cầu vay mua nhà nhưng chưa có cơ hội đang mở",
+    icon: "💳",
+    title: "Thẻ tín dụng VIP",
+    text: "Tìm quản lý, giám đốc hoặc chuyên gia quan tâm thẻ tín dụng hạn mức cao",
+  },
+  {
+    icon: "🏢",
+    title: "Vay vốn SME & Payroll",
+    text: "Tìm chủ doanh nghiệp, CEO, kế toán trưởng để chào gói vốn kinh doanh và chi lương",
   },
   {
     icon: "💎",
-    title: "Khách hàng Ưu tiên (Priority)",
-    text: "Tìm giám đốc ở Đà Nẵng có tín hiệu gần đây",
-  },
-  {
-    icon: "📈",
-    title: "Tiết kiệm & Đầu tư",
-    text: "Tìm khách hàng cá nhân có dòng tiền nhàn rỗi quan tâm chứng chỉ tiền gửi hoặc đầu tư",
+    title: "Khách Ưu tiên & Tiết kiệm",
+    text: "Tìm giám đốc, bác sĩ, chuyên gia lâu năm có dòng tiền tốt để tư vấn Priority & Tiết kiệm",
   },
 ];
 

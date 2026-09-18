@@ -389,11 +389,16 @@ def search(criteria, user=None):
         condition = Q()
         for hint in hints:
             condition |= Q(rb_profile__occupation__icontains=hint)
+            condition |= Q(headline__icontains=hint)
+            condition |= Q(talent_profile__current_title__icontains=hint)
+            condition |= Q(talent_profile__seniority__icontains=hint)
         queryset = queryset.filter(condition)
 
     products = criteria.get("products") or []
     if products:
-        queryset = queryset.filter(rb_profile__interests__product__in=products)
+        product_matches = queryset.filter(rb_profile__interests__product__in=products)
+        if product_matches.exists():
+            queryset = product_matches
 
     days = criteria.get("signal_recency_days") or 0
     if days:
