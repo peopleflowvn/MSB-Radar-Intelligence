@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import ProspectSearch from "./ProspectSearch";
+import ProspectSearch from "./ProspectAiSearch";
 import { AnswerStreamEvent, api } from "./api";
 import { CustomThemeProvider } from "./CustomThemeContext";
 import { SearchStateProvider } from "./searchPersistence";
@@ -113,7 +113,7 @@ describe("Growth Answer Engine — đường chính", () => {
     // Tên nhắc trong câu chữ tự thành liên kết (tính năng vốn chỉ Talent có) —
     // phải trỏ về ngữ cảnh RB, không lẫn sang Talent (khác "← Quay lại" & tab).
     const inlineMention = container.querySelector("a.chat-person-link");
-    expect(inlineMention).toHaveAttribute("href", "/person/42?from=rb");
+    expect(inlineMention).toHaveAttribute("href", "/person/42?from=search-ai-prospect");
   });
 
   it("vẫn hiện cách hệ thống hiểu câu hỏi — ràng buộc 'tiêu chí luôn hiện ra'", async () => {

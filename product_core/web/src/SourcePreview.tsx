@@ -46,7 +46,16 @@ function locate(text: string, snippet: string): [number, number] | null {
   return [Math.max(0, start), end];
 }
 
-export default function SourcePreview({ source, onClose }: { source: SourceRef; onClose: () => void }) {
+export default function SourcePreview({
+  source,
+  onClose,
+  personLinkFrom = "talent-ai",
+}: {
+  source: SourceRef;
+  onClose: () => void;
+  /** Ngữ cảnh quay lại cho Hồ sơ 360°, do màn hình chứa nó truyền xuống. */
+  personLinkFrom?: string;
+}) {
   // documentId = 0 nghĩa là đoạn lấy từ dữ liệu hồ sơ (trường CSDL + payload
   // Edge), không phải trích từ một file CV — không có văn bản gốc để mở.
   const fromProfile = !source.documentId;
@@ -105,7 +114,7 @@ export default function SourcePreview({ source, onClose }: { source: SourceRef; 
               </a>
             )}
             {source.personId ? (
-              <a className="btn ghost small" href={`/person/${source.personId}?from=talent-ai`}>
+              <a className="btn ghost small" href={`/person/${source.personId}?from=${personLinkFrom}`}>
                 Mở hồ sơ ↗
               </a>
             ) : null}

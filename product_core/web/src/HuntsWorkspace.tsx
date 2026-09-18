@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { api, HuntTaskRow } from "./api";
 import { Candidate, CandidateGroup, CreateShortlist, HuntCard } from "./Hunts";
-import Talent from "./Talent";
 
 const PAGE_SIZE = 30;
 
@@ -162,29 +161,26 @@ function RelationshipTask({
   );
 }
 
-export default function HuntsWorkspace({ initialTab }: { initialTab?: "talent" | "filter" | "tasks" | "pipeline" | "lists" }) {
-  const queryClient = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get("tab") as "talent" | "filter" | "tasks" | "pipeline" | "lists" | null;
+type HuntsView = "tasks" | "pipeline" | "lists";
 
-  const [view, setView] = useState<"talent" | "filter" | "tasks" | "pipeline" | "lists">(
-    initialTab || tabParam || "talent"
+export default function HuntsWorkspace({ initialTab }: { initialTab?: HuntsView }) {
+  const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+
+  // Tìm kiếm AI và bộ lọc đa chiều đã tách sang phân hệ Tìm kiếm (/search) —
+  // link cũ của Talent Radar chuyển tiếp sang đó, giữ nguyên góc nhìn Tuyển dụng.
+  const legacySearchTab = tabParam === "talent" ? "ai" : tabParam === "filter" ? "filter" : null;
+
+  const [view, setView] = useState<HuntsView>(
+    initialTab || (tabParam === "pipeline" || tabParam === "lists" ? tabParam : "tasks")
   );
 
   useEffect(() => {
-    if (tabParam && ["talent", "filter", "tasks", "pipeline", "lists"].includes(tabParam)) {
-      setView(tabParam);
+    if (tabParam && ["tasks", "pipeline", "lists"].includes(tabParam)) {
+      setView(tabParam as HuntsView);
     }
   }, [tabParam]);
-
-  const handleSetView = (nextView: "talent" | "filter" | "tasks" | "pipeline" | "lists") => {
-    setView(nextView);
-    setSearchParams((prev) => {
-      const p = new URLSearchParams(prev);
-      p.set("tab", nextView);
-      return p;
-    });
-  };
 
   const [scope, setScope] = useState<
     "all" | "overdue" | "today" | "unassigned" | "completed"
@@ -317,10 +313,13 @@ export default function HuntsWorkspace({ initialTab }: { initialTab?: "talent" |
   const overdueCount = taskRows.filter((r) => r.is_overdue).length;
   const huntCount = huntsQuery.data?.results?.length ?? 0;
 
+  if (legacySearchTab) {
+    return <Navigate to={`/search?tab=${legacySearchTab}&perspective=recruiter`} replace />;
+  }
+
   return (
     <div className="hunts-workspace-container">
-      {/* Workspace Header & KPI Summary - Chỉ hiển thị khi KHÔNG ở tab 'talent' và 'filter' */}
-      {view !== "talent" && view !== "filter" && (
+      {/* Workspace Header & KPI Summary */}
         <div className="workspace-header-card">
           <div className="workspace-title-block">
             <div className="workspace-icon-wrap">🎯</div>
@@ -353,7 +352,6 @@ export default function HuntsWorkspace({ initialTab }: { initialTab?: "talent" |
             </button>
           </div>
         </div>
-      )}
 
       {/* Creation Modal / Form */}
       {creating && (
@@ -368,10 +366,6 @@ export default function HuntsWorkspace({ initialTab }: { initialTab?: "talent" |
         </div>
       )}
 
-      {/* 0. VIEW: TALENT SEARCH & DISCOVERY (GỘP TỪ /TALENT) */}
-      {(view === "talent" || view === "filter") && (
-        <Talent initialMode={view === "filter" ? "loc" : "ai"} onNavigateTab={(tab) => handleSetView(tab)} />
-      )}
 
       {/* 1. VIEW: TASKS WORKSPACE */}
       {view === "tasks" && (

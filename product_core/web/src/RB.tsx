@@ -1,13 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import {
   api,
   RBCustomerTaskRow,
   RBOpportunityRow,
   WorkflowStage,
 } from "./api";
-import ProspectSearch from "./ProspectSearch";
 import TodaysOpportunities from "./TodaysOpportunities";
 
 const PAGE_SIZE = 30;
@@ -558,15 +557,21 @@ function CustomerGroup({ pool }: { pool: { id: number; name: string; description
 export default function RB() {
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
-  const tabParam = searchParams.get("tab") as "today" | "prospects" | "filter" | "tasks" | "pipeline" | "lists" | null;
-  const [view, setView] = useState<
-    "prospects" | "filter" | "tasks" | "pipeline" | "lists">(tabParam === "today" ? "tasks" : tabParam || "tasks");
+  const tabParam = searchParams.get("tab");
+
+  // Tìm khách AI và bộ lọc khách hàng đã tách sang phân hệ Tìm kiếm (/search) —
+  // link cũ của Growth Radar chuyển tiếp sang đó, giữ nguyên góc nhìn Khách hàng.
+  const legacySearchTab = tabParam === "prospects" ? "ai" : tabParam === "filter" ? "filter" : null;
+
+  const [view, setView] = useState<"tasks" | "pipeline" | "lists">(
+    tabParam === "pipeline" || tabParam === "lists" ? tabParam : "tasks"
+  );
 
   useEffect(() => {
-    if (tabParam === "today") {
+    if (tabParam && ["tasks", "pipeline", "lists"].includes(tabParam)) {
+      setView(tabParam as "tasks" | "pipeline" | "lists");
+    } else if (tabParam === "today") {
       setView("tasks");
-    } else if (tabParam && ["prospects", "filter", "tasks", "pipeline", "lists"].includes(tabParam)) {
-      setView(tabParam);
     }
   }, [tabParam]);
 
@@ -647,10 +652,13 @@ export default function RB() {
     setSelected([]);
   };
 
+  if (legacySearchTab) {
+    return <Navigate to={`/search?tab=${legacySearchTab}&perspective=prospect`} replace />;
+  }
+
   return (
     <div className="rb-workspace-container">
-      {/* Workspace Header & KPI Summary - Chỉ hiển thị khi KHÔNG ở tab 'prospects' và 'filter' */}
-      {view !== "prospects" && view !== "filter" && (
+      {/* Workspace Header & KPI Summary */}
         <div className="workspace-header-card">
           <div className="workspace-title-block">
             <div className="workspace-icon-wrap" style={{ background: "var(--accent-gradient)" }}>
@@ -682,12 +690,6 @@ export default function RB() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* 0b. VIEW: PROSPECTS & FILTER — RM chủ động hỏi NLP & Lọc đa chiều */}
-      {(view === "prospects" || view === "filter") && (
-        <ProspectSearch initialMode={view === "filter" ? "loc" : "ai"} />
-      )}
 
       {/* 1. VIEW: TASKS — Radar đề xuất hôm nay + bảng công việc chi tiết */}
       {view === "tasks" && (

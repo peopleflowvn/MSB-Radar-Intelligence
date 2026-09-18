@@ -328,7 +328,74 @@ describe("Person360 Component - Hồ sơ 360° Hợp Nhất (/person/:id)", () =
     expect(await screen.findByText("👔 Quan hệ Khách hàng (Growth Radar)")).toBeInTheDocument();
   });
 
-  it("quay lại đúng danh sách bộ lọc khi mở hồ sơ từ tìm kiếm đa chiều", async () => {
+  it("hiện chỉ báo đủ/thiếu chỉ mục tìm kiếm cho Admin, ẩn hoàn toàn với vai trò khác", async () => {
+    vi.spyOn(api, "person").mockResolvedValue({
+      ...mockPerson,
+      index_health: {
+        status: "missing", has_projection: false, embedding_current: false,
+        chunks_total: 0, chunks_current: 0, extraction_pending: false, indexed_at: null,
+      },
+    } as unknown as PersonDetail);
+
+    const { unmount } = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/person/7?from=talent"]}>
+          <Routes><Route path="/person/:id" element={<Person360 />} /></Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    expect(await screen.findByText(/Thiếu chỉ mục tìm kiếm/)).toBeInTheDocument();
+    unmount();
+
+    // Trường `index_health` không tồn tại với vai trò khác admin — backend đã
+    // lược bỏ (`talent/views.py::_can_view_index_health`); phía UI không được
+    // tự suy ra hay hiện badge nếu thiếu trường này.
+    vi.spyOn(api, "me").mockResolvedValue({
+      authenticated: true, username: "rm_nam", roles: ["rb_sales"], id: 2,
+      full_name: "RM Nam", role_labels: ["Chuyên viên QHKH"], is_superuser: false,
+      modules: ["rb", "social"],
+    } as unknown as Session);
+    vi.spyOn(api, "person").mockResolvedValue(mockPerson);
+    const clientForRM = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={clientForRM}>
+        <MemoryRouter initialEntries={["/person/7?from=rb"]}>
+          <Routes><Route path="/person/:id" element={<Person360 />} /></Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    expect(await screen.findByText("Nguyễn Văn An")).toBeInTheDocument();
+    expect(screen.queryByText(/chỉ mục tìm kiếm/)).not.toBeInTheDocument();
+  });
+
+  it("quay lại đúng bộ lọc của phân hệ Tìm kiếm, giữ nguyên góc nhìn đang dùng", async () => {
+    const { unmount } = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/person/7?from=search-filter-recruiter"]}>
+          <Routes><Route path="/person/:id" element={<Person360 />} /></Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    const back = await screen.findByRole("link", { name: /Quay lại bộ lọc đa chiều/ });
+    expect(back).toHaveAttribute("href", "/search?tab=filter&perspective=recruiter");
+    unmount();
+
+    // Vào từ góc nhìn Khách hàng: quay lại đúng góc nhìn đó, không văng sang /rb.
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/person/7?from=search-ai-prospect"]}>
+          <Routes><Route path="/person/:id" element={<Person360 />} /></Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    const backProspect = await screen.findByRole("link", { name: /Quay lại tìm kiếm AI/ });
+    expect(backProspect).toHaveAttribute("href", "/search?tab=ai&perspective=prospect");
+  });
+
+  it("nhận link cũ (?from=talent-filter) và trỏ về phân hệ Tìm kiếm mới", async () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={["/person/7?from=talent-filter"]}>
@@ -337,8 +404,8 @@ describe("Person360 Component - Hồ sơ 360° Hợp Nhất (/person/:id)", () =
       </QueryClientProvider>
     );
 
-    const back = await screen.findByRole("link", { name: /Quay lại kết quả lọc ứng viên/ });
-    expect(back).toHaveAttribute("href", "/talent?tab=filter");
+    const back = await screen.findByRole("link", { name: /Quay lại bộ lọc đa chiều/ });
+    expect(back).toHaveAttribute("href", "/search?tab=filter&perspective=recruiter");
   });
 
   it("cho phép Recruiter/Admin mở Kho CV và xem nội dung bóc tách", async () => {

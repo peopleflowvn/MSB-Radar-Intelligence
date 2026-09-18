@@ -2,10 +2,10 @@ import "@testing-library/jest-dom/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { SearchStateProvider, useTalentFilterState } from "./searchPersistence";
+import { SearchStateProvider, useSearchFilterState } from "./searchPersistence";
 
 function FilterHarness() {
-  const state = useTalentFilterState();
+  const state = useSearchFilterState();
   return <div>
     <span data-testid="query">{state.applied.q || ""}</span>
     <span data-testid="page">{state.page}</span>

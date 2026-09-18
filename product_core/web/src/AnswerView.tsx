@@ -388,7 +388,13 @@ export default function AnswerView<TPerson = AnswerPerson>({
 
   return (
     <div className="answer-turn">
-      {preview && <SourcePreview source={preview} onClose={() => setPreview(null)} />}
+      {preview && (
+        <SourcePreview
+          source={preview}
+          onClose={() => setPreview(null)}
+          personLinkFrom={personLinkFrom}
+        />
+      )}
 
       {turn.revised && (
         // Nói rõ đã sửa. Âm thầm thay bài dưới mắt người đang đọc còn khó chịu

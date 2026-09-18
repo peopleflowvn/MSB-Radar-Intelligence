@@ -18317,3 +18317,194 @@ body,
   font-size: 13px;
 }
 
+/* =========================================================
+   DUAL-PERSPECTIVE SEGMENTED SWITCHER (Talent vs Prospect)
+   ========================================================= */
+.perspective-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 5;
+}
+
+.perspective-segmented-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-width: 100%;
+}
+
+.perspective-segmented-switch .switch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: none;
+  user-select: none;
+}
+
+.perspective-segmented-switch .switch-btn:hover {
+  color: var(--text);
+  background: var(--surface-raised, rgba(255, 255, 255, 0.04));
+}
+
+.perspective-segmented-switch .switch-btn.active {
+  color: var(--text);
+  background: var(--surface-raised, rgba(255, 255, 255, 0.08));
+  border-color: var(--border-strong, rgba(255, 255, 255, 0.12));
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.perspective-segmented-switch .switch-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.perspective-segmented-switch .switch-text {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.perspective-segmented-switch .switch-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.perspective-segmented-switch .switch-btn:nth-child(1) .switch-badge {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.perspective-segmented-switch .switch-btn:nth-child(2) .switch-badge {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+@media (max-width: 640px) {
+  .perspective-segmented-switch {
+    width: 100%;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .perspective-segmented-switch .switch-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+
+
+/* =========================================================
+   PHÂN HỆ TÌM KIẾM THÔNG MINH (/search)
+   ========================================================= */
+.search-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.search-workspace-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.search-workspace-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 260px;
+  flex: 1 1 320px;
+}
+
+.search-workspace-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  font-size: 22px;
+  background: var(--surface-raised, rgba(127, 127, 127, 0.08));
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.search-workspace-head .perspective-segmented-switch {
+  flex: 0 0 auto;
+}
+
+.search-mode-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.search-mode-tab {
+  padding: 8px 18px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.search-mode-tab:hover {
+  color: var(--text);
+}
+
+.search-mode-tab.active {
+  color: var(--text);
+  background: var(--surface-raised, rgba(127, 127, 127, 0.1));
+  border-color: var(--border);
+}
+
+@media (max-width: 640px) {
+  .search-workspace-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .search-mode-tabs {
+    width: 100%;
+  }
+  .search-mode-tab {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+}

@@ -434,6 +434,21 @@ export interface PersonDetail extends TalentCard {
     added_at: string;
     added_by: string;
   }>;
+  /** Chỉ có mặt cho Admin — `talent/views.py::_can_view_index_health` lược bỏ
+   * trường này với người khác trước khi trả response. */
+  index_health?: IndexHealth;
+}
+
+/** "Tìm trong kho" có đủ dữ liệu về người này chưa — xem
+ * `talent/serializers.py::PersonDetailSerializer.get_index_health`. */
+export interface IndexHealth {
+  status: 'ok' | 'stale' | 'missing' | 'no_documents';
+  has_projection: boolean;
+  embedding_current: boolean;
+  chunks_total: number;
+  chunks_current: number;
+  extraction_pending: boolean;
+  indexed_at: string | null;
 }
 
 /** Một lượt hỏi/đáp trước đó về CÙNG một người — gửi kèm câu hỏi mới để AI
@@ -710,10 +725,32 @@ export interface IntelRunsDashboard {
     by_status: Record<string, number>;
     open_reviews: number;
     proposed_aliases: number;
+    open_identity_conflicts: number;
     accepted_facts: number;
   };
+  alerts: { reviews: boolean; aliases: boolean; conflicts: boolean };
   coverage_last_500: Record<string, number | null>;
   recent: { id: number; person_id: number; status: string; coverage: Record<string, number | boolean>; started_at: string }[];
+}
+
+/** Người liên quan một xung đột định danh — ảnh chụp gọn, không phải hồ sơ đầy đủ. */
+export interface IdentityConflictPerson {
+  id: number;
+  display_name: string;
+  primary_email: string;
+  primary_phone: string;
+  headline: string;
+}
+
+export interface IdentityConflict {
+  id: number;
+  evidence: {
+    identities: { kind: string; value: string }[];
+    people: { id: number; display_name: string; matched_by: { kind: string; value: string }[] }[];
+  };
+  source_record_id: string;
+  created_at: string;
+  people: IdentityConflictPerson[];
 }
 
 export interface HiringNeedRow {
@@ -1900,6 +1937,24 @@ export const api = {
   intelAliasResolve: (aliasId: number, decision: "accept" | "reject", entryCode?: string, note?: string) =>
     request<{ ok: boolean; status: string; entry_code: string }>(`/intel/aliases/${aliasId}/`, {
       method: "POST", body: JSON.stringify({ decision, entry_code: entryCode, note }),
+    }),
+  intelAliasNewEntry: (aliasId: number, code: string, label: string) =>
+    request<{ ok: boolean; status: string; entry_code: string }>(`/intel/aliases/${aliasId}/new-entry/`, {
+      method: "POST", body: JSON.stringify({ code, label }),
+    }),
+  intelAliasBulkResolve: (ids: number[], decision: "accept" | "reject", entryCode?: string) =>
+    request<{ resolved: number[]; skipped: number[] }>("/intel/aliases/bulk/", {
+      method: "POST", body: JSON.stringify({ ids, decision, entry_code: entryCode }),
+    }),
+  intelReviewBulkResolve: (ids: number[], decision: "accept" | "reject") =>
+    request<{ resolved: number[]; skipped: number[] }>("/intel/review/bulk/", {
+      method: "POST", body: JSON.stringify({ ids, decision }),
+    }),
+  intelIdentityConflicts: () =>
+    request<{ results: IdentityConflict[] }>("/intel/identity-conflicts/"),
+  intelIdentityConflictResolve: (conflictId: number, decision: "merge" | "dismiss") =>
+    request<{ ok: boolean; status: string }>(`/intel/identity-conflicts/${conflictId}/resolve/`, {
+      method: "POST", body: JSON.stringify({ decision }),
     }),
   intelRunsDashboard: () => request<IntelRunsDashboard>("/intel/runs/"),
 

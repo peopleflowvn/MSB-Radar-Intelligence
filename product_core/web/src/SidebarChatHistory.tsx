@@ -89,9 +89,15 @@ export default function SidebarChatHistory({ collapsed, onExpand, onNavigate, al
   const aiChat = useAiChatState();
   const prospectChat = useProspectChatState();
 
-  const isRbRoute = location.pathname.startsWith("/rb");
+  // Đang ở luồng Khách hàng nếu đứng trong Growth Radar, hoặc đang mở góc nhìn
+  // Khách hàng của phân hệ Tìm kiếm — nếu chỉ dò "/rb" thì người dùng ở
+  // /search?perspective=prospect sẽ bị kéo nhầm sang lịch sử chat Tuyển dụng.
+  const isRbRoute = location.pathname.startsWith("/rb")
+    || location.search.includes("perspective=prospect");
   const canAccessTalent = !allowedModules || allowedModules.has("talent");
   const canAccessRb = !allowedModules || allowedModules.has("rb");
+  const chatRoute = (perspective: "recruiter" | "prospect") =>
+    `/search?tab=ai&perspective=${perspective}`;
 
   // Tab mặc định theo route hiện tại
   const [activeTab, setActiveTab] = useState<"talent" | "prospect">(() => {
@@ -124,10 +130,10 @@ export default function SidebarChatHistory({ collapsed, onExpand, onNavigate, al
   const handleSelect = async (id: string) => {
     onNavigate?.();
     if (activeTab === "talent") {
-      navigate("/talent?tab=talent");
+      navigate(chatRoute("recruiter"));
       await aiChat.selectConversation(id);
     } else {
-      navigate("/rb?tab=prospects");
+      navigate(chatRoute("prospect"));
       await prospectChat.selectConversation(id);
     }
   };
@@ -136,10 +142,10 @@ export default function SidebarChatHistory({ collapsed, onExpand, onNavigate, al
     onNavigate?.();
     if (activeTab === "talent") {
       aiChat.resetConversation();
-      navigate("/talent?tab=talent");
+      navigate(chatRoute("recruiter"));
     } else {
       prospectChat.resetConversation();
-      navigate("/rb?tab=prospects");
+      navigate(chatRoute("prospect"));
     }
   };
 

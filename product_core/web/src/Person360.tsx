@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import React, { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { api, ApiError, DocumentRow, DocumentStats, PersonAskTurn, PersonDetail } from './api'
+import { api, ApiError, DocumentRow, DocumentStats, IndexHealth, PersonAskTurn, PersonDetail } from './api'
 import ContactUnlock from './ContactUnlock'
 import FormattedMarkdown from './FormattedMarkdown'
 import PersonFactsSection from './PersonFacts'
@@ -1243,6 +1243,32 @@ function ProfileManagement({ person }: { person: PersonDetail }) {
   )
 }
 
+const INDEX_HEALTH_STYLE: Record<IndexHealth['status'], { icon: string; label: string; cls: string }> = {
+  ok: { icon: '✅', label: 'Đủ chỉ mục tìm kiếm', cls: 'badge muted' },
+  stale: { icon: '🕓', label: 'Đang cập nhật chỉ mục', cls: 'badge warn' },
+  missing: { icon: '⚠️', label: 'Thiếu chỉ mục tìm kiếm', cls: 'badge err' },
+  no_documents: { icon: '', label: '', cls: '' },
+}
+
+/** Chỉ báo "Tìm trong kho" có đủ dữ liệu về người này chưa — chỉ Admin thấy
+ * (xem `talent/views.py::_can_view_index_health`). `no_documents` (chưa có CV
+ * nào để lập chỉ mục) không phải lỗi dữ liệu nên không hiện gì, tránh gây
+ * hiểu nhầm "thiếu chỉ mục" cho hồ sơ vốn dĩ trống. */
+function IndexHealthBadge({ health }: { health: IndexHealth }) {
+  if (health.status === 'no_documents') return null
+  const { icon, label, cls } = INDEX_HEALTH_STYLE[health.status]
+  const tooltip = [
+    `Đoạn CV đã embed: ${health.chunks_current}/${health.chunks_total}`,
+    health.extraction_pending ? 'Đang chờ trích xuất fact AI' : '',
+    health.indexed_at ? `Lập chỉ mục lần cuối: ${new Date(health.indexed_at).toLocaleString('vi-VN')}` : '',
+  ].filter(Boolean).join(' · ')
+  return (
+    <span className={cls} title={tooltip}>
+      {icon} {label}
+    </span>
+  )
+}
+
 /** 11. MÀN HÌNH CHÍNH PERSON 360 HỢP NHẤT — GIAO DIỆN ONE-PAGE HIỆN ĐẠI */
 export default function Person360() {
   const { id } = useParams<{ id: string }>()
@@ -1262,23 +1288,35 @@ export default function Person360() {
   const canManageRB = roles.has('rb_sales') || roles.has('manager') || roles.has('admin')
   const canViewCV = roles.has('recruiter') || roles.has('hiring_manager') || roles.has('manager') || roles.has('admin')
   const isRmOnly = roles.has('rb_sales') && !canManageTalent
-  const returnPath = isRmOnly || fromParam === 'rb'
-    ? '/rb'
+  const isAdmin = roles.has('admin')
+  // Ngữ cảnh mở hồ sơ, gắn qua `?from=`. Phân hệ Tìm kiếm (/search) dùng dạng
+  // `search-<tab>-<góc nhìn>`; các giá trị cũ (`talent-ai`, `talent-filter`) vẫn
+  // được nhận và trỏ về đúng tab tương ứng của /search.
+  const searchContext = fromParam === 'talent-ai'
+    ? { tab: 'ai', perspective: 'recruiter' }
     : fromParam === 'talent-filter'
-      ? '/talent?tab=filter'
-      : fromParam === 'talent-ai'
-        ? '/talent?tab=talent'
-        : '/hunts'
-  const returnLabel = isRmOnly || fromParam === 'rb'
-    ? 'Growth Radar'
-    : fromParam === 'talent-filter'
-      ? 'kết quả lọc ứng viên'
-      : fromParam === 'talent-ai'
-        ? 'tìm kiếm AI'
-        : 'Talent Radar'
+      ? { tab: 'filter', perspective: 'recruiter' }
+      : /^search-(ai|filter)-(recruiter|prospect)$/.test(fromParam ?? '')
+        ? { tab: fromParam!.split('-')[1], perspective: fromParam!.split('-')[2] }
+        : null
 
-  // Xác định tab quan hệ ban đầu theo ngữ cảnh (from=talent vs from=rb)
-  const initialRelTab: RelationshipTab = isRmOnly || fromParam === 'rb' ? 'rb' : 'talent'
+  const returnPath = searchContext
+    ? `/search?tab=${searchContext.tab}&perspective=${searchContext.perspective}`
+    : isRmOnly || fromParam === 'rb'
+      ? '/rb'
+      : '/hunts'
+  const returnLabel = searchContext
+    ? (searchContext.tab === 'filter' ? 'bộ lọc đa chiều' : 'tìm kiếm AI')
+    : isRmOnly || fromParam === 'rb'
+      ? 'Growth Radar'
+      : 'Talent Radar'
+
+  // Tab quan hệ mặc định theo ngữ cảnh: góc nhìn khách hàng và luồng Growth Radar
+  // mở thẳng bảng quan hệ RB, còn lại mở bảng quan hệ ứng viên.
+  const initialRelTab: RelationshipTab =
+    searchContext?.perspective === 'prospect' || (!searchContext && (isRmOnly || fromParam === 'rb'))
+      ? 'rb'
+      : 'talent'
   const [relTab, setRelTab] = useState<RelationshipTab>(initialRelTab)
   const hasBoth = canManageTalent && canManageRB
   const shouldMask = maskSensitiveData || !isUnlocked
@@ -1394,6 +1432,7 @@ export default function Person360() {
               {data.needs_review && (
                 <span className="badge err">⚠️ Cần xem lại định danh</span>
               )}
+              {isAdmin && data.index_health && <IndexHealthBadge health={data.index_health} />}
               {t?.seniority && (
                 <span className="badge" style={{ background: 'var(--accent-soft, rgba(99,102,241,0.12))', color: 'var(--accent, #6366f1)', fontWeight: 700 }}>
                   {t.seniority}
@@ -1623,7 +1662,7 @@ export default function Person360() {
             <HistoryAndTimelineSection person={data} />
 
             {/* Bằng chứng & nguồn gốc facts đã bóc tách (Chỉ dành cho Admin) */}
-            <PersonFactsSection personId={personId} isAdmin={roles.has('admin')} />
+            <PersonFactsSection personId={personId} isAdmin={isAdmin} />
 
             {/* Định danh số & Kênh liên kết */}
             <section className="person-section-card">

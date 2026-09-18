@@ -3,6 +3,10 @@ import { useAiChatState } from "./searchPersistence";
 import AnswerView from "./AnswerView";
 import StepTimeline from "./StepTimeline";
 import CopilotChat, { waitingHint } from "./CopilotChat";
+import { personLinkFrom } from "./searchPerspective";
+
+/** Ngữ cảnh quay lại cho Hồ sơ 360°: luồng này luôn là góc nhìn Tuyển dụng của /search. */
+const PERSON_FROM = personLinkFrom("recruiter", "ai");
 
 const GOI_Y = [
   {
@@ -76,6 +80,7 @@ export default function AiSearch() {
               question={messages[mi - 1]?.sender === "user" ? messages[mi - 1].text : undefined}
               conversationId={chatState.threadId}
               onFollowUp={sendFollowUp}
+              personLinkFrom={PERSON_FROM}
             />
           ) : (
             msg.text && <p className="chat-paragraph">{msg.text}</p>

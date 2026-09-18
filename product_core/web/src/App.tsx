@@ -7,6 +7,7 @@ import { useCustomTheme } from './CustomThemeContext'
 import Dashboard from './Dashboard'
 import Data from './Data'
 import Hunts from './HuntsWorkspace'
+import SearchWorkspace from './SearchWorkspace'
 import Knowledge from './Knowledge'
 import Login from './Login'
 import Person360 from './Person360'
@@ -218,6 +219,12 @@ interface NavSection {
 
 const NAV_SECTIONS: NavSection[] = [
   {
+    title: 'Tìm kiếm & Khám phá',
+    items: [
+      { to: '/search', label: 'Tìm kiếm Thông minh', module: 'talent', altModules: ['rb'], icon: <IconSubSearch />, category: 'Tìm kiếm & Khám phá' },
+    ],
+  },
+  {
     title: 'Phân hệ Radar',
     items: [
       { to: '/talent', label: 'Talent Radar', module: 'talent', icon: <IconHunts />, category: 'Phân hệ Radar', roles: ['recruiter', 'rb_sales', 'manager', 'admin'] },
@@ -311,9 +318,6 @@ export default function App() {
   const identity = session.data?.authenticated ? session.data : null
   const modules = new Set(identity?.modules ?? [])
   const userRoles = new Set(identity?.roles ?? [])
-  const rmOnly = userRoles.has('rb_sales') && !userRoles.has('recruiter') &&
-    !userRoles.has('manager') && !userRoles.has('admin')
-  const isRecruiterOrAbove = userRoles.has('recruiter') || userRoles.has('manager') || userRoles.has('admin')
   const edgeOpsOnly = modules.has('edge_ops') && !modules.has('talent') && !modules.has('rb')
 
   const visibleSections = NAV_SECTIONS.map((section) => ({
@@ -324,16 +328,20 @@ export default function App() {
   })).filter((section) => section.items.length > 0)
 
   const visibleItems = visibleSections.flatMap((s) => s.items)
-  // Landing mặc định theo role: recruiter/manager/admin → AI Search (/talent),
-  // rb_sales thuần → Growth Radar (/rb), edge_ops thuần → Data Hub (/data),
-  // còn lại → mục đầu tiên trong menu.
+  // Landing giữ nguyên ý cũ, chỉ đổi địa chỉ màn tìm kiếm: recruiter/manager/admin
+  // vào thẳng phân hệ Tìm kiếm, RM thuần vào hàng đợi công việc của Growth Radar
+  // (việc hằng ngày của họ là danh sách gọi theo SLA, không phải ô tìm kiếm),
+  // edge_ops thuần → Data Hub, còn lại → mục đầu tiên trong menu.
+  const rmOnly = userRoles.has('rb_sales') && !userRoles.has('recruiter') &&
+    !userRoles.has('manager') && !userRoles.has('admin')
+  const isRecruiterOrAbove = userRoles.has('recruiter') || userRoles.has('manager') || userRoles.has('admin')
   const landing = isRecruiterOrAbove && modules.has('talent')
-    ? '/talent'
+    ? '/search'
     : rmOnly
       ? '/rb'
       : edgeOpsOnly
         ? '/data'
-        : (visibleItems[0]?.to ?? '/talent')
+        : (visibleItems[0]?.to ?? '/search')
 
 
 
@@ -343,6 +351,16 @@ export default function App() {
   if (!currentNav) {
     if (currentPath.startsWith('/person/') || currentPath.startsWith('/talent/')) {
       currentNav = { to: currentPath, label: 'Hồ sơ 360°', module: 'talent', icon: <IconHunts />, category: 'Phân hệ Radar' }
+    } else if (currentPath.startsWith('/search')) {
+      const isProspect = location.search.includes('perspective=prospect')
+      currentNav = {
+        to: '/search',
+        label: isProspect ? 'Tìm Khách Hàng Tiềm Năng' : 'Tìm kiếm Thông minh',
+        module: 'talent',
+        altModules: ['rb'],
+        icon: isProspect ? <IconRB /> : <IconSubSearch />,
+        category: 'Tìm kiếm & Khám phá',
+      }
     } else if (currentPath.startsWith('/talent') || currentPath.startsWith('/hunts')) {
       currentNav = { to: '/talent', label: 'Talent Radar', module: 'talent', icon: <IconHunts />, category: 'Phân hệ Radar' }
     } else if (currentPath.startsWith('/rb')) {
@@ -454,7 +472,8 @@ export default function App() {
               {section.items.map((item) => {
                 const isTalent = item.to === '/talent'
                 const isRb = item.to === '/rb'
-                const hasSub = isTalent || isRb
+                const isSearch = item.to === '/search'
+                const hasSub = isTalent || isRb || isSearch
                 const isExpanded = hasSub && (expandedMenus[item.to] ?? true)
                 const isItemActive = location.pathname.startsWith(item.to) || (isTalent && location.pathname.startsWith('/hunts'))
 
@@ -462,7 +481,7 @@ export default function App() {
                   <React.Fragment key={item.to}>
                     <div className="sidebar-nav-item-wrap">
                       <NavLink
-                        to={isTalent ? '/talent?tab=talent' : isRb ? '/rb?tab=tasks' : item.to}
+                        to={isTalent ? '/talent?tab=tasks' : isRb ? '/rb?tab=tasks' : isSearch ? '/search?tab=ai' : item.to}
                         className={({ isActive }) => `sidebar-nav-item ${isActive || isItemActive ? 'active' : ''}`}
                         data-tooltip={collapsed && !mobileMenuOpen ? item.label : undefined}
                         onClick={() => {
@@ -490,25 +509,35 @@ export default function App() {
                       </NavLink>
                     </div>
 
-                    {/* Menu con trực tiếp cho Talent Radar */}
-                    {(!collapsed || mobileMenuOpen) && isTalent && isExpanded && (
+                    {/* Menu con của phân hệ Tìm kiếm Thông minh */}
+                    {(!collapsed || mobileMenuOpen) && isSearch && isExpanded && (
                       <div className="sidebar-submenu">
                         <Link
-                          to="/talent?tab=talent"
-                          className={`sidebar-subitem ${(isItemActive && (!location.search || location.search.includes('tab=talent'))) ? 'active' : ''}`}
+                          to="/search?tab=ai"
+                          className={`sidebar-subitem ${(isItemActive && !location.search.includes('tab=filter')) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
                           <span className="subitem-icon"><IconSubSearch /></span>
                           <span>Tìm kiếm AI</span>
                         </Link>
-                        <Link
-                          to="/talent?tab=filter"
-                          className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=filter')) ? 'active' : ''}`}
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          <span className="subitem-icon"><IconSubFilter /></span>
-                          <span>Bộ lọc đa chiều</span>
-                        </Link>
+                        {/* Bộ lọc chạy trên API của Talent Radar — không có module
+                            `talent` thì endpoint trả 403, nên không hiện lối vào. */}
+                        {modules.has('talent') && (
+                          <Link
+                            to="/search?tab=filter"
+                            className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=filter')) ? 'active' : ''}`}
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <span className="subitem-icon"><IconSubFilter /></span>
+                            <span>Bộ lọc đa chiều</span>
+                          </Link>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Menu con trực tiếp cho Talent Radar */}
+                    {(!collapsed || mobileMenuOpen) && isTalent && isExpanded && (
+                      <div className="sidebar-submenu">
                         <Link
                           to="/talent?tab=tasks"
                           className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=tasks')) ? 'active' : ''}`}
@@ -539,22 +568,6 @@ export default function App() {
                     {/* Menu con trực tiếp cho Growth Radar */}
                     {(!collapsed || mobileMenuOpen) && isRb && isExpanded && (
                       <div className="sidebar-submenu">
-                        <Link
-                          to="/rb?tab=prospects"
-                          className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=prospects')) ? 'active' : ''}`}
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          <span className="subitem-icon"><IconSubSearch /></span>
-                          <span>Tìm khách AI</span>
-                        </Link>
-                        <Link
-                          to="/rb?tab=filter"
-                          className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=filter')) ? 'active' : ''}`}
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          <span className="subitem-icon"><IconSubFilter /></span>
-                          <span>Bộ lọc khách hàng</span>
-                        </Link>
                         <Link
                           to="/rb?tab=tasks"
                           className={`sidebar-subitem ${(isItemActive && (!location.search || location.search.includes('tab=tasks') || location.search.includes('tab=today'))) ? 'active' : ''}`}
@@ -650,8 +663,11 @@ export default function App() {
               className="topbar-new-chat-btn"
               onClick={() => {
                 window.dispatchEvent(new CustomEvent('radar:new-chat'));
-                if (location.search.includes('tab=filter') || (!location.pathname.startsWith('/talent') && !location.pathname.startsWith('/rb'))) {
-                  navigate('/talent?tab=talent');
+                // Về tab chat của phân hệ Tìm kiếm, GIỮ NGUYÊN góc nhìn đang mở —
+                // RM đang tìm khách mà bấm "chat mới" không được văng sang Tuyển dụng.
+                if (location.pathname !== '/search' || location.search.includes('tab=filter')) {
+                  const perspective = location.search.includes('perspective=prospect') ? 'prospect' : ''
+                  navigate(`/search?tab=ai${perspective ? `&perspective=${perspective}` : ''}`)
                 }
               }}
               title="Tạo cuộc trò chuyện mới"
@@ -666,7 +682,8 @@ export default function App() {
         <div className="hub-page-body">
           <Routes>
             <Route path="/" element={<Navigate to={landing} replace />} />
-            <Route path="/talent" element={guard('talent', <Hunts initialTab="talent" />)} />
+            <Route path="/search" element={guardAny(['talent', 'rb'], <SearchWorkspace />)} />
+            <Route path="/talent" element={guard('talent', <Hunts />)} />
             <Route path="/talent/:id" element={guardAny(['talent', 'rb'], <Person360 />)} />
             <Route path="/person/:id" element={guardAny(['talent', 'rb'], <Person360 />)} />
             <Route path="/hunts" element={guard('talent', <Hunts />)} />
