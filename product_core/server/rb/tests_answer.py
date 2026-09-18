@@ -7,6 +7,8 @@ test ở đây đỏ sau khi ai đó sửa code, câu hỏi đúng không phải
 nào" mà là "quyết định này còn đúng không".
 """
 import json
+import threading
+import time
 from types import SimpleNamespace
 from unittest import mock
 
@@ -358,6 +360,28 @@ class JudgeRefusesUnbackedClaimsTest(SimpleTestCase):
         def dead(*a, **k):
             raise RuntimeError("429")
         report = judge_stage.judge(ProspectPlan(), [self._candidate()], complete_fn=dead)
+        self.assertTrue(report.broken)
+
+    def test_het_ngan_sach_thoi_gian_thi_bo_lo_con_lai_khong_mat_ca_luot(self):
+        """Hết giờ phải trả phần đã đọc, không kéo cả lượt quá trần 150s của runner."""
+        block = threading.Event()
+
+        def slow(*a, **k):
+            block.wait(5)
+            return FakeCompletion("{}")
+
+        many = [Candidate(i, f"Khách {i}", passages=[
+            Passage(i, "Em đang cần vay mua chung cư", "social",
+                    observed_at=_days_ago(3), ref=f"socialpost:{i}")])
+            for i in range(1, 17)]                      # 16 khách = 2 lô
+        try:
+            report = judge_stage.judge(ProspectPlan(), many, complete_fn=slow,
+                                       deadline=time.monotonic() + 0.2)
+        finally:
+            block.set()
+        self.assertTrue(report.skipped > 0)
+        self.assertEqual(list(report), [])
+        # Chưa đọc được gì ⇒ gãy, KHÔNG được để ⑤ kết luận "không có khách nào".
         self.assertTrue(report.broken)
 
 

@@ -40,6 +40,12 @@ log = logging.getLogger(__name__)
 
 #: Trần thời gian mềm — vượt thì bỏ vòng nới, không cắt ngang chặng đang chạy.
 BUDGET_SECONDS = 15.0
+
+#: Trần thời gian CỨNG của chặng ③ đọc bằng chứng, tính từ lúc vào pipeline.
+#: Cùng lý do và cùng con số với `talent/answer/engine.py`: `core/answer/runner.py`
+#: cắt cả lượt ở 150 giây, mà số lô của ③ đi theo số khách ② trả về nên tự phình
+#: theo kho. Chốt 90 giây để còn dư cho ⑤ viết bài.
+READ_BUDGET_SECONDS = 90.0
 STREAM_MAX_TOKENS = 2500
 
 #: Số lượt tự sửa tối đa ở ⑤ khi bài viết không qua kiểm chứng tất định.
@@ -269,7 +275,8 @@ def _pipeline(question, *, envelope=None, user=None, complete_fn=None,
         retrieved_ms = int((time.monotonic() - mark) * 1000)
         yield step(f"Tìm thấy {len(candidates)} khách liên quan", "done")
         yield step("Đọc bằng chứng")
-        judgements = judge_stage.judge(active_plan, candidates, complete_fn=complete_fn)
+        judgements = judge_stage.judge(active_plan, candidates, complete_fn=complete_fn,
+                                       deadline=started + READ_BUDGET_SECONDS)
         chosen, near, stats = aggregate_stage.aggregate(active_plan, judgements, user=user)
         # ② tìm được người mà ③ không đọc nổi ⇒ KHÔNG được kết luận "không có
         # khách nào". Đánh dấu để ⑤ nói đúng chuyện đã xảy ra.

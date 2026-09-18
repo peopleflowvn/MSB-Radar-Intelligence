@@ -528,7 +528,10 @@ class OutreachTest(TestCase):
         đó nằm trong system prompt — chỗ duy nhất chặn được việc này."""
         from . import outreach as outreach_module
         self.assertIn("KHÔNG hứa lãi suất", outreach_module.SYSTEM_PROMPT)
-        self.assertIn("không nói lộ nguồn", outreach_module.SYSTEM_PROMPT)
+        # Luật "không nói lộ nguồn" vẫn phải còn, chỉ là `28a0312` viết lại nó
+        # thành câu cụ thể hơn. Neo vào Ý của luật, đừng neo vào một cách diễn
+        # đạt — nếu không, mỗi lần trau prompt là test đỏ dù luật còn nguyên.
+        self.assertIn("KHÔNG nhắc rằng thông tin đến từ", outreach_module.SYSTEM_PROMPT)
 
     def test_LLM_ban_thi_tra_KHUNG_de_ngo(self):
         from unittest import mock

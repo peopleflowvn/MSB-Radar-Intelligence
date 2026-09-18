@@ -33,7 +33,8 @@ from __future__ import annotations
 import logging
 import math
 import re
-from concurrent.futures import ThreadPoolExecutor
+import time
+from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 
 from ai.jsonx import extract_json
@@ -181,19 +182,22 @@ class JudgeReport(list):
     này theo thì một lỗi nhà cung cấp trông y hệt một kho rỗng.
     """
 
-    def __init__(self, rows, *, batches=0, failed=0):
+    def __init__(self, rows, *, batches=0, failed=0, skipped=0):
         super().__init__(rows)
         self.batches = batches
         self.failed = failed
+        #: Số lô bị BỎ vì hết ngân sách thời gian — khác `failed` (lô có chạy
+        #: nhưng hỏng). Tách ra để ⑤ nói "chưa đọc hết" thay vì "đọc hỏng".
+        self.skipped = skipped
 
     @property
     def broken(self):
-        """Mọi lô đều hỏng — không có phán đoán nào là thật."""
-        return bool(self.batches) and self.failed >= self.batches
+        """Không lô nào cho ra phán đoán thật — hỏng hoặc chưa kịp đọc lô nào."""
+        return bool(self.batches) and (self.failed + self.skipped) >= self.batches
 
     @property
     def incomplete(self):
-        return bool(self.failed) and not self.broken
+        return bool(self.failed or self.skipped) and not self.broken
 
 
 def _fold(text):
@@ -389,8 +393,17 @@ def _read_batch_in_thread(query_plan, batch, caller):
         connection.close()
 
 
-def judge(query_plan, candidates, *, complete_fn=None, batch_size=BATCH):
-    """`[Candidate]` → `JudgeReport`. Không bao giờ ném lỗi lên trên."""
+def judge(query_plan, candidates, *, complete_fn=None, batch_size=BATCH,
+          deadline=None):
+    """`[Candidate]` → `JudgeReport`. Không bao giờ ném lỗi lên trên.
+
+    `deadline` (mốc `time.monotonic()`) chặn trần thời gian cả chặng đọc: hết giờ
+    thì thôi chờ các lô còn lại và trả về phần đã đọc xong, đếm phần bỏ dở vào
+    `skipped`. Không có nó, số lô đi thẳng theo số khách ② trả về và cả lượt có
+    thể vượt trần 150 giây của `core/answer/runner.py` — người dùng mất TRẮNG câu
+    trả lời dù phần lớn bằng chứng đã đọc xong. Đọc thiếu mà nói rõ là thiếu thì
+    vẫn dùng được.
+    """
     candidates = list(candidates)
     if not candidates:
         return JudgeReport([])
@@ -400,26 +413,43 @@ def judge(query_plan, candidates, *, complete_fn=None, batch_size=BATCH):
                for i in range(0, len(candidates), batch_size)]
 
     results = [None] * len(batches)
+    skipped_idx = set()
     if len(batches) == 1:
         results[0] = _read_batch(query_plan, batches[0], caller)
     else:
         from ai.telemetry import submit
-        with ThreadPoolExecutor(max_workers=min(WORKERS, len(batches))) as workers:
+        workers = ThreadPoolExecutor(max_workers=min(WORKERS, len(batches)))
+        try:
             futures = {submit(workers, _read_batch_in_thread, query_plan, b, caller): i
                        for i, b in enumerate(batches)}
+            if deadline is not None:
+                wait(list(futures), timeout=max(0.0, deadline - time.monotonic()))
             for future, index in futures.items():
+                if deadline is not None and not future.done():
+                    skipped_idx.add(index)
+                    continue
                 try:
                     results[index] = future.result()
                 except Exception:                  # noqa: BLE001
                     log.exception("rb.answer.judge: lô %d hỏng", index)
                     results[index] = None
+        finally:
+            # `wait=False`: không chặn lối ra để chờ đúng những lô vừa bỏ.
+            workers.shutdown(wait=False, cancel_futures=True)
+
+    if skipped_idx:
+        log.info("rb.answer.judge: bỏ %d/%d lô vì hết ngân sách thời gian",
+                 len(skipped_idx), len(batches))
 
     rows, failed = [], 0
-    for result in results:
+    for index, result in enumerate(results):
+        if index in skipped_idx:        # bỏ vì hết giờ, KHÔNG phải lô hỏng
+            continue
         if result is None:
             failed += 1
         else:
             rows.extend(result)
     if failed:
         log.warning("rb.answer.judge: %d/%d lô hỏng", failed, len(batches))
-    return JudgeReport(rows, batches=len(batches), failed=failed)
+    return JudgeReport(rows, batches=len(batches), failed=failed,
+                       skipped=len(skipped_idx))
