@@ -182,6 +182,7 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
     "tinh_thanh": tên tỉnh/thành
     "phan_khuc": "mass" | "affluent" | "priority"
     "cap_bac": "manager" | "executive"
+    "kinh_nghiem_tu": số năm kinh nghiệm tối thiểu (ví dụ: "từ 5 năm" -> 5)
     "phai_co_lien_he": true nếu RM yêu cầu phải gọi được ngay
     "loai_co_hoi_dang_mo": true nếu muốn bỏ người đã có cơ hội đang mở
     "tin_hieu_trong_ngay": số ngày, khi RM nói "gần đây"/"tuần này"…

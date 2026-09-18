@@ -56,32 +56,130 @@ function sourceRef(source: AnswerSource): SourceRef {
   };
 }
 
-/** Dòng người được nhắc — đủ để mở hồ sơ, không phải một thẻ hồ sơ thu nhỏ. */
-function PeopleStrip({ people }: { people: AnswerPerson[] }) {
-  if (people.length === 0) return null;
+/** Thẻ ứng viên thông minh gọn gàng cho Talent Radar, thay thế dạng chip tối giản. */
+function TalentSmartCards({
+  people,
+  personLinkFrom = "talent-ai",
+}: {
+  people: AnswerPerson[];
+  personLinkFrom?: string;
+}) {
+  const [viewMode, setViewMode] = useState<"compact" | "chips">("compact");
+
+  if (!people || people.length === 0) return null;
+
   return (
-    <div className="answer-people">
-      <span className="answer-people-label">Hồ sơ được nhắc tới</span>
-      <div className="answer-people-chips">
-        {people.map((person) => {
-          const attributes = Object.entries(person.attributes ?? {});
-          return (
-            <Link
-              key={person.person_id}
-              to={`/person/${person.person_id}?from=talent-ai`}
-              className="answer-person-chip"
-              title={person.why || undefined}
-            >
-              <strong>{person.name}</strong>
-              {attributes.length > 0 && (
-                <span className="muted small">
-                  {attributes.slice(0, 2).map(([key, value]) => `${key}: ${value}`).join(" · ")}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+    <div className="talent-smart-section">
+      <div className="talent-smart-header">
+        <span className="talent-smart-title">
+          <span>Hồ sơ được nhắc tới</span> <span className="talent-smart-count">({people.length})</span>
+        </span>
+        <div className="talent-view-toggle">
+          <button
+            type="button"
+            className={`talent-toggle-btn ${viewMode === "compact" ? "active" : ""}`}
+            onClick={() => setViewMode("compact")}
+            title="Dạng thẻ thông minh gọn gàng"
+          >
+            ⊞ Thẻ gọn
+          </button>
+          <button
+            type="button"
+            className={`talent-toggle-btn ${viewMode === "chips" ? "active" : ""}`}
+            onClick={() => setViewMode("chips")}
+            title="Dạng nhãn tối giản"
+          >
+            ≡ Dạng nhãn
+          </button>
+        </div>
       </div>
+
+      {viewMode === "chips" ? (
+        <div className="answer-people-chips">
+          {people.map((person) => {
+            const attributes = Object.entries(person.attributes ?? {});
+            return (
+              <Link
+                key={person.person_id}
+                to={`/person/${person.person_id}?from=${personLinkFrom}`}
+                className="answer-person-chip"
+                title={person.why || undefined}
+              >
+                <strong>{person.name}</strong>
+                {attributes.length > 0 && (
+                  <span className="muted small">
+                    {attributes.slice(0, 2).map(([key, value]) => `${key}: ${value}`).join(" · ")}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="talent-smart-grid">
+          {people.map((person) => {
+            const attributes = Object.entries(person.attributes ?? {});
+            const role =
+              person.attributes?.["Chức danh"] ||
+              person.attributes?.["Vị trí"] ||
+              person.attributes?.["role"] ||
+              person.attributes?.["title"] ||
+              person.attributes?.["Nghề nghiệp"];
+            const company =
+              person.attributes?.["Công ty"] ||
+              person.attributes?.["Đơn vị"] ||
+              person.attributes?.["company"];
+            const headline = [role, company].filter(Boolean).join(" · ");
+
+            return (
+              <Link
+                key={person.person_id}
+                to={`/person/${person.person_id}?from=${personLinkFrom}`}
+                className="talent-compact-card"
+                title={`Mở hồ sơ 360° của ${person.name}`}
+              >
+                <div className="talent-card-header">
+                  <div className="talent-card-avatar">
+                    {(person.name || "U")[0]?.toUpperCase()}
+                  </div>
+                  <div className="talent-card-title-wrap">
+                    <div className="talent-card-name-row">
+                      <span className="talent-card-name">{person.name}</span>
+                      {person.citations && person.citations.length > 0 && (
+                        <span className="talent-card-citations" title="Trích dẫn bằng chứng">
+                          {person.citations.map((c) => `[${c}]`).join(" ")}
+                        </span>
+                      )}
+                    </div>
+                    {headline ? (
+                      <div className="talent-card-headline" title={headline}>
+                        {headline}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                {person.why && (
+                  <div className="talent-card-why" title={person.why}>
+                    <span className="talent-why-icon">💡</span>
+                    <span className="talent-why-text">{person.why}</span>
+                  </div>
+                )}
+
+                    {attributes.length > 0 && (
+                      <div className="talent-card-attributes">
+                        {attributes.slice(0, 3).map(([key, value]) => (
+                          <span key={key} className="talent-attr-pill" title={`${key}: ${value}`}>
+                            {`${key}: ${value}`}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -309,7 +407,7 @@ export default function AnswerView<TPerson = AnswerPerson>({
 
       {renderPeople
         ? renderPeople(turn.people)
-        : <PeopleStrip people={turn.people as unknown as AnswerPerson[]} />}
+        : <TalentSmartCards people={turn.people as unknown as AnswerPerson[]} personLinkFrom={personLinkFrom} />}
 
       {(turn.webSources?.length ?? 0) > 0 && (
         <div className="answer-sources">

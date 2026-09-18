@@ -200,16 +200,6 @@ function IconSubFolder() {
   )
 }
 
-function IconSubTarget() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <circle cx="12" cy="12" r="6" />
-      <circle cx="12" cy="12" r="2" />
-    </svg>
-  )
-}
-
 interface NavItem {
   to: string
   label: string
@@ -472,7 +462,7 @@ export default function App() {
                   <React.Fragment key={item.to}>
                     <div className="sidebar-nav-item-wrap">
                       <NavLink
-                        to={isTalent ? '/talent?tab=talent' : isRb ? '/rb?tab=today' : item.to}
+                        to={isTalent ? '/talent?tab=talent' : isRb ? '/rb?tab=tasks' : item.to}
                         className={({ isActive }) => `sidebar-nav-item ${isActive || isItemActive ? 'active' : ''}`}
                         data-tooltip={collapsed && !mobileMenuOpen ? item.label : undefined}
                         onClick={() => {
@@ -550,14 +540,6 @@ export default function App() {
                     {(!collapsed || mobileMenuOpen) && isRb && isExpanded && (
                       <div className="sidebar-submenu">
                         <Link
-                          to="/rb?tab=today"
-                          className={`sidebar-subitem ${(isItemActive && (!location.search || location.search.includes('tab=today'))) ? 'active' : ''}`}
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          <span className="subitem-icon"><IconSubTarget /></span>
-                          <span>Cơ hội hôm nay</span>
-                        </Link>
-                        <Link
                           to="/rb?tab=prospects"
                           className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=prospects')) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
@@ -575,11 +557,11 @@ export default function App() {
                         </Link>
                         <Link
                           to="/rb?tab=tasks"
-                          className={`sidebar-subitem ${(isItemActive && location.search.includes('tab=tasks')) ? 'active' : ''}`}
+                          className={`sidebar-subitem ${(isItemActive && (!location.search || location.search.includes('tab=tasks') || location.search.includes('tab=today'))) ? 'active' : ''}`}
                           onClick={() => setMobileMenuOpen(false)}
                         >
                           <span className="subitem-icon"><IconSubTasks /></span>
-                          <span>Việc cần xử lý</span>
+                          <span>Cơ hội &amp; Việc cần xử lý</span>
                         </Link>
                         <Link
                           to="/rb?tab=pipeline"

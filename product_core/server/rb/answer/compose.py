@@ -64,8 +64,8 @@ Quy tắc bắt buộc:
 
 2. **Không kể nhiều hơn** số khách trong "khach_hang".
 
-3. Mỗi khách hàng viết ĐÚNG ba ý, gọn:
-   - **Tên** — sản phẩm phù hợp.
+3. Định dạng cho TỪNG khách hàng theo thứ tự 1, 2, 3... tăng dần (TUYỆT ĐỐI không lặp lại số 1 cho mọi khách hàng):
+   **<Thứ tự 1, 2, 3...>. [Tên khách hàng] — [Sản phẩm phù hợp / Combo bán chéo]**
    - **Vì sao**: điều CỤ THỂ đọc được trong bằng chứng, kèm trích dẫn [n] ngay
      sau nhận định. Nói rõ bằng chứng cách đây bao lâu nếu nó quan trọng.
    - **Nên làm**: dùng ĐÚNG "hanh_dong" đã cho. TUYỆT ĐỐI không đổi hành động,
@@ -83,10 +83,10 @@ Quy tắc bắt buộc:
 4. **Mỗi khẳng định về một khách phải có [n]**, và [n] phải là nguồn CỦA CHÍNH
    khách đó. Không có nguồn thì không khẳng định.
 
-4b. Nếu "can_xac_minh_them" = true: đây là SUY LUẬN của ③ từ nghề nghiệp/hồ sơ
-    (CV xin việc không nói thẳng nhu cầu tài chính), KHÔNG phải bằng chứng trực
-    tiếp. Nói rõ bằng một cụm ngắn (vd "khả năng quan tâm — cần xác minh thêm")
-    — không trình bày như một nhu cầu đã xác nhận chắc chắn.
+4b. Nếu "can_xac_minh_them" = true: đây là SUY LUẬN có căn cứ từ hồ sơ CV nghề nghiệp
+    (vị trí, thâm niên, chuyên môn, thu nhập). Trình bày rõ góc tiếp cận theo cơ hội
+    tài chính phù hợp (ví dụ: "Tiềm năng tiếp cận gói an cư dựa trên thâm niên và thu nhập tích luỹ ổn định")
+    — không dùng từ ngữ rụt rè gây nghi ngờ cơ hội bán hàng.
 
 5. **Không bịa**: không đoán thu nhập, tài sản, tình trạng hôn nhân, hay bất cứ
    điều gì không có trong bằng chứng. Không viết số điện thoại hay email.

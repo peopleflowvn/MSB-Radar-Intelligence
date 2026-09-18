@@ -59,20 +59,21 @@ WEIGHTS = {
     "value": 0.10,
 }
 
-#: Dưới ngưỡng này thì không tạo đề xuất. Cao hơn hẳn ngưỡng bên tuyển dụng vì
-#: cùng lý do với `routing.MIN_CONFIDENCE`: mời khách vay tiền khi họ không hỏi
-#: là chuyện khác hẳn về mặt cảm nhận.
-MIN_PRIORITY = 40.0
+#: Từng có thêm một ngưỡng điểm tổng ở đây (`MIN_PRIORITY = 40.0`) chặn đề
+#: xuất trước khi tạo. Bỏ đi: hệ quả thật của nó là những cơ hội nhỏ nhưng có
+#: thật — khách vừa hỏi nhẹ một câu, tín hiệu CV yếu — bị Radar nuốt mất trước
+#: khi RM kịp thấy. Giờ nguyên tắc là **hễ phát hiện một cơ hội, dù nhỏ nhất,
+#: cũng phải coi là cơ hội**; việc xếp cái nào lên trước đã có `priority_score`
+#: và cá nhân hoá lo, không cần thêm một cánh cửa chặn trước đó nữa.
 
-#: Ngưỡng riêng cho chiều Need, kế thừa `routing.MIN_CONFIDENCE = 0.5`.
-#:
-#: Vì sao Need cần ngưỡng riêng thay vì để điểm tổng lo: bốn chiều kia có thể
-#: **cứu** một nhu cầu mơ hồ. Một người có hồ sơ đẹp, dễ liên hệ, tín hiệu vừa
-#: phát sinh hôm qua, sản phẩm giá trị cao — chỉ mỗi việc là ta không thật sự
-#: biết họ có cần hay không — vẫn dễ dàng vượt 40 điểm tổng. Gọi cho người đó
-#: là gọi cho một người không hỏi gì, và đó đúng là hành vi mà `MIN_CONFIDENCE`
-#: sinh ra để chặn. Need là chiều duy nhất không được phép bù trừ.
-MIN_NEED = 50.0
+#: Ngưỡng DUY NHẤT còn lại của toàn hệ thống đề xuất, và nó không phải ngưỡng
+#: "đủ tự tin" như trước (từng là 50.0, kế thừa `routing.MIN_CONFIDENCE`) — nó
+#: chỉ chặn đúng một trường hợp: hoàn toàn không có bằng chứng gì (điểm = 0,
+#: tức "không hỏi gì cả"). `score_need()` trả đúng 0.0 khi không có `interest`,
+#: không có `signals`, không có suy luận AI nào — nên ngưỡng này không lọc bớt
+#: cơ hội nhỏ, nó chỉ lọc trường hợp Radar tự nghĩ ra nhu cầu, đúng thứ nguyên
+#: tắc năm chiều ở đầu file cấm.
+MIN_NEED = 0.0
 
 #: Điểm tiếp cận khi chưa có số điện thoại lẫn email. Thấp nhưng khác 0 —
 #: xem `score_reachability()`.

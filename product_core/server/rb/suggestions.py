@@ -132,15 +132,12 @@ def create_or_update(person, product, interest=None, signals=(), need_summary=""
                  product, person.pk)
         return None, False
 
-    if draft.need_score < scoring.MIN_NEED:
-        # Ngưỡng không bù trừ được — xem `scoring.MIN_NEED`.
-        log.info("Bỏ qua đề xuất %s cho person=%s: nhu cầu %.1f dưới ngưỡng %.1f",
-                 product, person.pk, draft.need_score, scoring.MIN_NEED)
-        return None, False
-
-    if draft.priority_score < scoring.MIN_PRIORITY:
-        log.info("Bỏ qua đề xuất %s cho person=%s: điểm %.1f dưới ngưỡng %.1f",
-                 product, person.pk, draft.priority_score, scoring.MIN_PRIORITY)
+    if draft.need_score <= scoring.MIN_NEED:
+        # Ngưỡng duy nhất còn lại — xem `scoring.MIN_NEED`. Không có ngưỡng
+        # điểm tổng nữa: một cơ hội nhỏ nhưng có bằng chứng thật vẫn phải lọt
+        # qua, kể cả khi bốn chiều kia đều yếu.
+        log.info("Bỏ qua đề xuất %s cho person=%s: không có bằng chứng nhu cầu nào",
+                 product, person.pk)
         return None, False
 
     existing = (OpportunitySuggestion.objects

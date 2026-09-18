@@ -248,17 +248,25 @@ việc phản bác được từng chiều mới làm nên độ tin cậy. Mỗ
 `(điểm, [lý do])`; các lý do được gộp vào `evidence["why"]` và hiển thị nguyên
 văn ở mục **VÌ SAO BÂY GIỜ** trên thẻ.
 
-### 10.3. Hai ngưỡng, và vì sao Need có ngưỡng riêng
+### 10.3. Một ngưỡng duy nhất: phải có bằng chứng thật
 
 ```python
-MIN_PRIORITY = 40.0   # điểm tổng
-MIN_NEED     = 50.0   # riêng chiều Need, kế thừa routing.MIN_CONFIDENCE
+MIN_NEED = 0.0   # chặn đúng "điểm = 0", tức hoàn toàn không có bằng chứng
 ```
 
-Bốn chiều kia có thể **cứu** một nhu cầu mơ hồ: người có hồ sơ đẹp, dễ liên hệ,
-tín hiệu vừa phát sinh hôm qua, sản phẩm giá trị cao — chỉ mỗi việc là ta không
-thật sự biết họ có cần hay không — vẫn dễ dàng vượt 40 điểm tổng. Gọi cho người
-đó là gọi cho một người không hỏi gì. Need là chiều duy nhất không được bù trừ.
+Từng có thêm một ngưỡng "đủ tự tin" (`MIN_NEED = 50.0`, kế thừa
+`routing.MIN_CONFIDENCE`) và một ngưỡng điểm tổng (`MIN_PRIORITY = 40.0`) chặn
+đề xuất trước khi tạo. Bỏ cả hai: hệ quả thật của chúng là những cơ hội nhỏ
+nhưng có thật — khách chỉ nhắc thoáng qua, tín hiệu CV yếu — bị Radar lặng lẽ
+nuốt mất trước khi RM kịp thấy.
+
+Nguyên tắc bây giờ: **hễ phát hiện một cơ hội, dù nhỏ nhất, cũng phải coi là
+cơ hội.** `score_need()` trả đúng `0.0` khi không có `interest`, không có
+`signals`, không có suy luận AI nào — nên `MIN_NEED` không lọc bớt cơ hội nhỏ,
+nó chỉ lọc đúng trường hợp Radar tự nghĩ ra nhu cầu. Việc xếp cái nào lên
+trước đã có `priority_score` và cá nhân hoá lo; `recommend_action()` cũng tự
+hạ hành động xuống `ASK_FOR_INFORMATION`/`WAIT` cho các cơ hội yếu thay vì đề
+xuất gọi ngay — xem 10.6.
 
 ### 10.4. Chưa có số điện thoại ≠ khách từ chối
 

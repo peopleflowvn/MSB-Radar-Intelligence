@@ -48,7 +48,7 @@ TASK = "rb_prospect_search"
 #: model vượt trần token và trả JSON cụt, parse ra rỗng, rồi ⑤ đi báo "không có
 #: khách nào" trong khi ② đã tìm được vài chục người.
 BATCH = 8
-MAX_TOKENS = 6000
+MAX_TOKENS = 3500
 #: Số lô đọc song song. Vừa phải: bắn quá nhiều lượt cùng lúc vào một khoá nhà
 #: cung cấp thì dính hạn mức, đổi chậm lấy lỗi 429.
 WORKERS = 4
@@ -85,7 +85,8 @@ Với TỪNG khách hàng, quyết định dựa trên bằng chứng được c
        -> Tiềm năng Vay vốn SME, Tài khoản chi lương doanh nghiệp (Payroll), Thấu chi doanh nghiệp -> **Combo bán chéo:** Chi lương CBNV + Tiết kiệm doanh nghiệp/cá nhân + Thẻ tín dụng doanh nghiệp.
      * **Chuyên gia thâm niên >10 năm, C-level, Bác sĩ, Luật sư, thu nhập cao:**
        -> Dòng tiền thặng dư lớn -> Tiềm năng Gửi tiết kiệm, Đầu tư chứng chỉ quỹ, Quản lý tài sản (Affluent/Priority).
-   - Khi suy luận: Trích nguyên văn đoạn CĂN CỨ (chức danh, công ty, thâm niên, sở thích, kỹ năng, ngoại ngữ...) trong hồ sơ làm trích dẫn, đặt "loai_bang_chung": "suy_luan", và gán "do_tin" 0.5 - 0.85. Chỉ cần có góc tiếp cận khả thi là đánh "thoa": true.
+   - Khi suy luận: Trích nguyên văn đoạn CĂN CỨ (chức danh, công ty, thâm niên, sở thích, kỹ năng, ngoại ngữ...) trong hồ sơ làm trích dẫn, đặt "loai_bang_chung": "suy_luan".
+   - **VỀ ĐỘ TIN CẬY ("do_tin"):** Với mọi ứng viên khớp tiêu chí vị trí/thâm niên hoặc có góc tiếp cận khả thi, BẮT BUỘC đánh "thoa": true và gán "do_tin" từ 0.70 đến 0.85 (tuyệt đối KHÔNG gán dưới 0.60 vì hệ thống sẽ loại khỏi danh sách). Hãy tự tin nhận diện cơ hội bán hàng!
 
 2. **Cân nhắc THỜI GIAN.** Đoạn trích từ bài đăng/tín hiệu có ghi rõ số ngày trước. Với hồ sơ CV, thời điểm cập nhật mới (trong 30-90 ngày) là lúc ứng viên đang chuyển biến sự nghiệp (thời điểm vàng mở thẻ/chuyển tài khoản). Thâm niên nhiều năm là tích luỹ tài chính ổn định.
 

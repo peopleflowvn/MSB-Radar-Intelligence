@@ -560,10 +560,12 @@ export default function RB() {
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab") as "today" | "prospects" | "filter" | "tasks" | "pipeline" | "lists" | null;
   const [view, setView] = useState<
-    "today" | "prospects" | "filter" | "tasks" | "pipeline" | "lists">(tabParam || "today");
+    "prospects" | "filter" | "tasks" | "pipeline" | "lists">(tabParam === "today" ? "tasks" : tabParam || "tasks");
 
   useEffect(() => {
-    if (tabParam && ["today", "prospects", "filter", "tasks", "pipeline", "lists"].includes(tabParam)) {
+    if (tabParam === "today") {
+      setView("tasks");
+    } else if (tabParam && ["prospects", "filter", "tasks", "pipeline", "lists"].includes(tabParam)) {
       setView(tabParam);
     }
   }, [tabParam]);
@@ -682,17 +684,16 @@ export default function RB() {
         </div>
       )}
 
-      {/* 0. VIEW: TODAY — Radar đề xuất, RM quyết định */}
-      {view === "today" && <TodaysOpportunities />}
-
       {/* 0b. VIEW: PROSPECTS & FILTER — RM chủ động hỏi NLP & Lọc đa chiều */}
       {(view === "prospects" || view === "filter") && (
         <ProspectSearch initialMode={view === "filter" ? "loc" : "ai"} />
       )}
 
-      {/* 1. VIEW: TASKS — Bảng công việc chi tiết */}
+      {/* 1. VIEW: TASKS — Radar đề xuất hôm nay + bảng công việc chi tiết */}
       {view === "tasks" && (
         <>
+          <TodaysOpportunities />
+
           {/* Quick Filters Toolbar */}
           <div className="workspace-filter-toolbar">
             <div className="scope-pills-row">

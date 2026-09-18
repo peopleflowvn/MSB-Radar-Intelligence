@@ -100,7 +100,6 @@ function PlanChips({ plan }: { plan?: ProspectAnswerPlan }) {
   if (filters.phai_co_lien_he) chips.push({ icon: "📞", text: "Phải có liên hệ" });
   if (filters.loai_co_hoi_dang_mo) chips.push({ icon: "🛡️", text: "Loại người đã có cơ hội mở" });
   if (filters.tin_hieu_trong_ngay) chips.push({ icon: "⏱️", text: `Tín hiệu trong ${filters.tin_hieu_trong_ngay} ngày` });
-  if (plan.limit) chips.push({ icon: "🔢", text: `Lấy tối đa ${plan.limit}` });
 
   return (
     <div className="chips">
@@ -110,6 +109,53 @@ function PlanChips({ plan }: { plan?: ProspectAnswerPlan }) {
         </span>
       ))}
     </div>
+  );
+}
+
+function ProspectCriteriaSection({ plan }: { plan?: ProspectAnswerPlan }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <section className="prospect-criteria-card" style={{ marginBottom: "12px" }}>
+      <div
+        className="prospect-criteria-head"
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "8px",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          <h4 className="prospect-criteria-title" style={{ margin: 0, fontSize: "12.5px" }}>
+            <span>🎯</span> Hệ thống hiểu câu hỏi của bạn là
+          </h4>
+          <span
+            className={`badge ${plan?.fallback ? "warn" : "ok"}`}
+            title={
+              plan?.fallback
+                ? "Mô hình không hiểu được câu hỏi lúc này; hệ thống đang đoán theo từ khoá."
+                : "Đọc bằng chứng thật: bài đăng, tín hiệu, lịch sử tiếp cận."
+            }
+          >
+            {plan?.fallback ? "Dự phòng (đoán theo từ khoá)" : "AI suy luận bằng chứng"}
+          </span>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          style={{ fontSize: "11px", padding: "2px 8px", background: "none", border: "1px solid var(--border)" }}
+          onClick={() => setOpen((prev) => !prev)}
+        >
+          {open ? "Thu gọn ▴" : "Chi tiết ▾"}
+        </button>
+      </div>
+      {open ? (
+        <div style={{ marginTop: "8px" }}>
+          <PlanChips plan={plan} />
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -595,24 +641,7 @@ export default function ProspectSearch({ initialMode = "ai" }: { initialMode?: "
                       getFollowUps={getProspectFollowUps}
                       personLinkFrom="rb"
                       extraBeforePeople={
-                        showPayload ? (
-                          <section className="prospect-criteria-card">
-                            <div className="prospect-criteria-head" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px" }}>
-                              <h4 className="prospect-criteria-title">
-                                <span>🎯</span> Hệ thống hiểu câu hỏi của bạn là
-                              </h4>
-                              <span
-                                className={`badge ${plan?.fallback ? "warn" : "ok"}`}
-                                title={plan?.fallback
-                                  ? "Mô hình không hiểu được câu hỏi lúc này; hệ thống đang đoán theo từ khoá."
-                                  : "Đọc bằng chứng thật: bài đăng, tín hiệu, lịch sử tiếp cận."}
-                              >
-                                {plan?.fallback ? "Dự phòng (đoán theo từ khoá)" : "Đọc bằng chứng"}
-                              </span>
-                            </div>
-                            <PlanChips plan={plan} />
-                          </section>
-                        ) : null
+                        showPayload ? <ProspectCriteriaSection plan={plan} /> : null
                       }
                       renderPeople={() =>
                         !showPayload ? null : rows.length === 0 ? (
@@ -794,17 +823,25 @@ export default function ProspectSearch({ initialMode = "ai" }: { initialMode?: "
                               </div>
                             ) : (
                               <div
-                                className="talent-table-wrapper"
-                                style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "14px", overflow: "hidden" }}
+                                className="talent-table-wrapper prospect-table-wrapper"
+                                style={{
+                                  background: "var(--surface)",
+                                  border: "1px solid var(--border)",
+                                  borderRadius: "14px",
+                                  overflowX: "auto",
+                                  overflowY: "hidden",
+                                  WebkitOverflowScrolling: "touch",
+                                  maxWidth: "100%",
+                                }}
                               >
-                                <table className="table prospect-table" style={{ margin: 0 }}>
+                                <table className="table prospect-table" style={{ margin: 0, minWidth: "980px", width: "100%" }}>
                                   <thead>
                                     <tr>
-                                      <th style={{ minWidth: "220px" }}>Khách hàng</th>
-                                      <th style={{ minWidth: "180px" }}>Nghề nghiệp / Chức danh</th>
-                                      <th className="num" style={{ width: "140px", textAlign: "center" }}>Điểm ưu tiên</th>
+                                      <th style={{ minWidth: "220px", width: "240px" }}>Khách hàng</th>
+                                      <th style={{ minWidth: "160px", width: "180px" }}>Nghề nghiệp / Chức danh</th>
+                                      <th className="num" style={{ minWidth: "190px", width: "190px", textAlign: "center" }}>Điểm ưu tiên</th>
                                       <th style={{ minWidth: "260px" }}>Vì sao đề xuất</th>
-                                      <th style={{ width: "150px", textAlign: "right" }}>Thao tác</th>
+                                      <th style={{ minWidth: "140px", width: "140px", textAlign: "right" }}>Thao tác</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -859,8 +896,8 @@ export default function ProspectSearch({ initialMode = "ai" }: { initialMode?: "
                                             {row.occupation || <span className="muted">Chưa rõ</span>}
                                           </span>
                                         </td>
-                                        <td className="num">
-                                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                                        <td className="num" style={{ minWidth: "190px", width: "190px", textAlign: "center" }}>
+                                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
                                             <span
                                               style={{
                                                 fontSize: "18px",
@@ -871,17 +908,21 @@ export default function ProspectSearch({ initialMode = "ai" }: { initialMode?: "
                                             >
                                               {Math.round(row.priority_score)}
                                             </span>
-                                            <div className="muted small" style={{ fontSize: "11px", textAlign: "center" }}>
+                                            <div className="muted small" style={{ fontSize: "11px", textAlign: "center", lineHeight: 1.45, maxWidth: "180px" }}>
                                               {(Object.keys(TEN_CHIEU) as Array<keyof ProspectRowScores>)
                                                 .map((key) => `${TEN_CHIEU[key]} ${Math.round(row.scores[key])}`)
                                                 .join(" · ")}
                                             </div>
                                           </div>
                                         </td>
-                                        <td className="prospect-why">
-                                          {row.why.slice(0, 3).map((line, index) => (
-                                            <div key={index}>{line}</div>
-                                          ))}
+                                        <td className="prospect-why" style={{ minWidth: "260px" }}>
+                                          {row.why && row.why.length > 0 ? (
+                                            row.why.slice(0, 3).map((line, index) => (
+                                              <div key={index}>{line}</div>
+                                            ))
+                                          ) : (
+                                            <span className="muted small" style={{ fontStyle: "italic", opacity: 0.7 }}>Chưa có ghi chú phân tích</span>
+                                          )}
                                         </td>
                                         <td style={{ textAlign: "right" }}>
                                           {creatingFor === row.person_id ? (

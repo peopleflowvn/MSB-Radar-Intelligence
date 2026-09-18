@@ -222,11 +222,18 @@ class RouteSignalTest(TestCase):
         self.assertTrue(made[0].recommended_action)
         self.assertIn("tiết kiệm", " ".join(made[0].evidence["why"]).lower())
 
-    def test_tin_hieu_yeu_thi_KHONG_tao_de_xuat(self):
-        """Mời khách vay tiền khi họ chỉ nhắc thoáng qua là phản tác dụng."""
-        self.assertEqual(routing.route_signal(
-            self._signal("có nhắc tới vay tiền", confidence=0.3)), [])
-        self.assertEqual(OpportunitySuggestion.objects.count(), 0)
+    def test_tin_hieu_yeu_van_la_mot_co_hoi_nho_nhung_hanh_dong_phai_nhe_tay(self):
+        """Dù nhỏ nhất, một tín hiệu có thật vẫn phải thành cơ hội (Radar không
+        được lặng lẽ nuốt mất nó) — nhưng hành động đề xuất phải tương xứng:
+        nhắc thoáng qua thì đi xin thêm thông tin, không phải gọi ngay chào
+        vay tiền."""
+        made = routing.route_signal(
+            self._signal("có nhắc tới vay tiền", confidence=0.3))
+        self.assertEqual(len(made), 1)
+        self.assertEqual(OpportunitySuggestion.objects.count(), 1)
+        self.assertLess(made[0].need_score, 50)
+        self.assertNotEqual(made[0].recommended_action,
+                            OpportunitySuggestion.ACTION_CALL_NOW)
 
     def test_khong_khop_san_pham_thi_khong_tao_gi(self):
         self.assertEqual(routing.route_signal(self._signal("trời hôm nay đẹp")), [])

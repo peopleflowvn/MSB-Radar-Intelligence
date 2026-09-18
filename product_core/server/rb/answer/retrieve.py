@@ -175,6 +175,15 @@ def eligible_people(query_plan, *, user=None):
             where |= Q(talent_profile__current_title__icontains=hint)
             where |= Q(talent_profile__seniority__icontains=hint)
         queryset = queryset.filter(where)
+    if filters.get("kinh_nghiem_tu"):
+        try:
+            min_exp = float(filters["kinh_nghiem_tu"])
+            queryset = queryset.filter(
+                Q(talent_profile__years_experience__gte=min_exp) |
+                Q(talent_profile__years_experience__isnull=True)
+            )
+        except (ValueError, TypeError):
+            pass
     if filters.get("loai_co_hoi_dang_mo"):
         queryset = queryset.exclude(
             rb_opportunities__status__in=RBOpportunity.OPEN_STATUSES)
@@ -295,8 +304,17 @@ def _profile_ids(allowed_ids, terms, limit):
         from django.db.models import TextField
         from django.db.models.functions import Cast
 
+        # Mở rộng từ đồng nghĩa chức danh quản lý và chuyên gia
+        all_terms = list(terms)
+        terms_lower = [t.lower() for t in terms]
+        if any(t in terms_lower for t in ("quan", "ly", "manager")):
+            all_terms.extend(["truong", "phong", "giam", "doc", "lead", "head", "director"])
+        if any(t in terms_lower for t in ("chuyen", "gia", "expert")):
+            all_terms.extend(["senior", "architect", "specialist", "chinh"])
+        all_terms = list(dict.fromkeys(all_terms))
+
         where_cv = Q()
-        for term in terms:
+        for term in all_terms:
             where_cv |= Q(headline__icontains=term)
             where_cv |= Q(talent_profile__current_title__icontains=term)
             where_cv |= Q(talent_profile__current_company__icontains=term)
@@ -313,7 +331,8 @@ def _profile_ids(allowed_ids, terms, limit):
                         .annotate(_skills_text=Cast("talent_profile__skills", TextField()),
                                   _ind_text=Cast("talent_profile__industries", TextField())))
         cv_ids = list(annotated_cv.filter(where_cv)
-                      .order_by("-updated_at").values_list("pk", flat=True)[:limit])
+                      .order_by("-talent_profile__years_experience", "-updated_at")
+                      .values_list("pk", flat=True)[:limit * 2])
         p_ids.extend(cv_ids)
 
     return list(dict.fromkeys(p_ids))[:limit]
