@@ -123,7 +123,8 @@ def _people(chosen, actions, sources):
 
     ids = [j.person_id for j in chosen]
     facts = {row["pk"]: row for row in Person.objects.filter(pk__in=ids).values(
-        "pk", "location", "rb_profile__occupation")}
+        "pk", "location", "headline", "rb_profile__occupation",
+        "talent_profile__current_title", "talent_profile__current_company")}
     open_ids = set(RBOpportunity.objects.filter(
         person_id__in=ids, status__in=RBOpportunity.OPEN_STATUSES)
         .values_list("person_id", flat=True))
@@ -138,11 +139,16 @@ def _people(chosen, actions, sources):
         fact = facts.get(judgement.person_id) or {}
         reasons = [judgement.why] if judgement.why else []
         reasons += [str(r) for r in (detail.get("why") or [])]
+        occ = (fact.get("rb_profile__occupation") or
+               fact.get("talent_profile__current_title") or
+               fact.get("headline") or "")
+        company = fact.get("talent_profile__current_company") or ""
+        display_occ = f"{occ} tại {company}" if (occ and company and company not in occ) else occ
         out.append({
             "person_id": judgement.person_id,
             "name": judgement.name,
             "location": fact.get("location") or "",
-            "occupation": fact.get("rb_profile__occupation") or "",
+            "occupation": display_occ,
             "has_open_opportunity": judgement.person_id in open_ids,
             "reasons": reasons,
             "why": judgement.why,

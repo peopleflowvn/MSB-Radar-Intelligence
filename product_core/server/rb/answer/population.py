@@ -25,13 +25,15 @@ from django.db.models import Q
 def customers():
     from people.models import Person, Signal
     from social.models import SocialPost
+    from talent.models import TalentProfile
 
     from ..models import RBProfile
 
     return Person.objects.filter(merged_into__isnull=True).filter(
         Q(pk__in=RBProfile.objects.values("person_id"))
         | Q(pk__in=Signal.objects.filter(domain=Signal.DOMAIN_RB).values("person_id"))
-        | Q(pk__in=SocialPost.objects.exclude(person__isnull=True).values("person_id")))
+        | Q(pk__in=SocialPost.objects.exclude(person__isnull=True).values("person_id"))
+        | Q(pk__in=TalentProfile.objects.values("person_id")))
 
 
 def do_not_contact_ids():
