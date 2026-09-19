@@ -22,7 +22,7 @@ from core.models import WorkflowStage
 from people.models import Interaction, Person, Relationship, Signal
 from talent.models import Pool
 
-from . import routing
+from . import routing, scoring
 from .models import (PRODUCT_CREDIT_CARD, PRODUCT_FX, PRODUCT_INSURANCE,
                      PRODUCT_MORTGAGE, PRODUCT_SAVINGS, OpportunitySuggestion,
                      ProductInterest, RBOpportunity, RBOpportunityStatusEvent,
@@ -351,6 +351,21 @@ class OpportunityApiTest(TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertIn("không liên hệ", response.json()["detail"])
         self.assertFalse(RBOpportunity.objects.filter(person=binh).exists())
+
+    def test_nghe_nghiep_khong_lay_vi_tri_ung_tuyen(self):
+        """`headline` là vị trí ứng tuyển vào MSB, không phải nghề của khách."""
+        from talent.models import TalentProfile
+        from .scoring import cv_title
+        job = "Giám đốc phòng giao dịch - RB - MSB - 1D"
+        binh = Person.objects.create(display_name="Trần Bình", headline=job)
+        tp = TalentProfile.objects.create(person=binh, current_title=job)
+        self.assertEqual(cv_title(binh, tp), "")
+        tp.current_title = "Trưởng phòng kế toán"
+        self.assertEqual(cv_title(binh, tp), "Trưởng phòng kế toán")
+        fit, _why = scoring.score_fit(Person.objects.create(display_name="Chi", headline=job),
+                                      PRODUCT_CREDIT_CARD)
+        self.assertEqual(fit, scoring.score_fit(Person.objects.create(display_name="Dũng"),
+                                                PRODUCT_CREDIT_CARD)[0])
 
     def test_bo_loc_goc_nhin_khach_hang_loai_DNC_va_loc_theo_RM(self):
         from talent import search as talent_search

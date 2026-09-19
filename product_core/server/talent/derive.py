@@ -28,7 +28,10 @@ log = logging.getLogger(__name__)
 
 # Trường trên TalentProfile ← khoá trong payload của SourceRecord.
 SIMPLE_FIELDS = {
-    "current_title": ("current_title", "position"),
+    # KHÔNG đọc `position`: ở mọi provider Edge đó là "Vị trí ứng tuyển" (xem
+    # `intel/edge_mapper.py`, `edge/app/db.py`). Đọc nó ở đây làm 809/1019 hồ sơ
+    # prod (19/09) có "chức danh hiện tại" là tên tin tuyển dụng MSB.
+    "current_title": ("current_title",),
     "current_company": ("last_company",),
     "education": ("education",),
     "expected_salary": ("expected_salary",),
@@ -118,6 +121,14 @@ def derive(person, save=True):
         return profile
 
     payloads = [r.payload or {} for r in records]
+
+    # Gỡ giá trị do bản cũ ghi sai: chức danh trùng đúng một vị trí ứng tuyển thì
+    # là tên tin tuyển dụng, không phải chức danh. Để trống cho
+    # `apply_extracted_facts` điền từ CV. Tay người đã sửa (curated) thì giữ.
+    applied = {str(p.get("position") or "").strip()[:200] for p in payloads} - {""}
+    if (not profile.is_curated("current_title")
+            and (profile.current_title or "").strip() in applied):
+        profile.current_title = ""
 
     for field, sources in SIMPLE_FIELDS.items():
         if profile.is_curated(field):
@@ -210,7 +221,8 @@ def _detect_job_change(person, payloads):
         return
 
     observed = _parse_timestamp(payloads[0].get("applied_ts") or "") or timezone.now()
-    title = str(payloads[0].get("current_title") or payloads[0].get("position") or "")
+    # Chức danh ở công ty MỚI — không lấy `position` (vị trí ứng tuyển).
+    title = str(payloads[0].get("current_title") or "")
     try:
         signal, created = Signal.objects.get_or_create(
             person=person, domain=Signal.DOMAIN_RB, signal_type="job_change",

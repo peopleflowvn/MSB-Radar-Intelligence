@@ -85,7 +85,9 @@ def _facts(opportunity):
     # Khai thác dữ kiện phong phú từ hồ sơ nghề nghiệp & CV
     tp = getattr(opportunity.person, "talent_profile", None)
     if tp:
-        title = getattr(tp, "current_title", "") or getattr(opportunity.person, "headline", "")
+        # Không lấy `headline` (vị trí ứng tuyển) — xem `scoring.cv_title`.
+        from .scoring import cv_title
+        title = cv_title(opportunity.person, tp)
         company = getattr(tp, "current_company", "")
         if title and company:
             facts.append(f"Chức danh & công ty: {title} tại {company}")

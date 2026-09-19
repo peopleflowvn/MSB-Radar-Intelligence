@@ -37,7 +37,7 @@ import re
 
 from ai.router import complete
 from core.vn_locations import canonical_province, location_query_variants
-from django.db.models import Q
+from django.db.models import F, Q
 from people.models import Person, Signal
 from django.utils import timezone
 
@@ -394,8 +394,9 @@ def search(criteria, user=None):
         condition = Q()
         for hint in hints:
             condition |= Q(rb_profile__occupation__icontains=hint)
-            condition |= Q(headline__icontains=hint)
-            condition |= Q(talent_profile__current_title__icontains=hint)
+            # Không lọc theo `headline` (vị trí ứng tuyển) — xem `scoring.cv_title`.
+            condition |= (Q(talent_profile__current_title__icontains=hint)
+                          & ~Q(talent_profile__current_title=F("headline")))
             condition |= Q(talent_profile__seniority__icontains=hint)
         queryset = queryset.filter(condition)
 
@@ -476,8 +477,7 @@ def _score(person, products):
                                       strategic_weight=strategic)
 
     occupation = (getattr(profile, "occupation", "") or
-                  getattr(tp, "current_title", "") or
-                  person.headline or "")
+                  scoring.cv_title(person, tp))
     employer = (getattr(profile, "employer", "") or
                 getattr(tp, "current_company", "") or "")
 

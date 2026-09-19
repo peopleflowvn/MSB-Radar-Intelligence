@@ -90,6 +90,21 @@ class DeriveTest(TestCase):
         self.assertEqual(profile.years_experience, 3.0)
         self.assertEqual(profile.skills, ["SQL", "Python", "Power BI"])
 
+    def test_vi_tri_ung_tuyen_khong_thanh_chuc_danh_hien_tai(self):
+        """`position` ở Edge là vị trí ỨNG TUYỂN — prod 19/09: 809/1019 hồ sơ bị ghi nhầm."""
+        self._record(position="Giám đốc phòng giao dịch - RB - MSB - 1D", current_title="")
+        ingest.resolve_pending()
+        self.assertEqual(TalentProfile.objects.get().current_title, "")
+
+    def test_go_chuc_danh_cu_da_ghi_nham_tu_vi_tri_ung_tuyen(self):
+        self._record(position="Finance Analyst - QLTC - MSB - 3K057", current_title="")
+        ingest.resolve_pending()
+        person = Person.objects.get()
+        TalentProfile.objects.filter(person=person).update(
+            current_title="Finance Analyst - QLTC - MSB - 3K057")
+        derive_module.derive(person)
+        self.assertEqual(TalentProfile.objects.get().current_title, "")
+
     def test_ban_ghi_moi_nhat_thang(self):
         self._record("1", applied_ts="2024-01-01 09:00:00",
                      current_title="Junior Analyst")

@@ -109,6 +109,21 @@ PRODUCT_SENIORITY_FIT = {
 }
 
 
+def cv_title(person, tp=None):
+    """Chức danh HIỆN TẠI lấy từ hồ sơ CV — không bao giờ là vị trí ứng tuyển.
+
+    `Person.headline` chỉ được ghi từ `position` của Edge, tức vị trí người đó
+    ỨNG TUYỂN vào MSB ("Giám đốc phòng giao dịch - RB - MSB - 1D…"), không phải
+    nghề nghiệp của họ — nên RB không đọc nó. Bản `talent/derive.py` cũ còn chép
+    đúng giá trị đó sang `current_title`; chức danh trùng headline vì thế cũng
+    bị bỏ, kể cả khi dữ liệu cũ chưa được dựng lại.
+    """
+    tp = tp if tp is not None else getattr(person, "talent_profile", None)
+    title = (getattr(tp, "current_title", "") or "").strip()
+    applied = (getattr(person, "headline", "") or "").strip()
+    return "" if title and title == applied else title
+
+
 def score_fit(person, product, profile=None):
     """Người này có nằm trong khẩu vị sản phẩm không? → (0..100, lý do)."""
     reasons = []
@@ -122,8 +137,7 @@ def score_fit(person, product, profile=None):
     # Fallback dữ liệu từ hồ sơ CV (TalentProfile & Person)
     tp = getattr(person, "talent_profile", None)
     if not occupation:
-        cv_title = getattr(tp, "current_title", "") or getattr(person, "headline", "") or ""
-        occupation = cv_title.lower()
+        occupation = cv_title(person, tp).lower()
     if not employer and tp:
         employer = (getattr(tp, "current_company", "") or "").lower()
 
@@ -135,7 +149,7 @@ def score_fit(person, product, profile=None):
     if not is_professional and tp and (getattr(tp, "years_experience", 0) or 0) >= 3:
         is_professional = True
 
-    display_occ = getattr(profile, "occupation", "") or (getattr(tp, "current_title", "") if tp else "") or getattr(person, "headline", "")
+    display_occ = getattr(profile, "occupation", "") or cv_title(person, tp)
     display_emp = getattr(profile, "employer", "") or (getattr(tp, "current_company", "") if tp else "")
 
     if is_senior:

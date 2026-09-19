@@ -174,8 +174,11 @@ def eligible_people(query_plan, *, user=None):
         where = Q()
         for hint in hints:
             where |= Q(rb_profile__occupation__icontains=hint)
-            where |= Q(headline__icontains=hint)
-            where |= Q(talent_profile__current_title__icontains=hint)
+            # Không lọc theo `headline` (vị trí ứng tuyển) — ứng tuyển vị trí giám
+            # đốc không làm người đó thành giám đốc. Chức danh trùng headline là
+            # dữ liệu cũ ghi sai, cũng loại.
+            where |= (Q(talent_profile__current_title__icontains=hint)
+                      & ~Q(talent_profile__current_title=F("headline")))
             where |= Q(talent_profile__seniority__icontains=hint)
         queryset = queryset.filter(where)
     if filters.get("kinh_nghiem_tu"):

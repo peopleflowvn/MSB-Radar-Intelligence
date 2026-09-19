@@ -145,9 +145,12 @@ def _people(chosen, actions, sources):
         fact = facts.get(judgement.person_id) or {}
         reasons = [judgement.why] if judgement.why else []
         reasons += [str(r) for r in (detail.get("why") or [])]
-        occ = (fact.get("rb_profile__occupation") or
-               fact.get("talent_profile__current_title") or
-               fact.get("headline") or "")
+        # `headline` là vị trí ỨNG TUYỂN, không phải nghề nghiệp — xem
+        # `scoring.cv_title`. Chức danh trùng nó là dữ liệu cũ ghi sai.
+        title = fact.get("talent_profile__current_title") or ""
+        if title == (fact.get("headline") or ""):
+            title = ""
+        occ = fact.get("rb_profile__occupation") or title
         company = fact.get("talent_profile__current_company") or ""
         display_occ = f"{occ} tại {company}" if (occ and company and company not in occ) else occ
         out.append({

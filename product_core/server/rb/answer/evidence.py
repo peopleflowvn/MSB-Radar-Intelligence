@@ -276,7 +276,10 @@ def _cv_profile_passages(person_ids, now, depth=1):
     for p in people:
         parts = [f"Hồ sơ CV: {p.display_name}"]
         tp = getattr(p, "talent_profile", None)
-        title = (getattr(tp, "current_title", "") or p.headline or "").strip()
+        # Không dùng `headline` (vị trí ứng tuyển vào MSB): đưa nó vào đây là mời
+        # model đọc "Giám đốc phòng giao dịch - RB - MSB" thành nghề của khách.
+        from ..scoring import cv_title
+        title = cv_title(p, tp)
         company = (getattr(tp, "current_company", "") or "").strip()
         observed_time = getattr(tp, "last_source_at", None) if tp else None
         if title:
