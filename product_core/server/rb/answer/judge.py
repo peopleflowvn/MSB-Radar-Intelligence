@@ -122,7 +122,12 @@ nói đúng cơ hội đó chắc tới đâu:
 
 7. Bóc các thuộc tính trong "can_boc" nếu bằng chứng có nói, không có thì null.
 
-8. **"vi_sao"**: 2–3 câu MỘT DÒNG (không xuống dòng trong chuỗi JSON): điều cụ
+8. KHÔNG viết "thu nhập", "lương", "chi tiêu lớn", "tài sản", "giàu", "phân khúc
+   cao cấp", "khả năng tài chính" hay tình trạng hôn nhân trong bất kỳ trường
+   nào — căn cứ chỉ là chức danh, thâm niên, ngành, kỹ năng, sở thích ghi trong
+   hồ sơ ("trưởng phòng 7 năm" — KHÔNG "trưởng phòng nên thu nhập tốt").
+
+9. **"vi_sao"**: 2–3 câu MỘT DÒNG (không xuống dòng trong chuỗi JSON): điều cụ
    thể đọc được và nó khớp điều kiện nào (nếu là suy luận thì nói suy từ đâu),
    sản phẩm chính kèm một sản phẩm bán chéo liền kề nếu hợp lý, và một câu mở
    lời gợi ý cho RM. Người bị loại: một câu vì sao loại.
@@ -229,6 +234,22 @@ def _fold(text):
     return fold_text(text)
 
 
+#: Suy luận tài chính/nhân thân mà ③ bị CẤM — prompt đã dặn, nhưng production
+#: 19/09 vẫn ra "vị trí ổn định và thu nhập tốt", "nhu cầu chi tiêu lớn". Ràng
+#: buộc tuân thủ chỉ nằm trong prompt là ràng buộc chưa có, nên cắt bằng code.
+_SENSITIVE = re.compile(
+    r"thu nhap|muc luong|luong cao|chi tieu lon|tai san|giau co|kha nang tai chinh|"
+    r"phan khuc (?:khach hang )?cao cap|ket hon|hon nhan|doc than|co gia dinh", re.I)
+_SENTENCE = re.compile(r"(?<=[.!?;])\s+")
+
+
+def strip_sensitive(text):
+    """Bỏ nguyên CÂU nhắc tới thu nhập/tài sản/hôn nhân khỏi lý do của ③."""
+    kept = [part for part in _SENTENCE.split(str(text or ""))
+            if part and not _SENSITIVE.search(_fold(part))]
+    return " ".join(kept)
+
+
 def _verify_quote(quote, candidate):
     """Trích dẫn phải có mặt THẬT trong đoạn đã gửi. Không thì bỏ.
 
@@ -239,11 +260,27 @@ def _verify_quote(quote, candidate):
     text = " ".join(str(quote or "").split())
     if len(text) < MIN_QUOTE:
         return None
-    needle = _fold(text)
+    # Bỏ dấu câu ở CẢ HAI phía, và cho phép nối nhiều đoạn bằng "…". Đoạn CV là
+    # chuỗi ghép có nhãn ("vị trí/chức danh: Trưởng phòng, tại FPT"); model trích
+    # tự nhiên "Trưởng phòng tại FPT" — đúng nội dung, chỉ khác dấu phẩy — và bị
+    # loại, kéo người đúng xuống "không thoả" (production 19/09: gần hết lô). Mỗi
+    # mảnh vẫn phải CÓ THẬT trong đoạn: nới dấu câu, không nới nội dung.
+    pieces = [p for p in (_loose(part) for part in _ELLIPSIS.split(text)) if p]
+    if not pieces or max(len(p) for p in pieces) < MIN_QUOTE:
+        return None
     for passage in candidate.passages:
-        if needle in _fold(passage.text):
+        haystack = _loose(passage.text)
+        if all(piece in haystack for piece in pieces):
             return text
     return None
+
+
+_ELLIPSIS = re.compile(r"\.{3,}|…")
+
+
+def _loose(text):
+    """Bỏ dấu + bỏ dấu câu + gộp khoảng trắng — dạng so khớp trích dẫn."""
+    return " ".join(re.sub(r"[^\w\s]", " ", _fold(text)).split())
 
 
 def _passage_at(number, candidate):
@@ -367,7 +404,7 @@ def _parse_batch(text, batch, query_plan):
             name=candidate.name,
             relevant=relevant,
             confidence=_num(row.get("do_tin")),
-            why=" ".join(str(row.get("vi_sao") or "").split())[:700],
+            why=strip_sensitive(" ".join(str(row.get("vi_sao") or "").split()))[:700],
             evidence=evidence,
             extracted=extracted,
             gap=" ".join(str(row.get("con_thieu") or "").split())[:300],

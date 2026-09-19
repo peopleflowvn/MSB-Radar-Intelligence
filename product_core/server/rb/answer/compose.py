@@ -93,7 +93,11 @@ Quy tắc bắt buộc:
    điều gì không có trong bằng chứng. Không viết số điện thoại hay email.
 
 5b. KHÔNG dùng giới tính, tuổi, tình trạng hôn nhân, quê quán, tôn giáo hay
-   sức khoẻ làm lý do đề xuất, ưu tiên hay bỏ qua một khách hàng.
+   sức khoẻ làm lý do đề xuất, ưu tiên hay bỏ qua một khách hàng. KHÔNG nói về
+   thu nhập, chi tiêu, tài sản hay "phân khúc cao cấp" của khách.
+
+5c. KHÔNG viết nhãn kỹ thuật (INFERENCE, FACT, suy_luan, can_xac_minh_them…).
+   Muốn nói đây là suy luận thì nói bằng lời thường như mục 4b.
 
 6. Nếu "pham_vi" cho thấy có khách bị loại vì đã từ chối trước đó
    ("da_loai_vi_tu_choi" > 0), nói ngắn gọn một câu ở cuối — RM cần biết danh

@@ -1273,3 +1273,41 @@ class JudgePromptCalibrationTest(TestCase):
     def test_du_tran_token_cho_lo_tam_nguoi(self):
         from .answer import judge
         self.assertGreaterEqual(judge.MAX_TOKENS, 6000)
+
+
+class QuoteVerificationTest(TestCase):
+    """Trích dẫn đúng nội dung không được bị loại chỉ vì khác dấu câu."""
+
+    def _candidate(self, text):
+        from .answer.evidence import Candidate, Passage
+        return Candidate(person_id=1, name="A", score=1.0, hits=1,
+                         passages=[Passage(1, text, "profile")])
+
+    def test_khac_dau_phay_van_khop(self):
+        from .answer.judge import _verify_quote
+        c = self._candidate("Hồ sơ CV: A, vị trí/chức danh: Trưởng phòng Kỹ thuật, tại Tập đoàn FPT")
+        self.assertTrue(_verify_quote("Trưởng phòng Kỹ thuật tại Tập đoàn FPT", c))
+
+    def test_noi_bang_ba_cham_moi_manh_phai_co_that(self):
+        from .answer.judge import _verify_quote
+        c = self._candidate("vị trí/chức danh: Kế toán trưởng, thâm niên 8 năm kinh nghiệm")
+        self.assertTrue(_verify_quote("Kế toán trưởng … thâm niên 8 năm", c))
+        self.assertIsNone(_verify_quote("Kế toán trưởng … thâm niên 20 năm", c))
+
+    def test_noi_dung_bia_van_bi_loai(self):
+        from .answer.judge import _verify_quote
+        c = self._candidate("vị trí/chức danh: Nhân viên bán hàng")
+        self.assertIsNone(_verify_quote("Giám đốc điều hành tập đoàn", c))
+
+
+class StripSensitiveTest(TestCase):
+    def test_bo_cau_suy_luan_thu_nhap_giu_cau_con_lai(self):
+        from .answer.judge import strip_sensitive
+        text = ("Trưởng phòng kinh doanh 7 năm tại FPT. Vị trí ổn định và thu nhập tốt. "
+                "Phù hợp gói vay mua nhà.")
+        self.assertEqual(strip_sensitive(text),
+                         "Trưởng phòng kinh doanh 7 năm tại FPT. Phù hợp gói vay mua nhà.")
+
+    def test_bo_ca_hon_nhan_va_chi_tieu(self):
+        from .answer.judge import strip_sensitive
+        self.assertEqual(strip_sensitive("Đã kết hôn nên cần nhà. Có nhu cầu chi tiêu lớn."), "")
