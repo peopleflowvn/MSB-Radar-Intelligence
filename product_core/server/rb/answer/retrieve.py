@@ -49,7 +49,7 @@ from __future__ import annotations
 import logging
 
 from core.answer.fusion import reciprocal_rank_fusion
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 from people.models import Person, Signal
 

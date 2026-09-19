@@ -247,6 +247,31 @@ class ComplianceIsAGateNotAFilterTest(TestCase):
         self.assertNotIn(self.cam.pk, ids)
 
 
+class SeniorityFilterIgnoresAppliedPositionTest(TestCase):
+    """Lọc cấp bậc không được đọc vị trí ỨNG TUYỂN (`headline`) thành chức danh.
+
+    Cũng là ca duy nhất chạy qua nhánh `cap_bac` của `eligible_people` — thiếu
+    ca này, bản 19/09 lên prod với `F` chưa import và mọi câu hỏi "quản lý /
+    giám đốc" ném NameError.
+    """
+
+    def setUp(self):
+        from talent.models import TalentProfile
+        job = "Giám đốc phòng giao dịch - RB - MSB - 1D066"
+        self.ung_vien = _customer("Ứng Viên Vị Trí Giám Đốc")
+        self.ung_vien.headline = job
+        self.ung_vien.save(update_fields=["headline"])
+        TalentProfile.objects.create(person=self.ung_vien, current_title=job)
+        self.giam_doc = _customer("Giám Đốc Thật")
+        TalentProfile.objects.create(person=self.giam_doc, current_title="Giám đốc tài chính")
+
+    def test_chi_giu_nguoi_co_chuc_danh_that(self):
+        ids = set(retrieve_stage.eligible_people(
+            ProspectPlan(filters={"cap_bac": "executive"})).values_list("pk", flat=True))
+        self.assertIn(self.giam_doc.pk, ids)
+        self.assertNotIn(self.ung_vien.pk, ids)
+
+
 class PortfolioScopeTest(TestCase):
     """Lần đầu trong hệ thống, danh tính người hỏi ĐỔI TẬP KẾT QUẢ."""
 
