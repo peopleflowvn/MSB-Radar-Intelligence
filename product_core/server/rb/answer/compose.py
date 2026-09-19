@@ -92,6 +92,9 @@ Quy tắc bắt buộc:
 5. **Không bịa**: không đoán thu nhập, tài sản, tình trạng hôn nhân, hay bất cứ
    điều gì không có trong bằng chứng. Không viết số điện thoại hay email.
 
+5b. KHÔNG dùng giới tính, tuổi, tình trạng hôn nhân, quê quán, tôn giáo hay
+   sức khoẻ làm lý do đề xuất, ưu tiên hay bỏ qua một khách hàng.
+
 6. Nếu "pham_vi" cho thấy có khách bị loại vì đã từ chối trước đó
    ("da_loai_vi_tu_choi" > 0), nói ngắn gọn một câu ở cuối — RM cần biết danh
    sách ngắn là có lý do.
