@@ -25,6 +25,7 @@ import html
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -34,6 +35,10 @@ from .adapter import ModelRequest, get_adapter
 from .prompt_guard import GUARD_RULE, wrap_source
 
 _DEFAULT_TIMEOUT = 12
+#: Trần CẢ LƯỢT tra web (mọi backend + tổng hợp). Không có nó, lặp qua từng
+#: backend (12 s tìm + 20 s tổng hợp mỗi cái) làm một câu "tổng giám đốc
+#: Techcombank là ai" mất 103 s trên production 19/09.
+WEB_TOTAL_BUDGET = 35.0
 _DEFAULT_ORDER = ["searxng", "duckduckgo", "tavily", "brave", "google_cse",
                   "gemini_grounding"]
 _UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -405,7 +410,7 @@ def _format_hits(hits, limit=6):
     return "\n\n".join(lines)
 
 
-def _synthesize(question, hits, *, system, adapter):
+def _synthesize(question, hits, *, system, adapter, budget=20):
     """Cho bộ não hiện hành viết câu trả lời từ kết quả web (đã bọc guard)."""
     model = adapter or get_adapter()
     sources_block = wrap_source(_format_hits(hits), "KẾT QUẢ TÌM KIẾM WEB")
@@ -422,7 +427,7 @@ def _synthesize(question, hits, *, system, adapter):
     # ăn hết max_tokens rồi cắt cụt câu trả lời — tổng hợp web không cần suy nghĩ dài.
     request = ModelRequest(messages=messages, task="assistant_web",
                            temperature=0.2, max_tokens=1200,
-                           extra={"budget_seconds": 20, "reasoning_effort": "none"},
+                           extra={"budget_seconds": budget, "reasoning_effort": "none"},
                            meta={"router": "websearch_synthesis"})
     return model.complete(request)
 
@@ -446,8 +451,14 @@ def web_answer(question, *, system="", adapter=None, timeout=None, env=None,
             "ASSISTANT_WEBSEARCH_DDG / SEARXNG_URL / *_API_KEY).")
 
     wait = timeout or _DEFAULT_TIMEOUT
+    deadline = time.monotonic() + WEB_TOTAL_BUDGET
     last = None
     for backend in backends:
+        remaining = deadline - time.monotonic()
+        if remaining < 5:
+            last = WebSearchUnavailable(f"hết ngân sách tra web ({WEB_TOTAL_BUDGET:.0f}s)")
+            break
+        wait = min(wait, remaining)
         try:
             if backend.grounded:
                 result = backend.run(q, timeout=wait, system=system)
@@ -462,7 +473,8 @@ def web_answer(question, *, system="", adapter=None, timeout=None, env=None,
             continue
 
         try:
-            response = _synthesize(q, result.hits, system=system, adapter=adapter)
+            response = _synthesize(q, result.hits, system=system, adapter=adapter,
+                                   budget=max(5, min(20, deadline - time.monotonic())))
         except Exception as exc:                       # noqa: BLE001
             # Bộ não lỗi/timeout khi tổng hợp → thử backend kế (vd gemini_grounding
             # tự trả lời), rồi mới bỏ cuộc. KHÔNG để ModelError lọt ra ngoài.

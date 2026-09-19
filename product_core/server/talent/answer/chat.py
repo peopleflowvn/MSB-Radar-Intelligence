@@ -172,6 +172,8 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
             text = str(getattr(result, "text", "") or "").strip()
             if text:
                 if not internal_sources:
+                    from ai.answer_hygiene import strip_internal_labels
+                    text = strip_internal_labels(text)
                     yield {"type": "answer", "text": text}
                     yield {"type": "done", "payload": {
                         "text": text, "mode": "web",
@@ -243,6 +245,8 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
                 question, system=web_system(surface, user), adapter=model)
             wtext = str(getattr(result, "text", "") or "").strip()
             if wtext:
+                from ai.answer_hygiene import strip_internal_labels
+                wtext = strip_internal_labels(wtext)
                 yield {"type": "answer", "text": wtext}
                 yield {"type": "done", "payload": {
                     "text": wtext, "mode": "web",
@@ -257,6 +261,15 @@ def stream_chat(question, *, envelope=None, user=None, intent=None, adapter=None
         text = ("Tôi chưa tra được câu này. Bạn thử hỏi lại cụ thể hơn, hoặc "
                 "hỏi về hồ sơ trong Kho con người giúp tôi.")
         yield {"type": "answer", "text": text}
+
+    # Nhánh này không chạy tìm kiếm: câu "đã tìm/lọc lại…" ở đây chắc chắn bịa
+    # (production 19/09). Thay cả bài — `done` ghi đè phần đã stream ở giao diện.
+    from ai.answer_hygiene import NO_SEARCH_TEXT, claims_search, strip_internal_labels
+    if claims_search(text):
+        log.warning("answer.chat: câu trả lời hội thoại tự nhận đã tìm kiếm — thay bằng lời thật")
+        text = NO_SEARCH_TEXT
+        guard_flags = list(guard_flags or []) + ["false_search_claim"]
+    text = strip_internal_labels(text)
 
     yield {"type": "done", "payload": {
         "text": text, "mode": "chat", "provider": provider, "model": model_name,

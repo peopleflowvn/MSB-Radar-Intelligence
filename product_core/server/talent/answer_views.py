@@ -54,6 +54,13 @@ def _persist(user, conversation_id, client_turn_id, parent_turn_id, question,
         metadata["cv_citations"] = result.sources
     if aborted:
         metadata["aborted"] = True
+    # Kế hoạch của lượt TÌM được lưu làm `criteria` — câu tinh chỉnh ở lượt sau
+    # ("nới lỏng số năm…") cần biết lượt trước đã tìm gì mới tìm lại đúng
+    # (`plan.previous_search_criteria`). Lượt hội thoại không lưu gì.
+    plan = (result.trace or {}).get("plan") or {}
+    if isinstance(plan, dict) and plan.get("shape") in ("find_people", "followup", "compare", "count"):
+        metadata["criteria"] = {key: plan.get(key) for key in (
+            "information_need", "must_have", "should_have", "search_queries", "limit")}
     # Khoá phải là "items" với shape {id, name, why} — đó là thứ
     # `ai/projection.py::last_result_lines()` và mọi chỗ đọc `last_result` mong
     # đợi. Trước đây ghi "people"/"id" nên `last_result_lines()` LUÔN trả rỗng:

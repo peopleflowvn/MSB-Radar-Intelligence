@@ -607,6 +607,8 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
         trace["verify"] = {"problems": problems, "repaired": bool(attempts) and not problems,
                            "attempts": attempts}
 
+    from ai.answer_hygiene import strip_internal_labels
+    text = strip_internal_labels(text)
     trace["ms_total"] = int((time.monotonic() - started) * 1000)
     trace["compose"] = {"provider": provider, "model": model,
                         "deterministic": deterministic, "sources": len(sources)}

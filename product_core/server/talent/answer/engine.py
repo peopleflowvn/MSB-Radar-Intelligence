@@ -49,7 +49,17 @@ BUDGET_SECONDS = 15.0
 #: lô, 4 luồng là 3 đợt, mỗi đợt tới 70 giây — vượt trần và người dùng mất trắng
 #: câu trả lời dù gần hết hồ sơ đã đọc xong. Chốt ở 90 giây để còn dư cho ⑤ viết
 #: bài (một lượt gọi model nữa) trong 150 giây đó.
-READ_BUDGET_SECONDS = 90.0
+READ_BUDGET_SECONDS = 80.0
+
+#: Trần CẢ LƯỢT do engine tự giữ, dưới `core/answer/runner.py::HARD_DEADLINE`
+#: (150 s). Vượt trần runner là người dùng nhận câu trả lời RỖNG — production
+#: 18–20/09: 4/31 lượt. ⑤ và vòng tự sửa chỉ được dùng phần thời gian còn lại.
+TURN_BUDGET_SECONDS = 135.0
+#: Dưới mức này không gọi model viết nữa — dựng câu trả lời bằng CODE từ những
+#: gì ③④ đã chốt (vẫn có danh sách + trích dẫn), thay vì chờ tới khi bị cắt.
+MIN_COMPOSE_SECONDS = 25.0
+#: Một lượt tự sửa cần chừng này mới đáng thử.
+MIN_REPAIR_SECONDS = 30.0
 
 #: Số lượt tự sửa tối đa ở ⑤ khi bài viết không qua kiểm chứng tất định.
 MAX_REPAIR_ATTEMPTS = 2
@@ -774,7 +784,7 @@ def answer(question, *, envelope=None, user=None, history=None, complete_fn=None
 NEXT_STEP_BUDGET = 60.0
 
 
-def _repair(messages, problems, draft, streamer):
+def _repair(messages, problems, draft, streamer, budget_seconds=None):
     """Một lượt viết lại khi phát hiện lỗi. Hỏng thì trả None, giữ bản cũ.
 
     `draft` là bài vừa bị bắt lỗi, đưa vào làm lượt `assistant` thật để model
@@ -784,10 +794,11 @@ def _repair(messages, problems, draft, streamer):
     """
     try:
         parts = []
+        extra = {"budget_seconds": budget_seconds} if budget_seconds else {}
         for chunk in streamer(verify_stage.repair_messages(messages, problems, draft),
                               task=compose_stage.TASK, temperature=0.2,
                               max_tokens=compose_stage.STREAM_MAX_TOKENS,
-                              reasoning_effort="none"):
+                              reasoning_effort="none", **extra):
             if chunk.get("type") == "answer":
                 parts.append(chunk.get("text") or "")
             elif chunk.get("type") == "done":
@@ -1197,11 +1208,23 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
     compose_fallback = False
     fallback_reason = ""
     streamer = stream_fn or router_stream
+    compose_left = started + TURN_BUDGET_SECONDS - time.monotonic()
     try:
-        for chunk in streamer(messages, task=compose_stage.TASK,
+        if compose_left < MIN_COMPOSE_SECONDS:
+            # Không còn đủ giờ cho model viết: nói bằng CODE những gì đã có.
+            trace["compose_skipped"] = f"còn {compose_left:.0f}s"
+            fallback_reason = "time_budget"
+            deterministic = compose_stage.fallback_text(query_plan, chosen, stats)
+            buffer.append(deterministic)
+            yield {"type": "answer", "text": deterministic}
+            chunks = ()
+        else:
+            chunks = streamer(messages, task=compose_stage.TASK,
                               temperature=0.35,
                               max_tokens=compose_stage.STREAM_MAX_TOKENS,
-                              reasoning_effort="none"):
+                              reasoning_effort="none",
+                              budget_seconds=max(10.0, compose_left - 5.0))
+        for chunk in chunks:
             kind = chunk.get("type")
             if kind == "answer":
                 buffer.append(chunk.get("text") or "")
@@ -1249,13 +1272,19 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
     # Tối đa HAI lượt sửa, không phải một: lượt đầu hay chỉ sửa đúng lỗi vừa nêu
     # mà lại lệch một lỗi khác (VD gộp trích dẫn làm lệch số lượng), và bây giờ
     # `_repair` đã cho model thấy bài cũ nên một lượt sửa thêm thường xử lý gọn.
-    problems = verify_stage.check(query_plan, verified_rows, text, sources)
+    problems = ([] if trace.get("compose_skipped")
+                else verify_stage.check(query_plan, verified_rows, text, sources))
     attempts = 0
     while problems and attempts < MAX_REPAIR_ATTEMPTS:
+        repair_left = started + TURN_BUDGET_SECONDS - time.monotonic()
+        if repair_left < MIN_REPAIR_SECONDS:
+            trace["repair_skipped"] = f"còn {repair_left:.0f}s"
+            break
         attempts += 1
         trace["verify"] = problems
         yield _step("Kiểm lại câu trả lời")
-        revised = _repair(messages, problems, text, streamer)
+        revised = _repair(messages, problems, text, streamer,
+                          budget_seconds=max(10.0, repair_left - 5.0))
         if not revised:
             break
         text = revised
@@ -1269,13 +1298,18 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
         # rõ Radar đã tự sửa chứ không phải im lặng đổi bài.
         yield {"type": "revision", "text": text, "ok": True}
     elif problems:
-        text = compose_stage.ai_unavailable_text("verification_failed")
+        # Bài của model không qua kiểm chứng: trả bản CODE dựng từ danh sách đã
+        # chốt (có tên + trích dẫn) thay vì câu xin lỗi trống rỗng.
+        text = ("Bài viết của AI không vượt qua bước kiểm chứng, nên Radar trình bày "
+                "thẳng danh sách đã chốt:\n\n" + compose_stage.fallback_text(query_plan, chosen, stats))
         trace["verify_fallback"] = True
         compose_fallback = True
         fallback_reason = "verification_failed"
         # `ok: False` — bản sửa vẫn không qua kiểm chứng, đây là bỏ cuộc.
         yield {"type": "revision", "text": text, "ok": False}
 
+    from ai.answer_hygiene import strip_internal_labels
+    text = strip_internal_labels(text)
     text, used = compose_stage.used_sources(text, sources)
     people = _answer_people(chosen, stats, sources, near=near, shape=query_plan.shape)
 

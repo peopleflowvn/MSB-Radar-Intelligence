@@ -473,6 +473,12 @@ def plan(question, *, envelope=None, complete_fn=None) -> QueryPlan:
         and any(mark in normalized for mark in (
             "phan tich", "danh gia", "xem chi tiet", "doc chi tiet", "lay ho so", "mo ho so"))
     )
+    # "Thống kê / phân bố / cơ cấu … theo <trường>" là câu TỔNG HỢP TOÀN KHO.
+    # Production 19/09: "Thống kê số lượng ứng viên theo từng khu vực" bị xếp
+    # "count", đọc sâu 60 hồ sơ rồi trả "Hà Nội: 5 ứng viên" — trong khi ~500
+    # hồ sơ có địa điểm. Đếm theo tên người (count theo tên) giữ nguyên ở trên.
+    if shape in ("count", "find_people", "general") and _DISTRIBUTION.search(normalized):
+        shape = "analyze"
     if shape == "action" and asks_profile_analysis:
         shape = "analyze"
         if not queries:
@@ -518,6 +524,23 @@ def plan(question, *, envelope=None, complete_fn=None) -> QueryPlan:
 
     must_have = as_list(payload.get("must_have"), limit=6)
     should_have = as_list(payload.get("should_have"), limit=10)
+
+    # Câu TINH CHỈNH ngay sau một lượt tìm ("Nới lỏng tiêu chí số năm…", "bỏ yêu
+    # cầu Python") là một lượt TÌM LẠI, không phải hội thoại. Production 19/09:
+    # ① xếp nó "general", model hội thoại tự bịa "đã tìm kiếm lại" + 3 ứng viên.
+    if shape == "general" and is_refinement(question):
+        previous = previous_search_criteria(envelope)
+        if previous:
+            prev_need = str(previous.get("information_need") or "").strip()
+            shape = "find_people"
+            info_need = f"{prev_need} — điều chỉnh: {question}" if prev_need else question
+            queries = queries if queries and queries != [question] else (
+                list(previous.get("search_queries") or []) or [info_need])
+            must_have = must_have or list(previous.get("must_have") or [])
+            should_have = should_have or list(previous.get("should_have") or [])
+            clarify = ""
+            confidence = max(confidence, 0.85)
+            log.info("answer.plan: câu tinh chỉnh %r sau lượt tìm → find_people", question[:80])
     if shape == "find_people":
         must_have, should_have = split_seniority(must_have, should_have)
     queries = useful_queries(queries, info_need or question)
@@ -599,6 +622,46 @@ def _location_keys():
 
 
 _LOCATION_KEYS = _location_keys()
+
+
+_REFINE = re.compile(
+    r"^(noi long|mo rong|bo (yeu cau|tieu chi|dieu kien|bot)|khong (can|bat buoc)|"
+    r"chap nhan|tim (them|lai|rong)|thu lai|ha (yeu cau|tieu chi)|giam (yeu cau|tieu chi)|"
+    r"them (tieu chi|dieu kien)|chi can|loai bo|khong yeu cau)"
+    r"|\b(noi long tieu chi|mo rong tim kiem|khong can ca hai|khong bat buoc)\b")
+
+
+_DISTRIBUTION = re.compile(
+    r"\b(thong ke|phan bo|co cau|ty le|ti le|bao nhieu phan tram)\b.*\btheo\b"
+    r"|\btheo (tung )?(khu vuc|tinh|thanh pho|dia phuong|nganh|chuc danh|cap bac|ky nang|cong ty|nguon)\b")
+
+
+def is_refinement(question):
+    """Câu điều chỉnh tiêu chí của lượt tìm trước (không phải một câu hỏi mới)."""
+    return bool(_REFINE.search(normalize_name(question)))
+
+
+def previous_search_criteria(envelope):
+    """Kế hoạch của lượt TÌM gần nhất trong hội thoại, hoặc {} nếu chưa tìm lần nào."""
+    projection = getattr(envelope, "projection", None)
+    if projection is None:
+        return {}
+    for turn in reversed(list(getattr(projection, "recent_turns", []) or [])):
+        criteria = turn.get("criteria") if isinstance(turn, dict) else None
+        if isinstance(criteria, dict) and (criteria.get("search_queries")
+                                           or criteria.get("information_need")):
+            return criteria
+    active = getattr(projection, "active_criteria", None) or {}
+    if isinstance(active, dict) and active.get("information_need"):
+        return active
+    # Lượt cũ chưa lưu kế hoạch: có snapshot kết quả tìm kiếm là đã có một lượt
+    # tìm — lấy câu hỏi gần nhất KHÔNG phải câu tinh chỉnh làm nhu cầu gốc.
+    if getattr(projection, "last_result", None):
+        for turn in reversed(list(getattr(projection, "recent_turns", []) or [])):
+            asked = str((turn or {}).get("question") or "").strip()
+            if asked and not is_refinement(asked):
+                return {"information_need": asked, "search_queries": [asked]}
+    return {}
 
 
 #: Trần số bước tiếp theo. Mỗi bước là một lượt gọi model nữa, nên chuỗi dài

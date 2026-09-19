@@ -60,6 +60,88 @@ def _top_from_json_list(queryset, field, limit=TOP_N):
     return counter.most_common(limit), filled
 
 
+#: Trường thống kê -> field tương ứng trong `intel.ExtractedFact`.
+_FACT_FIELD = {"skills": "skills", "industries": "industries", "location": "city",
+               "current_title": "current_title", "current_company": "current_company",
+               "seniority": "seniority", "years_experience": "years_experience"}
+_LIST_FIELDS = {"skills", "industries"}
+
+
+def merged_profiles(fields):
+    """`{person_id: {field: value}}` cho MỌI ứng viên — hồ sơ có cấu trúc GỘP với
+    dữ liệu AI đã bóc từ CV.
+
+    Trước đây thống kê chỉ đọc `TalentProfile`: kỹ năng có ở 29/1073 hồ sơ, ngành
+    21/1073 — nên Radar trả lời "không thể thống kê" (production 18/09), trong
+    khi `ExtractedFact` có kỹ năng ở 592, ngành 547, thành phố 578 hồ sơ. Giá trị
+    trong `TalentProfile` (Edge/người nhập) thắng; trống thì lấy `ExtractedFact`
+    (nhãn chuẩn nếu có). Fact bị từ chối không được dùng.
+    """
+    from intel.models import ExtractedFact
+    from people.models import Person
+    from talent.models import TalentProfile
+
+    ids = list(Person.applicants().values_list("id", flat=True))
+    rows = {pid: {name: ([] if name in _LIST_FIELDS else None) for name in fields} for pid in ids}
+    tp_fields = [name for name in fields if name != "years_experience"] + (
+        ["years_experience"] if "years_experience" in fields else [])
+    for row in (TalentProfile.objects.filter(person_id__in=ids)
+                .values("person_id", *tp_fields).iterator(chunk_size=500)):
+        target = rows.get(row["person_id"])
+        if target is None:
+            continue
+        for name in fields:
+            value = row.get(name)
+            if name in _LIST_FIELDS:
+                target[name] = _as_values(value, True)
+            elif value not in (None, ""):
+                target[name] = value
+
+    fact_fields = {_FACT_FIELD[name]: name for name in fields if name in _FACT_FIELD}
+    if not fact_fields:
+        return rows
+    facts = (ExtractedFact.objects
+             .filter(person_id__in=ids, field__in=list(fact_fields), is_current=True)
+             .exclude(status=ExtractedFact.STATUS_REJECTED)
+             .values_list("person_id", "field", "normalized_value", "raw_value", "canonical_label")
+             .order_by("person_id", "pk"))
+    from_facts = {}
+    for pid, fact_field, norm, raw, label in facts.iterator(chunk_size=2000):
+        name = fact_fields[fact_field]
+        shown = " ".join(str(label or raw or norm or "").split())
+        if not shown:
+            continue
+        bucket = from_facts.setdefault((pid, name), {})
+        bucket.setdefault(str(norm or shown).casefold(), shown)
+    for (pid, name), values in from_facts.items():
+        target = rows.get(pid)
+        if target is None:
+            continue
+        if name in _LIST_FIELDS:
+            if not target[name]:
+                target[name] = list(values.values())
+        elif target[name] in (None, ""):
+            first = next(iter(values.values()))
+            if name == "years_experience":
+                match = re.search(r"\d+(?:[.,]\d+)?", first)
+                target[name] = float(match.group(0).replace(",", ".")) if match else None
+            else:
+                target[name] = first
+    return rows
+
+
+def _top_rows(rows, field, limit=TOP_N):
+    """Đếm giá trị của `field` trên hồ sơ gộp → (top, số hồ sơ có giá trị)."""
+    counter, filled = Counter(), 0
+    for values in rows.values():
+        items = _as_values(values.get(field), field in _LIST_FIELDS)
+        if not items:
+            continue
+        filled += 1
+        counter.update(items)
+    return counter.most_common(limit), filled
+
+
 def _top_from_char(queryset, field, limit=TOP_N):
     rows = (queryset.exclude(**{field: ""}).exclude(**{f"{field}__isnull": True})
             .values(field).annotate(n=Count("id")).order_by("-n")[:limit])
@@ -100,26 +182,26 @@ def overview():
         person__in=people).count()
     chunks = CVChunk.objects.filter(person__in=people).count()
 
-    industries, industries_filled = _top_from_json_list(profiles, "industries")
-    skills, skills_filled = _top_from_json_list(profiles, "skills")
-    titles, titles_filled = _top_from_char(profiles, "current_title")
-    companies, companies_filled = _top_from_char(profiles, "current_company")
-    locations, locations_filled = _top_from_char(profiles, "location")
-    desired_locations, desired_locations_filled = _top_from_char(profiles, "desired_location")
-    seniority, seniority_filled = _top_from_char(profiles, "seniority")
+    merged = merged_profiles(["industries", "skills", "current_title", "current_company",
+                              "location", "desired_location", "seniority", "years_experience"])
+    industries, industries_filled = _top_rows(merged, "industries")
+    skills, skills_filled = _top_rows(merged, "skills")
+    titles, titles_filled = _top_rows(merged, "current_title")
+    companies, companies_filled = _top_rows(merged, "current_company")
+    locations, locations_filled = _top_rows(merged, "location")
+    desired_locations, desired_locations_filled = _top_rows(merged, "desired_location")
+    seniority, seniority_filled = _top_rows(merged, "seniority")
 
-    experience = profiles.aggregate(
-        co_so_lieu=Count("id", filter=Q(years_experience__isnull=False)))
+    years = [row["years_experience"] for row in merged.values()
+             if isinstance(row.get("years_experience"), (int, float))]
+    experience = {"co_so_lieu": len(years)}
     buckets = []
     for label, low, high in (("dưới 1 năm", 0, 1), ("từ 1 đến dưới 3 năm", 1, 3),
                              ("từ 3 đến dưới 5 năm", 3, 5), ("từ 5 đến dưới 10 năm", 5, 10),
                              ("từ 10 năm", 10, None)):
-        bucket = profiles.filter(years_experience__gte=low)
-        if high is not None:
-            bucket = bucket.filter(years_experience__lt=high)
         buckets.append({
             "label": label,
-            "count": bucket.count(),
+            "count": sum(1 for y in years if y >= low and (high is None or y < high)),
         })
 
     return {
@@ -196,8 +278,6 @@ def breakdown(field, *, filters=None, limit=TOP_N):
 
     Ném `ValueError` khi tên trường/giá trị lọc không hợp lệ.
     """
-    from talent.models import TalentProfile
-
     if field not in BREAKDOWN_FIELDS:
         raise ValueError(f"trường không thống kê được: {field}")
     clean_filters = {}
@@ -212,14 +292,12 @@ def breakdown(field, *, filters=None, limit=TOP_N):
     limit = max(1, min(int(limit or TOP_N), BREAKDOWN_MAX_LIMIT))
 
     columns = list(dict.fromkeys([field, *clean_filters]))
-    profiles = TalentProfile.objects.filter(person__merged_into__isnull=True,
-                                            person__is_applicant=True)
-    total = profiles.count()
+    merged = merged_profiles(columns)
+    total = len(merged)
     filter_filled = {name: 0 for name in clean_filters}
     population = filled = 0
     counter = Counter()
-    for row in profiles.values_list(*columns).iterator(chunk_size=500):
-        by_name = dict(zip(columns, row))
+    for by_name in merged.values():
         matched = True
         for name, needle in clean_filters.items():
             values = _as_values(by_name[name], BREAKDOWN_FIELDS[name][1])
@@ -274,6 +352,8 @@ _TARGET_WORDS = (
     ("chuc danh", "current_title"), ("vi tri", "current_title"),
     ("cong ty", "current_company"), ("noi lam viec mong muon", "desired_location"),
     ("noi o", "location"), ("dia diem", "location"), ("tinh thanh", "location"),
+    ("khu vuc", "location"), ("thanh pho", "location"), ("tinh", "location"),
+    ("dia phuong", "location"),
     ("cap bac", "seniority"),
 )
 #: Trường mà một giá trị nhắc trong câu hỏi có thể dùng làm điều kiện lọc.
@@ -292,23 +372,17 @@ def breakdown_for_question(text):
     hỏi chứa nguyên cụm một giá trị ĐÃ CÓ trong kho ở trường khác. Không đoán —
     không khớp thì trả None và câu hỏi đi đường `overview()` như cũ.
     """
-    from talent.models import TalentProfile
-
     folded = f" {_fold_plain(text)} "
-    target = next((name for word, name in _TARGET_WORDS if f" {word} " in folded), None)
-    if target is None:
+    hit = next(((word, name) for word, name in _TARGET_WORDS if f" {word} " in folded), None)
+    if hit is None:
         return None
-    profiles = TalentProfile.objects.filter(person__merged_into__isnull=True,
-                                            person__is_applicant=True)
+    target_word, target = hit
+    merged = merged_profiles(list(_FILTER_FIELDS))
     best = None
     for name in _FILTER_FIELDS:
         if name == target:
             continue
-        is_list = BREAKDOWN_FIELDS[name][1]
-        if is_list:
-            pairs, _ = _top_from_json_list(profiles, name, limit=200)
-        else:
-            pairs, _ = _top_from_char(profiles, name, limit=200)
+        pairs, _ = _top_rows(merged, name, limit=200)
         for value, _count in pairs:
             needle = _fold_plain(value)
             if (len(needle) >= _MIN_FILTER_LEN and needle not in _QUESTION_WORDS
@@ -317,6 +391,13 @@ def breakdown_for_question(text):
                 if best is None or len(needle) > len(best[2]):
                     best = (name, value, needle)
     if best is None:
+        # Câu PHÂN BỐ ("thống kê theo từng khu vực") không có nhóm lọc: trả phân
+        # bố đầy đủ trên toàn kho — top 8 của `facts_for_prompt` không đủ. Chỉ khi
+        # câu hỏi đúng dạng "theo <trường>": câu "kỹ năng phổ biến ở Đà Nẵng" mà
+        # kho không có Đà Nẵng thì KHÔNG được trả số toàn kho, ⑤ sẽ đọc nhầm nó
+        # thành số của Đà Nẵng.
+        if re.search(rf" theo (tung |cac )?{target_word} ", folded):
+            return breakdown(target, limit=BREAKDOWN_MAX_LIMIT)
         return None
     return breakdown(target, filters={best[0]: best[1]})
 

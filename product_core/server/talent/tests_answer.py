@@ -1927,8 +1927,11 @@ class VerifyTest(TestCase):
             chunks = list(engine.stream_answer("x", stream_fn=fake_stream,
                                                query_plan=plan_obj))
         result = next(c["result"] for c in chunks if c["type"] == "done")
-        self.assertNotIn("Bình", result.text)
+        # Không phát hành bản sai thứ tự của model; thay bằng danh sách ĐÃ CHỐT
+        # (đúng thứ tự ④) và nói rõ lý do — không bỏ trắng.
+        self.assertNotIn("Bình [2] rồi An [1]", result.text)
         self.assertIn("không vượt qua bước kiểm chứng", result.text)
+        self.assertLess(result.text.index("An"), result.text.index("Bình"))
 
 
 # --------------------------------------- một câu, NHIỀU việc (phân rã)

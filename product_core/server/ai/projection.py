@@ -148,7 +148,11 @@ class ConversationEnvelope:
 
 def _permissions_note(user):
     who = getattr(user, "username", None) or "tài khoản hiện tại"
-    return (f"Chỉ dùng dữ liệu mà {who} được phép xem; không suy đoán ngoài phạm vi đó.")
+    # Chỉ dẫn cho MODEL, không phải lời để nói lại: production 18/09 Radar chào
+    # "Tôi đã ghi nhận yêu cầu về việc chỉ sử dụng dữ liệu mà superadmin được
+    # phép xem…" — đọc nguyên chỉ dẫn hệ thống cho người dùng.
+    return (f"[Quy tắc nội bộ — áp dụng, KHÔNG nhắc lại với người dùng] Chỉ dùng dữ "
+            f"liệu mà {who} được phép xem; không suy đoán ngoài phạm vi đó.")
 
 
 def _user_memories(user, limit=12):
