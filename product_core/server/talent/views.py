@@ -73,6 +73,27 @@ def _search_kwargs(params):
     }
 
 
+def _pool_denied(request, pool_id):
+    """Lọc theo nhóm của nghiệp vụ người dùng không được vào ⇒ 403.
+
+    `talent.Pool` dùng chung một bảng cho hai nghiệp vụ (cột `domain`). Danh
+    sách nhóm (`pool_list`) đã chặn nhóm RB với người không có module RB, nhưng
+    bộ lọc thì nhận thẳng id — đoán id là đọc được ai đang nằm trong nhóm khách
+    hàng của RM. Chặn ở đây, không dựa vào việc giao diện xoá lựa chọn khi đổi
+    góc nhìn.
+    """
+    if pool_id is None:
+        return None
+    pool = Pool.objects.filter(pk=pool_id).only("domain").first()
+    if pool is None:
+        return Response({"detail": "Không tìm thấy nhóm."},
+                        status=status.HTTP_404_NOT_FOUND)
+    if pool.domain == Pool.DOMAIN_RB and not roles.can_access(request.user, roles.MODULE_RB):
+        return Response({"detail": "Bạn không có quyền lọc theo nhóm khách hàng này."},
+                        status=status.HTTP_403_FORBIDDEN)
+    return None
+
+
 @api_view(["GET"])
 @permission_classes([RequiresTalent])
 def talent_search(request):
@@ -84,6 +105,9 @@ def talent_search(request):
     """
     params = request.query_params
     kwargs = _search_kwargs(params)
+    denied = _pool_denied(request, kwargs["pool"])
+    if denied:
+        return denied
     if (kwargs["min_years"] is not None and kwargs["max_years"] is not None
             and kwargs["min_years"] > kwargs["max_years"]):
         return Response({"detail": "Số năm tối thiểu không được lớn hơn tối đa."},
@@ -163,9 +187,12 @@ def talent_search_export(request):
     nhìn, không phải một phiên bản gần giống.
     """
     params = request.query_params
+    kwargs = _search_kwargs(params)
+    denied = _pool_denied(request, kwargs["pool"])
+    if denied:
+        return denied
     _total, people = search_module.search(
-        **_search_kwargs(params), limit=EXPORT_LIMIT, offset=0,
-        max_limit=EXPORT_LIMIT)
+        **kwargs, limit=EXPORT_LIMIT, offset=0, max_limit=EXPORT_LIMIT)
 
     response = HttpResponse(content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = 'attachment; filename="talent.csv"'
@@ -241,7 +268,17 @@ def person_detail(request, person_id):
     else:
         data["pools"] = [row for row in data["pools"]
                          if Pool.objects.filter(pk=row["id"], domain=Pool.DOMAIN_TALENT).exists()]
+    if not _can_view_index_health(request.user):
+        data.pop("index_health", None)
     return Response(data)
+
+
+def _can_view_index_health(user):
+    """Chỉ mục có đủ hay không là chẩn đoán vận hành nội bộ, không phải dữ liệu
+    nghiệp vụ — cùng mức hiển thị với `PersonFactsSection` (chỉ Admin). Không
+    mở cho edge_operator: vai trò đó bị chặn hẳn khỏi module Talent theo quyết
+    định đã chốt (docs/ACCESS_CONTROL.md mục 4.3, có test giữ ở accounts/tests.py)."""
+    return roles.ADMIN in roles.roles_of(user)
 
 
 def _rm_only(user):

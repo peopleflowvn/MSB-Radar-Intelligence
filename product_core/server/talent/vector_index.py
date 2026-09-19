@@ -320,6 +320,18 @@ def stale_chunks(limit=500):
             .order_by("pk")[:limit])
 
 
+def missing_projection_ids(limit=500):
+    """Ứng viên hợp lệ nhưng CHƯA có `PersonSearchDocument` — bất kể vào hệ
+    thống bằng đường nào (nhập tay, nhập hàng loạt tắt `TALENT_INDEX_ON_SAVE`,
+    kích hoạt lại sau khi gộp/bỏ cờ ứng tuyển, hay một đường ghi tương lai chưa
+    lường trước). Lưới an toàn cuối: không dựa vào việc biết TRƯỚC mọi nơi có
+    thể ghi `Person`/`Document`, chỉ so trực tiếp với tập phải có mặt trong
+    chỉ mục — đúng `Person.applicants()` mà mọi đường tất định khác đã dùng.
+    """
+    return list(Person.applicants().filter(search_document__isnull=True)
+                .order_by("pk").values_list("pk", flat=True)[:limit])
+
+
 def search(query, *, limit=250):
     """Return person ids from person + CV vectors, preserving best rank per person."""
     if connection.vendor != "postgresql":

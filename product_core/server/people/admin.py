@@ -68,12 +68,8 @@ class IdentityConflictAdmin(admin.ModelAdmin):
         """Gộp vào Person được tạo sớm nhất — nó mang lịch sử dài nhất."""
         merged = 0
         for conflict in queryset.filter(status=IdentityConflict.STATUS_OPEN):
-            people = list(conflict.people.order_by("created_at"))
-            if len(people) < 2:
-                continue
-            primary = people[0]
-            for duplicate in people[1:]:
-                resolution.merge(primary, duplicate, note=f"Gộp bởi {request.user}")
+            resolution.resolve_identity_conflict(
+                conflict, "merge", note=f"Gộp bởi {request.user}")
             merged += 1
         self.message_user(request, f"Đã gộp {merged} xung đột.",
                           level=messages.SUCCESS if merged else messages.WARNING)
@@ -82,11 +78,8 @@ class IdentityConflictAdmin(admin.ModelAdmin):
     def bo_qua_hai_nguoi_khac_nhau(self, request, queryset):
         count = 0
         for conflict in queryset.filter(status=IdentityConflict.STATUS_OPEN):
-            conflict.resolve(IdentityConflict.STATUS_DISMISSED, f"Bỏ qua bởi {request.user}")
-            for person in conflict.people.all():
-                if not IdentityConflict.objects.filter(
-                        status=IdentityConflict.STATUS_OPEN, people__pk=person.pk).exists():
-                    Person.objects.filter(pk=person.pk).update(needs_review=False)
+            resolution.resolve_identity_conflict(
+                conflict, "dismiss", note=f"Bỏ qua bởi {request.user}")
             count += 1
         self.message_user(request, f"Đã bỏ qua {count} xung đột.")
 

@@ -678,27 +678,6 @@ export default function CopilotChat<TPerson>({
         </div>
       ) : (
         <>
-          <div className="copilot-stream-header">
-            <div className="stream-header-left">
-              <span className="stream-header-title">💬 Hội thoại với Radar AI</span>
-              <span className="stream-header-badge">
-                {messages.filter((m) => m.sender === "user").length} câu hỏi
-              </span>
-            </div>
-            <button
-              type="button"
-              className="copilot-new-chat-top-btn"
-              onClick={resetConversation}
-              title="Bắt đầu đoạn chat mới"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              <span>Bắt đầu chat mới</span>
-            </button>
-          </div>
-
           <div className="copilot-chat-stream">
             {messages.map((msg, mi) => {
               const elapsedSeconds = msg.isPending

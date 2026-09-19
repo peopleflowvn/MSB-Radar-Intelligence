@@ -76,6 +76,34 @@ class IndexPersonTest(TestCase):
         self.assertEqual(CVChunk.objects.filter(person=self.person).count(), 1)
 
 
+class MissingProjectionTest(TestCase):
+    """`missing_projection_ids` — lưới an toàn cho worker `reconcile_talent_index`:
+    ứng viên hợp lệ nhưng chưa có `PersonSearchDocument`, bất kể lý do thiếu."""
+
+    def test_applicant_without_projection_is_reported(self):
+        person = Person.objects.create(display_name="Chưa lập chỉ mục")
+        Document.objects.create(person=person, sha256="c1", parse_status="done",
+                                parsed_text="Chuyên viên tín dụng. " * 40)
+        self.assertIn(person.pk, vector_index.missing_projection_ids())
+
+    def test_applicant_with_projection_is_not_reported(self):
+        person = Person.objects.create(display_name="Đã lập chỉ mục")
+        Document.objects.create(person=person, sha256="c2", parse_status="done",
+                                parsed_text="Chuyên viên tín dụng. " * 40)
+        vector_index.index_person(person.pk, with_embeddings=False)
+        self.assertNotIn(person.pk, vector_index.missing_projection_ids())
+
+    def test_non_applicant_without_projection_is_not_reported(self):
+        person = Person.objects.create(display_name="Chỉ được nhắc tới",
+                                       is_applicant=False)
+        self.assertNotIn(person.pk, vector_index.missing_projection_ids())
+
+    def test_merged_person_without_projection_is_not_reported(self):
+        primary = Person.objects.create(display_name="Gốc")
+        merged = Person.objects.create(display_name="Trùng", merged_into=primary)
+        self.assertNotIn(merged.pk, vector_index.missing_projection_ids())
+
+
 class IndexScopeTest(TestCase):
     """Chỉ ỨNG VIÊN được vào chỉ mục — lưới chống rò rỉ của ② (audit 16/09/2026).
 

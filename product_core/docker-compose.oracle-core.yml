@@ -213,7 +213,7 @@ services:
       MSB_AI_GREENNODE_API_KEY: ${MSB_AI_GREENNODE_API_KEY:-}
       MSB_AI_GREENNODE_BASE_URL: ${MSB_AI_GREENNODE_BASE_URL:-}
       MSB_AI_GEMINI_API_KEY: ${MSB_AI_GEMINI_API_KEY:-}
-    command: ["python", "manage.py", "embed_talent_index", "--loop", "--limit", "0", "--batch-size", "25", "--sleep", "2"]
+    command: ["python", "manage.py", "reconcile_talent_index", "--apply", "--loop", "--batch-size", "25", "--sleep", "2"]
     healthcheck:
       disable: true
 

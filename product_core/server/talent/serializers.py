@@ -2,10 +2,11 @@
 """Serializer cho Talent Radar."""
 from people.models import Person
 from django.contrib.auth import get_user_model
+from django.db.models import F
 from rest_framework import serializers
 from accounts import privacy
 
-from .models import Pool, Tag, TalentProfile
+from .models import CVChunk, Pool, PersonSearchDocument, Tag, TalentProfile
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -157,13 +158,19 @@ class PersonDetailSerializer(serializers.ModelSerializer):
     primary_phone = serializers.SerializerMethodField()
     contact_masked = serializers.SerializerMethodField()
 
+    # Nội bộ — view chỉ giữ trường này lại trong response cho admin/edge_operator
+    # (xem `talent/views.py::person_detail`). Luôn tính ở đây, không tuỳ theo
+    # người gọi, để logic phân quyền nằm đúng MỘT chỗ (view), không lặp lại.
+    index_health = serializers.SerializerMethodField()
+
     class Meta:
         model = Person
         fields = ["id", "display_name", "primary_email", "primary_phone",
                   "contact_masked", "headline",
                   "location", "needs_review", "created_at", "updated_at",
                   "talent", "identities", "sources", "documents", "document_stats", "timeline",
-                  "signals", "relationships", "person_links", "pools", "active_worklists"]
+                  "signals", "relationships", "person_links", "pools", "active_worklists",
+                  "index_health"]
 
     def get_primary_email(self, person):
         return privacy.mask_email(person.primary_email)
@@ -176,6 +183,45 @@ class PersonDetailSerializer(serializers.ModelSerializer):
 
     def get_active_worklists(self, person):
         return TalentCardSerializer().get_active_worklists(person)
+
+    def get_index_health(self, person):
+        """Kho tìm kiếm (`talent/answer/retrieve.py` — bước "Tìm trong kho") có
+        đủ dữ liệu về người này chưa. Đọc trực tiếp `PersonSearchDocument`/
+        `CVChunk` — đúng những gì retrieval thật sự dùng, không phải một phép
+        đoán riêng — cộng thêm hàng đợi trích xuất fact AI (`intel.queue`),
+        vì nội dung chỉ mục còn phụ thuộc facts đã trích xuất xong hay chưa.
+        """
+        from intel.models import ExtractionJob
+
+        has_documents = person.documents.exists()
+        projection = PersonSearchDocument.objects.filter(person=person).first()
+        chunks_total = CVChunk.objects.filter(person=person).count()
+        chunks_current = CVChunk.objects.filter(
+            person=person, embedding_fingerprint=F("fingerprint")).count()
+        extraction_pending = ExtractionJob.objects.filter(
+            person_id=person.pk,
+            status__in=[ExtractionJob.STATUS_QUEUED, ExtractionJob.STATUS_LEASED]).exists()
+        embedding_current = bool(
+            projection and projection.embedding_fingerprint == projection.fingerprint)
+
+        if not has_documents:
+            state = "no_documents"
+        elif projection is None:
+            state = "missing"
+        elif not embedding_current or chunks_current < chunks_total or extraction_pending:
+            state = "stale"
+        else:
+            state = "ok"
+
+        return {
+            "status": state,
+            "has_projection": projection is not None,
+            "embedding_current": embedding_current,
+            "chunks_total": chunks_total,
+            "chunks_current": chunks_current,
+            "extraction_pending": extraction_pending,
+            "indexed_at": projection.indexed_at if projection else None,
+        }
 
     def get_identities(self, person):
         return [{"kind": i.kind, "value": i.value, "first_seen_at": i.first_seen_at}

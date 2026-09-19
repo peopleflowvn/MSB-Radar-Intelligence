@@ -84,6 +84,14 @@ def person_intelligence_visibility_changed(sender, instance, created, **kwargs):
     is_visible = instance.is_applicant and instance.merged_into_id is None
     if was_visible is None or was_visible == is_visible:
         return
+    # Chỉ mục pgvector Talent (PersonSearchDocument/CVChunk) phải theo đúng lưới
+    # is_applicant/merged_into này, không riêng gì sổ tombstone của RAG V2 bên
+    # dưới. Không gọi lại đây thì người được kích hoạt lại (bỏ merge, hoặc bật
+    # lại is_applicant) sẽ MẤT chỉ mục vô thời hạn — vector đã bị index_person()
+    # xoá lần gần nhất họ rời kho, và không có sự kiện nào khác chắc chắn sẽ đưa
+    # họ trở lại. Gọi ở cả hai chiều: hiện lại thì dựng lại, ẩn đi thì dọn sớm
+    # thay vì chờ một save không liên quan nào đó tình cờ trigger index_person.
+    _after_commit(instance.pk)
     documents = list(instance.documents.select_related("primary_text_version"))
     if not is_visible:
         for document in documents:

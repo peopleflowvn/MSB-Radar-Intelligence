@@ -17,7 +17,6 @@ import json
 import logging
 
 from django.db import IntegrityError, transaction
-from django.utils import timezone
 
 from .models import (DocumentTextLink, Identity, IdentityConflict, ParsedTextVersion,
                      Person)
@@ -211,9 +210,14 @@ def _mark_applicant(person):
     chỉ `is_applicant` bật lên, vì đó là thứ tìm kiếm và thống kê tuyển dụng lọc.
     """
     if not person.is_applicant:
-        Person.objects.filter(pk=person.pk).update(
-            is_applicant=True, updated_at=timezone.now())
+        # `.save()`, không `.update()`: phải qua post_save để
+        # `person_intelligence_visibility_changed` (talent/signals.py) tái lập
+        # chỉ mục pgvector cho người vừa CHUYỂN thành ứng viên lần đầu — một
+        # queryset `.update()` ghi thẳng SQL, bỏ qua signal, và người này sẽ
+        # thiếu chỉ mục tìm kiếm cho tới khi có một sự kiện không liên quan nào
+        # khác tình cờ trigger lại.
         person.is_applicant = True
+        person.save(update_fields=["is_applicant", "updated_at"])
 
 
 def _flag_guessed_contact(person, payload):
@@ -439,6 +443,36 @@ def merge(primary, duplicate, note=""):
         Person.objects.filter(pk=primary.pk).update(needs_review=False)
 
     return primary
+
+
+def resolve_identity_conflict(conflict, decision, note=""):
+    """Người xử lý một `IdentityConflict`: gộp (CÙNG một người) hoặc bỏ qua
+    (HAI người khác nhau). Logic dùng chung cho Django admin
+    (`people/admin.py::IdentityConflictAdmin`) VÀ API (`intel/views.py`) — tách
+    ra một chỗ vì đây là quyết định nguy hiểm nhất hệ thống (xem docstring
+    module); để hai bản trôi khỏi nhau theo thời gian là đúng loại lỗi mà lưu ý
+    đó cảnh báo.
+    """
+    if conflict.status != IdentityConflict.STATUS_OPEN:
+        return conflict
+    if decision == "merge":
+        people = list(conflict.people.order_by("created_at"))
+        if len(people) >= 2:
+            primary = people[0]
+            for duplicate in people[1:]:
+                merge(primary, duplicate, note=note)
+        else:
+            conflict.resolve(IdentityConflict.STATUS_MERGED, note)
+    elif decision == "dismiss":
+        conflict.resolve(IdentityConflict.STATUS_DISMISSED, note)
+        for person in conflict.people.all():
+            if not IdentityConflict.objects.filter(
+                    status=IdentityConflict.STATUS_OPEN, people__pk=person.pk).exists():
+                Person.objects.filter(pk=person.pk).update(needs_review=False)
+    else:
+        raise ValueError("decision phải là 'merge' hoặc 'dismiss'.")
+    conflict.refresh_from_db()
+    return conflict
 
 
 def _move_document_texts(source_document, target_document, primary_person):

@@ -9,12 +9,21 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from accounts.permissions import RequiresAdmin, RequiresTalent
-from people.models import ContactMention
+from people import resolution
+from people.models import ContactMention, IdentityConflict
 
+from . import registry
 from .extraction import coverage_summary
 from .facts import accept_fact, reject_fact
 from .models import (CanonicalAlias, CanonicalEntry, ExtractedFact, ExtractionRun,
                      ReviewItem)
+
+#: Hàng chờ phình to mà không ai để ý là đúng cách nó âm thầm hỏng — không phải
+#: lỗi tức thì mà là recall/precision giảm dần theo thời gian không ai đo được.
+#: Ngưỡng ở đây chỉ để CẢNH BÁO (hiện banner), không tự xử lý gì cả.
+REVIEW_ALERT_THRESHOLD = 50
+ALIAS_ALERT_THRESHOLD = 50
+CONFLICT_ALERT_THRESHOLD = 10
 
 
 def _fact_dict(fact):
@@ -166,6 +175,32 @@ def review_resolve(request, item_id):
     return Response({"ok": True, "status": item.status})
 
 
+@api_view(["POST"])
+@permission_classes([RequiresAdmin])
+def review_bulk_resolve(request):
+    """Duyệt/từ chối nhiều mục Hàng chờ duyệt cùng lúc — người vẫn tự chọn
+    từng dòng ở phía trước; đây chỉ gộp N lần bấm thành 1, không tự chọn thay.
+    """
+    ids = request.data.get("ids") or []
+    decision = str(request.data.get("decision") or "").lower()
+    if decision not in ("accept", "reject"):
+        return Response({"detail": "decision phải là accept hoặc reject."}, status=400)
+    by = str(request.user)[:150]
+    resolved, skipped = [], []
+    for item in ReviewItem.objects.filter(pk__in=ids, status=ReviewItem.STATUS_OPEN):
+        if decision == "accept":
+            if item.fact_id:
+                accept_fact(item.fact, by=by)
+            item.resolve(ReviewItem.STATUS_ACCEPTED, by=by)
+        else:
+            if item.fact_id:
+                reject_fact(item.fact, by=by)
+            item.resolve(ReviewItem.STATUS_REJECTED, by=by)
+        resolved.append(item.pk)
+    skipped = [pk for pk in ids if pk not in resolved]
+    return Response({"resolved": resolved, "skipped": skipped})
+
+
 @api_view(["GET"])
 @permission_classes([RequiresAdmin])
 def alias_queue(request):
@@ -179,6 +214,11 @@ def alias_queue(request):
         "alias_raw": a.alias_raw, "source": a.source, "created_by": a.created_by,
         "created_at": a.created_at,
     } for a in aliases[:300]]})
+
+
+def _clear_alias_cache():
+    from talent.semantic_index import clear_registry_alias_cache
+    clear_registry_alias_cache()
 
 
 @api_view(["POST"])
@@ -197,14 +237,120 @@ def alias_resolve(request, alias_id):
         if entry is None:
             return Response({"detail": "entry_code không hợp lệ cho namespace này."}, status=400)
         alias.accept(entry, by=by, note=str(request.data.get("note") or ""))
-        from talent.semantic_index import clear_registry_alias_cache
-        clear_registry_alias_cache()
+        _clear_alias_cache()
     elif decision == "reject":
         alias.reject(by=by, note=str(request.data.get("note") or ""))
     else:
         return Response({"detail": "decision phải là accept hoặc reject."}, status=400)
     return Response({"ok": True, "status": alias.status,
                      "entry_code": alias.entry.code if alias.entry_id else ""})
+
+
+@api_view(["POST"])
+@permission_classes([RequiresAdmin])
+def alias_new_entry(request, alias_id):
+    """Alias thật sự MỚI (không phải lỗi chính tả của mã đã có) — tạo mã
+    canonical mới rồi nối luôn, thay vì bắt người duyệt rời app sang Django
+    admin/management command chỉ để `upsert_entry` rồi quay lại nối tay.
+
+    Vẫn là người gõ `code`/`label` và bấm xác nhận — không đoán thay. Chặn
+    cứng khi `code` đã tồn tại: `registry.upsert_entry` dùng `update_or_create`
+    nên trùng code sẽ ÂM THẦM ghi đè label/attrs của một entry đang được dùng ở
+    nơi khác — hành động "tạo mới" không bao giờ được phép sửa nhầm entry cũ.
+    """
+    alias = CanonicalAlias.objects.filter(
+        pk=alias_id, status=CanonicalAlias.STATUS_PROPOSED).first()
+    if alias is None:
+        return Response({"detail": "Không thấy alias."}, status=404)
+    code = str(request.data.get("code") or "").strip()
+    label = str(request.data.get("label") or "").strip()
+    if not code or not label:
+        return Response({"detail": "Cần cả code và label."}, status=400)
+    if CanonicalEntry.objects.filter(namespace=alias.namespace, code=code).exists():
+        return Response(
+            {"detail": "Mã đã tồn tại — dùng cách nối vào mã có sẵn thay vì tạo mới."},
+            status=400)
+    by = str(request.user)[:150]
+    entry = registry.upsert_entry(alias.namespace, code, label)
+    alias.accept(entry, by=by, note="tạo mã mới")
+    _clear_alias_cache()
+    return Response({"ok": True, "status": alias.status, "entry_code": entry.code})
+
+
+@api_view(["POST"])
+@permission_classes([RequiresAdmin])
+def alias_bulk_resolve(request):
+    """Nối/từ chối nhiều alias cùng lúc — `accept` áp CHUNG một `entry_code`
+    cho mọi id đã chọn (đúng ca dùng thật: vài biến thể viết của cùng một cái
+    tên). Người vẫn tự chọn dòng và tự gõ mã; đây chỉ gộp N lần bấm thành 1.
+    """
+    ids = request.data.get("ids") or []
+    decision = str(request.data.get("decision") or "").lower()
+    if decision not in ("accept", "reject"):
+        return Response({"detail": "decision phải là accept hoặc reject."}, status=400)
+    by = str(request.user)[:150]
+    resolved, skipped = [], []
+    aliases = list(CanonicalAlias.objects.filter(
+        pk__in=ids, status=CanonicalAlias.STATUS_PROPOSED).select_related("namespace"))
+
+    if decision == "accept":
+        entry_code = request.data.get("entry_code")
+        if not entry_code:
+            return Response({"detail": "entry_code bắt buộc khi decision=accept."}, status=400)
+        for alias in aliases:
+            entry = CanonicalEntry.objects.filter(
+                namespace=alias.namespace, code=entry_code).first()
+            if entry is None:
+                skipped.append(alias.pk)
+                continue
+            alias.accept(entry, by=by, note="duyệt hàng loạt")
+            resolved.append(alias.pk)
+        if resolved:
+            _clear_alias_cache()
+    else:
+        for alias in aliases:
+            alias.reject(by=by, note="duyệt hàng loạt")
+            resolved.append(alias.pk)
+
+    skipped += [pk for pk in ids if pk not in resolved and pk not in skipped]
+    return Response({"resolved": resolved, "skipped": skipped})
+
+
+def _person_snapshot(person):
+    return {"id": person.pk, "display_name": person.display_name,
+            "primary_email": person.primary_email, "primary_phone": person.primary_phone,
+            "headline": person.headline}
+
+
+@api_view(["GET"])
+@permission_classes([RequiresAdmin])
+def identity_conflict_queue(request):
+    """Hàng đợi rủi ro cao nhất hệ thống (Master Plan mục 12) — trước đây chỉ
+    xem/xử lý được ở Django admin. Không có duyệt hàng loạt ở đây, cố ý: mỗi
+    xung đột phải được người xem riêng, không gộp N quyết định vào một cú bấm.
+    """
+    conflicts = (IdentityConflict.objects.filter(status=IdentityConflict.STATUS_OPEN)
+                 .prefetch_related("people").order_by("-created_at"))
+    return Response({"results": [{
+        "id": c.pk, "evidence": c.evidence, "source_record_id": c.source_record_id,
+        "created_at": c.created_at,
+        "people": [_person_snapshot(p) for p in c.people.all()],
+    } for c in conflicts[:200]]})
+
+
+@api_view(["POST"])
+@permission_classes([RequiresAdmin])
+def identity_conflict_resolve(request, conflict_id):
+    conflict = IdentityConflict.objects.filter(
+        pk=conflict_id, status=IdentityConflict.STATUS_OPEN).first()
+    if conflict is None:
+        return Response({"detail": "Không thấy xung đột."}, status=404)
+    decision = str(request.data.get("decision") or "").lower()
+    if decision not in ("merge", "dismiss"):
+        return Response({"detail": "decision phải là merge hoặc dismiss."}, status=400)
+    conflict = resolution.resolve_identity_conflict(
+        conflict, decision, note=f"{request.user} qua /admin")
+    return Response({"ok": True, "status": conflict.status})
 
 
 @api_view(["GET"])
@@ -214,15 +360,28 @@ def runs_dashboard(request):
     recent = list(ExtractionRun.objects.order_by("-started_at")[:500])
     by_status = dict(ExtractionRun.objects.values_list("status")
                      .annotate(n=Count("id")))
+    open_reviews = ReviewItem.objects.filter(status=ReviewItem.STATUS_OPEN).count()
+    proposed_aliases = CanonicalAlias.objects.filter(
+        status=CanonicalAlias.STATUS_PROPOSED).count()
+    open_identity_conflicts = IdentityConflict.objects.filter(
+        status=IdentityConflict.STATUS_OPEN).count()
     return Response({
         "totals": {
             "runs": ExtractionRun.objects.count(),
             "by_status": by_status,
-            "open_reviews": ReviewItem.objects.filter(status=ReviewItem.STATUS_OPEN).count(),
-            "proposed_aliases": CanonicalAlias.objects.filter(
-                status=CanonicalAlias.STATUS_PROPOSED).count(),
+            "open_reviews": open_reviews,
+            "proposed_aliases": proposed_aliases,
+            "open_identity_conflicts": open_identity_conflicts,
             "accepted_facts": ExtractedFact.objects.filter(
                 status=ExtractedFact.STATUS_ACCEPTED).count(),
+        },
+        # Chỉ để hiện cảnh báo — không tự xử lý gì. Ngưỡng cố định trong code,
+        # không phải setting: đổi ngưỡng là quyết định vận hành, nên sửa code
+        # + review, không phải một biến môi trường ai đó âm thầm chỉnh.
+        "alerts": {
+            "reviews": open_reviews > REVIEW_ALERT_THRESHOLD,
+            "aliases": proposed_aliases > ALIAS_ALERT_THRESHOLD,
+            "conflicts": open_identity_conflicts > CONFLICT_ALERT_THRESHOLD,
         },
         "coverage_last_500": coverage_summary(recent),
         "recent": [{

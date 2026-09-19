@@ -11,6 +11,7 @@ Hai điều quan trọng nhất được canh ở đây:
 import json
 
 from django.contrib.auth.models import User
+from django.db.models import F
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -562,6 +563,16 @@ class ApiTest(TestCase):
         rev = self.client.get(reverse("talent-person", args=[ref.pk])).json()
         self.assertEqual(len(rev["person_links"]["incoming"]), 1)
 
+    def test_loc_theo_nhom_rb_khi_khong_co_module_rb_bi_chan(self):
+        """Pool dùng chung bảng cho hai nghiệp vụ: đoán id nhóm khách RB không được
+        đọc ra ai đang nằm trong nhóm đó — kể cả qua xuất CSV."""
+        rb_pool = Pool.objects.create(name="Khách VIP", domain=Pool.DOMAIN_RB)
+        talent_pool = Pool.objects.create(name="Đợt tuyển", domain=Pool.DOMAIN_TALENT)
+        for name in ("talent-search", "talent-search-export"):
+            self.assertEqual(self.client.get(reverse(name), {"pool": rb_pool.pk}).status_code, 403)
+            self.assertEqual(self.client.get(reverse(name), {"pool": talent_pool.pk}).status_code, 200)
+        self.assertEqual(self.client.get(reverse("talent-search"), {"pool": 999999}).status_code, 404)
+
     def test_rm_khong_nhan_cv_nhung_thay_duoc_pipeline_ung_vien(self):
         from accounts import roles as role_module
         from django.contrib.auth.models import Group
@@ -573,6 +584,71 @@ class ApiTest(TestCase):
         self.assertEqual(body["documents"], [])
         self.assertEqual(body["sources"], [])
         self.assertIn("active_worklists", body)
+
+    def test_index_health_an_voi_recruiter(self):
+        """Chẩn đoán chỉ mục là chuyện vận hành nội bộ — recruiter không cần
+        thấy, tránh nhiễu màn hình Person 360 với thông tin không phải nghiệp
+        vụ của họ."""
+        body = self.client.get(reverse("talent-person", args=[self.person.pk])).json()
+        self.assertNotIn("index_health", body)
+
+    def test_index_health_hien_voi_admin(self):
+        from accounts import roles as role_module
+        from django.contrib.auth.models import Group
+        admin = User.objects.create_user("admin-test", password="mat-khau-rat-dai-1")
+        admin.groups.add(Group.objects.get(name=role_module.ADMIN))
+        self.client.force_login(admin)
+        body = self.client.get(reverse("talent-person", args=[self.person.pk])).json()
+        # setUp không đính CV nào — đúng trạng thái "chưa có gì để lập chỉ mục".
+        self.assertEqual(body["index_health"]["status"], "no_documents")
+
+    def test_index_health_van_an_voi_edge_operator(self):
+        """edge_operator bị chặn hẳn khỏi module Talent (quyết định đã chốt,
+        docs/ACCESS_CONTROL.md mục 4.3) — không mở riêng cho chỉ báo này."""
+        from accounts import roles as role_module
+        from django.contrib.auth.models import Group
+        role_module.ensure_groups()
+        operator = User.objects.create_user("edge-op-test", password="mat-khau-rat-dai-1")
+        operator.groups.add(Group.objects.get(name=role_module.EDGE_OPERATOR))
+        self.client.force_login(operator)
+        response = self.client.get(reverse("talent-person", args=[self.person.pk]))
+        self.assertEqual(response.status_code, 403)
+
+    def test_index_health_phan_anh_du_lieu_chi_muc(self):
+        from accounts import roles as role_module
+        from django.contrib.auth.models import Group
+        from intel.models import ExtractionJob
+        from talent.models import CVChunk, PersonSearchDocument
+        admin = User.objects.create_user("admin-test-2", password="mat-khau-rat-dai-1")
+        admin.groups.add(Group.objects.get(name=role_module.ADMIN))
+        self.client.force_login(admin)
+
+        Document.objects.create(person=self.person, sha256="ih1", parse_status="done",
+                                parsed_text="Chuyên viên tín dụng. " * 40)
+        body = self.client.get(reverse("talent-person", args=[self.person.pk])).json()
+        self.assertEqual(body["index_health"]["status"], "missing")
+        self.assertFalse(body["index_health"]["has_projection"])
+
+        from talent import vector_index
+        vector_index.index_person(self.person.pk, with_embeddings=False)
+        body = self.client.get(reverse("talent-person", args=[self.person.pk])).json()
+        self.assertEqual(body["index_health"]["status"], "stale")
+        self.assertTrue(body["index_health"]["has_projection"])
+        self.assertGreater(body["index_health"]["chunks_total"], 0)
+        self.assertEqual(body["index_health"]["chunks_current"], 0)
+
+        PersonSearchDocument.objects.filter(person=self.person).update(
+            embedding_fingerprint=F("fingerprint"))
+        CVChunk.objects.filter(person=self.person).update(
+            embedding_fingerprint=F("fingerprint"))
+        # setUp đã ingest self.person qua SourceRecord thật — enqueue một
+        # ExtractionJob còn treo mà không worker nào trong test xử lý. Đóng nó
+        # lại để cô lập đúng thứ test này đang xét (đồng bộ fingerprint), thay
+        # vì lẫn với việc trích xuất fact còn dở dang.
+        ExtractionJob.objects.filter(person_id=self.person.pk).update(
+            status=ExtractionJob.STATUS_DONE)
+        body = self.client.get(reverse("talent-person", args=[self.person.pk])).json()
+        self.assertEqual(body["index_health"]["status"], "ok")
 
     def test_xem_ho_so_duoc_ghi_lai_va_khu_trung_lap_trong_ngay(self):
         url = reverse("talent-person", args=[self.person.pk])

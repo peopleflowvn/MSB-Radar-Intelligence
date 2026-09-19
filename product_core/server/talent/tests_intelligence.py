@@ -12,6 +12,7 @@ from knowledge.models import KnowledgeDocument
 from people.models import Document, Person
 
 from .intelligence_views import issue_scope_token
+from .models import PersonSearchDocument
 
 
 @override_settings(
@@ -134,6 +135,54 @@ class IntelligenceBridgeTest(TestCase):
             "document_updated_at": self.document.updated_at.isoformat(),
         })
         self.assertEqual(visible["events"][0]["operation"], "upsert")
+
+    def test_reactivation_rebuilds_talent_search_index(self):
+        """`person_intelligence_visibility_changed` phải tái lập chỉ mục pgvector
+        Talent (PersonSearchDocument), không riêng gì sổ tombstone của RAG V2 —
+        nếu không, người được kích hoạt lại (bỏ merge / bật lại is_applicant) sẽ
+        mất chỉ mục vô thời hạn vì `vector_index.index_person` đã xoá vector của
+        họ lần gần nhất họ rời kho, và không có sự kiện nào khác chắc chắn sẽ
+        đưa họ trở lại."""
+        with self.captureOnCommitCallbacks(execute=True):
+            person = Person.objects.create(display_name="Tái Lập Chỉ Mục",
+                                           is_applicant=True)
+            Document.objects.create(
+                person=person, document_type="cv", source="topcv", sha256="d" * 64,
+                parsed_text="Python SQL banking", text_length=18,
+                parse_status=Document.PARSE_DONE)
+        self.assertTrue(PersonSearchDocument.objects.filter(person=person).exists())
+
+        with self.captureOnCommitCallbacks(execute=True):
+            person.is_applicant = False
+            person.save(update_fields=["is_applicant", "updated_at"])
+        self.assertFalse(PersonSearchDocument.objects.filter(person=person).exists())
+
+        with self.captureOnCommitCallbacks(execute=True):
+            person.is_applicant = True
+            person.save(update_fields=["is_applicant", "updated_at"])
+        self.assertTrue(PersonSearchDocument.objects.filter(person=person).exists())
+
+    def test_mark_applicant_via_save_rebuilds_talent_search_index(self):
+        """`people.resolution._mark_applicant` phải dùng `.save()`, không
+        `.update()` — queryset `.update()` ghi thẳng SQL, bỏ qua `post_save`,
+        nên người lần đầu ứng tuyển thật (trước đó chỉ được NHẮC TỚI trong CV
+        người khác, `is_applicant=False`) sẽ không được tái lập chỉ mục pgvector
+        qua tín hiệu `person_intelligence_visibility_changed`."""
+        from people import resolution
+
+        with self.captureOnCommitCallbacks(execute=True):
+            person = Person.objects.create(display_name="Từng chỉ được nhắc tới",
+                                           is_applicant=False)
+            Document.objects.create(
+                person=person, document_type="cv", source="topcv", sha256="e" * 64,
+                parsed_text="Python SQL banking", text_length=18,
+                parse_status=Document.PARSE_DONE)
+        self.assertFalse(PersonSearchDocument.objects.filter(person=person).exists())
+
+        with self.captureOnCommitCallbacks(execute=True):
+            resolution._mark_applicant(person)
+        self.assertTrue(person.is_applicant)
+        self.assertTrue(PersonSearchDocument.objects.filter(person=person).exists())
 
     def test_evidence_uses_existing_user_cv_permission(self):
         token = issue_scope_token(self.user)

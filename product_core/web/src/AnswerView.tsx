@@ -56,17 +56,122 @@ function sourceRef(source: AnswerSource): SourceRef {
   };
 }
 
-/** Thẻ ứng viên thông minh gọn gàng cho Talent Radar, thay thế dạng chip tối giản. */
+function extractPersonInfo(person: AnswerPerson, sources: AnswerSource[] = []) {
+  const attrs = person.attributes ?? {};
+  const lowerAttrs: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries(attrs)) {
+    lowerAttrs[k.toLowerCase().trim()] = v;
+  }
+
+  // 1. Role / Title
+  let role =
+    attrs["Chức danh"] ||
+    attrs["Vị trí"] ||
+    attrs["role"] ||
+    attrs["title"] ||
+    attrs["Nghề nghiệp"] ||
+    attrs["Chuyên môn"] ||
+    lowerAttrs["chức danh"] ||
+    lowerAttrs["vị trí"] ||
+    lowerAttrs["role"] ||
+    lowerAttrs["title"] ||
+    lowerAttrs["nghề nghiệp"] ||
+    lowerAttrs["chuyên môn"];
+
+  // 2. Company
+  let company =
+    attrs["Công ty"] ||
+    attrs["Đơn vị"] ||
+    attrs["company"] ||
+    attrs["organization"] ||
+    attrs["Nơi làm việc"] ||
+    lowerAttrs["công ty"] ||
+    lowerAttrs["đơn vị"] ||
+    lowerAttrs["company"] ||
+    lowerAttrs["nơi làm việc"];
+
+  // 3. Location
+  const location =
+    attrs["Địa điểm"] ||
+    attrs["Khu vực"] ||
+    attrs["location"] ||
+    attrs["city"] ||
+    attrs["Tỉnh thành"] ||
+    lowerAttrs["địa điểm"] ||
+    lowerAttrs["khu vực"] ||
+    lowerAttrs["location"] ||
+    lowerAttrs["tỉnh thành"];
+
+  // 4. Experience
+  const experience =
+    attrs["Kinh nghiệm"] ||
+    attrs["Kinh nghiệm (năm)"] ||
+    attrs["Số năm kinh nghiệm"] ||
+    attrs["experience"] ||
+    attrs["years_experience"] ||
+    lowerAttrs["kinh nghiệm"] ||
+    lowerAttrs["kinh nghiệm (năm)"] ||
+    lowerAttrs["số năm kinh nghiệm"] ||
+    lowerAttrs["experience"];
+
+  // 5. Matching sources
+  const personSources = (sources || []).filter(
+    (s) => s.person_id === person.person_id || (person.name && s.name === person.name)
+  );
+  const citationNums = (person.citations && person.citations.length > 0)
+    ? person.citations
+    : personSources.map((s) => s.n);
+
+  // 6. Highlight text / why / snippet fallback
+  let highlight = (person.why || "").trim();
+  if (!highlight && personSources.length > 0) {
+    const rawSnippet = personSources[0].snippet || "";
+    const cleanSnippet = rawSnippet.replace(/[#*`_]/g, "").replace(/\s+/g, " ").trim();
+    if (cleanSnippet) {
+      highlight = cleanSnippet.length > 130 ? `${cleanSnippet.slice(0, 127)}…` : cleanSnippet;
+    }
+  }
+
+  // If role is still missing, try to get a quick summary from the first line of snippet
+  if (!role && personSources.length > 0) {
+    const firstLine = (personSources[0].snippet || "").split("\n")[0]?.replace(/[#*`_]/g, "").trim();
+    if (firstLine && firstLine.length < 75 && !firstLine.includes(person.name)) {
+      role = firstLine;
+    }
+  }
+
+  const headline = [role, company].filter(Boolean).join(" · ");
+
+  return {
+    headline: String(headline || ""),
+    location: location ? String(location) : null,
+    experience: experience ? String(experience) : null,
+    citationNums,
+    highlight: highlight || null,
+    extraAttrs: Object.entries(attrs).filter(([k]) => {
+      const lk = k.toLowerCase().trim();
+      return !["chức danh", "vị trí", "role", "title", "nghề nghiệp", "chuyên môn", "công ty", "đơn vị", "company", "organization", "nơi làm việc", "địa điểm", "khu vực", "location", "city", "tỉnh thành", "kinh nghiệm", "kinh nghiệm (năm)", "số năm kinh nghiệm", "experience", "years_experience"].includes(lk);
+    }),
+  };
+}
+
+/** Thẻ ứng viên thông minh cho Talent Radar — dạng thẻ với thông tin nhận diện cốt lõi. */
 function TalentSmartCards({
   people,
   personLinkFrom = "talent-ai",
+  sources = [],
 }: {
   people: AnswerPerson[];
   personLinkFrom?: string;
+  sources?: AnswerSource[];
 }) {
-  const [viewMode, setViewMode] = useState<"compact" | "chips">("compact");
+  const [expanded, setExpanded] = useState(false);
 
   if (!people || people.length === 0) return null;
+
+  const INITIAL_LIMIT = 6;
+  const hasMore = people.length > INITIAL_LIMIT;
+  const visiblePeople = (!hasMore || expanded) ? people : people.slice(0, INITIAL_LIMIT);
 
   return (
     <div className="talent-smart-section">
@@ -74,110 +179,95 @@ function TalentSmartCards({
         <span className="talent-smart-title">
           <span>Hồ sơ được nhắc tới</span> <span className="talent-smart-count">({people.length})</span>
         </span>
-        <div className="talent-view-toggle">
+        {hasMore && (
           <button
             type="button"
-            className={`talent-toggle-btn ${viewMode === "compact" ? "active" : ""}`}
-            onClick={() => setViewMode("compact")}
-            title="Dạng thẻ thông minh gọn gàng"
+            className="talent-header-expand-link"
+            onClick={() => setExpanded((prev) => !prev)}
           >
-            ⊞ Thẻ gọn
+            {expanded ? "Thu gọn ▴" : `Xem tất cả ${people.length} hồ sơ ▾`}
           </button>
-          <button
-            type="button"
-            className={`talent-toggle-btn ${viewMode === "chips" ? "active" : ""}`}
-            onClick={() => setViewMode("chips")}
-            title="Dạng nhãn tối giản"
-          >
-            ≡ Dạng nhãn
-          </button>
-        </div>
+        )}
       </div>
 
-      {viewMode === "chips" ? (
-        <div className="answer-people-chips">
-          {people.map((person) => {
-            const attributes = Object.entries(person.attributes ?? {});
-            return (
-              <Link
-                key={person.person_id}
-                to={`/person/${person.person_id}?from=${personLinkFrom}`}
-                className="answer-person-chip"
-                title={person.why || undefined}
-              >
-                <strong>{person.name}</strong>
-                {attributes.length > 0 && (
-                  <span className="muted small">
-                    {attributes.slice(0, 2).map(([key, value]) => `${key}: ${value}`).join(" · ")}
+      <div className="talent-smart-grid">
+        {visiblePeople.map((person) => {
+          const info = extractPersonInfo(person, sources);
+          return (
+            <Link
+              key={person.person_id}
+              to={`/person/${person.person_id}?from=${personLinkFrom}`}
+              className="talent-compact-card"
+              title={`Mở hồ sơ 360° của ${person.name}`}
+            >
+              <div className="talent-card-header">
+                <div className="talent-card-avatar">
+                  {(person.name || "U")[0]?.toUpperCase()}
+                </div>
+                <div className="talent-card-title-wrap">
+                  <div className="talent-card-name-row">
+                    <span className="talent-card-name">{person.name}</span>
+                    {info.citationNums.length > 0 && (
+                      <span className="talent-card-citations" title="Trích dẫn bằng chứng trong CV">
+                        {info.citationNums.map((c) => `[${c}]`).join(" ")}
+                      </span>
+                    )}
+                  </div>
+                  {info.headline ? (
+                    <div className="talent-card-headline" title={info.headline}>
+                      {info.headline}
+                    </div>
+                  ) : (
+                    <div className="talent-card-headline subtle-tag">
+                      Hồ sơ đối soát trong kho nhân tài
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {info.highlight && (
+                <div className="talent-card-why" title={info.highlight}>
+                  <span className="talent-why-icon">💡</span>
+                  <span className="talent-why-text">{info.highlight}</span>
+                </div>
+              )}
+
+              <div className="talent-card-attributes">
+                {info.experience && (
+                  <span className="talent-attr-pill" title={`Kinh nghiệm: ${info.experience}`}>
+                    ⏱️ {String(info.experience).includes("năm") || String(info.experience).includes("tháng") ? info.experience : `${info.experience} năm KN`}
                   </span>
                 )}
-              </Link>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="talent-smart-grid">
-          {people.map((person) => {
-            const attributes = Object.entries(person.attributes ?? {});
-            const role =
-              person.attributes?.["Chức danh"] ||
-              person.attributes?.["Vị trí"] ||
-              person.attributes?.["role"] ||
-              person.attributes?.["title"] ||
-              person.attributes?.["Nghề nghiệp"];
-            const company =
-              person.attributes?.["Công ty"] ||
-              person.attributes?.["Đơn vị"] ||
-              person.attributes?.["company"];
-            const headline = [role, company].filter(Boolean).join(" · ");
-
-            return (
-              <Link
-                key={person.person_id}
-                to={`/person/${person.person_id}?from=${personLinkFrom}`}
-                className="talent-compact-card"
-                title={`Mở hồ sơ 360° của ${person.name}`}
-              >
-                <div className="talent-card-header">
-                  <div className="talent-card-avatar">
-                    {(person.name || "U")[0]?.toUpperCase()}
-                  </div>
-                  <div className="talent-card-title-wrap">
-                    <div className="talent-card-name-row">
-                      <span className="talent-card-name">{person.name}</span>
-                      {person.citations && person.citations.length > 0 && (
-                        <span className="talent-card-citations" title="Trích dẫn bằng chứng">
-                          {person.citations.map((c) => `[${c}]`).join(" ")}
-                        </span>
-                      )}
-                    </div>
-                    {headline ? (
-                      <div className="talent-card-headline" title={headline}>
-                        {headline}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
-                {person.why && (
-                  <div className="talent-card-why" title={person.why}>
-                    <span className="talent-why-icon">💡</span>
-                    <span className="talent-why-text">{person.why}</span>
-                  </div>
+                {info.location && (
+                  <span className="talent-attr-pill" title={`Địa điểm: ${info.location}`}>
+                    📍 {info.location}
+                  </span>
                 )}
+                {info.extraAttrs.slice(0, 2).map(([key, value]) => (
+                  <span key={key} className="talent-attr-pill" title={`${key}: ${value}`}>
+                    {`${key}: ${value}`}
+                  </span>
+                ))}
+                <span className="talent-attr-pill profile-link-pill">
+                  Xem 360° →
+                </span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
 
-                    {attributes.length > 0 && (
-                      <div className="talent-card-attributes">
-                        {attributes.slice(0, 3).map(([key, value]) => (
-                          <span key={key} className="talent-attr-pill" title={`${key}: ${value}`}>
-                            {`${key}: ${value}`}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-              </Link>
-            );
-          })}
+      {hasMore && (
+        <div className="talent-cards-expand-row">
+          <button
+            type="button"
+            className="talent-cards-expand-btn"
+            onClick={() => setExpanded((prev) => !prev)}
+          >
+            {expanded
+              ? "▴ Thu gọn danh sách ứng viên"
+              : `▾ Xem thêm ${people.length - INITIAL_LIMIT} ứng viên khác`}
+          </button>
         </div>
       )}
     </div>
@@ -413,7 +503,11 @@ export default function AnswerView<TPerson = AnswerPerson>({
 
       {renderPeople
         ? renderPeople(turn.people)
-        : <TalentSmartCards people={turn.people as unknown as AnswerPerson[]} personLinkFrom={personLinkFrom} />}
+        : <TalentSmartCards
+            people={turn.people as unknown as AnswerPerson[]}
+            personLinkFrom={personLinkFrom}
+            sources={turn.sources}
+          />}
 
       {(turn.webSources?.length ?? 0) > 0 && (
         <div className="answer-sources">
@@ -505,15 +599,6 @@ export default function AnswerView<TPerson = AnswerPerson>({
             );
           })()}
           <div className="answer-footer-meta">
-            {(() => {
-              const dur = turn.durationMs || Number((turn.trace as any)?.ms_total || 0);
-              if (!dur) return null;
-              return (
-                <span className="answer-duration muted small" title="Thời gian xử lý câu trả lời">
-                  ⏱️ {(dur / 1000).toFixed(1)}s
-                </span>
-              );
-            })()}
             <button
               type="button"
               className="answer-copy-btn"

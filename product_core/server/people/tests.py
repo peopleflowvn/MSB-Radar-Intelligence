@@ -346,6 +346,45 @@ class ConflictTest(TestCase):
                                               value="+84902222222").person_id, self.b.pk)
 
 
+class ResolveIdentityConflictTest(TestCase):
+    """`resolve_identity_conflict` — logic dùng chung giữa Django admin
+    (`people/admin.py::IdentityConflictAdmin`) và API (`intel/views.py`)."""
+
+    def setUp(self):
+        self.a = resolution.resolve(payload(email="a@example.com", phone="0901111111")).person
+        self.b = resolution.resolve(payload(fullname="Người B", email="b@example.com",
+                                            phone="0902222222")).person
+        resolution.resolve(payload(cv_id="9", email="a@example.com", phone="0902222222"))
+        self.conflict = IdentityConflict.objects.get()
+
+    def test_merge_gop_vao_nguoi_tao_som_nhat(self):
+        resolution.resolve_identity_conflict(self.conflict, "merge", note="test")
+        self.b.refresh_from_db()
+        self.assertEqual(self.b.merged_into_id, self.a.pk)
+        self.conflict.refresh_from_db()
+        self.assertEqual(self.conflict.status, IdentityConflict.STATUS_MERGED)
+
+    def test_dismiss_xoa_co_can_xem_lai_khi_het_xung_dot_mo(self):
+        resolution.resolve_identity_conflict(self.conflict, "dismiss", note="test")
+        self.conflict.refresh_from_db()
+        self.assertEqual(self.conflict.status, IdentityConflict.STATUS_DISMISSED)
+        self.a.refresh_from_db()
+        self.b.refresh_from_db()
+        self.assertFalse(self.a.needs_review)
+        self.assertFalse(self.b.needs_review)
+
+    def test_decision_khong_hop_le_nem_loi(self):
+        with self.assertRaises(ValueError):
+            resolution.resolve_identity_conflict(self.conflict, "khac", note="test")
+
+    def test_conflict_da_xu_ly_thi_khong_lam_gi_them(self):
+        resolution.resolve_identity_conflict(self.conflict, "dismiss")
+        result = resolution.resolve_identity_conflict(self.conflict, "merge")
+        self.assertEqual(result.status, IdentityConflict.STATUS_DISMISSED)
+        self.b.refresh_from_db()
+        self.assertIsNone(self.b.merged_into_id, "conflict đã đóng thì không được gộp lại")
+
+
 class MergeTest(TestCase):
     def setUp(self):
         self.a = resolution.resolve(payload(email="a@example.com", phone="0901111111")).person
