@@ -78,14 +78,6 @@ export default function SearchWorkspace() {
     });
   };
 
-  const setTab = (next: SearchTab) => {
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev);
-      params.set("tab", next);
-      return params;
-    });
-  };
-
   if (session.isLoading) return null;
 
   if (!canRecruiter && !canProspect) {
@@ -108,50 +100,47 @@ export default function SearchWorkspace() {
         <div className="glow-orb orb-4" />
       </div>
 
-      {/* Sleek, Compact Top Control Bar */}
-      <div className="search-control-toolbar">
-        <div className="search-mode-tabs">
-          <button
-            type="button"
-            className={`search-mode-tab ${tab === "ai" ? "active" : ""}`}
-            onClick={() => setTab("ai")}
-          >
-            ✨ Tìm kiếm AI
-          </button>
-          {canUseFilter && (
+      {/* Sleek Centered Perspective Switch */}
+      {canSwitch && (
+        <div className="search-control-toolbar">
+          <div className="perspective-segmented-switch" role="tablist" aria-label="Góc nhìn tìm kiếm">
             <button
               type="button"
-              className={`search-mode-tab ${tab === "filter" ? "active" : ""}`}
-              onClick={() => setTab("filter")}
-            >
-              ⚙️ Bộ lọc đa chiều
-            </button>
-          )}
-        </div>
-
-        {canSwitch && (
-          <div className="perspective-segmented-switch">
-            <button
-              type="button"
+              role="tab"
+              aria-selected={perspective === "recruiter"}
               className={`switch-btn ${perspective === "recruiter" ? "active" : ""}`}
               onClick={() => switchPerspective("recruiter")}
             >
-              <span className="switch-icon">🎯</span>
+              <span className="switch-icon talent-icon" aria-hidden="true">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </span>
               <span className="switch-text">Góc nhìn Tuyển dụng</span>
-              <span className="switch-badge">Recruiter</span>
+              <span className="switch-badge badge-recruiter">Recruiter</span>
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={perspective === "prospect"}
               className={`switch-btn ${perspective === "prospect" ? "active" : ""}`}
               onClick={() => switchPerspective("prospect")}
             >
-              <span className="switch-icon">💳</span>
+              <span className="switch-icon prospect-icon" aria-hidden="true">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="20" height="14" x="2" y="7" rx="2" />
+                  <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+                </svg>
+              </span>
               <span className="switch-text">Góc nhìn Khách hàng</span>
-              <span className="switch-badge">RM &amp; Sales</span>
+              <span className="switch-badge badge-prospect">RM &amp; Sales</span>
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {tab === "ai"
         ? (isProspect ? <ProspectAiSearch /> : <AiSearch />)

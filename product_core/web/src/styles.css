@@ -18310,49 +18310,110 @@ body,
 .perspective-segmented-switch {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  gap: 4px;
+  padding: 3.5px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   max-width: 100%;
+}
+
+:root[data-theme="light"] .perspective-segmented-switch {
+  background: rgba(241, 245, 249, 0.88);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
 .perspective-segmented-switch .switch-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 18px;
-  border-radius: 10px;
-  font-size: 13.5px;
-  font-weight: 600;
+  padding: 6.5px 16px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--muted);
   background: transparent;
-  border: 1px solid transparent;
+  border: none;
   cursor: pointer;
-  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: none;
   user-select: none;
+  white-space: nowrap;
 }
 
 .perspective-segmented-switch .switch-btn:hover {
   color: var(--text);
-  background: var(--surface-raised, rgba(255, 255, 255, 0.04));
+  background: rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme="light"] .perspective-segmented-switch .switch-btn:hover {
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .perspective-segmented-switch .switch-btn.active {
-  color: var(--text);
-  background: var(--surface-raised, rgba(255, 255, 255, 0.08));
-  border-color: var(--border-strong, rgba(255, 255, 255, 0.12));
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  color: #ffffff;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.perspective-segmented-switch .switch-btn.active:nth-child(1) {
+  background: rgba(56, 189, 248, 0.14);
+  color: #f0f9ff;
+  box-shadow: 0 2px 10px rgba(56, 189, 248, 0.16);
+}
+
+.perspective-segmented-switch .switch-btn.active:nth-child(2) {
+  background: rgba(52, 211, 153, 0.14);
+  color: #ecfdf5;
+  box-shadow: 0 2px 10px rgba(52, 211, 153, 0.16);
+}
+
+:root[data-theme="light"] .perspective-segmented-switch .switch-btn.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="light"] .perspective-segmented-switch .switch-btn.active:nth-child(1) {
+  background: #ffffff;
+  color: #0369a1;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.15);
+}
+
+:root[data-theme="light"] .perspective-segmented-switch .switch-btn.active:nth-child(2) {
+  background: #ffffff;
+  color: #047857;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.15);
 }
 
 .perspective-segmented-switch .switch-icon {
-  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.perspective-segmented-switch .switch-btn:hover .switch-icon {
+  transform: scale(1.08);
+}
+
+.perspective-segmented-switch .switch-icon.talent-icon {
+  color: #38bdf8;
+}
+
+.perspective-segmented-switch .switch-icon.prospect-icon {
+  color: #34d399;
+}
+
+.perspective-segmented-switch .switch-btn:not(.active) .switch-icon {
+  opacity: 0.65;
 }
 
 .perspective-segmented-switch .switch-text {
@@ -18361,39 +18422,53 @@ body,
 }
 
 .perspective-segmented-switch .switch-badge {
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 6px;
-  letter-spacing: 0.02em;
+  padding: 2px 7.5px;
+  border-radius: 9999px;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
+  line-height: 1.2;
+  border: none;
 }
 
-.perspective-segmented-switch .switch-btn:nth-child(1) .switch-badge {
-  background: rgba(59, 130, 246, 0.12);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.25);
+.perspective-segmented-switch .badge-recruiter {
+  background: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
 }
 
-.perspective-segmented-switch .switch-btn:nth-child(2) .switch-badge {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.25);
+.perspective-segmented-switch .badge-prospect {
+  background: rgba(52, 211, 153, 0.16);
+  color: #34d399;
+}
+
+:root[data-theme="light"] .perspective-segmented-switch .badge-recruiter {
+  background: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+}
+
+:root[data-theme="light"] .perspective-segmented-switch .badge-prospect {
+  background: rgba(5, 150, 105, 0.12);
+  color: #059669;
 }
 
 @media (max-width: 640px) {
   .perspective-segmented-switch {
     width: 100%;
-    flex-direction: column;
-    gap: 4px;
+    border-radius: 14px;
+    gap: 2px;
   }
   .perspective-segmented-switch .switch-btn {
-    width: 100%;
+    flex: 1 1 0;
     justify-content: center;
+    padding: 7px 10px;
+    font-size: 12px;
+    gap: 6px;
+  }
+  .perspective-segmented-switch .switch-badge {
+    display: none;
   }
 }
-
-
 
 /* =========================================================
    PHÂN HỆ TÌM KIẾM THÔNG MINH (/search)
@@ -18409,96 +18484,11 @@ body,
 .search-control-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 12px;
-  background: var(--surface-glass, rgba(15, 23, 42, 0.45));
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  flex-wrap: wrap;
+  justify-content: center;
+  padding: 2px 0 6px 0;
   position: relative;
   z-index: 10;
-}
-
-:root[data-theme="light"] .search-control-toolbar {
-  background: rgba(255, 255, 255, 0.82);
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-}
-
-.search-mode-tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-raised, rgba(0, 0, 0, 0.2));
-  max-width: 100%;
-}
-
-.search-mode-tab {
-  padding: 6.5px 16px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.search-mode-tab:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.search-mode-tab.active {
-  color: var(--text);
-  background: var(--surface);
-  border-color: var(--border-strong, rgba(255, 255, 255, 0.12));
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-}
-
-:root[data-theme="light"] .search-mode-tab.active {
-  background: #ffffff;
-  border-color: rgba(0, 0, 0, 0.12);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-}
-
-.search-control-toolbar .perspective-segmented-switch {
-  flex: 0 0 auto;
-}
-
-@media (max-width: 768px) {
-  .search-control-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    padding: 8px;
-  }
-  .search-mode-tabs {
-    width: 100%;
-  }
-  .search-mode-tab {
-    flex: 1 1 auto;
-    text-align: center;
-    justify-content: center;
-    padding: 8px 12px;
-  }
-
-
-  .search-control-toolbar .perspective-segmented-switch {
-    width: 100%;
-  }
+  width: 100%;
 }
 
 /* Talent Smart Cards Expand & Collapse Controls */
