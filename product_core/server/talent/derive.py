@@ -117,23 +117,33 @@ def derive(person, save=True):
     """Dựng lại TalentProfile từ các SourceRecord. Trả về profile."""
     profile, _created = TalentProfile.objects.get_or_create(person=person)
     records = _ordered_records(person)
-    if not records:
-        return profile
-
     payloads = [r.payload or {} for r in records]
 
     # Gỡ giá trị do bản cũ ghi sai: chức danh trùng đúng một vị trí ứng tuyển thì
     # là tên tin tuyển dụng, không phải chức danh. Để trống cho
     # `apply_extracted_facts` điền từ CV. Tay người đã sửa (curated) thì giữ.
+    # `headline` cũng tính: nó chỉ được ghi từ `position` (people/resolution.py),
+    # và là dấu vết duy nhất còn lại ở hồ sơ đã mất bản ghi nguồn (prod 19/09: 16).
+    from intel.edge_mapper import is_posting_title
     applied = {str(p.get("position") or "").strip()[:200] for p in payloads} - {""}
+    current = (profile.current_title or "").strip()
     if (not profile.is_curated("current_title")
-            and (profile.current_title or "").strip() in applied):
+            and (current in applied or is_posting_title(current, person.headline))):
         profile.current_title = ""
+        if not records:
+            if save:
+                profile.save(update_fields=["current_title"])
+            return profile
+    if not records:
+        return profile
 
     for field, sources in SIMPLE_FIELDS.items():
         if profile.is_curated(field):
             continue
-        value = _first_value(payloads, sources)
+        if field == "current_title":
+            value = _own_title(payloads)
+        else:
+            value = _first_value(payloads, sources)
         if value:
             # Cắt theo đúng max_length của cột (Postgres từ chối chuỗi quá dài) -
             # các trường "mong muốn"/"tình trạng hôn nhân" ngắn hơn 200.
@@ -278,6 +288,15 @@ def _fact_value(fact):
     return (fact.canonical_label or fact.normalized_value or fact.raw_value or "").strip()
 
 
+def _display_value(fact):
+    """Giá trị để HIỂN THỊ: nguyên văn thay vì dạng chuẩn hoá.
+
+    `normalized_value` là chữ thường bỏ dấu, dùng để so khớp — ghi nó vào cột
+    hiển thị làm chức danh ra "giam doc kinh doanh" (prod 19/09: 75 hồ sơ).
+    """
+    return (fact.canonical_label or fact.raw_value or fact.normalized_value or "").strip()
+
+
 def apply_extracted_facts(person, save=True):
     """Lấp các cột TalentProfile còn trống bằng fact AI bóc từ text CV.
 
@@ -307,11 +326,22 @@ def apply_extracted_facts(person, save=True):
             continue
 
         if mode == "latest":
-            if str(getattr(profile, attr) or "").strip():
-                continue                    # derive() đã điền từ payload
-            value = _fact_value(by_field[intel_field][0])
+            fact = by_field[intel_field][0]
+            value = _display_value(fact)
+            current = str(getattr(profile, attr) or "").strip()
+            # Có giá trị rồi thì giữ (derive() đã điền từ payload) — trừ khi đó
+            # chính là dạng chuẩn hoá do bản cũ của hàm này ghi vào.
+            if current and not (current == (fact.normalized_value or "").strip()
+                                and current != value):
+                continue
             if not value:
                 continue
+            # Fact Edge cũ (trước khi `edge_mapper` lọc) có thể chính là tên tin
+            # đăng — điền lại nó là hoàn tác việc `derive()` vừa gỡ.
+            if attr == "current_title":
+                from intel.edge_mapper import is_posting_title
+                if is_posting_title(value, person.headline):
+                    continue
             limit = TalentProfile._meta.get_field(attr).max_length or 2000
             setattr(profile, attr, value[:limit])
             changed = True
@@ -335,7 +365,7 @@ def apply_extracted_facts(person, save=True):
                 continue
             values, seen = [], set()
             for fact in by_field[intel_field]:
-                value = _fact_value(fact)
+                value = _display_value(fact)
                 if value and value.lower() not in seen:
                     seen.add(value.lower())
                     values.append(value)
@@ -364,6 +394,21 @@ def _first_value(payloads, keys):
             value = str(payload.get(key) or "").strip()
             if value:
                 return value
+    return ""
+
+
+def _own_title(payloads):
+    """`current_title` ứng viên tự khai, mới trước — bỏ bản trùng `position` của
+    CHÍNH bản ghi đó.
+
+    careerviet/vieclam24h đôi khi trả tên tin đăng ("[RVI] Chuyên viên … - MSB -
+    1O330") vào ô tiêu đề hồ sơ; giá trị đó là vị trí ứng tuyển, không phải chức danh.
+    """
+    from intel.edge_mapper import is_posting_title
+    for payload in payloads:
+        value = str(payload.get("current_title") or "").strip()
+        if value and not is_posting_title(value, payload.get("position")):
+            return value
     return ""
 
 

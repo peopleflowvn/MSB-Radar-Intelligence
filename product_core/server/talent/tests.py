@@ -105,6 +105,20 @@ class DeriveTest(TestCase):
         derive_module.derive(person)
         self.assertEqual(TalentProfile.objects.get().current_title, "")
 
+    def test_tieu_de_ho_so_la_ten_tin_dang_thi_bo(self):
+        """careerviet/vieclam24h: ô tiêu đề hồ sơ đôi khi chứa chính tên tin đăng."""
+        job = "[RVI] Chuyên viên phát triển khách hàng cá nhân - RB - MSB - 1O330"
+        self._record(position=job, current_title=job)
+        ingest.resolve_pending()
+        self.assertEqual(TalentProfile.objects.get().current_title, "")
+
+    def test_ho_so_mat_ban_ghi_nguon_van_go_ten_tin_dang(self):
+        job = "Finance Analyst - QLTC - MSB - 3K057"
+        person = Person.objects.create(display_name="Mồ Côi", headline=job)
+        TalentProfile.objects.create(person=person, current_title=job)
+        derive_module.derive(person)
+        self.assertEqual(TalentProfile.objects.get(person=person).current_title, "")
+
     def test_ban_ghi_moi_nhat_thang(self):
         self._record("1", applied_ts="2024-01-01 09:00:00",
                      current_title="Junior Analyst")
@@ -349,6 +363,21 @@ class ApplyExtractedFactsTest(TestCase):
         derive_module.apply_extracted_facts(self.person)
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.current_title, "Chuyên viên")
+
+    def test_hien_thi_nguyen_van_co_dau_khong_phai_dang_chuan_hoa(self):
+        """Prod 19/09: 75 chức danh hiện "giam doc kinh doanh"."""
+        self._fact("current_title", "Giám đốc Kinh doanh", normalized="giam doc kinh doanh")
+        derive_module.apply_extracted_facts(self.person)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.current_title, "Giám đốc Kinh doanh")
+
+    def test_sua_gia_tri_khong_dau_do_ban_cu_ghi(self):
+        self.profile.current_title = "giam doc kinh doanh"
+        self.profile.save()
+        self._fact("current_title", "Giám đốc Kinh doanh", normalized="giam doc kinh doanh")
+        derive_module.apply_extracted_facts(self.person)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.current_title, "Giám đốc Kinh doanh")
 
     def test_khong_co_profile_thi_khong_no(self):
         orphan = Person.objects.create(display_name="Chưa có hồ sơ")

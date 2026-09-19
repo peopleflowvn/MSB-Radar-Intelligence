@@ -8,6 +8,7 @@ rỗng), có `district`/`birth_year`, ngày ở `applied_ts` (ISO) và `applied_
 
 Nguyên tắc: đọc thẳng, KHÔNG gọi AI để "đoán lại" trường Edge đã gửi (§7.2).
 """
+import re
 from datetime import datetime
 
 from django.utils import timezone
@@ -64,6 +65,22 @@ def _parse_dt(value):
     return None
 
 
+#: Dấu vết của TÊN TIN ĐĂNG: mã tin ("1O330", "3K057"), tiền tố chiến dịch
+#: ("[RVI]", "[Rv3]"), hoặc hậu tố đơn vị "- MSB -".
+_POSTING_MARKS = re.compile(r"\b\d[A-Z]\d{3}\b|^\s*\[\w+\]|\s-\s*MSB\b", re.IGNORECASE)
+
+
+def is_posting_title(value, position):
+    """`value` là tên tin tuyển dụng (vị trí ứng tuyển) chứ không phải chức danh?
+
+    Phải VỪA trùng vị trí ứng tuyển VỪA mang dấu vết tin đăng: ứng viên đang là
+    "Data Analyst" nộp đúng vị trí "Data Analyst" vẫn giữ chức danh của mình.
+    """
+    text = str(value or "").strip()
+    return (bool(text) and text == str(position or "").strip()
+            and bool(_POSTING_MARKS.search(text)))
+
+
 def map_record(source_record):
     """Trả list dict: {field, raw_value, observed_at}. Bỏ khoá rỗng."""
     payload = source_record.payload or {}
@@ -77,6 +94,10 @@ def map_record(source_record):
                 value = candidate
                 break
         if value is None:
+            continue
+        # careerviet/vieclam24h đôi khi trả tên tin đăng vào ô tiêu đề hồ sơ —
+        # đó là vị trí ứng tuyển, không phải chức danh.
+        if field == "current_title" and is_posting_title(value, payload.get("position")):
             continue
         if field in ("applied_date", "date_of_birth"):
             dt = _parse_dt(value)
