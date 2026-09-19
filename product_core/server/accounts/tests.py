@@ -128,6 +128,14 @@ class AuthApiTest(TestCase):
         body = self.client.get(reverse("auth-me")).json()
         self.assertTrue(body["authenticated"])
         self.assertEqual(body["username"], "tuyendung")
+        self.assertTrue(body["can_read_cv"])
+
+    def test_me_bao_rm_thuan_khong_doc_duoc_cv(self):
+        from django.contrib.auth.models import Group
+        rm = User.objects.create_user("rm-thuan", password="mat-khau-rat-dai-1")
+        rm.groups.add(Group.objects.get(name=roles.RB_SALES))
+        self.client.force_login(rm)
+        self.assertFalse(self.client.get(reverse("auth-me")).json()["can_read_cv"])
 
     def test_dang_xuat(self):
         self._login()

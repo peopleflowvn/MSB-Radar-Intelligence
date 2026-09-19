@@ -95,7 +95,16 @@ def _identity(user):
         # Giao diện dùng cái này để ẩn tab người dùng không vào được. Đây chỉ là
         # tiện ích hiển thị — chặn thật nằm ở phía máy chủ.
         "modules": sorted(roles.modules_of(user)),
+        # Luật đọc CV không suy ra được từ `modules` (RB Sales vẫn có module
+        # `talent`). Trả thẳng từ máy chủ để giao diện khỏi chép lại luật và lệch
+        # nhau — lệch là người dùng bấm vào một nút chắc chắn ăn 403.
+        "can_read_cv": _can_read_cv(user),
     }
+
+
+def _can_read_cv(user):
+    from talent.corpus_qa import can_read_cv
+    return bool(can_read_cv(user))
 
 
 def _preference_payload(preference):

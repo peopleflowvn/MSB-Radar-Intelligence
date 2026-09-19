@@ -20,8 +20,10 @@ export interface PerspectiveAccess {
 }
 
 /**
- * Bản sao phía giao diện của `talent.corpus_qa.can_read_cv`: RM thuần (`rb_sales`
- * mà không kiêm vai trò tuyển dụng nào) không được đọc nội dung CV.
+ * Dự phòng cho `talent.corpus_qa.can_read_cv` khi phiên chưa mang cờ
+ * `can_read_cv` (máy chủ bản cũ): RM thuần (`rb_sales` mà không kiêm vai trò
+ * tuyển dụng nào) không được đọc nội dung CV. Có cờ từ `/auth/me/` thì luôn
+ * dùng cờ đó — luật chỉ nên sống ở một chỗ.
  *
  * Không thể suy ra điều này từ `modules`: RB Sales VẪN có module `talent` (quyết
  * định 19/08 — đọc chéo hồ sơ, có ghi log `cross_domain`), nhưng backend chặn
@@ -35,8 +37,13 @@ function canReadCv(roles: Set<string>): boolean {
     || roles.has("manager") || roles.has("admin");
 }
 
-export function perspectiveAccess(modules: Set<string>, roles: Set<string>): PerspectiveAccess {
-  const canRecruiter = modules.has("talent") && canReadCv(roles);
+export function perspectiveAccess(
+  modules: Set<string>,
+  roles: Set<string>,
+  serverCanReadCv?: boolean,
+): PerspectiveAccess {
+  const readCv = serverCanReadCv ?? canReadCv(roles);
+  const canRecruiter = modules.has("talent") && readCv;
   const canProspect = modules.has("rb");
   return { canRecruiter, canProspect, canSwitch: canRecruiter && canProspect };
 }
@@ -70,12 +77,14 @@ export function resolvePerspective({
   modules,
   roles,
   param,
+  canReadCv: serverCanReadCv,
 }: {
   modules: Set<string>;
   roles: Set<string>;
   param?: string | null;
+  canReadCv?: boolean;
 }): SearchPerspective {
-  const { canRecruiter, canProspect } = perspectiveAccess(modules, roles);
+  const { canRecruiter, canProspect } = perspectiveAccess(modules, roles, serverCanReadCv);
 
   const requested = parsePerspective(param ?? null);
   if (requested === "prospect" && canProspect) return "prospect";

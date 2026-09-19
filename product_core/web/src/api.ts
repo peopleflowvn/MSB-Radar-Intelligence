@@ -1497,6 +1497,9 @@ export interface Identity {
   role_labels: string[];
   /** Module người này vào được. Chỉ để ẩn/hiện tab — chặn thật ở máy chủ. */
   modules: string[];
+  /** Được đọc nội dung CV không — `talent.corpus_qa.can_read_cv`. Không suy ra
+   * được từ `modules`: RB Sales vẫn có module `talent`. Máy chủ cũ không gửi. */
+  can_read_cv?: boolean;
 }
 
 export type Session =

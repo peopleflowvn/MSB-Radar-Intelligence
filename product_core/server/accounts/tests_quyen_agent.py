@@ -120,9 +120,10 @@ class KhoDungChungLaCoYTest(TestCase):
 
         from talent.answer import retrieve as mod
 
-        than = inspect.getsource(mod.retrieve)
-        self.assertIn("user", inspect.signature(mod.retrieve).parameters,
-                      "chữ ký vẫn nhận `user` để sau này nối lọc vào")
-        self.assertNotIn("user=user", than,
+        # `retrieve` từng nhận `user` mà không đọc lần nào — chữ ký hứa lọc theo
+        # người dùng mà thân hàm không làm. Bản 16/09 bỏ hẳn tham số (xem
+        # docstring của `retrieve`). Nên chủ đích "kho dùng chung" giờ được ghi
+        # bằng việc KHÔNG có `user`; ai thêm lại là đang nối lọc cấp dòng.
+        self.assertNotIn("user", inspect.signature(mod.retrieve).parameters,
                          "đã có lọc theo người dùng — cập nhật lại docstring "
                          "đầu file này và `talent/answer/cache.py::key_for`")

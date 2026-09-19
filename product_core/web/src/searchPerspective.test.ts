@@ -96,3 +96,18 @@ describe("personLinkFrom — ngữ cảnh quay lại của Hồ sơ 360°", () =
     expect(personLinkFrom("recruiter", "filter")).toBe("search-filter-recruiter");
   });
 });
+
+describe("cờ can_read_cv từ máy chủ", () => {
+  it("máy chủ nói được đọc CV thì mở góc nhìn Tuyển dụng, bất kể suy từ vai trò", () => {
+    expect(perspectiveAccess(set("talent", "rb"), set("rb_sales"), true).canRecruiter).toBe(true);
+  });
+
+  it("máy chủ nói không được đọc CV thì khoá góc nhìn Tuyển dụng dù là recruiter", () => {
+    expect(perspectiveAccess(set("talent", "rb"), set("recruiter"), false)).toEqual({
+      canRecruiter: false, canProspect: true, canSwitch: false,
+    });
+    expect(resolvePerspective({
+      modules: set("talent", "rb"), roles: set("recruiter"), param: "recruiter", canReadCv: false,
+    })).toBe("prospect");
+  });
+});

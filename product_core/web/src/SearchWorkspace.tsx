@@ -34,7 +34,8 @@ export default function SearchWorkspace() {
   const identity = session.data?.authenticated ? session.data : null;
   const modules = new Set(identity?.modules ?? []);
   const roles = new Set(identity?.roles ?? []);
-  const { canRecruiter, canProspect, canSwitch } = perspectiveAccess(modules, roles);
+  const canReadCv = identity?.can_read_cv;
+  const { canRecruiter, canProspect, canSwitch } = perspectiveAccess(modules, roles, canReadCv);
 
   // Bộ lọc đa chiều chạy trên `/talent/search/` + `/talent/facets/`, hai endpoint
   // đòi MODULE_TALENT (xem `talent/views.py`). Người chỉ được cấp `rb` vẫn dùng
@@ -50,6 +51,7 @@ export default function SearchWorkspace() {
     modules,
     roles,
     param: searchParams.get("perspective"),
+    canReadCv,
   });
 
   // Ghim góc nhìn đã giải quyết vào URL để link chia sẻ / nút quay lại từ Hồ sơ
@@ -97,20 +99,34 @@ export default function SearchWorkspace() {
   const isProspect = perspective === "prospect";
 
   return (
-    <div className="search-workspace">
-      <div className="search-workspace-head">
-        <div className="search-workspace-title">
-          <span className="search-workspace-icon">{isProspect ? "💳" : "🎯"}</span>
-          <div>
-            <h1 className="workspace-main-title">
-              {isProspect ? "Tìm Khách Hàng Tiềm Năng" : "Tìm Kiếm Nhân Tài"}
-            </h1>
-            <p className="workspace-subtitle">
-              {isProspect
-                ? "Trợ lý AI và bộ lọc đa chiều trên toàn kho hồ sơ — chấm điểm tiềm năng, đề xuất sản phẩm và đẩy cơ hội sang Growth Radar."
-                : "Trợ lý AI và bộ lọc đa chiều trên toàn kho hồ sơ — bóc tách JD, đối sánh năng lực và đẩy ứng viên sang đợt tuyển của Talent Radar."}
-            </p>
-          </div>
+    <div className="search-workspace full-page-ai-glow">
+      {/* Dynamic Animated AI Glow Spheres */}
+      <div className="ai-ambient-glow" aria-hidden="true">
+        <div className="glow-orb orb-1" />
+        <div className="glow-orb orb-2" />
+        <div className="glow-orb orb-3" />
+        <div className="glow-orb orb-4" />
+      </div>
+
+      {/* Sleek, Compact Top Control Bar */}
+      <div className="search-control-toolbar">
+        <div className="search-mode-tabs">
+          <button
+            type="button"
+            className={`search-mode-tab ${tab === "ai" ? "active" : ""}`}
+            onClick={() => setTab("ai")}
+          >
+            ✨ Tìm kiếm AI
+          </button>
+          {canUseFilter && (
+            <button
+              type="button"
+              className={`search-mode-tab ${tab === "filter" ? "active" : ""}`}
+              onClick={() => setTab("filter")}
+            >
+              ⚙️ Bộ lọc đa chiều
+            </button>
+          )}
         </div>
 
         {canSwitch && (
@@ -134,25 +150,6 @@ export default function SearchWorkspace() {
               <span className="switch-badge">RM &amp; Sales</span>
             </button>
           </div>
-        )}
-      </div>
-
-      <div className="search-mode-tabs">
-        <button
-          type="button"
-          className={`search-mode-tab ${tab === "ai" ? "active" : ""}`}
-          onClick={() => setTab("ai")}
-        >
-          ✨ Tìm kiếm AI
-        </button>
-        {canUseFilter && (
-          <button
-            type="button"
-            className={`search-mode-tab ${tab === "filter" ? "active" : ""}`}
-            onClick={() => setTab("filter")}
-          >
-            ⚙️ Bộ lọc đa chiều
-          </button>
         )}
       </div>
 

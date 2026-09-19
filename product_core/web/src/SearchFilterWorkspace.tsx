@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   api,
@@ -174,6 +174,254 @@ function WorklistBadges({ person }: { person: TalentCard }) {
   );
 }
 
+/**
+ * Kết quả của một thao tác hàng loạt chạy bằng `Promise.allSettled`: báo đúng số
+ * thành công, và nói rõ số hỏng — trước đây thông báo luôn lấy số đã CHỌN, nên
+ * 3/50 người thêm vào nhóm thất bại vẫn hiện "Đã thêm 50".
+ */
+function settledCount(results: PromiseSettledResult<unknown>[]) {
+  const ok = results.filter((r) => r.status === "fulfilled").length;
+  return { ok, failed: results.length - ok };
+}
+
+function failedSuffix(failed: number) {
+  return failed > 0 ? ` (${failed} hồ sơ không xử lý được — thử lại sau)` : "";
+}
+
+/**
+ * Mọi chữ và con số khác nhau giữa hai góc nhìn, gom một chỗ. Trước đây là hơn
+ * ba chục phép `isProspect ? … : …` rải khắp phần hiển thị — thêm một nhãn là
+ * phải lần hết file, sót một chỗ là màn hình Khách hàng hiện chữ "ứng viên".
+ */
+const COPY = {
+  recruiter: {
+    //: Giữ đúng nhịp duyệt cũ của từng bên: bộ lọc ứng viên 50 hồ sơ một trang.
+    pageSize: 50,
+    noun: "ứng viên",
+    nounTitle: "Ứng viên",
+    found: "ứng viên phù hợp",
+    tasksLink: "/talent?tab=tasks",
+    tasksLabel: "Sang Nhiệm vụ săn",
+    searchPlaceholder: "Tìm theo tên ứng viên, kỹ năng, chức danh, công ty…",
+    poolLabel: "Đợt tuyển & Pool",
+    ownerLabel: "Recruiter phụ trách",
+    emptyIcon: "🎯",
+    emptyTitle: "Kho Hồ Sơ Ứng Viên & Nhân Tài",
+    titleFallback: "Chưa cập nhật chức danh",
+    metaColumn: "Khu vực & Kinh nghiệm",
+  },
+  prospect: {
+    //: Bộ lọc khách hàng vốn duyệt 30 — gộp về một số là đổi nhịp của cả hai.
+    pageSize: 30,
+    noun: "khách hàng",
+    nounTitle: "Khách hàng",
+    found: "khách hàng tiềm năng",
+    tasksLink: "/rb?tab=tasks",
+    tasksLabel: "Sang Cơ hội & Việc cần xử lý",
+    searchPlaceholder: "Tìm theo tên khách hàng, chức danh, công ty, nhu cầu tài chính…",
+    poolLabel: "Nhóm khách hàng",
+    ownerLabel: "RM phụ trách",
+    emptyIcon: "💼",
+    emptyTitle: "Kho Dữ Liệu Khách Hàng Tiềm Năng & Bán Chéo",
+    titleFallback: "Khách hàng cá nhân",
+    metaColumn: "Khu vực & Liên hệ",
+  },
+} as const;
+
+const PRODUCT_OPTIONS: Array<[string, string]> = [
+  ["credit_card", "Thẻ tín dụng"],
+  ["mortgage", "Vay mua nhà"],
+  ["savings", "Tiết kiệm"],
+  ["investment", "Đầu tư"],
+  ["insurance", "Bảo hiểm"],
+  ["fx", "Ngoại tệ"],
+  ["auto_loan", "Vay mua xe"],
+  ["consumer_loan", "Vay tiêu dùng"],
+  ["payroll", "Tài khoản lương"],
+];
+
+interface BulkActionProps {
+  selectedIds: number[];
+  /** Xong một thao tác: bỏ chọn và báo kết quả lên banner chung. */
+  onDone: (message: string) => void;
+}
+
+/** Thao tác hàng loạt của góc nhìn Khách hàng: tạo cơ hội sang Growth Radar. */
+function ProspectBulkActions({ selectedIds, onDone }: BulkActionProps) {
+  const qc = useQueryClient();
+  const [product, setProduct] = useState("credit_card");
+  const [need, setNeed] = useState("");
+
+  const create = useMutation({
+    mutationFn: async () => settledCount(await Promise.allSettled(
+      selectedIds.map((personId) =>
+        api.rbOpportunityCreate({
+          person_id: personId,
+          product: product || "credit_card",
+          need: need.trim() || "Tạo hàng loạt từ bộ lọc đa chiều",
+        })
+      )
+    )),
+    onSuccess: ({ ok, failed }) => {
+      onDone(`✓ Đã tạo ${ok} cơ hội tiếp cận cho khách hàng đã chọn${failedSuffix(failed)}`);
+      qc.invalidateQueries({ queryKey: ["rb-customer-tasks"] });
+      qc.invalidateQueries({ queryKey: ["rb-opportunities"] });
+      qc.invalidateQueries({ queryKey: ["search-filter-results"] });
+    },
+  });
+
+  return (
+    <>
+      <select
+        className="config-select"
+        style={{ minWidth: "160px" }}
+        value={product}
+        onChange={(e) => setProduct(e.target.value)}
+      >
+        {PRODUCT_OPTIONS.map(([value, label]) => (
+          <option key={value} value={value}>{label}</option>
+        ))}
+      </select>
+      <input
+        className="search-main"
+        style={{ minWidth: "200px" }}
+        value={need}
+        onChange={(e) => setNeed(e.target.value)}
+        placeholder="Ghi chú nhu cầu tiếp cận…"
+      />
+      <button
+        type="button"
+        className="btn btn-primary btn-sm"
+        disabled={create.isPending}
+        onClick={() => create.mutate()}
+      >
+        {create.isPending ? "Đang tạo…" : "⚡ Tạo cơ hội hàng loạt"}
+      </button>
+      {create.error && <span className="err-box">{String(create.error)}</span>}
+    </>
+  );
+}
+
+/** Thao tác hàng loạt của góc nhìn Tuyển dụng: đưa ứng viên vào đợt tuyển. */
+function RecruiterBulkActions({ selectedIds, onDone }: BulkActionProps) {
+  const qc = useQueryClient();
+  const [targetHunt, setTargetHunt] = useState("");
+  const [title, setTitle] = useState("");
+
+  const hunts = useQuery({
+    queryKey: ["hunts", "open-from-search"],
+    queryFn: () => api.hunts({ open: true, mine: true }),
+  });
+
+  function refresh() {
+    qc.invalidateQueries({ queryKey: ["hunts"] });
+    qc.invalidateQueries({ queryKey: ["hunt-tasks"] });
+    qc.invalidateQueries({ queryKey: ["search-filter-results"] });
+  }
+
+  const createWorklist = useMutation({
+    mutationFn: () => api.createShortlist({ title: title.trim(), person_ids: selectedIds }),
+    onSuccess: () => {
+      onDone(`✓ Đã tạo đợt tuyển mới từ ${selectedIds.length} ứng viên đã chọn!`);
+      setTitle("");
+      refresh();
+    },
+  });
+
+  const addToWorklist = useMutation({
+    mutationFn: () => api.huntUpdate(Number(targetHunt), { person_ids_add: selectedIds }),
+    onSuccess: () => {
+      onDone(`✓ Đã thêm ${selectedIds.length} ứng viên vào đợt tuyển thành công!`);
+      setTargetHunt("");
+      refresh();
+    },
+  });
+
+  const error = addToWorklist.error || createWorklist.error;
+  return (
+    <>
+      <select
+        className="config-select"
+        style={{ minWidth: "180px" }}
+        value={targetHunt}
+        onChange={(e) => setTargetHunt(e.target.value)}
+      >
+        <option value="">Thêm vào đợt tuyển…</option>
+        {(hunts.data?.results ?? []).map((hunt) => (
+          <option key={hunt.id} value={hunt.id}>
+            {hunt.title}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        className="btn btn-primary btn-sm"
+        disabled={!targetHunt || addToWorklist.isPending}
+        onClick={() => addToWorklist.mutate()}
+      >
+        {addToWorklist.isPending ? "Đang thêm…" : "🎯 Thêm vào đợt tuyển"}
+      </button>
+      <span className="muted" style={{ fontSize: "12px", margin: "0 4px" }}>hoặc</span>
+      <input
+        className="search-main"
+        style={{ minWidth: "180px" }}
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Tên đợt tuyển mới…"
+      />
+      <button
+        type="button"
+        className="btn btn-secondary btn-sm"
+        disabled={!title.trim() || createWorklist.isPending}
+        onClick={() => createWorklist.mutate()}
+      >
+        {createWorklist.isPending ? "Đang tạo…" : "+ Tạo đợt tuyển mới"}
+      </button>
+      {error && <span className="err-box">{String(error)}</span>}
+    </>
+  );
+}
+
+/**
+ * Tạo một cơ hội cho một khách, dùng chung cho thẻ và bảng.
+ *
+ * Sản phẩm lấy từ bộ lọc ĐÃ ÁP (trước đây lấy từ bản nháp — gõ dở bộ lọc sản
+ * phẩm rồi bấm là tạo cơ hội cho sản phẩm chưa hề lọc), và khoá nút trong lúc
+ * chờ để bấm đúp không sinh hai cơ hội trùng.
+ */
+function CreateOpportunityButton({
+  card, product, onCreated,
+}: {
+  card: TalentCard;
+  product?: string;
+  onCreated: (message: string) => void;
+}) {
+  const qc = useQueryClient();
+  const create = useMutation({
+    mutationFn: () => api.rbOpportunityCreate({
+      person_id: card.id,
+      product: product || "credit_card",
+      need: `Tạo từ bộ lọc đa chiều: ${card.headline || ""}`,
+    }),
+    onSuccess: () => {
+      onCreated("✓ Đã tạo cơ hội mới vào Growth Radar thành công!");
+      qc.invalidateQueries({ queryKey: ["rb-customer-tasks"] });
+      qc.invalidateQueries({ queryKey: ["rb-opportunities"] });
+    },
+  });
+  return (
+    <button
+      type="button"
+      className="btn btn-primary btn-sm"
+      disabled={create.isPending}
+      title={create.error ? String(create.error) : undefined}
+      onClick={() => create.mutate()}
+    >
+      {create.isPending ? "Đang tạo…" : create.error ? "⚠ Thử lại" : "⚡ Tạo cơ hội"}
+    </button>
+  );
+}
+
 function Field({
   label,
   hint,
@@ -205,6 +453,7 @@ export default function SearchFilterWorkspace({
   const qc = useQueryClient();
   const { maskSensitiveData } = useCustomTheme();
   const isProspect = perspective === "prospect";
+  const copy = COPY[perspective];
   const domain = perspectiveDomain(perspective);
 
   const {
@@ -216,19 +465,12 @@ export default function SearchFilterWorkspace({
   } = useSearchFilterState();
 
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<string>("credit_card");
-  const [selectedNeed, setSelectedNeed] = useState<string>("");
   const [targetPool, setTargetPool] = useState<string>("");
   const [newPoolTitle, setNewPoolTitle] = useState<string>("");
-  const [targetHunt, setTargetHunt] = useState<string>("");
-  const [worklistTitle, setWorklistTitle] = useState<string>("");
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [createdMsg, setCreatedMsg] = useState<string | null>(null);
 
   const personFrom = personLinkFrom(perspective, "filter");
-  //: Giữ đúng cỡ trang cũ của từng bên: bộ lọc ứng viên vốn duyệt 50 hồ sơ một
-  //: trang, bộ lọc khách hàng 30 — gộp về một số là đổi nhịp duyệt của cả hai.
-  const pageSize = isProspect ? 30 : 50;
+  const pageSize = copy.pageSize;
 
   const facets = useQuery({
     queryKey: ["talent-facets"],
@@ -246,14 +488,11 @@ export default function SearchFilterWorkspace({
     queryFn: () => api.pools(domain),
   });
 
-  const hunts = useQuery({
-    queryKey: ["hunts", "open-from-search"],
-    queryFn: () => api.hunts({ open: true, mine: true }),
-    enabled: !isProspect && selectedIds.length > 0,
-  });
-
   const searchResults = useQuery({
-    queryKey: ["search-filter-results", appliedFilters, page],
+    // `pageSize` nằm trong khoá: hai góc nhìn duyệt 50 và 30 hồ sơ một trang, cùng
+    // bộ lọc + cùng số trang mà dùng chung cache thì đổi góc nhìn sẽ hiện trang
+    // của bên kia (offset 100 thay vì 60) với số trang tính theo bên này.
+    queryKey: ["search-filter-results", appliedFilters, page, pageSize],
     queryFn: () => api.talentSearch(appliedFilters, pageSize, page * pageSize),
     enabled: hasSearched,
     retry: false,
@@ -271,7 +510,6 @@ export default function SearchFilterWorkspace({
     if (prevPerspective.current === perspective) return;  // lần mount đầu: giữ bộ lọc đã lưu
     prevPerspective.current = perspective;
     setTargetPool("");
-    setTargetHunt("");
     setDraft((prev) => (prev.pool ? { ...prev, pool: "" } : prev));
     setAppliedFilters((prev) => (prev.pool ? { ...prev, pool: "" } : prev));
   }, [perspective, setDraft, setAppliedFilters]);
@@ -286,56 +524,36 @@ export default function SearchFilterWorkspace({
     return () => window.clearTimeout(timer);
   }, [hasSearched, searchResults.data, scrollY, setScrollY]);
 
-  const createOpportunity = useMutation({
-    mutationFn: ({ personId, product, need }: { personId: number; product: string; need: string }) =>
-      api.rbOpportunityCreate({ person_id: personId, product, need }),
-    onSuccess: () => {
-      setCreatedMsg("✓ Đã tạo cơ hội mới vào Growth Radar thành công!");
-      qc.invalidateQueries({ queryKey: ["rb-customer-tasks"] });
-      qc.invalidateQueries({ queryKey: ["rb-opportunities"] });
-      setTimeout(() => setCreatedMsg(null), 4000);
-    },
-  });
-
-  const bulkCreateOpportunity = useMutation({
-    mutationFn: async () => {
-      const results = await Promise.allSettled(
-        selectedIds.map((personId) =>
-          api.rbOpportunityCreate({
-            person_id: personId,
-            product: selectedProduct || "credit_card",
-            need: selectedNeed.trim() || "Tạo hàng loạt từ bộ lọc đa chiều",
-          })
-        )
-      );
-      return results.filter((r) => r.status === "fulfilled").length;
-    },
-    onSuccess: (count) => {
-      setSelectedIds([]);
-      setSuccessMsg(`✓ Đã tạo thành công ${count} cơ hội tiếp cận cho khách hàng đã chọn!`);
-      qc.invalidateQueries({ queryKey: ["rb-customer-tasks"] });
-      qc.invalidateQueries({ queryKey: ["rb-opportunities"] });
-      setTimeout(() => setSuccessMsg(null), 5000);
-    },
-  });
+  // Một bộ hẹn giờ cho banner, huỷ khi có thông báo mới hoặc khi rời màn hình —
+  // trước đây mỗi thao tác tự `setTimeout` riêng, thông báo sau bị thông báo
+  // trước xoá sớm, và hẹn giờ còn chạy sau khi component đã gỡ.
+  const successTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(successTimer.current), []);
+  const showSuccess = useCallback((message: string) => {
+    window.clearTimeout(successTimer.current);
+    setSuccessMsg(message);
+    successTimer.current = window.setTimeout(() => setSuccessMsg(null), 5000);
+  }, []);
+  const finishBulk = useCallback((message: string) => {
+    setSelectedIds([]);
+    showSuccess(message);
+  }, [showSuccess]);
 
   const addToPool = useMutation({
     mutationFn: async () => {
-      if (!targetPool) return;
-      await Promise.allSettled(
+      if (!targetPool) return { ok: 0, failed: 0 };
+      return settledCount(await Promise.allSettled(
         selectedIds.map((personId) =>
           api.setPoolMember(Number(targetPool), personId)
         )
-      );
+      ));
     },
-    onSuccess: () => {
-      const count = selectedIds.length;
-      setSelectedIds([]);
+    onSuccess: ({ ok, failed }) => {
       setTargetPool("");
-      setSuccessMsg(`✓ Đã thêm ${count} hồ sơ vào nhóm thành công!`);
+      finishBulk(`✓ Đã thêm ${ok} hồ sơ vào nhóm${failedSuffix(failed)}`);
       qc.invalidateQueries({ queryKey: ["customer-groups"] });
       qc.invalidateQueries({ queryKey: ["pools", domain] });
-      setTimeout(() => setSuccessMsg(null), 5000);
+      qc.invalidateQueries({ queryKey: ["search-filter-results"] });
     },
   });
 
@@ -343,48 +561,19 @@ export default function SearchFilterWorkspace({
     mutationFn: async () => {
       if (!newPoolTitle.trim()) return;
       const pool = await api.createPool(newPoolTitle.trim(), "Tạo từ bộ lọc đa chiều", domain);
-      await Promise.allSettled(
+      const { ok, failed } = settledCount(await Promise.allSettled(
         selectedIds.map((personId) => api.setPoolMember(pool.id, personId))
-      );
-      return pool;
+      ));
+      return { pool, ok, failed };
     },
-    onSuccess: (pool) => {
-      const count = selectedIds.length;
-      setSelectedIds([]);
+    onSuccess: (result) => {
       setNewPoolTitle("");
-      setSuccessMsg(`✓ Đã tạo nhóm "${pool?.name || newPoolTitle}" với ${count} hồ sơ!`);
+      if (result) {
+        finishBulk(`✓ Đã tạo nhóm "${result.pool.name || newPoolTitle}" với ${result.ok} hồ sơ${failedSuffix(result.failed)}`);
+      }
       qc.invalidateQueries({ queryKey: ["customer-groups"] });
       qc.invalidateQueries({ queryKey: ["pools", domain] });
-      setTimeout(() => setSuccessMsg(null), 5000);
-    },
-  });
-
-  const createWorklist = useMutation({
-    mutationFn: () =>
-      api.createShortlist({ title: worklistTitle.trim(), person_ids: selectedIds }),
-    onSuccess: () => {
-      const count = selectedIds.length;
-      setSelectedIds([]);
-      setWorklistTitle("");
-      setSuccessMsg(`✓ Đã tạo đợt tuyển mới từ ${count} ứng viên đã chọn!`);
-      qc.invalidateQueries({ queryKey: ["hunts"] });
-      qc.invalidateQueries({ queryKey: ["hunt-tasks"] });
-      setTimeout(() => setSuccessMsg(null), 6000);
-    },
-  });
-
-  const addToWorklist = useMutation({
-    mutationFn: () =>
-      api.huntUpdate(Number(targetHunt), { person_ids_add: selectedIds }),
-    onSuccess: () => {
-      const count = selectedIds.length;
-      setSelectedIds([]);
-      setTargetHunt("");
-      setSuccessMsg(`✓ Đã thêm ${count} ứng viên vào đợt tuyển thành công!`);
-      qc.invalidateQueries({ queryKey: ["hunts"] });
-      qc.invalidateQueries({ queryKey: ["hunt-tasks"] });
       qc.invalidateQueries({ queryKey: ["search-filter-results"] });
-      setTimeout(() => setSuccessMsg(null), 6000);
     },
   });
 
@@ -498,16 +687,16 @@ export default function SearchFilterWorkspace({
 
   return (
     <div className="talent-filter-workspace">
-      {(createdMsg || successMsg) && (
+      {successMsg && (
         <div className="talent-success-banner" style={{ marginBottom: "16px" }}>
-          <span>{createdMsg || successMsg}</span>
+          <span>{successMsg}</span>
           {/* Phân hệ Tìm kiếm không có bảng công việc — đưa thẳng sang nơi xử lý
               tiếp ở Radar tương ứng, thay vì bắt người dùng tự mò trong menu. */}
           <Link
             className="btn btn-primary btn-sm"
-            to={isProspect ? "/rb?tab=tasks" : "/talent?tab=tasks"}
+            to={copy.tasksLink}
           >
-            👉 {isProspect ? "Sang Cơ hội & Việc cần xử lý" : "Sang Nhiệm vụ săn"} →
+            👉 {copy.tasksLabel} →
           </Link>
         </div>
       )}
@@ -522,9 +711,7 @@ export default function SearchFilterWorkspace({
               <input
                 type="search"
                 className="search-main-input"
-                placeholder={isProspect
-                  ? "Tìm theo tên khách hàng, chức danh, công ty, nhu cầu tài chính…"
-                  : "Tìm theo tên ứng viên, kỹ năng, chức danh, công ty…"}
+                placeholder={copy.searchPlaceholder}
                 value={draft.q ?? ""}
                 onChange={(event) => setDraft((prev) => ({ ...prev, q: event.target.value }))}
               />
@@ -858,7 +1045,7 @@ export default function SearchFilterWorkspace({
 
               <div className="filter-col">
                 <label className="filter-label">
-                  <span>👥 {isProspect ? "Nhóm khách hàng" : "Đợt tuyển & Pool"}</span>
+                  <span>👥 {copy.poolLabel}</span>
                 </label>
                 <select
                   className="config-select"
@@ -876,7 +1063,7 @@ export default function SearchFilterWorkspace({
 
               <div className="filter-col">
                 <label className="filter-label">
-                  <span>👔 {isProspect ? "RM phụ trách" : "Recruiter phụ trách"}</span>
+                  <span>👔 {copy.ownerLabel}</span>
                 </label>
                 <select
                   className="config-select"
@@ -989,7 +1176,7 @@ export default function SearchFilterWorkspace({
         <div className="bulk-actions-toolbar" style={{ marginBottom: "16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
             <span className="bulk-count-badge">
-              Đã chọn: <strong>{selectedIds.length}</strong> {isProspect ? "khách hàng" : "ứng viên"}
+              Đã chọn: <strong>{selectedIds.length}</strong> {copy.noun}
             </span>
             <button
               type="button"
@@ -1008,81 +1195,11 @@ export default function SearchFilterWorkspace({
 
             <span className="muted" style={{ fontSize: "12px", margin: "0 6px" }}>|</span>
 
-            {isProspect ? (
-              <>
-                <select
-                  className="config-select"
-                  style={{ minWidth: "160px" }}
-                  value={selectedProduct}
-                  onChange={(e) => setSelectedProduct(e.target.value)}
-                >
-                  <option value="credit_card">Thẻ tín dụng</option>
-                  <option value="mortgage">Vay mua nhà</option>
-                  <option value="savings">Tiết kiệm</option>
-                  <option value="investment">Đầu tư</option>
-                  <option value="insurance">Bảo hiểm</option>
-                  <option value="fx">Ngoại tệ</option>
-                  <option value="auto_loan">Vay mua xe</option>
-                  <option value="consumer_loan">Vay tiêu dùng</option>
-                  <option value="payroll">Tài khoản lương</option>
-                </select>
-                <input
-                  className="search-main"
-                  style={{ minWidth: "200px" }}
-                  value={selectedNeed}
-                  onChange={(e) => setSelectedNeed(e.target.value)}
-                  placeholder="Ghi chú nhu cầu tiếp cận…"
-                />
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  disabled={bulkCreateOpportunity.isPending}
-                  onClick={() => bulkCreateOpportunity.mutate()}
-                >
-                  {bulkCreateOpportunity.isPending ? "Đang tạo…" : "⚡ Tạo cơ hội hàng loạt"}
-                </button>
-              </>
-            ) : (
-              <>
-                <select
-                  className="config-select"
-                  style={{ minWidth: "180px" }}
-                  value={targetHunt}
-                  onChange={(e) => setTargetHunt(e.target.value)}
-                >
-                  <option value="">Thêm vào đợt tuyển…</option>
-                  {(hunts.data?.results ?? []).map((hunt) => (
-                    <option key={hunt.id} value={hunt.id}>
-                      {hunt.title}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  disabled={!targetHunt || addToWorklist.isPending}
-                  onClick={() => addToWorklist.mutate()}
-                >
-                  {addToWorklist.isPending ? "Đang thêm…" : "🎯 Thêm vào đợt tuyển"}
-                </button>
-                <span className="muted" style={{ fontSize: "12px", margin: "0 4px" }}>hoặc</span>
-                <input
-                  className="search-main"
-                  style={{ minWidth: "180px" }}
-                  value={worklistTitle}
-                  onChange={(e) => setWorklistTitle(e.target.value)}
-                  placeholder="Tên đợt tuyển mới…"
-                />
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  disabled={!worklistTitle.trim() || createWorklist.isPending}
-                  onClick={() => createWorklist.mutate()}
-                >
-                  {createWorklist.isPending ? "Đang tạo…" : "+ Tạo đợt tuyển mới"}
-                </button>
-              </>
-            )}
+            {/* `key` theo góc nhìn: đổi góc nhìn là dựng lại, không mang lựa chọn
+                đợt tuyển / sản phẩm của nghiệp vụ này sang nghiệp vụ kia. */}
+            {isProspect
+              ? <ProspectBulkActions key="prospect" selectedIds={selectedIds} onDone={finishBulk} />
+              : <RecruiterBulkActions key="recruiter" selectedIds={selectedIds} onDone={finishBulk} />}
 
             <span className="muted" style={{ fontSize: "12px", margin: "0 6px" }}>|</span>
 
@@ -1126,11 +1243,9 @@ export default function SearchFilterWorkspace({
               {createPoolWithMembers.isPending ? "Đang tạo…" : "+ Tạo nhóm mới"}
             </button>
           </div>
-          {(bulkCreateOpportunity.error || addToPool.error || createPoolWithMembers.error
-            || addToWorklist.error || createWorklist.error) && (
+          {(addToPool.error || createPoolWithMembers.error) && (
             <p className="err-box" style={{ marginTop: "10px" }}>
-              {String(bulkCreateOpportunity.error || addToPool.error || createPoolWithMembers.error
-                || addToWorklist.error || createWorklist.error)}
+              {String(addToPool.error || createPoolWithMembers.error)}
             </p>
           )}
         </div>
@@ -1140,12 +1255,10 @@ export default function SearchFilterWorkspace({
       {!hasSearched && (
         <div className="talent-search-initial-card">
           <div className="initial-card-icon" style={{ background: "rgba(5, 150, 105, 0.12)", color: "#059669" }}>
-            {isProspect ? "💼" : "🎯"}
+            {copy.emptyIcon}
           </div>
           <h3 className="initial-card-title">
-            {isProspect
-              ? "Kho Dữ Liệu Khách Hàng Tiềm Năng & Bán Chéo"
-              : "Kho Hồ Sơ Ứng Viên & Nhân Tài"}
+            {copy.emptyTitle}
           </h3>
           <p className="initial-card-desc">
             Nhập từ khoá tìm kiếm, chọn các bộ lọc nhanh ở trên hoặc thiết lập tiêu chí chuyên sâu rồi bấm <strong>Tìm kiếm</strong> để bắt đầu tra cứu.
@@ -1215,7 +1328,7 @@ export default function SearchFilterWorkspace({
               ) : (
                 <span>
                   Tìm thấy <strong>{(searchResults.data?.count ?? 0).toLocaleString("vi-VN")}</strong>{" "}
-                  {isProspect ? "khách hàng tiềm năng" : "ứng viên phù hợp"}
+                  {copy.found}
                 </span>
               )}
               {searchResults.data && searchResults.data.count > pageSize && (
@@ -1285,7 +1398,7 @@ export default function SearchFilterWorkspace({
                         type="checkbox"
                         checked={selectedIds.includes(card.id)}
                         onChange={() => togglePerson(card.id)}
-                        title="Chọn khách hàng này"
+                        title={`Chọn ${copy.noun} này`}
                         style={{ cursor: "pointer", width: "16px", height: "16px", accentColor: "var(--accent)" }}
                       />
                       <div
@@ -1316,7 +1429,7 @@ export default function SearchFilterWorkspace({
                         <div className="talent-title" style={{ marginTop: "2px" }}>
                           <span className="title-text">
                             {card.talent?.current_title || card.headline
-                              || (isProspect ? "Khách hàng cá nhân" : "Chưa cập nhật chức danh")}
+                              || copy.titleFallback}
                           </span>
                           {!isProspect && card.talent?.current_company && (
                             <span className="company-text"> @ {card.talent.current_company}</span>
@@ -1375,19 +1488,11 @@ export default function SearchFilterWorkspace({
                       Hồ sơ 360° →
                     </Link>
                     {isProspect && (
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        onClick={() =>
-                          createOpportunity.mutate({
-                            personId: card.id,
-                            product: draft.product || "credit_card",
-                            need: `Tạo từ bộ lọc đa chiều: ${card.headline || ""}`,
-                          })
-                        }
-                      >
-                        ⚡ Tạo cơ hội
-                      </button>
+                      <CreateOpportunityButton
+                        card={card}
+                        product={appliedFilters.product}
+                        onCreated={showSuccess}
+                      />
                     )}
                   </div>
                 </div>
@@ -1395,7 +1500,7 @@ export default function SearchFilterWorkspace({
 
               {searchResults.data && searchResults.data.results.length === 0 && (
                 <div className="empty-results-box">
-                  <p>Không có khách hàng nào khớp với bộ lọc.</p>
+                  <p>Không có {copy.noun} nào khớp với bộ lọc.</p>
                 </div>
               )}
             </div>
@@ -1424,9 +1529,9 @@ export default function SearchFilterWorkspace({
                         style={{ cursor: "pointer", width: "16px", height: "16px" }}
                       />
                     </th>
-                    <th>{isProspect ? "Khách hàng" : "Ứng viên"}</th>
+                    <th>{copy.nounTitle}</th>
                     <th>Chức danh / Nghề nghiệp</th>
-                    <th>{isProspect ? "Khu vực & Liên hệ" : "Khu vực & Kinh nghiệm"}</th>
+                    <th>{copy.metaColumn}</th>
                     {!isProspect && <th>Kỹ năng</th>}
                     {!isProspect && <th>Liên hệ</th>}
                     <th style={{ textAlign: "right", width: "140px" }}>Thao tác</th>
@@ -1510,19 +1615,11 @@ export default function SearchFilterWorkspace({
                       )}
                       <td style={{ textAlign: "right" }}>
                         {isProspect ? (
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm"
-                            onClick={() =>
-                              createOpportunity.mutate({
-                                personId: card.id,
-                                product: draft.product || "credit_card",
-                                need: `Tạo từ bộ lọc đa chiều: ${card.headline || ""}`,
-                              })
-                            }
-                          >
-                            ⚡ Tạo cơ hội
-                          </button>
+                          <CreateOpportunityButton
+                            card={card}
+                            product={appliedFilters.product}
+                            onCreated={showSuccess}
+                          />
                         ) : (
                           <Link
                             className="btn btn-secondary btn-sm"
