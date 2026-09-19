@@ -434,6 +434,13 @@ def opportunity_list(request):
         if priority not in {"low", "normal", "high", "urgent"}:
             return Response({"detail": "Mức ưu tiên không hợp lệ."},
                             status=status.HTTP_400_BAD_REQUEST)
+        # Chặn ngay từ lúc tạo, không đợi tới bước soạn/gửi tin mới chặn — cơ
+        # hội cho khách DNC chỉ nằm trong hộp việc chờ một hành động bị cấm.
+        if Relationship.objects.filter(person=person, domain="rb",
+                                       do_not_contact=True).exists():
+            return Response({"detail": "Khách hàng đã yêu cầu không liên hệ — "
+                                       "không thể tạo cơ hội."},
+                            status=status.HTTP_409_CONFLICT)
         existing = RBOpportunity.objects.filter(
             person=person, product=product,
             status__in=RBOpportunity.OPEN_STATUSES).first()

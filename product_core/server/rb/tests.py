@@ -341,6 +341,29 @@ class OpportunityApiTest(TestCase):
             content_type="application/json")
         self.assertEqual(response.status_code, 409)
 
+    def test_tao_tay_chan_khach_da_yeu_cau_khong_lien_he(self):
+        binh = Person.objects.create(display_name="Trần Bình")
+        Relationship.objects.create(person=binh, domain="rb", do_not_contact=True)
+        response = self.client.post(
+            reverse("rb-opportunities"),
+            data=json.dumps({"person_id": binh.pk, "product": PRODUCT_MORTGAGE}),
+            content_type="application/json")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("không liên hệ", response.json()["detail"])
+        self.assertFalse(RBOpportunity.objects.filter(person=binh).exists())
+
+    def test_bo_loc_goc_nhin_khach_hang_loai_DNC_va_loc_theo_RM(self):
+        from talent import search as talent_search
+        binh = Person.objects.create(display_name="Trần Bình")
+        Relationship.objects.create(person=binh, domain="rb", do_not_contact=True)
+        RBProfile.objects.create(person=self.an, sales_owner=self.rm)
+        _, rb_people = talent_search.search(domain="rb", limit=50)
+        _, talent_people = talent_search.search(limit=50)
+        self.assertNotIn(binh.pk, {p.pk for p in rb_people})
+        self.assertIn(binh.pk, {p.pk for p in talent_people})
+        _, owned = talent_search.search(domain="rb", owner=self.rm.pk, limit=50)
+        self.assertEqual([p.pk for p in owned], [self.an.pk])
+
     def test_goi_y_san_pham_qua_API(self):
         response = self.client.post(
             reverse("rb-suggest"),

@@ -119,6 +119,7 @@ def search(
     max_limit=MAX_LIMIT,
     ai_mode=False,
     canonical_codes=None,
+    domain="talent",
 ):
     """Tìm Person theo tiêu chí tuyển dụng hỗ trợ cú pháp Boolean Search thông minh.
 
@@ -262,8 +263,13 @@ def search(
             facts__field=field, facts__canonical_code__in=codes,
             facts__status="accepted", facts__is_current=True).distinct()
 
+    # `domain="rb"`: góc nhìn Khách hàng của /search dùng chung hàm này, nên
+    # "người phụ trách" là RM bán lẻ và quan hệ là quan hệ bán lẻ, không phải của
+    # recruiter.
+    is_rb = domain == "rb"
     if owner is not None:
-        queryset = queryset.filter(talent_profile__owner=owner)
+        queryset = queryset.filter(**{("rb_profile__sales_owner" if is_rb
+                                       else "talent_profile__owner"): owner})
 
     tag_list = _as_list(tags)
     if tag_list:
@@ -282,7 +288,7 @@ def search(
     if source:
         queryset = queryset.filter(source_records__source=source)
     if relationship_state:
-        queryset = queryset.filter(relationships__domain="talent",
+        queryset = queryset.filter(relationships__domain=("rb" if is_rb else "talent"),
                                    relationships__state=relationship_state)
     if product_interest:
         queryset = queryset.filter(rb_profile__interests__product=product_interest)
@@ -302,6 +308,12 @@ def search(
         queryset = queryset.exclude(primary_email="")
     if has_phone:
         queryset = queryset.exclude(primary_phone="")
+
+    # Khách đã bật cờ Không liên hệ không bao giờ hiện ở góc nhìn Khách hàng —
+    # cùng ràng buộc tuân thủ với `rb/answer/retrieve.eligible_people`.
+    if is_rb:
+        from rb.answer.population import do_not_contact_ids
+        queryset = queryset.exclude(pk__in=do_not_contact_ids())
 
     if soft:
         # Truy hồi mềm: OR mọi tín hiệu để mở rộng pool; nếu vẫn mỏng thì bù bằng

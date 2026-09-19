@@ -83,13 +83,13 @@ describe("SearchWorkspace — đổi góc nhìn trong bộ lọc", () => {
       roles: ["admin"], modules: ["talent", "rb"], can_read_cv: true,
     }));
     await waitFor(() => expect(search).toHaveBeenCalled());
-    expect(search).toHaveBeenLastCalledWith(expect.objectContaining({ pool: "5" }), 50, 0);
+    expect(search).toHaveBeenLastCalledWith(expect.objectContaining({ pool: "5" }), 50, 0, "talent");
 
     fireEvent.click(await screen.findByText("Góc nhìn Khách hàng"));
 
     // Cùng id nhưng là một nhóm khác ở nghiệp vụ kia — phải bỏ, và trang 30.
     await waitFor(() =>
-      expect(search).toHaveBeenLastCalledWith(expect.objectContaining({ pool: "" }), 30, 0));
+      expect(search).toHaveBeenLastCalledWith(expect.objectContaining({ pool: "" }), 30, 0, "rb"));
   });
 });
 

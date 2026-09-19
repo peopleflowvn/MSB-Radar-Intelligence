@@ -363,6 +363,19 @@ class JudgeRefusesUnbackedClaimsTest(SimpleTestCase):
         self.assertTrue(rows[0].declined)
         self.assertEqual(rows[0].need_kind, "trang_thai")
 
+    def test_goi_model_voi_tran_thoi_gian_rieng_va_tat_che_do_nghi(self):
+        """Lô 8 khách ra 4–5 nghìn token: trần 25s mặc định làm 8/8 lô hết giờ (prod 19/09)."""
+        seen = {}
+
+        def caller(messages, **kwargs):
+            seen.update(kwargs)
+            return FakeCompletion("{}")
+        judge_stage.judge(ProspectPlan(), [self._candidate()], complete_fn=caller)
+        self.assertEqual(seen["budget_seconds"], judge_stage.JUDGE_BUDGET_SECONDS)
+        self.assertGreater(seen["budget_seconds"], 25)
+        self.assertEqual(seen["reasoning_effort"], "none")
+        self.assertEqual(seen["response_format"], {"type": "json_object"})
+
     def test_moi_lo_hong_thi_bao_broken_khong_phai_kho_rong(self):
         """Lỗi nhà cung cấp mà trông như kho rỗng thì ⑤ báo "không có khách" — sai."""
         def dead(*a, **k):

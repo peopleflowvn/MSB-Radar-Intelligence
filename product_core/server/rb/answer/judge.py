@@ -56,6 +56,9 @@ MAX_TOKENS = 6000
 #: Số lô đọc song song. Vừa phải: bắn quá nhiều lượt cùng lúc vào một khoá nhà
 #: cung cấp thì dính hạn mức, đổi chậm lấy lỗi 429.
 WORKERS = 4
+#: Trần thời gian cho MỘT lô (gồm chuyển nhà cung cấp). Lô 8 khách ra chừng
+#: 4–5 nghìn token nên 25 giây mặc định của router không bao giờ đủ.
+JUDGE_BUDGET_SECONDS = 70
 #: Trích dẫn ngắn hơn mức này không đủ để đối chiếu — bỏ.
 MIN_QUOTE = 12
 
@@ -380,8 +383,14 @@ def _parse_batch(text, batch, query_plan):
 
 def _read_batch(query_plan, batch, caller):
     try:
+        # Cùng cấu hình với `talent/answer/judge.py`. Thiếu ba tham số này, lô
+        # 4–5 nghìn token đầu ra chạy dưới trần mặc định 25 giây của router, model
+        # còn tự bật chế độ nghĩ — đo trên prod 19/09: 8/8 lô hết giờ, mọi câu
+        # hỏi tìm khách đều trả "chưa đọc được bằng chứng".
         result = caller(_messages(query_plan, batch), task=TASK, temperature=0.1,
-                        max_tokens=MAX_TOKENS)
+                        max_tokens=MAX_TOKENS, reasoning_effort="none",
+                        budget_seconds=JUDGE_BUDGET_SECONDS,
+                        response_format={"type": "json_object"})
     except Exception as exc:                       # noqa: BLE001
         log.warning("rb.answer.judge: lô %d hồ sơ đọc hỏng: %s", len(batch), exc)
         return None

@@ -70,6 +70,7 @@ def _search_kwargs(params):
         "has_email": params.get("has_email") == "1",
         "has_phone": params.get("has_phone") == "1",
         "order": params.get("order", "relevance"),
+        "domain": "rb" if params.get("domain") == "rb" else "talent",
     }
 
 

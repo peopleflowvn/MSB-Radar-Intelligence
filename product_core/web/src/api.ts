@@ -2088,7 +2088,7 @@ export const api = {
   intakeDeleteBatch: (batchId: number) =>
     request<{ ok: boolean }>(`/intake/batches/${batchId}/`, { method: "DELETE" }),
 
-  talentSearch: (filters: SearchFilters, limit = 50, offset = 0) => {
+  talentSearch: (filters: SearchFilters, limit = 50, offset = 0, domain: "talent" | "rb" = "talent") => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(filters)) {
       // Bỏ giá trị rỗng/false: gửi lên chỉ làm URL rối và không đổi kết quả.
@@ -2097,6 +2097,8 @@ export const api = {
     }
     params.set("limit", String(limit));
     params.set("offset", String(offset));
+    // Góc nhìn Khách hàng: backend loại khách DNC, lọc RM theo hồ sơ bán lẻ.
+    if (domain === "rb") params.set("domain", "rb");
     return request<{ count: number; results: TalentCard[] }>(
       `/talent/search/?${params.toString()}`,
     );

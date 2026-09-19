@@ -157,11 +157,16 @@ export default function ProspectAiSearch() {
   const chatState = useProspectChatState();
   const [creatingFor, setCreatingFor] = useState<number | null>(null);
   const [createdMsg, setCreatedMsg] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [aiViewMode, setAiViewMode] = useState<"cards" | "table">("cards");
 
   const createOpportunity = useMutation({
     mutationFn: ({ personId, product, need }: { personId: number; product: string; need: string }) =>
       api.rbOpportunityCreate({ person_id: personId, product, need }),
+    onMutate: () => setCreateError(null),
+    // 409 = khách đã có cơ hội mở cho sản phẩm này, hoặc đã yêu cầu không liên
+    // hệ. Trước đây lỗi trôi mất: ô chọn vẫn mở, người dùng không biết vì sao.
+    onError: (err) => setCreateError(err instanceof Error ? err.message : String(err)),
     onSuccess: () => {
       setCreatedMsg("✓ Đã tạo cơ hội mới vào Growth Radar thành công!");
       qc.invalidateQueries({ queryKey: ["rb-customer-tasks"] });
@@ -176,6 +181,11 @@ export default function ProspectAiSearch() {
       {createdMsg && (
         <div className="talent-success-banner" style={{ marginBottom: "16px" }}>
           <span>{createdMsg}</span>
+        </div>
+      )}
+      {createError && (
+        <div className="err-box" role="alert" style={{ marginBottom: "16px" }}>
+          ⚠ Không tạo được cơ hội: {createError}
         </div>
       )}
 

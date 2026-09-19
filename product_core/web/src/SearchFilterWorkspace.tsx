@@ -205,6 +205,7 @@ const COPY = {
     searchPlaceholder: "Tìm theo tên ứng viên, kỹ năng, chức danh, công ty…",
     poolLabel: "Đợt tuyển & Pool",
     ownerLabel: "Recruiter phụ trách",
+    relationshipLabel: "Quan hệ ứng viên",
     emptyIcon: "🎯",
     emptyTitle: "Kho Hồ Sơ Ứng Viên & Nhân Tài",
     titleFallback: "Chưa cập nhật chức danh",
@@ -221,6 +222,7 @@ const COPY = {
     searchPlaceholder: "Tìm theo tên khách hàng, chức danh, công ty, nhu cầu tài chính…",
     poolLabel: "Nhóm khách hàng",
     ownerLabel: "RM phụ trách",
+    relationshipLabel: "Quan hệ khách hàng",
     emptyIcon: "💼",
     emptyTitle: "Kho Dữ Liệu Khách Hàng Tiềm Năng & Bán Chéo",
     titleFallback: "Khách hàng cá nhân",
@@ -477,6 +479,14 @@ export default function SearchFilterWorkspace({
     queryFn: api.talentFacets,
   });
 
+  // Bộ lọc "RM phụ trách" lọc theo `rb_profile.sales_owner` — danh sách phải là
+  // RM bán lẻ, không phải mọi người có vai trò vận hành (gồm cả recruiter).
+  const rbOwners = useQuery({
+    queryKey: ["rb-owners"],
+    queryFn: api.rbOwners,
+    enabled: isProspect,
+  });
+
   const filterHistoryQuery = useQuery({
     queryKey: ["filter-history", domain],
     queryFn: () => api.filterHistory(domain),
@@ -492,8 +502,8 @@ export default function SearchFilterWorkspace({
     // `pageSize` nằm trong khoá: hai góc nhìn duyệt 50 và 30 hồ sơ một trang, cùng
     // bộ lọc + cùng số trang mà dùng chung cache thì đổi góc nhìn sẽ hiện trang
     // của bên kia (offset 100 thay vì 60) với số trang tính theo bên này.
-    queryKey: ["search-filter-results", appliedFilters, page, pageSize],
-    queryFn: () => api.talentSearch(appliedFilters, pageSize, page * pageSize),
+    queryKey: ["search-filter-results", appliedFilters, page, pageSize, domain],
+    queryFn: () => api.talentSearch(appliedFilters, pageSize, page * pageSize, domain),
     enabled: hasSearched,
     retry: false,
   });
@@ -987,7 +997,7 @@ export default function SearchFilterWorkspace({
 
               <div className="filter-col">
                 <label className="filter-label">
-                  <span>🤝 Quan hệ ứng viên</span>
+                  <span>🤝 {copy.relationshipLabel}</span>
                 </label>
                 <select
                   className="config-select"
@@ -1071,7 +1081,7 @@ export default function SearchFilterWorkspace({
                   onChange={(event) => setDraft((prev) => ({ ...prev, owner: event.target.value }))}
                 >
                   <option value="">Tất cả RM</option>
-                  {(facets.data?.owners ?? []).map((owner) => (
+                  {(isProspect ? rbOwners.data?.results ?? [] : facets.data?.owners ?? []).map((owner) => (
                     <option key={owner.id} value={owner.id}>
                       {owner.name}
                     </option>
@@ -1582,7 +1592,11 @@ export default function SearchFilterWorkspace({
                         <div>{card.talent?.location || card.location || "—"}</div>
                         <small className="muted">
                           {isProspect
-                            ? (card.primary_phone || card.primary_email || "—")
+                            ? (card.primary_phone
+                                ? (maskSensitiveData ? maskString(card.primary_phone, "phone") : card.primary_phone)
+                                : card.primary_email
+                                  ? (maskSensitiveData ? maskString(card.primary_email, "email") : card.primary_email)
+                                  : "—")
                             : (card.talent?.years_experience != null
                                 ? `${card.talent.years_experience} năm KN` : "—")}
                         </small>
