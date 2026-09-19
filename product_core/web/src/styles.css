@@ -658,11 +658,11 @@ button.link.small,
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  background: var(--accent-gradient, linear-gradient(135deg, #d81f2a, #ff4d5a));
+  background: transparent;
   color: #ffffff;
   flex-shrink: 0;
-  box-shadow: 0 4px 14px var(--accent-soft, rgba(216, 31, 42, 0.25));
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: none;
+  transition: transform 0.2s ease;
 }
 
 .brand-icon:hover {
@@ -670,10 +670,10 @@ button.link.small,
 }
 
 .brand-custom-img {
-  width: 26px;
-  height: 26px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .brand-emoji-icon {
