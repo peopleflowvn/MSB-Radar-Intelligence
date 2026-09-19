@@ -97,9 +97,10 @@ nói đúng cơ hội đó chắc tới đâu:
      "loai_bang_chung": "suy_luan". Một cơ hội đáng xem xét là đủ để "thoa":
      true — RM sẽ tự thẩm định trước khi gọi.
 
-   TUYỆT ĐỐI không suy luận thu nhập, tài sản, tình trạng hôn nhân hay tình
-   trạng tài chính cụ thể của khách, kể cả khi "có vẻ hợp lý" từ chức danh.
-   Đây là ranh giới tuân thủ, không được nới.
+   Được dùng giới tính, tuổi và tình trạng hôn nhân nếu bằng chứng có ghi; cũng
+   được nêu một suy luận có căn cứ từ các dữ kiện đó nếu gắn nhãn là suy luận và
+   chỉ coi đó là đầu vào cho khuyến nghị. Không biến khuyến nghị thành quyết định
+   thay RM và không bịa thuộc tính còn thiếu.
 
 2. **"do_tin" phải PHÂN BIỆT được người với người** — hệ thống xếp hạng bằng
    chính con số này, chấm ai cũng như nhau là mất thứ tự:
@@ -124,10 +125,10 @@ nói đúng cơ hội đó chắc tới đâu:
 
 7. Bóc các thuộc tính trong "can_boc" nếu bằng chứng có nói, không có thì null.
 
-8. KHÔNG viết "thu nhập", "lương", "chi tiêu lớn", "tài sản", "giàu", "phân khúc
-   cao cấp", "khả năng tài chính" hay tình trạng hôn nhân trong bất kỳ trường
-   nào — căn cứ chỉ là chức danh, thâm niên, ngành, kỹ năng, sở thích ghi trong
-   hồ sơ ("trưởng phòng 7 năm" — KHÔNG "trưởng phòng nên thu nhập tốt").
+8. Không suy diễn thu nhập, tài sản hay khả năng tài chính khi bằng chứng không
+   có. Giới tính, tuổi và tình trạng hôn nhân được dùng như các dữ kiện bối cảnh
+   bình thường khi có nguồn; giải thích ngắn chúng liên quan thế nào và để RM là
+   người quyết định có dùng khuyến nghị hay không.
 
 9. **"vi_sao"**: 2–3 câu MỘT DÒNG (không xuống dòng trong chuỗi JSON): điều cụ
    thể đọc được và nó khớp điều kiện nào (nếu là suy luận thì nói suy từ đâu),
@@ -236,17 +237,17 @@ def _fold(text):
     return fold_text(text)
 
 
-#: Suy luận tài chính/nhân thân mà ③ bị CẤM — prompt đã dặn, nhưng production
+#: Suy luận tài chính không có bằng chứng mà ③ bị chặn — prompt đã dặn, nhưng production
 #: 19/09 vẫn ra "vị trí ổn định và thu nhập tốt", "nhu cầu chi tiêu lớn". Ràng
 #: buộc tuân thủ chỉ nằm trong prompt là ràng buộc chưa có, nên cắt bằng code.
 _SENSITIVE = re.compile(
     r"thu nhap|muc luong|luong cao|chi tieu lon|tai san|giau co|kha nang tai chinh|"
-    r"phan khuc (?:khach hang )?cao cap|ket hon|hon nhan|doc than|co gia dinh", re.I)
+    r"phan khuc (?:khach hang )?cao cap", re.I)
 _SENTENCE = re.compile(r"(?<=[.!?;])\s+")
 
 
 def strip_sensitive(text):
-    """Bỏ nguyên CÂU nhắc tới thu nhập/tài sản/hôn nhân khỏi lý do của ③."""
+    """Bỏ câu suy diễn tài chính không có bằng chứng; giữ bối cảnh nhân thân."""
     kept = [part for part in _SENTENCE.split(str(text or ""))
             if part and not _SENSITIVE.search(_fold(part))]
     return " ".join(kept)

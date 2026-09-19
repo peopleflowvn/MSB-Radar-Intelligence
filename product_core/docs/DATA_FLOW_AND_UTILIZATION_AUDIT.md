@@ -81,7 +81,7 @@ flowchart LR
 | CV binary | Edge/import | R2, khử trùng theo SHA-256 | Preview + parser/OCR | Có gián tiếp | File thiếu trên Hub chỉ phục hồi được khi Edge còn file và online. |
 | Text CV | Edge parser hoặc Hub parser/OCR | `ParsedTextVersion` có hash | AI extraction có evidence | Full-text, semantic, dense | AI structured extraction hiện ưu tiên CV mới nhất; text mọi CV vẫn được tìm kiếm và vector hóa. |
 | Trường hồ sơ chuẩn | Edge + AI + người dùng | Fact có provenance | `TalentProfile`, canonical registry | Có | Alias AI chưa duyệt có thể nằm ở proposed, nên chưa thành bộ lọc cấu trúc. |
-| Dữ liệu nhạy cảm | Edge/CV/import | Có trong vùng kiểm soát | Fact nhạy cảm vào review | Chỉ theo RBAC/masking | Không tự động quảng bá gender, DOB, salary vào kết luận AI. |
+| Dữ liệu nhạy cảm | Edge/CV/import | Có trong vùng kiểm soát | Fact nhạy cảm vào review | Chỉ theo RBAC/masking | Gender, DOB/tuổi và hôn nhân có thể vào phân tích có nguồn; Radar giải thích và khuyến nghị, người dùng quyết định. |
 | Lịch sử CV/lượt ứng tuyển | Mọi SourceRecord/Document của Person | Có | Sắp theo thời điểm quan sát | Có sau bản sửa | Cần backfill lại SearchDocument/SemanticIndex để dữ liệu cũ tham gia đầy đủ. |
 | Embedding | SearchDocument/CVChunk | Fingerprint + model | GreenNode BGE-M3 ưu tiên sau probe | Dense retrieval | Cần theo dõi độ phủ và không trộn vector khác model/khác chiều. |
 | Nhập tay | `/data` | Batch/row + staging volume | normalize, dedupe, AI/rule extraction | Có sau commit | Draft cũ nằm trong `/tmp` trước bản sửa không thể tự phục hồi nếu file đã mất. |

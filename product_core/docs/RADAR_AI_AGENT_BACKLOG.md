@@ -204,7 +204,7 @@ không bơm toàn bộ schema vào mọi prompt.
 - Tạo shortlist/pool proposal, draft outreach, draft interview questions, summarize candidate.
 - Match candidate ↔ requisition và gap analysis hai chiều.
 - Chỉ sau approval: lưu pool/note/task; stage change là workflow riêng có policy.
-- Không dùng giới tính, tuổi hoặc thuộc tính nhạy cảm để xếp hạng trừ trường hợp pháp lý được cấu hình.
+- Cho phép dùng giới tính, tuổi và tình trạng hôn nhân có nguồn làm tiêu chí hoặc bối cảnh xếp hạng; phải giải thích ảnh hưởng, phân biệt fact/suy luận và để người dùng quyết định cuối cùng.
 
 ### P1-04 — Customer/RB Answer Engine ngang cấp Talent
 

@@ -19,9 +19,9 @@ Khách hàng = người chưa bị gộp, có ÍT NHẤT MỘT trong:
 
 Nhánh cuối đưa ỨNG VIÊN vào tập tìm khách. Căn cứ: pháp chế MSB đồng ý
 (19/09/2026) cho dùng dữ liệu ứng viên để tìm kiếm khách hàng. Cổng không liên
-hệ (`do_not_contact_ids`) vẫn áp như mọi khách khác. Nhận xét về giới tính/tuổi/
-hôn nhân/thu nhập suy đoán vẫn bị cắt ở ⑤ (`compose`) — đồng ý dùng dữ liệu
-không có nghĩa là được phân biệt theo các thuộc tính đó.
+hệ (`do_not_contact_ids`) vẫn áp như mọi khách khác. Giới tính, tuổi và hôn nhân
+có thể được dùng làm bối cảnh phân tích khi có bằng chứng; Radar chỉ đưa khuyến
+nghị có giải thích, còn RM quyết định cuối cùng.
 
 Dùng `pk__in` với truy vấn con thay vì JOIN: không nhân dòng, không cần
 `distinct()`, và `count()` ra đúng số người.

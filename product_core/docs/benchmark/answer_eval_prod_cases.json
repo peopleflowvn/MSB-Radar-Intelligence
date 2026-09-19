@@ -22,8 +22,7 @@
         "Luong Thanh Tung"
       ],
       "must_not_say": [
-        "đối soát trong kho",
-        "ưu tiên ứng viên nữ"
+        "đối soát trong kho"
       ],
       "max_seconds": 150
     },
@@ -81,7 +80,6 @@
       "must_not_say": [
         "thu nhập",
         "INFERENCE",
-        "kết hôn",
         "phân khúc cao cấp"
       ],
       "max_seconds": 150

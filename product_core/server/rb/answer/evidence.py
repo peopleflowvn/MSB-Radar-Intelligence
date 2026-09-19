@@ -253,10 +253,9 @@ def _cv_profile_passages(person_ids, now, depth=1):
     ngoại ngữ, kỹ năng, ngành nghề, hình thức làm việc, đặc thù công việc và sở
     thích cá nhân.
 
-    CỐ Ý KHÔNG đưa lương và tình trạng hôn nhân vào bằng chứng: ③ bị cấm suy luận
-    thu nhập/hôn nhân để chào sản phẩm tài chính (ranh giới tuân thủ), mà cấp dữ
-    liệu đó cho model rồi dặn "đừng dùng" là một ràng buộc chưa có. Dữ liệu CV
-    thu cho mục đích tuyển dụng, không phải để định giá khách.
+    Đưa cả giới tính, tuổi/ngày sinh và tình trạng hôn nhân đã được chấp nhận vào
+    gói bằng chứng để model có đủ bối cảnh. Đây là dữ kiện hỗ trợ phân tích, không
+    phải quyết định tự động; lời khuyên cuối cùng vẫn để RM cân nhắc.
 
     Đây là nguồn dữ liệu cốt lõi giúp AI phán đoán cơ hội sản phẩm ngân hàng
     (vay mua nhà, thẻ tín dụng, vay kinh doanh, tiết kiệm, bảo hiểm, ngoại tệ, chi lương)
@@ -271,6 +270,7 @@ def _cv_profile_passages(person_ids, now, depth=1):
                     "talent_profile__current_title", "talent_profile__current_company",
                     "talent_profile__years_experience", "talent_profile__seniority",
                     "talent_profile__education", "talent_profile__foreign_language", "talent_profile__job_type",
+                    "talent_profile__marital_status",
                     "talent_profile__skills", "talent_profile__industries",
                     "talent_profile__summary", "talent_profile__last_source_at"))
     for p in people:
@@ -305,12 +305,26 @@ def _cv_profile_passages(person_ids, now, depth=1):
                     parts.append(f"ngành từng làm: {', '.join(top_inds)}")
             if tp.education:
                 parts.append(f"học vấn {tp.education}")
+            if tp.marital_status:
+                parts.append(f"tình trạng hôn nhân: {tp.marital_status}")
             if p.location:
                 parts.append(f"địa bàn: {p.location}")
             if tp.summary:
                 parts.append(f"đặc thù CV & sở thích: {tp.summary[:350]}")
         elif p.location:
             parts.append(f"địa bàn: {p.location}")
+
+        try:
+            from intel.facts import current_facts
+            context_fields = {"gender": "giới tính", "date_of_birth": "ngày sinh",
+                              "birth_year": "năm sinh", "age": "tuổi",
+                              "marital_status": "tình trạng hôn nhân"}
+            for fact in current_facts(p).filter(field__in=context_fields):
+                value = fact.canonical_label or fact.raw_value
+                if value:
+                    parts.append(f"{context_fields[fact.field]}: {value}")
+        except Exception:  # intel có thể chưa migrate trong lúc bootstrap
+            pass
 
         if len(parts) > 1:
             text = ", ".join(parts)

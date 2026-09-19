@@ -19,7 +19,7 @@ Edge thật của từng provider trước khi coi là hợp đồng**.
 - *Auto-accept*: field an toàn, độ tin cậy cao, không thuộc `curated_fields` thì
   được nhận tự động; còn lại vào review queue.
 - *Mức nhạy cảm*: `S0` công khai nghiệp vụ · `S1` PII thường · `S2` PII định danh
-  mạnh (email/phone/DOB) · `S3` nhạy cảm, **không dùng để xếp hạng** (giới tính).
+  mạnh (email/phone/DOB) · `S3` nhạy cảm, được dùng khi có quyền và có nguồn (giới tính).
 
 ---
 
@@ -56,7 +56,7 @@ Edge thật của từng provider trước khi coi là hợp đồng**.
 | full_name | text | — | S1 | `Person.display_name` | edge > cv_text > curated | có | `normalized_name` = bỏ dấu, chỉ gợi ý trùng. Tên **không** phải định danh mạnh. |
 | email | text | RFC-ish | S2 | `Identity(kind=email)` + ảnh `Person.primary_email` | edge > cv_text | có | Unique `(kind,value)`. Xung đột định danh → `IdentityConflict`, không tự gộp. |
 | phone | text | E.164 sau chuẩn hoá | S2 | `Identity(kind=phone)` + `Person.primary_phone` | edge > cv_text | có | Hai người có thể chung số → conflict queue. |
-| gender | enum | `nam` / `nữ` / `""` | **S3** | *hồ sơ nhân khẩu học — chưa có* | curated > edge > cv_text | **không** | **Không suy từ tên. Không dùng để xếp hạng** (Master Plan §2.4). |
+| gender | enum | `nam` / `nữ` / `""` | **S3** | *hồ sơ nhân khẩu học — chưa có* | curated > edge > cv_text | theo RBAC | Không suy từ tên; được dùng làm bối cảnh/tiêu chí khi có nguồn và người dùng quyết định cuối cùng. |
 | date_of_birth | date | `YYYY-MM-DD` / `YYYY` | S2 | *hồ sơ nhân khẩu học — chưa có* | edge > cv_text | không | Review vì nhạy cảm. |
 | linkedin / facebook | url | — | S1 | `Identity(kind=linkedin/facebook)` | edge > cv_text | có | Chuẩn hoá URL trước khi so khớp. |
 | provider_person_id | text | — | S1 | `Identity(kind=provider_person_id)` | edge | có | Khoá `source:candidate_id`. |

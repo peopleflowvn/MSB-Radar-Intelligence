@@ -145,8 +145,8 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
 
 - "should_have": mảng câu chữ — tiêu chí mong muốn, dùng để xếp hạng và định hướng
   tìm kiếm (ví dụ "cấp quản lý hoặc chuyên môn cao", "thâm niên trên 5 năm",
-  "làm việc tại công ty uy tín"). KHÔNG dùng tình trạng hôn nhân, thu nhập hay
-  tài sản làm tiêu chí — đó là ranh giới tuân thủ.
+  "làm việc tại công ty uy tín"). Được giữ giới tính, tuổi và tình trạng hôn
+  nhân khi người dùng nêu rõ; không tự bịa thuộc tính còn thiếu.
 
 - "extract": mảng tên thuộc tính cần BÓC RA TỪ BẰNG CHỨNG để trả lời được câu
   hỏi (ví dụ "sản phẩm đang quan tâm", "thời điểm phát sinh nhu cầu", "nghề

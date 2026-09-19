@@ -1051,9 +1051,8 @@ class BusinessProspectingReasoningTest(TestCase):
         self.assertIn("Tập đoàn FPT", text)
         self.assertIn("7.5", text)
         self.assertIn("manager", text)
-        # Ranh giới tuân thủ: ③ không được suy luận hôn nhân/thu nhập, nên dữ liệu
-        # đó không được tới tay model ngay từ đầu.
-        self.assertNotIn("kết hôn", text)
+        # Hôn nhân là bối cảnh hợp lệ; thu nhập vẫn không được tự suy ra từ chức danh.
+        self.assertIn("kết hôn", text)
         self.assertNotIn("40 triệu", text)
 
     def test_score_fit_fallback_to_talent_profile(self):
@@ -1268,9 +1267,11 @@ class JudgePromptCalibrationTest(TestCase):
         self.assertNotIn("0.70 đến 0.85", judge.SYSTEM)
         self.assertIn("PHÂN BIỆT", judge.SYSTEM)
 
-    def test_giu_ranh_gioi_khong_suy_luan_thu_nhap_hon_nhan(self):
+    def test_khong_suy_dien_thu_nhap_khi_khong_co_bang_chung(self):
+        # Chính sách 20/09: giới tính/tuổi/hôn nhân CÓ trong bằng chứng được dùng
+        # làm bối cảnh; thu nhập/tài sản vẫn không được tự suy ra từ chức danh.
         from .answer import judge
-        self.assertIn("không suy luận thu nhập", judge.SYSTEM)
+        self.assertIn("suy diễn thu nhập", judge.SYSTEM)
 
     def test_du_tran_token_cho_lo_tam_nguoi(self):
         from .answer import judge
@@ -1310,6 +1311,7 @@ class StripSensitiveTest(TestCase):
         self.assertEqual(strip_sensitive(text),
                          "Trưởng phòng kinh doanh 7 năm tại FPT. Phù hợp gói vay mua nhà.")
 
-    def test_bo_ca_hon_nhan_va_chi_tieu(self):
+    def test_giu_hon_nhan_nhung_bo_suy_dien_chi_tieu(self):
         from .answer.judge import strip_sensitive
-        self.assertEqual(strip_sensitive("Đã kết hôn nên cần nhà. Có nhu cầu chi tiêu lớn."), "")
+        self.assertEqual(strip_sensitive("Đã kết hôn nên cần nhà. Có nhu cầu chi tiêu lớn."),
+                         "Đã kết hôn nên cần nhà.")
