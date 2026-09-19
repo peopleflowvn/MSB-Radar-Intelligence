@@ -39,10 +39,14 @@ export default function StepTimeline({
   elapsedSeconds = 0,
   hint,
   isPending = false,
-  compact = false,
+  compact: _compact = false,
   durationMs = 0,
 }: Props) {
-  const [expanded, setExpanded] = useState(true);
+  // Người dùng có thể chủ động bấm "Chi tiết ▾" hoặc "Thu gọn ▲"
+  // Mặc định: khi đang xử lý (isPending) -> mở rộng; sau khi có câu trả lời (!isPending) -> tự động thu gọn
+  const [userExpanded, setUserExpanded] = useState<boolean | null>(null);
+
+  const isExpanded = userExpanded !== null ? userExpanded : isPending;
 
   const totalCount = steps.length;
   // Khi không có steps mảng nhưng đã hoàn tất có durationMs -> tính là 1 bước tổng hợp hoàn tất
@@ -55,14 +59,14 @@ export default function StepTimeline({
   // Nếu không có bước nào và không pending và không có duration thì không hiển thị
   if (!totalCount && !isPending && !stage && !durationMs) return null;
 
-  // Trạng thái thu gọn (khi người dùng bấm thu gọn)
-  if (compact && !expanded && (totalCount > 0 || durationMs > 0)) {
+  // Trạng thái thu gọn (sau khi có câu trả lời hoặc khi người dùng bấm thu gọn)
+  if (!isExpanded && (totalCount > 0 || durationMs > 0)) {
     return (
       <div className="radar-steps-compact-bar">
         <button
           type="button"
           className="radar-steps-compact-btn"
-          onClick={() => setExpanded(true)}
+          onClick={() => setUserExpanded(true)}
           title="Xem chi tiết các bước xử lý của AI"
         >
           {isPending ? (
@@ -73,9 +77,9 @@ export default function StepTimeline({
           <span className="radar-steps-compact-text">
             {isPending ? "Đang xử lý" : "Quá trình xử lý"} ({doneCount}/{effectiveTotal || 1} bước)
             {!isPending && durationMs > 0 ? (
-              <span className="radar-steps-time"> · Hoàn tất trong {(durationMs / 1000).toFixed(1)} giây</span>
+              <> · <span className="radar-steps-time">Hoàn tất trong {(durationMs / 1000).toFixed(1)} giây</span></>
             ) : isPending && elapsedSeconds > 0 ? (
-              <span className="radar-steps-time"> · {elapsedSeconds}s</span>
+              <> · <span className="radar-steps-time">{elapsedSeconds}s</span></>
             ) : null}
           </span>
           <span className="radar-steps-compact-chevron">Chi tiết ▾</span>
@@ -108,11 +112,11 @@ export default function StepTimeline({
               ⏱ {(durationMs / 1000).toFixed(1)}s
             </span>
           ) : null}
-          {compact && (totalCount > 0 || durationMs > 0) && (
+          {(totalCount > 0 || durationMs > 0) && (
             <button
               type="button"
               className="radar-steps-toggle-btn"
-              onClick={() => setExpanded(false)}
+              onClick={() => setUserExpanded(false)}
               title="Thu gọn danh sách bước"
             >
               Thu gọn ▲

@@ -82,6 +82,52 @@ function isMissingOrEmptyAnswer(text: string): boolean {
 /**
  * Suy luận thông minh bộ câu hỏi tiếp theo dựa trên ngữ cảnh câu hỏi, kết quả trả lời và danh sách đối tượng.
  */
+type NearMissPerson = { judgement_status?: string; gap?: string; why?: string };
+
+function peopleAreOnlyNearMisses(people: unknown[]): boolean {
+  const rows = people as NearMissPerson[];
+  return rows.length > 0 && rows.every((p) => p.judgement_status === "SUGGESTION");
+}
+
+/**
+ * Gợi ý khi KHÔNG ai đạt đủ tiêu chí — dựa trên điều thật sự làm hụt kết quả.
+ *
+ * Bản cũ luôn gợi "nới lỏng số năm kinh nghiệm" và "tìm ở địa bàn lân cận" dù
+ * người gần đúng hụt vì sai vai trò/thiếu kỹ năng chứ không vì số năm hay nơi
+ * làm (production 19/09, "Senior Data Analyst … SQL và Python").
+ */
+function emptyTalentSuggestions(
+  question: string,
+  people: unknown[],
+  seniorities: string[],
+  locations: string[],
+): string[] {
+  const gaps = (people as NearMissPerson[])
+    .map((p) => `${p.gap || ""} ${p.why || ""}`.toLowerCase())
+    .join(" ");
+  const qSkills = extractMatchingKeywords(question, [...SKILL_KEYWORDS, ...BANKING_KEYWORDS]);
+  const out: string[] = [];
+  if (seniorities.length > 0) {
+    out.push(`Bỏ yêu cầu cấp ${seniorities[0]}, giữ nguyên các tiêu chí còn lại`);
+  }
+  if (/năm|kinh nghiệm|sinh viên|fresher|mới tốt nghiệp/.test(gaps)) {
+    out.push("Nới lỏng tiêu chí số năm kinh nghiệm để tìm thêm ứng viên tiềm năng");
+  }
+  if (qSkills.length >= 2) {
+    out.push(`Tìm ứng viên biết ${qSkills[0]} hoặc ${qSkills[1]} (không cần cả hai)`);
+  } else if (qSkills.length === 1) {
+    out.push(`Tìm ứng viên có kỹ năng tương đương hoặc chuyển đổi sang ${qSkills[0]}`);
+  }
+  if (qSkills.length > 0) {
+    out.push(`Trong kho có bao nhiêu ứng viên biết ${qSkills[0]}?`);
+  }
+  if (locations.length > 0 && /địa điểm|khu vực|nơi làm|tỉnh|thành phố/.test(gaps)) {
+    out.push(`Tìm ứng viên phù hợp ngoài ${locations[0]} hoặc chấp nhận làm việc linh hoạt`);
+  }
+  out.push("Mở rộng tìm kiếm sang các vị trí/chức danh công việc tương tự");
+  return Array.from(new Set(out)).slice(0, 3);
+}
+
 export function inferFollowUpQuestions<TPerson = any>(
   turn: AnswerTurn<TPerson>,
   options?: InferFollowUpOptions,
@@ -111,23 +157,8 @@ export function inferFollowUpQuestions<TPerson = any>(
     const seniorities = extractMatchingKeywords(question, SENIORITY_KEYWORDS);
 
     // 1. Kết quả trống / Không tìm thấy ứng viên phù hợp
-    if (emptyResult) {
-      const qSkills = extractMatchingKeywords(question, [...SKILL_KEYWORDS, ...BANKING_KEYWORDS]);
-      const suggestions: string[] = [];
-      if (qSkills.length > 0 && locations.length > 0) {
-        suggestions.push(`Tìm ứng viên có kỹ năng tương đương hoặc chuyển đổi sang ${qSkills[0]}`);
-        suggestions.push(`Nới lỏng tiêu chí số năm kinh nghiệm để tìm thêm ứng viên tiềm năng`);
-        suggestions.push(`Tìm ứng viên ${qSkills[0]} tại các địa bàn lân cận hoặc chấp nhận làm việc linh hoạt`);
-      } else if (qSkills.length > 0) {
-        suggestions.push(`Tìm ứng viên có kỹ năng tương đương hoặc chuyển đổi sang ${qSkills[0]}`);
-        suggestions.push("Nới lỏng tiêu chí số năm kinh nghiệm để tìm thêm ứng viên tiềm năng");
-        suggestions.push("Mở rộng tìm kiếm sang các vị trí/chức danh công việc tương tự");
-      } else {
-        suggestions.push("Nới lỏng tiêu chí số năm kinh nghiệm để tìm thêm ứng viên tiềm năng");
-        suggestions.push("Mở rộng tìm kiếm sang các vị trí/chức danh công việc tương tự");
-        suggestions.push("Đề xuất điều chỉnh bộ tiêu chí tuyển dụng dựa trên dữ liệu hiện có trong kho");
-      }
-      return suggestions.slice(0, 3);
+    if (emptyResult || peopleAreOnlyNearMisses(people)) {
+      return emptyTalentSuggestions(question, people, seniorities, locations);
     }
 
     // 2. Người dùng vừa yêu cầu So Sánh

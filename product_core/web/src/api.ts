@@ -1672,6 +1672,17 @@ export interface AnswerPerson {
   why: string;
   attributes: Record<string, string | number>;
   citations: number[];
+  /** "SUGGESTION" = gần đúng: bị loại nhưng khớp một phần — KHÔNG phải kết quả. */
+  judgement_status?: string;
+  /** Điều còn thiếu so với yêu cầu (chỉ người gần đúng). */
+  gap?: string;
+  /** Hồ sơ có cấu trúc — nguồn chức danh/công ty khi ③ không bóc được. */
+  profile?: {
+    title?: string;
+    company?: string;
+    location?: string;
+    years_experience?: number | null;
+  };
 }
 
 export interface AnswerPayload {

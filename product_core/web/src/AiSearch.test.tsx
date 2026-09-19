@@ -123,7 +123,9 @@ describe("Answer Engine trên giao diện", () => {
 
     ask("lãi suất huy động hiện nay?");
 
-    expect(await screen.findByText("🌐 Nguồn trên internet")).toBeInTheDocument();
+    const toggle = await screen.findByText("🌐 Nguồn trên internet");
+    expect(toggle).toBeInTheDocument();
+    fireEvent.click(toggle);
     const link = screen.getByRole("link", { name: "Ngân hàng Nhà nước" });
     expect(link).toHaveAttribute("href", "https://sbv.gov.vn");
   });
@@ -149,6 +151,11 @@ describe("Answer Engine trên giao diện", () => {
     });
     expect(container.querySelectorAll(".step-spinner-icon")).toHaveLength(0);
     expect(container.querySelectorAll(".radar-step-item.step-active")).toHaveLength(0);
+    expect(screen.getByText("Chi tiết ▾")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Chi tiết ▾"));
+    expect(screen.getByText("Thu gọn ▲")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Thu gọn ▲"));
+    expect(screen.getByText("Chi tiết ▾")).toBeInTheDocument();
   });
 
   it("trích dẫn gộp [1,2] thành hai nút bấm riêng", async () => {
@@ -178,11 +185,31 @@ describe("Answer Engine trên giao diện", () => {
 
     ask("ai phù hợp?");
 
-    expect(await screen.findByText("Hồ sơ được nhắc tới")).toBeInTheDocument();
+    expect(await screen.findByText("Hồ sơ phù hợp")).toBeInTheDocument();
     expect(screen.getByText(/năm sinh: 1995/)).toBeInTheDocument();
     // Không còn điểm %, không còn nút thêm vào chiến dịch — tức là hết thẻ.
     expect(container.querySelector(".ai-card")).toBeNull();
     expect(container.querySelector(".criteria")).toBeNull();
+  });
+
+  it("người gần đúng nằm ở nhóm riêng và hiện điều còn thiếu, không hiện như kết quả", async () => {
+    fakeAsk([
+      { event: "done", data: {
+        answer: "Không ai đạt đủ.", citations: [],
+        people: [{ person_id: 8, name: "Lương Hữu Duy", why: "Thực tập Data Analyst",
+                   gap: "chưa đủ 3 năm kinh nghiệm", judgement_status: "SUGGESTION",
+                   attributes: {}, citations: [],
+                   profile: { title: "Data Analyst Intern", company: "ABC" } }] } },
+    ]);
+    renderSearch();
+
+    ask("Tìm Senior Data Analyst");
+
+    expect(await screen.findByText("Gần phù hợp — chưa đạt đủ tiêu chí")).toBeInTheDocument();
+    expect(screen.queryByText("Hồ sơ phù hợp")).not.toBeInTheDocument();
+    expect(screen.getByText("Còn thiếu: chưa đủ 3 năm kinh nghiệm")).toBeInTheDocument();
+    expect(screen.getByText("Data Analyst Intern · ABC")).toBeInTheDocument();
+    expect(screen.queryByText("Hồ sơ đối soát trong kho nhân tài")).not.toBeInTheDocument();
   });
 
   it("gửi tệp đính kèm kèm câu hỏi", async () => {

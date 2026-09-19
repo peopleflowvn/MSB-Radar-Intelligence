@@ -208,6 +208,7 @@ describe("Growth Answer Engine — đường chính", () => {
     renderSearch();
     ask("Radar là gì?");
     expect(await screen.findByText("Radar hỗ trợ RM tìm khách hàng.")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("🌐 Nguồn trên internet"));
     expect(screen.getByText("Trang MSB")).toBeInTheDocument();
     expect(stream).toHaveBeenCalledTimes(1);
     // Không có kế hoạch = không phải lượt tìm kiếm: không hiện thẻ tiêu chí

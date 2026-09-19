@@ -18494,6 +18494,8 @@ body,
     justify-content: center;
     padding: 8px 12px;
   }
+
+
   .search-control-toolbar .perspective-segmented-switch {
     width: 100%;
   }
@@ -18606,4 +18608,23 @@ body,
 
 :root[data-theme="light"] .chat-table tbody tr:hover {
   background: #f1f5f9;
+}
+
+.radar-steps-compact-btn:hover {
+  background: var(--surface-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text);
+  border-color: var(--accent, #f97316);
+}
+
+.radar-steps-compact-btn:hover .radar-steps-compact-chevron {
+  color: var(--accent, #f97316);
+}
+
+/* Nhóm "gần phù hợp" trong câu trả lời Talent: nhạt hơn nhóm phù hợp, và dòng
+   ghi chú là điều còn thiếu (màu cảnh báo), không phải điểm mạnh. */
+.talent-smart-section.is-near-miss { margin-top: 16px; }
+.talent-smart-section.is-near-miss .talent-smart-title { color: var(--muted, #94a3b8); }
+.talent-compact-card.is-near-miss { opacity: 0.92; }
+.talent-compact-card.is-near-miss .talent-card-why {
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
 }

@@ -76,7 +76,8 @@ function extractPersonInfo(person: AnswerPerson, sources: AnswerSource[] = []) {
     lowerAttrs["role"] ||
     lowerAttrs["title"] ||
     lowerAttrs["nghề nghiệp"] ||
-    lowerAttrs["chuyên môn"];
+    lowerAttrs["chuyên môn"] ||
+    person.profile?.title;
 
   // 2. Company
   let company =
@@ -88,7 +89,8 @@ function extractPersonInfo(person: AnswerPerson, sources: AnswerSource[] = []) {
     lowerAttrs["công ty"] ||
     lowerAttrs["đơn vị"] ||
     lowerAttrs["company"] ||
-    lowerAttrs["nơi làm việc"];
+    lowerAttrs["nơi làm việc"] ||
+    person.profile?.company;
 
   // 3. Location
   const location =
@@ -100,7 +102,8 @@ function extractPersonInfo(person: AnswerPerson, sources: AnswerSource[] = []) {
     lowerAttrs["địa điểm"] ||
     lowerAttrs["khu vực"] ||
     lowerAttrs["location"] ||
-    lowerAttrs["tỉnh thành"];
+    lowerAttrs["tỉnh thành"] ||
+    person.profile?.location;
 
   // 4. Experience
   const experience =
@@ -112,7 +115,8 @@ function extractPersonInfo(person: AnswerPerson, sources: AnswerSource[] = []) {
     lowerAttrs["kinh nghiệm"] ||
     lowerAttrs["kinh nghiệm (năm)"] ||
     lowerAttrs["số năm kinh nghiệm"] ||
-    lowerAttrs["experience"];
+    lowerAttrs["experience"] ||
+    (person.profile?.years_experience != null ? person.profile.years_experience : undefined);
 
   // 5. Matching sources
   const personSources = (sources || []).filter(
@@ -155,29 +159,108 @@ function extractPersonInfo(person: AnswerPerson, sources: AnswerSource[] = []) {
   };
 }
 
-/** Thẻ ứng viên thông minh cho Talent Radar — dạng thẻ với thông tin nhận diện cốt lõi. */
-function TalentSmartCards({
-  people,
-  personLinkFrom = "talent-ai",
-  sources = [],
+/** Một thẻ hồ sơ. `nearMiss`: người bị loại nhưng khớp một phần — hiện điều CÒN
+ * THIẾU, không hiện lý do như một điểm mạnh (production 19/09: dòng 💡 hiện
+ * "…không phải Senior Data Analyst" trên thẻ nằm cùng hàng với người phù hợp). */
+function TalentPersonCard({
+  person,
+  sources,
+  personLinkFrom,
+  nearMiss,
 }: {
+  person: AnswerPerson;
+  sources: AnswerSource[];
+  personLinkFrom: string;
+  nearMiss: boolean;
+}) {
+  const info = extractPersonInfo(person, sources);
+  const gap = (person.gap || "").trim();
+  const note = nearMiss ? (gap || info.highlight) : info.highlight;
+  return (
+    <Link
+      to={`/person/${person.person_id}?from=${personLinkFrom}`}
+      className={`talent-compact-card${nearMiss ? " is-near-miss" : ""}`}
+      title={`Mở hồ sơ 360° của ${person.name}`}
+    >
+      <div className="talent-card-header">
+        <div className="talent-card-avatar">
+          {(person.name || "U")[0]?.toUpperCase()}
+        </div>
+        <div className="talent-card-title-wrap">
+          <div className="talent-card-name-row">
+            <span className="talent-card-name">{person.name}</span>
+            {info.citationNums.length > 0 && (
+              <span className="talent-card-citations" title="Trích dẫn bằng chứng trong CV">
+                {info.citationNums.map((c) => `[${c}]`).join(" ")}
+              </span>
+            )}
+          </div>
+          {info.headline && (
+            <div className="talent-card-headline" title={info.headline}>
+              {info.headline}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {note && (
+        <div className="talent-card-why" title={note}>
+          <span className="talent-why-icon">{nearMiss ? "⚠️" : "💡"}</span>
+          <span className="talent-why-text">
+            {nearMiss && gap ? `Còn thiếu: ${gap}` : note}
+          </span>
+        </div>
+      )}
+
+      <div className="talent-card-attributes">
+        {info.experience && (
+          <span className="talent-attr-pill" title={`Kinh nghiệm: ${info.experience}`}>
+            ⏱️ {String(info.experience).includes("năm") || String(info.experience).includes("tháng") ? info.experience : `${info.experience} năm KN`}
+          </span>
+        )}
+        {info.location && (
+          <span className="talent-attr-pill" title={`Địa điểm: ${info.location}`}>
+            📍 {info.location}
+          </span>
+        )}
+        {info.extraAttrs.slice(0, 2).map(([key, value]) => (
+          <span key={key} className="talent-attr-pill" title={`${key}: ${value}`}>
+            {`${key}: ${value}`}
+          </span>
+        ))}
+        <span className="talent-attr-pill profile-link-pill">
+          Xem 360° →
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function TalentCardGroup({
+  title,
+  people,
+  sources,
+  personLinkFrom,
+  nearMiss,
+}: {
+  title: string;
   people: AnswerPerson[];
-  personLinkFrom?: string;
-  sources?: AnswerSource[];
+  sources: AnswerSource[];
+  personLinkFrom: string;
+  nearMiss: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-
-  if (!people || people.length === 0) return null;
+  if (people.length === 0) return null;
 
   const INITIAL_LIMIT = 6;
   const hasMore = people.length > INITIAL_LIMIT;
   const visiblePeople = (!hasMore || expanded) ? people : people.slice(0, INITIAL_LIMIT);
 
   return (
-    <div className="talent-smart-section">
+    <div className={`talent-smart-section${nearMiss ? " is-near-miss" : ""}`}>
       <div className="talent-smart-header">
         <span className="talent-smart-title">
-          <span>Hồ sơ được nhắc tới</span> <span className="talent-smart-count">({people.length})</span>
+          <span>{title}</span> <span className="talent-smart-count">({people.length})</span>
         </span>
         {hasMore && (
           <button
@@ -191,70 +274,15 @@ function TalentSmartCards({
       </div>
 
       <div className="talent-smart-grid">
-        {visiblePeople.map((person) => {
-          const info = extractPersonInfo(person, sources);
-          return (
-            <Link
-              key={person.person_id}
-              to={`/person/${person.person_id}?from=${personLinkFrom}`}
-              className="talent-compact-card"
-              title={`Mở hồ sơ 360° của ${person.name}`}
-            >
-              <div className="talent-card-header">
-                <div className="talent-card-avatar">
-                  {(person.name || "U")[0]?.toUpperCase()}
-                </div>
-                <div className="talent-card-title-wrap">
-                  <div className="talent-card-name-row">
-                    <span className="talent-card-name">{person.name}</span>
-                    {info.citationNums.length > 0 && (
-                      <span className="talent-card-citations" title="Trích dẫn bằng chứng trong CV">
-                        {info.citationNums.map((c) => `[${c}]`).join(" ")}
-                      </span>
-                    )}
-                  </div>
-                  {info.headline ? (
-                    <div className="talent-card-headline" title={info.headline}>
-                      {info.headline}
-                    </div>
-                  ) : (
-                    <div className="talent-card-headline subtle-tag">
-                      Hồ sơ đối soát trong kho nhân tài
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {info.highlight && (
-                <div className="talent-card-why" title={info.highlight}>
-                  <span className="talent-why-icon">💡</span>
-                  <span className="talent-why-text">{info.highlight}</span>
-                </div>
-              )}
-
-              <div className="talent-card-attributes">
-                {info.experience && (
-                  <span className="talent-attr-pill" title={`Kinh nghiệm: ${info.experience}`}>
-                    ⏱️ {String(info.experience).includes("năm") || String(info.experience).includes("tháng") ? info.experience : `${info.experience} năm KN`}
-                  </span>
-                )}
-                {info.location && (
-                  <span className="talent-attr-pill" title={`Địa điểm: ${info.location}`}>
-                    📍 {info.location}
-                  </span>
-                )}
-                {info.extraAttrs.slice(0, 2).map(([key, value]) => (
-                  <span key={key} className="talent-attr-pill" title={`${key}: ${value}`}>
-                    {`${key}: ${value}`}
-                  </span>
-                ))}
-                <span className="talent-attr-pill profile-link-pill">
-                  Xem 360° →
-                </span>
-              </div>
-            </Link>
-          );
-        })}
+        {visiblePeople.map((person) => (
+          <TalentPersonCard
+            key={person.person_id}
+            person={person}
+            sources={sources}
+            personLinkFrom={personLinkFrom}
+            nearMiss={nearMiss}
+          />
+        ))}
       </div>
 
       {hasMore && (
@@ -271,6 +299,40 @@ function TalentSmartCards({
         </div>
       )}
     </div>
+  );
+}
+
+/** Thẻ ứng viên cho Talent Radar: người phù hợp và người GẦN phù hợp là hai nhóm
+ * riêng — gộp chung dưới một tiêu đề thì người bị loại trông như một kết quả. */
+function TalentSmartCards({
+  people,
+  personLinkFrom = "talent-ai",
+  sources = [],
+}: {
+  people: AnswerPerson[];
+  personLinkFrom?: string;
+  sources?: AnswerSource[];
+}) {
+  if (!people || people.length === 0) return null;
+  const matched = people.filter((p) => p.judgement_status !== "SUGGESTION");
+  const near = people.filter((p) => p.judgement_status === "SUGGESTION");
+  return (
+    <>
+      <TalentCardGroup
+        title="Hồ sơ phù hợp"
+        people={matched}
+        sources={sources}
+        personLinkFrom={personLinkFrom}
+        nearMiss={false}
+      />
+      <TalentCardGroup
+        title="Gần phù hợp — chưa đạt đủ tiêu chí"
+        people={near}
+        sources={sources}
+        personLinkFrom={personLinkFrom}
+        nearMiss
+      />
+    </>
   );
 }
 
@@ -442,6 +504,7 @@ export default function AnswerView<TPerson = AnswerPerson>({
 }) {
   const [preview, setPreview] = useState<SourceRef | null>(null);
   const [showSources, setShowSources] = useState(false);
+  const [showWebSources, setShowWebSources] = useState(false);
   const [copied, setCopied] = useState(false);
   const byNumber = new Map(turn.sources.map((source) => [source.n, source]));
 
@@ -511,16 +574,25 @@ export default function AnswerView<TPerson = AnswerPerson>({
 
       {(turn.webSources?.length ?? 0) > 0 && (
         <div className="answer-sources">
-          <span className="answer-people-label">🌐 Nguồn trên internet</span>
-          <ol className="answer-sources-list">
-            {turn.webSources!.map((source, index) => (
-              <li key={`${source.url}-${index}`}>
-                <a href={source.url} target="_blank" rel="noopener noreferrer">
-                  {source.title || source.url}
-                </a>
-              </li>
-            ))}
-          </ol>
+          <button
+            type="button"
+            className="answer-sources-toggle"
+            onClick={() => setShowWebSources((open) => !open)}
+            aria-expanded={showWebSources}
+          >
+            {showWebSources ? "▾" : "▸"} <span>🌐 Nguồn trên internet</span> ({turn.webSources!.length})
+          </button>
+          {showWebSources && (
+            <ol className="answer-sources-list">
+              {turn.webSources!.map((source, index) => (
+                <li key={`${source.url}-${index}`}>
+                  <a href={source.url} target="_blank" rel="noopener noreferrer">
+                    {source.title || source.url}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
       )}
 
