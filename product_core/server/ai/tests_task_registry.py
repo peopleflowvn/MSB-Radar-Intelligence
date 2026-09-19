@@ -194,7 +194,8 @@ class BenchmarkDefaultsTest(TestCase):
     `DEFAULT_REASON` và chạy lại benchmark, không sửa lẻ một con số."""
 
     def test_doc_cv_va_hieu_cau_hoi_dung_qwen_plus(self):
-        for task in ("talent_answer_plan", "talent_answer_judge", "rb_prospect_search"):
+        for task in ("talent_answer_plan", "talent_answer_judge", "rb_prospect_search",
+                     "candidate_extraction"):
             self.assertEqual(tasks_registry.default_route(task), ("greennode", "qwen/qwen3.7-plus"))
             self.assertTrue(tasks_registry.DEFAULT_REASON.get(task))
 

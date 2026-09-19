@@ -237,7 +237,7 @@ DEFAULT_ROUTE = {
 
     "cv_parsing": _QWEN,
     "cv_ocr": _QWEN,                     # đo được: đọc đúng ảnh chữ
-    "candidate_extraction": _QWEN,
+    "candidate_extraction": _QWEN_PLUS,  # benchmark 19/09 — xem DEFAULT_REASON
     "candidate_intake_extraction": _QWEN,
     "cv_reference_extraction": _QWEN,
 
@@ -289,6 +289,9 @@ DEFAULT_REASON = {
     "talent_answer_compose": "Benchmark 19/09: bài phân tích sâu nhất, 0 lỗi trích dẫn (20–50 s). "
                              "glm-5.2 là lựa chọn nhanh hơn gấp đôi nếu cần. KHÔNG dùng "
                              "qwen3.7-plus: từng viết gợi ý theo giới tính.",
+    "candidate_extraction": "Benchmark 19/09 (10 CV thật × 2 lần): số năm kinh nghiệm khớp Edge "
+                            "10/10 (flash 8/8, bỏ sót 2), nhiều trường hơn, ổn định hơn; ~13 s/CV. "
+                            "deepseek-v4-flash hỏng JSON 10/10.",
     "rb_prospect_search": "Một task cho cả ba chặng hiểu câu hỏi/đọc bằng chứng/viết của Growth — "
                           "cùng lý do với talent_answer_judge.",
 }
