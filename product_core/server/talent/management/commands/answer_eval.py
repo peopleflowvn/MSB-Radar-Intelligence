@@ -323,9 +323,13 @@ def _check(case, result, *, elapsed=None, engine_name="talent"):
     if not checks["grounded"]:
         problems.append(f"nêu tên {named[0]['name']} nhưng không trích dẫn nguồn nào")
 
+    # Chỉ người ĐÃ CHỐT mới có đoạn nguồn để trích; nhóm "gần đúng" (SUGGESTION)
+    # được nêu tên + điểm còn thiếu mà không có nguồn — kiểm họ là báo lỗi oan.
+    cited_people = [person for person in result.people
+                    if person.get("judgement_status") != "SUGGESTION"]
     citation_audit = ({"status": "PASS"} if engine_name != "talent" else verify.citation_audit(
         [SimpleNamespace(person_id=person.get("person_id"), name=person.get("name", ""))
-         for person in result.people], result.text, result.all_sources))
+         for person in cited_people], result.text, result.all_sources))
     checks["citations_owned"] = citation_audit["status"] == "PASS"
     if not checks["citations_owned"]:
         problems.append(
