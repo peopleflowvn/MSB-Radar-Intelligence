@@ -2890,6 +2890,7 @@ export interface AiModelInfo {
 export interface PublicSettings {
   app_name: string;
   app_tagline: string;
+  brand_tag?: string;
   app_icon: string;
   app_logo_url: string;
   color_preset: string;

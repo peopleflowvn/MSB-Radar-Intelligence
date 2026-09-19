@@ -252,7 +252,7 @@ const NAV_SECTIONS: NavSection[] = [
 const ALL_ITEMS = NAV_SECTIONS.flatMap((s) => s.items)
 
 export default function App() {
-  const { appName, appIcon, appLogoUrl } = useCustomTheme()
+  const { appName, appIcon, appLogoUrl, brandTag } = useCustomTheme()
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const saved = localStorage.getItem('radar_sidebar_collapsed')
@@ -441,7 +441,7 @@ export default function App() {
             {(!collapsed || mobileMenuOpen) && (
               <div className="brand-text">
                 <span className="brand-title">{appName}</span>
-                <span className="brand-tag">RADAR INTELLIGENCE</span>
+                <span className="brand-tag">{brandTag || 'RADAR INTELLIGENCE'}</span>
               </div>
             )}
           </div>

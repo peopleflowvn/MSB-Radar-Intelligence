@@ -392,6 +392,7 @@ class EmailOtpSettings(models.Model):
     app_logo_url = models.TextField(blank=True, default="")
     app_icon = models.CharField(max_length=20, blank=True, default="⚡")
     app_tagline = models.CharField(max_length=255, blank=True, default="Hệ Thống Tìm Kiếm Nhân Tài & Tăng Trưởng Khách Hàng")
+    brand_tag = models.CharField(max_length=60, blank=True, default="RADAR INTELLIGENCE")
 
     # --- Thumbnail / xem trước liên kết (Open Graph + Twitter card + SEO) ---
     #

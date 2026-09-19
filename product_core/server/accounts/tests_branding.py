@@ -244,6 +244,17 @@ class ThumbnailApiTest(TestCase):
         self.assertEqual(config.og_image_width, 800)
         self.assertEqual(config.meta_robots, "noindex, nofollow")
 
+    def test_admin_luu_brand_tag_va_gia_tri_xuong_csdl(self):
+        self.client.force_login(self.admin)
+        response = self.client.patch(
+            "/api/v1/auth/public-settings/",
+            data={"brand_tag": "ENTERPRISE INTELLIGENCE"},
+            content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["brand_tag"], "ENTERPRISE INTELLIGENCE")
+        config = EmailOtpSettings.current()
+        self.assertEqual(config.brand_tag, "ENTERPRISE INTELLIGENCE")
+
     def test_kich_thuoc_vo_ly_bi_bo_qua_chu_khong_lam_hong_ca_lan_luu(self):
         self.client.force_login(self.admin)
         self.client.patch("/api/v1/auth/public-settings/",

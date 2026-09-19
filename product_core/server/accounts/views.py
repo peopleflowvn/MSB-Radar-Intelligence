@@ -337,6 +337,7 @@ def _public_settings_payload(config):
     return {
         "app_name": config.from_name or "MSB Radar",
         "app_tagline": config.app_tagline or "Hệ Thống Tìm Kiếm Nhân Tài & Tăng Trưởng Khách Hàng",
+        "brand_tag": config.brand_tag or "RADAR INTELLIGENCE",
         "app_icon": config.app_icon or "⚡",
         "app_logo_url": config.app_logo_url or "",
         "color_preset": config.color_preset or "amber_gold",
@@ -451,6 +452,10 @@ def public_settings(request):
         tagline = str(data.get("app_tagline") or "").strip()
         if len(tagline) <= 255:
             config.app_tagline = tagline or "Hệ Thống Tìm Kiếm Nhân Tài & Tăng Trưởng Khách Hàng"
+    if "brand_tag" in data:
+        tag = str(data.get("brand_tag") or "").strip()
+        if len(tag) <= 60:
+            config.brand_tag = tag or "RADAR INTELLIGENCE"
     if "app_icon" in data:
         icon = str(data.get("app_icon") or "").strip()
         if len(icon) <= 20:

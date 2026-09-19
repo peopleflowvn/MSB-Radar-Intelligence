@@ -19,6 +19,7 @@ function AppearanceSettings() {
   const {
     appName,
     appTagline,
+    brandTag,
     appIcon,
     appLogoUrl,
     themeMode,
@@ -43,6 +44,7 @@ function AppearanceSettings() {
 
   const [localName, setLocalName] = useState(appName)
   const [localTagline, setLocalTagline] = useState(appTagline)
+  const [localBrandTag, setLocalBrandTag] = useState(brandTag)
   const [localIcon, setLocalIcon] = useState(appIcon)
   const [localLogoUrl, setLocalLogoUrl] = useState(appLogoUrl)
   const [savedMsg, setSavedMsg] = useState('')
@@ -63,6 +65,9 @@ function AppearanceSettings() {
   React.useEffect(() => {
     setLocalTagline(appTagline)
   }, [appTagline])
+  React.useEffect(() => {
+    setLocalBrandTag(brandTag)
+  }, [brandTag])
   React.useEffect(() => {
     setLocalIcon(appIcon)
   }, [appIcon])
@@ -119,6 +124,7 @@ function AppearanceSettings() {
       await saveSystemSettings({
         app_name: localName.trim() || 'MSB Radar',
         app_tagline: localTagline.trim() || 'Hệ Thống Tìm Kiếm Nhân Tài & Tăng Trưởng Khách Hàng',
+        brand_tag: localBrandTag.trim() || 'RADAR INTELLIGENCE',
         app_icon: localIcon || '⚡',
         app_logo_url: localLogoUrl.trim(),
       })
@@ -178,15 +184,29 @@ function AppearanceSettings() {
               />
             </div>
             <div>
-              <label>Khẩu hiệu (Tagline)</label>
+              <label>Nhãn thương hiệu phụ Sidebar (Brand Tag)</label>
               <input
                 type="text"
-                value={localTagline}
-                onChange={(e) => setLocalTagline(e.target.value)}
-                placeholder="VD: People Intelligence & Opportunity Discovery"
+                value={localBrandTag}
+                onChange={(e) => setLocalBrandTag(e.target.value)}
+                placeholder="VD: RADAR INTELLIGENCE, ENTERPRISE AI..."
                 className="input-text"
               />
+              <p className="hint" style={{ margin: '4px 0 0', fontSize: '11px' }}>
+                Hiển thị chữ hoa nhỏ màu cam ngay dưới tên hệ thống trên Sidebar bên trái.
+              </p>
             </div>
+          </div>
+
+          <div style={{ marginTop: '12px' }}>
+            <label>Khẩu hiệu hệ thống (Tagline)</label>
+            <input
+              type="text"
+              value={localTagline}
+              onChange={(e) => setLocalTagline(e.target.value)}
+              placeholder="VD: Hệ Thống Tìm Kiếm Nhân Tài & Tăng Trưởng Khách Hàng"
+              className="input-text"
+            />
           </div>
 
           {/* Tải tệp Biểu tượng & Favicon lên trực tiếp */}
@@ -326,8 +346,8 @@ function AppearanceSettings() {
                     <span style={{ fontSize: '20px' }}>{localIcon || '⚡'}</span>
                   )}
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <strong style={{ fontSize: '14px', color: 'var(--text)' }}>{localName || 'Radar'}</strong>
-                    <small style={{ fontSize: '11px', color: 'var(--muted)' }}>{localTagline || 'People Intelligence'}</small>
+                    <strong style={{ fontSize: '14px', color: 'var(--text)' }}>{localName || 'MSB Radar'}</strong>
+                    <span className="brand-tag" style={{ marginTop: '1px' }}>{localBrandTag || 'RADAR INTELLIGENCE'}</span>
                   </div>
                 </div>
               </div>

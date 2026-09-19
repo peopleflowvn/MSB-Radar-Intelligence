@@ -86,6 +86,7 @@ export const PRESET_ICONS = ['⚡', '🎯', '🚀', '🔮', '🌐', '🛡️', '
 interface CustomThemeContextType {
   appName: string
   appTagline: string
+  brandTag: string
   appIcon: string
   appLogoUrl: string
   radarAvatarUrl: string
@@ -104,6 +105,7 @@ interface CustomThemeContextType {
   soundAlerts: boolean
   setAppName: (name: string) => void
   setAppTagline: (tagline: string) => void
+  setBrandTag: (tag: string) => void
   setAppIcon: (icon: string) => void
   setAppLogoUrl: (url: string) => void
   setRadarAvatarUrl: (url: string) => void
@@ -133,6 +135,10 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
 
   const [appTagline, setAppTaglineState] = useState(() => {
     return localStorage.getItem('radar_custom_app_tagline') || 'Hệ Thống Tìm Kiếm Nhân Tài & Tăng Trưởng Khách Hàng'
+  })
+
+  const [brandTag, setBrandTagState] = useState(() => {
+    return localStorage.getItem('radar_custom_brand_tag') || 'RADAR INTELLIGENCE'
   })
 
   const [appIcon, setAppIconState] = useState(() => {
@@ -214,6 +220,10 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
           setAppTaglineState(settings.app_tagline)
           localStorage.setItem('radar_custom_app_tagline', settings.app_tagline)
         }
+        if (settings.brand_tag) {
+          setBrandTagState(settings.brand_tag)
+          localStorage.setItem('radar_custom_brand_tag', settings.brand_tag)
+        }
         if (settings.app_icon) {
           setAppIconState(settings.app_icon)
           localStorage.setItem('radar_custom_app_icon', settings.app_icon)
@@ -293,6 +303,10 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
     if (patch.app_tagline !== undefined) {
       setAppTaglineState(patch.app_tagline)
       localStorage.setItem('radar_custom_app_tagline', patch.app_tagline)
+    }
+    if (patch.brand_tag !== undefined) {
+      setBrandTagState(patch.brand_tag)
+      localStorage.setItem('radar_custom_brand_tag', patch.brand_tag)
     }
     if (patch.app_icon !== undefined) {
       setAppIconState(patch.app_icon)
@@ -377,6 +391,12 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
     setAppTaglineState(tagline)
     localStorage.setItem('radar_custom_app_tagline', tagline)
     saveSystemSettings({ app_tagline: tagline }).catch(() => {})
+  }
+
+  const setBrandTag = (tag: string) => {
+    setBrandTagState(tag)
+    localStorage.setItem('radar_custom_brand_tag', tag)
+    saveSystemSettings({ brand_tag: tag }).catch(() => {})
   }
 
   const setAppIcon = (icon: string) => {
@@ -497,6 +517,7 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
     const defaults: Partial<PublicSettings> = {
       app_name: 'MSB Radar',
       app_tagline: 'Hệ Thống Tìm Kiếm Nhân Tài & Tăng Trưởng Khách Hàng',
+      brand_tag: 'RADAR INTELLIGENCE',
       app_icon: '⚡',
       app_logo_url: '',
       theme_mode: 'dark',
@@ -617,6 +638,7 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
       value={{
         appName,
         appTagline,
+        brandTag,
         appIcon,
         appLogoUrl,
         radarAvatarUrl,
@@ -635,6 +657,7 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
         soundAlerts,
         setAppName,
         setAppTagline,
+        setBrandTag,
         setAppIcon,
         setAppLogoUrl,
         setRadarAvatarUrl,
@@ -663,6 +686,7 @@ export function CustomThemeProvider({ children }: { children: React.ReactNode })
 const DEFAULT_THEME_CONTEXT: CustomThemeContextType = {
   appName: 'MSB Radar',
   appTagline: 'Hệ Thống Tìm Kiếm Nhân Tài & Tăng Trưởng Khách Hàng',
+  brandTag: 'RADAR INTELLIGENCE',
   appIcon: '⚡',
   appLogoUrl: '',
   radarAvatarUrl: '',
@@ -681,6 +705,7 @@ const DEFAULT_THEME_CONTEXT: CustomThemeContextType = {
   soundAlerts: true,
   setAppName: () => {},
   setAppTagline: () => {},
+  setBrandTag: () => {},
   setAppIcon: () => {},
   setAppLogoUrl: () => {},
   setRadarAvatarUrl: () => {},
