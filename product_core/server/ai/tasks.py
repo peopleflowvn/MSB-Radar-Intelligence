@@ -202,6 +202,12 @@ TASKS = {row.name: row for row in _ROWS}
 _QWEN = ("greennode", "qwen/qwen3.6-flash")        # nhanh, rẻ, có thị giác
 _VIET_TOT = ("greennode", "deepseek/deepseek-v4-pro")   # CHỈ khi hạn mức ≥ 4000
 _VIET_NHANH = ("greennode", "deepseek/deepseek-v4-flash")
+#: Đọc/phán đoán chính xác hơn flash, vẫn tôn trọng `reasoning_effort="none"`.
+#: Benchmark 19/09 trên dữ liệu production (30 CV: 17 liên quan dữ liệu + 13 nhiễu,
+#: chạy 2 lần mỗi model): qwen3.7-plus 0 lần nhận nhầm hồ sơ nhiễu là phù hợp,
+#: ~45 s/30 CV; qwen3.6-flash nhận nhầm ở cả hai benchmark (~30 s);
+#: deepseek-v4-*/glm-5.2 2–8 phút, timeout từng lô, lệch giữa hai lần chạy.
+_QWEN_PLUS = ("greennode", "qwen/qwen3.7-plus")
 _EMBED = ("gemini", "models/gemini-embedding-2")
 
 # GreenNode là hạ tầng chính (điều kiện tranh giải Best Use of GreenNode AI
@@ -212,8 +218,8 @@ _EMBED = ("gemini", "models/gemini-embedding-2")
 # đó bắt buộc ở lại Gemini.
 DEFAULT_ROUTE = {
     # ① và ③ cần nhanh/rẻ; ⑤ là chặng duy nhất người dùng đọc thấy.
-    "talent_answer_plan": _QWEN,
-    "talent_answer_judge": _QWEN,
+    "talent_answer_plan": _QWEN_PLUS,    # flash đặt "Senior Data Analyst" vào bắt buộc
+    "talent_answer_judge": _QWEN_PLUS,
     "talent_answer_compose": _VIET_TOT,  # hạn mức 7000 — đủ chỗ cho phần nghĩ
     "talent_corpus_qa": _QWEN,           # hạn mức 900
     "talent_search": _QWEN,
@@ -238,7 +244,7 @@ DEFAULT_ROUTE = {
     "jd_parse": _QWEN,
     "outreach_draft": _QWEN,             # hạn mức 1200
 
-    "rb_prospect_search": _QWEN,
+    "rb_prospect_search": _QWEN_PLUS,    # một task cho cả ①③⑤ của Growth
     "rb_outreach_draft": _QWEN,          # hạn mức 800
     "rb_suggest_product_reasoning": _QWEN,  # JSON ngắn, hạn mức 400
 
@@ -273,6 +279,21 @@ def capability_for(name):
     return task.capability if task else ""
 
 
+#: Vì sao đề xuất model này — hiện cạnh mặc định trong `/settings` để người vận
+#: hành biết đổi đi là đổi CÁI GÌ, không chỉ thấy một mã model.
+DEFAULT_REASON = {
+    "talent_answer_plan": "Benchmark 19/09: flash hay đặt cấp bậc (\"Senior\") vào điều kiện "
+                          "bắt buộc, loại oan người đúng nghề.",
+    "talent_answer_judge": "Benchmark 19/09: không nhận nhầm hồ sơ nhiễu (flash có), ổn định giữa "
+                           "hai lần chạy; ~45 s/30 CV. deepseek/glm chậm 2–8 phút và timeout.",
+    "talent_answer_compose": "Benchmark 19/09: bài phân tích sâu nhất, 0 lỗi trích dẫn (20–50 s). "
+                             "glm-5.2 là lựa chọn nhanh hơn gấp đôi nếu cần. KHÔNG dùng "
+                             "qwen3.7-plus: từng viết gợi ý theo giới tính.",
+    "rb_prospect_search": "Một task cho cả ba chặng hiểu câu hỏi/đọc bằng chứng/viết của Growth — "
+                          "cùng lý do với talent_answer_judge.",
+}
+
+
 def as_payload():
     """Cho `/settings`: đủ để dựng danh sách chọn có nhãn, không phải gõ tay mã."""
     rows = []
@@ -281,5 +302,6 @@ def as_payload():
         rows.append({"name": row.name, "label": row.label,
                      "description": row.description, "group": row.group,
                      "kind": row.kind, "default_provider": provider,
-                     "default_model": model})
+                     "default_model": model,
+                     "default_reason": DEFAULT_REASON.get(row.name, "")})
     return rows

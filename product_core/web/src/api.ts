@@ -2871,6 +2871,8 @@ export interface AiTaskInfo {
   kind: string;
   /** Model hợp nhất theo đo đạc, điền sẵn khi chọn tác vụ. */
   default_provider: string;
+  /** Vì sao đề xuất model mặc định (kết quả benchmark), rỗng nếu chưa đo riêng. */
+  default_reason?: string;
   default_model: string;
 }
 

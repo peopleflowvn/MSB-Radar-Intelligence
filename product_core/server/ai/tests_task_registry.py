@@ -120,7 +120,7 @@ class TaskRegistryTest(TestCase):
         for item in payload:
             self.assertEqual(
                 set(item), {"name", "label", "description", "group", "kind",
-                            "default_provider", "default_model"})
+                            "default_provider", "default_model", "default_reason"})
 
 
 class DefaultRouteTest(TestCase):
@@ -187,3 +187,17 @@ class DefaultRouteTest(TestCase):
                               f"mục {provider} — UI sẽ hiện ô trống")
                 ok, ly_do = catalog.usable_for(rows[model], name)
                 self.assertTrue(ok, f"{name}: {ly_do}")
+
+
+class BenchmarkDefaultsTest(TestCase):
+    """Mặc định theo benchmark 19/09 — đổi thì phải đổi CÙNG lý do trong
+    `DEFAULT_REASON` và chạy lại benchmark, không sửa lẻ một con số."""
+
+    def test_doc_cv_va_hieu_cau_hoi_dung_qwen_plus(self):
+        for task in ("talent_answer_plan", "talent_answer_judge", "rb_prospect_search"):
+            self.assertEqual(tasks_registry.default_route(task), ("greennode", "qwen/qwen3.7-plus"))
+            self.assertTrue(tasks_registry.DEFAULT_REASON.get(task))
+
+    def test_viet_cau_tra_loi_giu_deepseek_pro(self):
+        self.assertEqual(tasks_registry.default_route("talent_answer_compose"),
+                         ("greennode", "deepseek/deepseek-v4-pro"))

@@ -1404,12 +1404,33 @@ function EffectiveTaskRoutes({ routes, providers, catalog, groups, models, kindR
   const save = useMutation({ mutationFn: () => api.aiTaskRouteSave(task.trim(), { provider, model }), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ai-providers'] }) })
   const remove = useMutation({ mutationFn: (name: string) => api.aiTaskRouteDelete(name), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ai-providers'] }) })
   const labelOf = (name: string) => catalog.find(item => item.name === name)?.label ?? ''
+  const infoOf = (name: string) => catalog.find(item => item.name === name)
+  /** Đổi model là quyền của người vận hành — nhưng lệch khỏi mức đã đo phải
+   *  nhìn thấy được, kèm một nút quay về. */
+  const useRecommended = useMutation({
+    mutationFn: (info: AiTaskInfo) => api.aiTaskRouteSave(info.name, {
+      provider: info.default_provider, model: info.default_model }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ai-providers'] }),
+  })
   return <div className="settings-block" style={{ marginTop: 20 }}>
     <h3>Model thực sự đang có hiệu lực theo tác vụ</h3>
     <p className="hint">Nguồn DB task route là ưu tiên vận hành. Nếu có emergency override từ VPS, Radar hiển thị rõ nguồn thay vì âm thầm ghi đè cài đặt.</p>
     {!routes.length && <p className="hint">Chưa có route theo tác vụ. Thêm route đầu tiên bên dưới.</p>}
-    <div className="table-scroll"><table><thead><tr><th>Tác vụ</th><th>Provider / model hiệu lực</th><th>Nguồn</th></tr></thead>
-      <tbody>{routes.map(route => <tr key={route.task}><td><code>{route.task}</code>{labelOf(route.task) && <><br /><span className="muted small">{labelOf(route.task)}</span></>}</td><td><code>{route.effective.provider}/{route.effective.model || 'default'}</code></td><td>{route.effective.config_source}{route.effective.emergency_key ? ` (${route.effective.emergency_key})` : ''} <button type="button" className="btn btn-secondary" onClick={() => remove.mutate(route.task)}>Bỏ</button></td></tr>)}</tbody>
+    <div className="table-scroll"><table><thead><tr><th>Tác vụ</th><th>Provider / model hiệu lực</th><th>Đề xuất (đã đo)</th><th>Nguồn</th></tr></thead>
+      <tbody>{routes.map(route => {
+        const info = infoOf(route.task)
+        const recommended = info?.default_model ? `${info.default_provider}/${info.default_model}` : ''
+        const current = `${route.effective.provider}/${route.effective.model || 'default'}`
+        const drift = !!recommended && recommended !== current
+        return <tr key={route.task}>
+          <td><code>{route.task}</code>{labelOf(route.task) && <><br /><span className="muted small">{labelOf(route.task)}</span></>}</td>
+          <td><code>{current}</code>{drift && <><br /><span className="badge warn" title="Model đang chạy khác model đề xuất theo benchmark">Khác đề xuất</span></>}</td>
+          <td>{recommended ? <code title={info?.default_reason || ''}>{recommended}</code> : <span className="hint">—</span>}
+            {drift && info && <><br /><button type="button" className="btn btn-secondary btn-sm"
+              disabled={useRecommended.isPending} onClick={() => useRecommended.mutate(info)}>Dùng đề xuất</button></>}</td>
+          <td>{route.effective.config_source}{route.effective.emergency_key ? ` (${route.effective.emergency_key})` : ''} <button type="button" className="btn btn-secondary" onClick={() => remove.mutate(route.task)}>Bỏ</button></td>
+        </tr>
+      })}</tbody>
     </table></div>
     <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
       {/* Danh sách CHỌN, không phải ô gõ tay: gõ tay nghĩa là chỉ đổi được
@@ -1440,6 +1461,7 @@ function EffectiveTaskRoutes({ routes, providers, catalog, groups, models, kindR
       {' '}<em>{KIND_HINT[selected.kind] ?? ''}</em>
       {selected.default_model && <>
         {' '}Mặc định đề xuất: <code>{selected.default_provider}/{selected.default_model}</code>.
+        {selected.default_reason && <> <span className="muted">({selected.default_reason})</span></>}
       </>}
     </p>}
     {chosen?.note && !chan && <p className="hint" style={{ marginTop: 4 }}>
