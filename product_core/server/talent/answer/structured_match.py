@@ -74,6 +74,51 @@ def _fold(text):
                    if unicodedata.category(c) != "Mn")
 
 
+def _tokens(text):
+    return re.findall(r"[a-z0-9+#.]+", _fold(text))
+
+
+#: Từ đệm trong câu điều kiện ("biết Python", "có kinh nghiệm về SQL") — không
+#: mang nghĩa để khớp với một giá trị trường như "Python".
+_FILLER = frozenset("""biet thanh thao su dung co kinh nghiem ve ky nang lam o tai
+va hoac voi trong nganh linh vuc vi tri chuc danh la mot the know using with
+experience in skill skills of and or""".split())
+
+
+def _phrase_tokens(phrase):
+    tokens = _tokens(phrase)
+    core = [t for t in tokens if t not in _FILLER]
+    return core or tokens
+
+
+def _contains_run(haystack, needle):
+    """`needle` xuất hiện NGUYÊN CỤM TỪ trong `haystack` (theo từ, không theo ký tự)."""
+    n = len(needle)
+    return n > 0 and any(haystack[i:i + n] == needle for i in range(len(haystack) - n + 1))
+
+
+def value_matches(value, phrase):
+    """Giá trị trường có cấu trúc có khớp câu điều kiện không — theo TỪ.
+
+    Bản cũ so chuỗi con hai chiều (`cand in folded or folded in cand`), nên:
+      * cấp bậc "senior" khớp điều kiện "Senior Data Analyst" → MỌI người có
+        cấp bậc senior bị ghim vào đọc (production 19/09: 40 chuyên viên ngân
+        hàng chiếm chỗ của người làm phân tích dữ liệu);
+      * kỹ năng một chữ ("R", "C") khớp bất kỳ câu nào có chữ cái đó.
+    Nay: câu điều kiện nằm trọn trong giá trị ("data analyst" ⊂ "senior data
+    analyst") thì khớp; giá trị nằm trong câu thì chỉ khớp khi nó phủ phần lớn
+    câu (≥ 60% số từ, và ≥ 2 từ nếu câu dài hơn một từ).
+    """
+    v, p = _tokens(value), _phrase_tokens(phrase)
+    if not v or not p:
+        return False
+    if _contains_run(v, p):
+        return True
+    if _contains_run(p, v):
+        return len(v) >= max(1 if len(p) == 1 else 2, -(-len(p) * 3 // 5))
+    return False
+
+
 def _years_experience_threshold(phrase):
     """"trên 3 năm kinh nghiệm" → 3.0, hoặc None nếu câu không nói số năm KN."""
     folded = _fold(phrase)
@@ -147,8 +192,7 @@ def _match_ids_for_phrase(phrase, universe_ids):
                       .exclude(status=ExtractedFact.STATUS_REJECTED)
                       .values_list("person_id", "normalized_value", "raw_value"))
             return {pid for pid, norm, raw in ids
-                    if folded in _fold(norm) or folded in _fold(raw)
-                    or _fold(norm) in folded or _fold(raw) in folded}
+                    if value_matches(norm, phrase) or value_matches(raw, phrase)}
 
     # Trường "latest" (chuỗi đơn): khớp lỏng hai chiều.
     hits = set()
@@ -158,8 +202,7 @@ def _match_ids_for_phrase(phrase, universe_ids):
             .exclude(status=ExtractedFact.STATUS_REJECTED)
             .values_list("person_id", "normalized_value", "raw_value"))
     for pid, norm, raw in rows:
-        cand = _fold(norm) or _fold(raw)
-        if cand and (cand in folded or folded in cand):
+        if value_matches(norm or raw, phrase):
             hits.add(pid)
     return hits or None
 

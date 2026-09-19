@@ -34,6 +34,32 @@ from people.models import Person
 from talent import vector_index
 
 
+class DimensionMismatch(RuntimeError):
+    pass
+
+
+def _save_vector(row, fields):
+    """Ghi vector; lệch số chiều với cột thì báo thành lỗi CÓ HƯỚNG DẪN.
+
+    Lệch chiều nghĩa là model embedding đã đổi mà cột vẫn chốt chiều cũ. Không
+    tự xoá vector cũ ở đây — đó là thao tác phá dữ liệu, người vận hành chạy
+    có chủ đích bằng lệnh dưới.
+    """
+    from django.db import DataError, transaction
+    try:
+        with transaction.atomic():
+            row.save(update_fields=fields)
+    except DataError as exc:
+        if "dimensions" not in str(exc):
+            raise
+        raise DimensionMismatch(
+            f"Cột vector lệch số chiều với model embedding đang dùng "
+            f"({row.embedding_model}, {len(row.embedding or [])} chiều): {exc}. "
+            f"Sửa: xoá vector của model cũ rồi "
+            f"`python manage.py pin_vector_dimensions --dimensions "
+            f"{len(row.embedding or [])} --apply`.") from exc
+
+
 class Command(BaseCommand):
     help = "Tự phát hiện + tự sửa chỉ mục Talent thiếu (projection/chunk/embedding/HNSW)."
 
@@ -90,7 +116,16 @@ class Command(BaseCommand):
             tick += 1
 
             fixed = self._fix_missing_projection(batch, skip_projection_ids)
-            processed, failed = self._fill_embeddings(batch, skip_row_keys)
+            try:
+                processed, failed = self._fill_embeddings(batch, skip_row_keys)
+            except DimensionMismatch as exc:
+                # Không crash: container sẽ khởi động lại vô hạn (production
+                # 19/09: 26 lần) mà không sửa được gì. Nói rõ cách sửa rồi chờ.
+                self.stderr.write(self.style.ERROR(str(exc)))
+                if not options["loop"]:
+                    raise SystemExit(2)
+                time.sleep(max(600.0, options["idle_sleep"]))
+                continue
             deep_scanned = False
             if tick % deep_scan_every == 0:
                 self.stdout.write("→ quét sâu toàn kho (rebuild_talent_vector_index --stale)…")
@@ -157,8 +192,8 @@ class Command(BaseCommand):
                 row.embedding = vector
                 row.embedding_model = model
                 row.embedding_fingerprint = row.fingerprint
-                row.save(update_fields=["embedding", "embedding_model",
-                                        "embedding_fingerprint", "indexed_at"])
+                _save_vector(row, ["embedding", "embedding_model",
+                                   "embedding_fingerprint", "indexed_at"])
                 processed += 1
             else:
                 failed += 1
@@ -176,8 +211,8 @@ class Command(BaseCommand):
                     row.embedding = vector
                     row.embedding_model = model
                     row.embedding_fingerprint = row.fingerprint
-                    row.save(update_fields=["embedding", "embedding_model",
-                                            "embedding_fingerprint", "updated_at"])
+                    _save_vector(row, ["embedding", "embedding_model",
+                                       "embedding_fingerprint", "updated_at"])
                     processed += 1
                 else:
                     failed += 1

@@ -467,11 +467,14 @@ class AggregateTest(TestCase):
         self.assertEqual(stats["missing_sort_value"], 0)
 
     def test_khong_thoa_thi_thanh_gan_dung_chu_khong_mat_hut(self):
-        rows = [_j("Loại", confidence=0.2, relevant=False)]
+        # `do_tin` là mức khớp: bị loại mà khớp một phần (≥ NEAR_FLOOR) là gần
+        # đúng; khớp gần như không có gì thì không được giới thiệu là gần đúng.
+        rows = [_j("Khớp một phần", confidence=0.4, relevant=False),
+                _j("Không liên quan", confidence=0.2, relevant=False)]
         chosen, near, _stats = aggregate_stage.aggregate(
             plan_stage.QueryPlan(limit=5), rows)
         self.assertEqual(chosen, [])
-        self.assertEqual([j.name for j in near], ["Loại"])
+        self.assertEqual([j.name for j in near], ["Khớp một phần"])
 
 
 # ------------------------------------------------------------- ⑤ compose

@@ -94,6 +94,76 @@ def _collect_workflow_models(trace, default_provider="", default_model=""):
     return models
 
 
+#: Trọng số từng nguồn khi hợp nhất pool đọc sâu. V2 (BM25 + vector trên
+#: đoạn CV) là nguồn chính; truy hồi local phủ cả 462 ứng viên KHÔNG có file
+#: CV mà V2 không lập chỉ mục; khớp cấu trúc là tín hiệu phụ — nó chỉ biết
+#: "có trường khớp chữ", không biết mức liên quan.
+SOURCE_WEIGHTS = {"v2": 1.0, "local": 1.0, "structured": 0.6}
+
+
+def _retrieve_all(active_plan, *, user, envelope, pool, pinned_ids, structured_ids,
+                  queries, pinned_only):
+    """② — mọi nguồn truy hồi, hợp nhất thành MỘT pool có trần `pool`.
+
+    Chạy V2 ở luồng phụ song song với truy hồi local (V2 chỉ gọi HTTP; ORM
+    nằm ở luồng chính), rồi hợp bằng RRF có trọng số. V2 lỗi thì vẫn còn
+    local — không có đường nào mà một nguồn hỏng làm rỗng cả pool.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    from django.conf import settings
+
+    if pinned_only:
+        return (retrieve_stage.retrieve(active_plan, pinned_ids=pinned_ids, search_queries=[]),
+                "product-core")
+
+    use_v2 = getattr(settings, "INTELLIGENCE_V2_PRIMARY", False)
+    v2_future, executor = None, None
+    if use_v2:
+        from talent.intelligence_client import retrieve as intelligence_retrieve
+        conversation_id = getattr(getattr(envelope, "thread", None), "thread_id", "")
+        executor = ThreadPoolExecutor(max_workers=1)
+        v2_future = executor.submit(_in_thread, intelligence_retrieve, user, active_plan,
+                                    limit=pool, conversation_id=conversation_id)
+
+    local = retrieve_stage.retrieve(active_plan, pinned_ids=pinned_ids, search_queries=queries,
+                                    pool=pool)
+    structured = (retrieve_stage.retrieve(active_plan, pinned_ids=structured_ids,
+                                          search_queries=[], pool=len(structured_ids))
+                  if structured_ids else [])
+    # Giữ đúng thứ tự xếp hạng của khớp cấu trúc (retrieve đặt người ghim theo
+    # thứ tự được đưa vào).
+    rank = {pid: i for i, pid in enumerate(structured_ids)}
+    structured.sort(key=lambda c: rank.get(c.person_id, len(rank)))
+
+    engine = "product-core"
+    sources = []
+    if v2_future is not None:
+        try:
+            v2 = v2_future.result()
+            sources.append((v2, SOURCE_WEIGHTS["v2"]))
+            engine = "intelligence-v2+local"
+        except Exception as exc:                   # noqa: BLE001
+            log.warning("answer: Intelligence retrieval failed; local only: %s", exc)
+            engine = "product-core-fallback"
+        finally:
+            executor.shutdown(wait=False)
+    sources.append((local, SOURCE_WEIGHTS["local"]))
+    if structured:
+        sources.append((structured, SOURCE_WEIGHTS["structured"]))
+    return (retrieve_stage.fuse_candidates(sources, pool=pool, pinned_ids=pinned_ids),
+            engine)
+
+
+def _in_thread(fn, *args, **kwargs):
+    """Gọi `fn` ở luồng phụ và trả kết nối CSDL của luồng đó khi xong."""
+    from django.db import connection
+    try:
+        return fn(*args, **kwargs)
+    finally:
+        connection.close()
+
+
 @dataclass
 class AnswerResult:
     text: str = ""
@@ -249,6 +319,9 @@ def _answer_people(chosen, stats, sources, near=None, shape=""):
                     "attribute_status": getattr(j, "attribute_status", {}) if not isinstance(j, dict) else (j.get("attribute_status") or {}),
                     "criteria": getattr(j, "criteria", []) if not isinstance(j, dict) else (j.get("criteria") or []),
                     "judgement_status": "SUGGESTION",
+                    # Điều còn thiếu so với yêu cầu — thẻ "gần đúng" hiện cái này,
+                    # không hiện `why` như thể đó là điểm mạnh.
+                    "gap": (getattr(j, "gap", "") if not isinstance(j, dict) else j.get("gap", "")) or "",
                     "confidence": (getattr(j, "confidence", 0.5) if not isinstance(j, dict) else j.get("confidence", 0.5)) or 0.5,
                     "citations": [s["n"] for s in sources if s.get("person_id") == pid],
                 })
@@ -259,7 +332,33 @@ def _answer_people(chosen, stats, sources, near=None, shape=""):
                    "criteria": [], "judgement_status": "FACT", "confidence": 1.0,
                    "citations": []}
                   for row in stats["exact_name_count"].get("people", [])[:50]]
+    _attach_profiles(people)
     return people
+
+
+def _attach_profiles(people):
+    """Chức danh / công ty / nơi ở / số năm KN từ hồ sơ có cấu trúc.
+
+    Thẻ trên giao diện lấy chức danh từ thuộc tính ③ bóc được — người "gần
+    đúng" thường không có, nên thẻ hiện câu dự phòng vô nghĩa "Hồ sơ đối soát
+    trong kho nhân tài". Một truy vấn cho cả danh sách, không LLM.
+    """
+    ids = [row["person_id"] for row in people if row.get("person_id")]
+    if not ids:
+        return
+    from people.models import Person
+    rows = {row["pk"]: row for row in Person.objects.filter(pk__in=ids).values(
+        "pk", "headline", "location", "talent_profile__current_title",
+        "talent_profile__current_company", "talent_profile__location",
+        "talent_profile__years_experience")}
+    for person in people:
+        row = rows.get(person.get("person_id")) or {}
+        person["profile"] = {
+            "title": row.get("talent_profile__current_title") or row.get("headline") or "",
+            "company": row.get("talent_profile__current_company") or "",
+            "location": row.get("talent_profile__location") or row.get("location") or "",
+            "years_experience": row.get("talent_profile__years_experience"),
+        }
 
 
 #: Sự kiện BƯỚC — hợp đồng với giao diện nằm ở `core/answer/steps.py`.
@@ -275,7 +374,9 @@ def _preamble(query_plan, question):
     """
     shape = getattr(query_plan, "shape", "") or ""
     need = (getattr(query_plan, "information_need", "") or question or "").strip()
-    need = " ".join(need.split())[:200]
+    # Bỏ dấu câu cuối: các mẫu câu bên dưới tự thêm dấu chấm, giữ lại thì thành
+    # "…trên 3 năm.. Cách làm" (production 19/09).
+    need = " ".join(need.split())[:200].rstrip(" .;,!?…")
     nq = len(getattr(query_plan, "search_queries", []) or [])
     steps = [s.get("yeu_cau", "") for s in
              (getattr(query_plan, "next_steps", []) or []) if s.get("yeu_cau")]
@@ -446,9 +547,13 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
                            structured_match.must_have_pins(query_plan))
     except Exception:                              # noqa: BLE001 - phụ, không hỏng lượt
         structured_pins = None
+    # Khớp cấu trúc là một NGUỒN XẾP HẠNG ngang hàng với truy hồi, không phải
+    # người ghim: bản cũ nối 40 người này lên ĐẦU pool và bắt ③ đọc hết, cộng
+    # thêm 60 người của truy hồi — production 19/09 đọc 93 hồ sơ, 85 giây, và
+    # 40 người ghim (khớp nhầm chữ "senior") chiếm luôn danh sách "gần đúng".
+    structured_pins = list(structured_pins or [])
     if structured_pins:
         trace["structured_pins"] = len(structured_pins)
-        pinned_ids = list(dict.fromkeys(list(pinned_ids) + list(structured_pins)))
 
     if pinned_ids:
         trace["pinned_ids"] = len(pinned_ids)
@@ -470,32 +575,11 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         mark = time.monotonic()
         yield _step("Tìm trong kho")
         queries = [] if pinned_only else None
-        retrieval_engine = "product-core"
-        if getattr(settings, "INTELLIGENCE_V2_PRIMARY", False) and not pinned_only:
-            try:
-                from talent.intelligence_client import retrieve as intelligence_retrieve
-                conversation_id = getattr(getattr(envelope, "thread", None), "thread_id", "")
-                candidates = intelligence_retrieve(
-                    user, active_plan, limit=retrieve_stage.pool_for(active_plan),
-                    conversation_id=conversation_id)
-                retrieval_engine = "intelligence-v2-haystack"
-                # Deterministic pins represent exact names, prior results or
-                # hard structured matches. They must not disappear merely
-                # because approximate retrieval ranked them below its window.
-                missing_pins = [pid for pid in pinned_ids
-                                if pid not in {row.person_id for row in candidates}]
-                if missing_pins:
-                    pinned = retrieve_stage.retrieve(
-                        active_plan, pinned_ids=missing_pins, search_queries=[])
-                    candidates = pinned + candidates
-            except Exception as exc:               # noqa: BLE001
-                log.warning("answer: Intelligence retrieval failed; using local fallback: %s", exc)
-                candidates = retrieve_stage.retrieve(
-                    active_plan, pinned_ids=pinned_ids, search_queries=queries)
-                retrieval_engine = "product-core-fallback"
-        else:
-            candidates = retrieve_stage.retrieve(
-                active_plan, pinned_ids=pinned_ids, search_queries=queries)
+        pool = retrieve_stage.pool_for(active_plan)
+        candidates, retrieval_engine = _retrieve_all(
+            active_plan, user=user, envelope=envelope, pool=pool,
+            pinned_ids=pinned_ids, structured_ids=[] if pinned_only else structured_pins,
+            queries=queries, pinned_only=pinned_only)
         if active_plan.shape == "count":
             from people.models import Person
             eligible = set(Person.applicants().filter(

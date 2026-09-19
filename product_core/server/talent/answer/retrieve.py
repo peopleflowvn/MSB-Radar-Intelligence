@@ -145,31 +145,129 @@ class _DenseBranch:
 VISIBLE = vector_index.VISIBLE
 
 
+#: Từ quá chung trong câu hỏi tuyển dụng. Để trong truy vấn full-text OR thì
+#: "tìm ứng viên … trên 3 năm kinh nghiệm" khớp gần như MỌI CV (ai cũng ghi
+#: "kinh nghiệm"), và người khớp chuyên môn bị chìm giữa đám đông đó.
+_FTS_STOP = frozenset("""tim kiem ung vien nguoi ho so cv co va hoac o tai tren
+duoi hon it nhat toi thieu nam kinh nghiem biet lam viec cac nhung cho voi la
+mot trong ve can muon the and or in of with for years year experience
+experienced candidate candidates""".split())
+
+
+def _search_tokens(query):
+    tokens = [t for t in vector_index.fts_tokens(query, limit=24) if t not in _FTS_STOP]
+    return tokens or vector_index.fts_tokens(query, limit=24)
+
+
+def _ranked_fts(queryset, field, query, limit):
+    """person_id khớp full-text, XẾP THEO ĐỘ KHỚP.
+
+    Bản cũ (`vector_index.fts_filter` + `[:limit]`) không có ORDER BY: trả một
+    tập con TUỲ Ý của những người khớp, rồi đưa thẳng vào RRF như thể đã xếp
+    hạng — người đứng đầu một danh sách không thứ tự được điểm cao nhất. Đo trên
+    production 19/09: chỉ 4/12 hồ sơ có cả SQL lẫn Python lọt vào top 60.
+    """
+    from django.db import connection
+
+    tokens = _search_tokens(query)
+    if not tokens:
+        return []
+    if connection.vendor == "postgresql":
+        from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
+        vector = SearchVector(field, config="simple")
+        tsquery = SearchQuery(" | ".join(tokens), config="simple", search_type="raw")
+        rows = (queryset.annotate(_sv=vector).filter(_sv=tsquery)
+                .annotate(_rank=SearchRank(vector, tsquery, cover_density=True))
+                .order_by("-_rank", "person_id"))
+        ids = rows.values_list("person_id", flat=True)[:limit * 3]
+        return list(dict.fromkeys(ids))[:limit]
+    # SQLite (dev/test): đếm số token khớp làm điểm — vẫn là một thứ tự thật.
+    terms = [t for t in tokens if len(t) >= 3][:8]
+    if not terms:
+        return []
+    lexical = Q()
+    for term in terms:
+        lexical |= Q(**{f"{field}__icontains": term})
+    scores = {}
+    for person_id, text in queryset.filter(lexical).values_list("person_id", field):
+        score = sum(1 for term in terms if term in (text or ""))
+        scores[person_id] = max(scores.get(person_id, 0), score)
+    return sorted(scores, key=lambda pid: (-scores[pid], pid))[:limit]
+
+
 def _fts_person_ids(query, limit):
-    """Full-text trên đoạn CV và projection hồ sơ; SQLite lùi về icontains."""
+    """Full-text trên đoạn CV và projection hồ sơ, xếp theo độ khớp.
+
+    Hai danh sách được HỢP bằng RRF chứ không nối đuôi: nối đuôi thì mọi người
+    khớp đoạn CV luôn đứng trên mọi người chỉ có projection — tức 462 ứng viên
+    không có file CV (chỉ có hồ sơ từ Edge) gần như không bao giờ vào pool.
+    """
+    chunks = _ranked_fts(CVChunk.objects.filter(**VISIBLE), "text_norm", query, limit)
+    docs = _ranked_fts(PersonSearchDocument.objects.filter(**VISIBLE),
+                       "content_norm", query, limit)
+    ranked = [ids for ids in (chunks, docs) if ids]
+    if not ranked:
+        return []
+    order, _hits = _rrf(ranked)
+    return [person_id for person_id, _score in order[:limit]]
+
+
+def dedupe_passages(passages):
+    """Bỏ đoạn trùng NỘI DUNG (cùng CV nộp hai lần = hai document khác id).
+
+    Đo trên production: 679 document cho 611 người — một ứng viên có thể được
+    cấp cùng một đoạn hai lần, chiếm chỗ của đoạn khác trong ngân sách bằng
+    chứng mà ③ đọc.
+    """
+    seen, out = set(), []
+    for passage in passages:
+        key = _fold(passage.text)[:400]
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(passage)
+    return out
+
+
+def fuse_candidates(ranked_sources, *, pool, pinned_ids=(), per_person=PASSAGES_PER_PERSON):
+    """Hợp nhiều danh sách `Candidate` (mỗi nguồn truy hồi một danh sách đã xếp
+    hạng) thành MỘT pool đọc sâu.
+
+    `ranked_sources`: `[(candidates, weight)]`. Người xuất hiện ở nhiều nguồn
+    được cộng điểm RRF và GỘP bằng chứng (bỏ trùng). `pinned_ids` — người được
+    gọi đích danh — luôn đứng đầu và không bị cắt. Tổng số người không vượt
+    `max(pool, len(pinned_ids))`: đây là trần chi phí của ③.
+    """
+    lists, weights, by_id = [], [], {}
+    for candidates, weight in ranked_sources:
+        ids = []
+        for candidate in candidates or []:
+            if candidate.person_id in by_id:
+                merged = by_id[candidate.person_id]
+                merged.passages = dedupe_passages(merged.passages + list(candidate.passages))
+                merged.hits += candidate.hits
+            else:
+                by_id[candidate.person_id] = Candidate(
+                    person_id=candidate.person_id, name=candidate.name,
+                    score=candidate.score, hits=candidate.hits,
+                    passages=dedupe_passages(list(candidate.passages)))
+            ids.append(candidate.person_id)
+        if ids:
+            lists.append(list(dict.fromkeys(ids)))
+            weights.append(weight)
+    if not lists:
+        return []
+    order, _hits = reciprocal_rank_fusion(lists, k=RRF_K, weights=weights)
+    pinned = [pid for pid in dict.fromkeys(pinned_ids) if pid in by_id]
+    rest = [pid for pid, _score in order if pid not in set(pinned)]
+    chosen = (pinned + rest)[:max(pool, len(pinned))]
+    scores = dict(order)
     out = []
-    chunks = vector_index.fts_filter(
-        CVChunk.objects.filter(**VISIBLE), "text_norm", query)
-    docs = vector_index.fts_filter(
-        PersonSearchDocument.objects.filter(**VISIBLE), "content_norm", query)
-    if chunks is None:                              # không phải PostgreSQL
-        terms = [t for t in _fold(query).split() if len(t) >= 3][:6]
-        if not terms:
-            return []
-        lexical = Q()
-        for term in terms:
-            lexical |= Q(text_norm__icontains=term)
-        chunks = CVChunk.objects.filter(lexical).filter(**VISIBLE)
-        profile_q = Q()
-        for term in terms:
-            profile_q |= Q(content_norm__icontains=term)
-        docs = PersonSearchDocument.objects.filter(profile_q).filter(**VISIBLE)
-    for person_id in list(chunks.values_list("person_id", flat=True)[:limit]):
-        if person_id not in out:
-            out.append(person_id)
-    for person_id in list(docs.values_list("person_id", flat=True)[:limit]):
-        if person_id not in out:
-            out.append(person_id)
+    for person_id in chosen:
+        candidate = by_id[person_id]
+        candidate.score = round(scores.get(person_id, candidate.score), 6)
+        candidate.passages = candidate.passages[:per_person + 1]
+        out.append(candidate)
     return out
 
 
@@ -333,7 +431,7 @@ def retrieve(query_plan, *, pool=None, pinned_ids=(), search_queries=None):
     candidates = []
     for rank, (person_id, score) in enumerate(order[:max(pool, len(pinned_ids))]):
         depth = PASSAGES_PER_PERSON if rank < depth_cut else TAIL_PASSAGES
-        passages = list(cv_passages.get(person_id) or [])[:depth]
+        passages = dedupe_passages(list(cv_passages.get(person_id) or []))[:depth]
         profile = profile_passages.get(person_id)
         if profile is not None:
             passages.append(profile)

@@ -67,6 +67,13 @@ Với TỪNG hồ sơ, quyết định dựa DUY NHẤT trên đoạn được c
    trường "doan" phải là số thứ tự đoạn mà bạn lấy câu chữ đó ra.
 3. Bóc các thuộc tính trong "can_boc" nếu đoạn CV có nói. Không có thì để null —
    TUYỆT ĐỐI không đoán tuổi, trường, bằng cấp.
+4. "do_tin" là MỨC ĐỘ HỒ SƠ KHỚP NHU CẦU — KHÔNG phải độ chắc chắn của kết
+   luận. Hệ thống xếp hạng cả người thoả lẫn người "gần đúng" bằng con số này:
+     0.70–1.00  thoả đủ bắt buộc, có bằng chứng
+     0.35–0.65  bị loại nhưng khớp MỘT PHẦN đáng kể (đúng nghề mà thiếu số năm
+                kinh nghiệm, đúng kỹ năng mà khác chức danh…)
+     0.00–0.30  gần như không liên quan (khác nghề, không kỹ năng nào khớp)
+   Một hồ sơ chắc chắn KHÔNG liên quan thì do_tin THẤP, không phải cao.
 
 Chỉ trả JSON:
 {"ket_qua": [{

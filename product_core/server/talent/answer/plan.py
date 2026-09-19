@@ -516,14 +516,20 @@ def plan(question, *, envelope=None, complete_fn=None) -> QueryPlan:
             if not info_need or info_need.casefold() == question.casefold():
                 info_need = clean_need
 
+    must_have = as_list(payload.get("must_have"), limit=6)
+    should_have = as_list(payload.get("should_have"), limit=10)
+    if shape == "find_people":
+        must_have, should_have = split_seniority(must_have, should_have)
+    queries = useful_queries(queries, info_need or question)
+
     return QueryPlan(
         reasoning=reasoning,
         confidence=confidence,
         clarify=clarify,
         shape=shape,
         information_need=info_need,
-        must_have=as_list(payload.get("must_have"), limit=6),
-        should_have=as_list(payload.get("should_have"), limit=10),
+        must_have=must_have,
+        should_have=should_have,
         extract=as_list(payload.get("extract"), limit=8),
         sort_by=sort_by,
         limit=as_int(payload.get("limit"), default=DEFAULT_LIMIT, low=1, high=MAX_LIMIT),
@@ -531,6 +537,68 @@ def plan(question, *, envelope=None, complete_fn=None) -> QueryPlan:
         next_steps=_next_steps(payload.get("next_steps")),
         provider=getattr(result, "provider", ""), model=getattr(result, "model", ""),
         raw=payload)
+
+
+#: Tiền tố cấp bậc đứng trước một chức danh. Đo trên production 19/09:
+#: "Tìm Senior Data Analyst…" → ① đặt must_have=["Senior Data Analyst"], dù
+#: prompt đã dặn cấp bậc là should_have. ③ đọc đúng chữ "bắt buộc" nên loại cả
+#: người làm Data Analyst thật chỉ vì CV không ghi chữ "Senior" — và ở
+#: `structured_match` chữ "senior" còn khớp lỏng với MỌI người có cấp bậc
+#: senior, ghim 40 chuyên viên ngân hàng vào đọc thay cho người đúng nghề.
+_SENIORITY_PREFIX = re.compile(
+    r"^\s*(senior|sr\.?|junior|jr\.?|lead|principal|middle|mid-level|mid|"
+    r"fresher|intern|entry-level)\s+(?=\S)", re.I)
+_SENIORITY_SUFFIX = re.compile(r"\s+(cấp cao|cao cấp|cấp senior)\s*$", re.I)
+
+
+def split_seniority(must_have, should_have):
+    """Tách cấp bậc khỏi chức danh trong must_have: vai trò vẫn là bắt buộc,
+    cấp bậc thành tiêu chí xếp hạng. Chỉ áp cho câu tìm người — câu ĐẾM thì
+    "đếm Senior Data Analyst" phải giữ nguyên nghĩa hẹp."""
+    must, should = [], list(should_have)
+    for item in must_have:
+        text = str(item)
+        level = None
+        match = _SENIORITY_PREFIX.match(text) or _SENIORITY_SUFFIX.search(text)
+        if match:
+            level = match.group(1).strip()
+            text = (text[match.end():] if match.start() == 0 else text[:match.start()]).strip()
+        if text:
+            must.append(text)
+        if level:
+            label = level if level.casefold().startswith("cấp") or "cao" in level.casefold()                 else f"cấp {level}"
+            if not any(label.casefold() in str(s).casefold() for s in should):
+                should.append(label)
+    return must, should
+
+
+def useful_queries(queries, information_need):
+    """Bỏ truy vấn chỉ là TÊN ĐỊA DANH ("Hà Nội", "hanoi").
+
+    Mỗi truy vấn là một phiếu bầu ngang hàng trong RRF. Truy vấn "Hà Nội" kéo về
+    mọi CV ở Hà Nội — 310/1073 hồ sơ trên production — và đẩy chúng lên ngang
+    người khớp chuyên môn. Địa điểm là tiêu chí, ③ tự đối chiếu; nó không phải
+    một cách diễn đạt câu hỏi. Không còn truy vấn nào thì dùng chính nhu cầu.
+    """
+    from core.vn_locations import _normalize_key, canonical_province
+
+    kept = []
+    for query in queries:
+        text = str(query or "").strip()
+        if not text:
+            continue
+        if canonical_province(text) != text or _normalize_key(text) in _LOCATION_KEYS:
+            continue
+        kept.append(text)
+    return kept or ([information_need] if information_need else [])
+
+
+def _location_keys():
+    from core.vn_locations import _HANOI_DISTRICTS, _HCM_DISTRICTS, _LOOKUP
+    return set(_LOOKUP) | set(_HANOI_DISTRICTS) | set(_HCM_DISTRICTS)
+
+
+_LOCATION_KEYS = _location_keys()
 
 
 #: Trần số bước tiếp theo. Mỗi bước là một lượt gọi model nữa, nên chuỗi dài

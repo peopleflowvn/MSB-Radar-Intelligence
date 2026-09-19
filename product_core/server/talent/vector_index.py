@@ -332,9 +332,31 @@ def missing_projection_ids(limit=500):
                 .order_by("pk").values_list("pk", flat=True)[:limit])
 
 
+def current_model():
+    """Tên model embedding ĐANG cấu hình (không gọi mạng)."""
+    config = _embedding_config()
+    return config[3] if config else ""
+
+
+def has_vectors_for(model):
+    """Chỉ mục có vector nào của `model` chưa — hỏi trước khi trả tiền embedding."""
+    if not model:
+        return False
+    return (PersonSearchDocument.objects.filter(embedding_model=model)
+            .exclude(embedding__isnull=True).exists()
+            or CVChunk.objects.filter(embedding_model=model)
+            .exclude(embedding__isnull=True).exists())
+
+
 def search(query, *, limit=250):
     """Return person ids from person + CV vectors, preserving best rank per person."""
     if connection.vendor != "postgresql":
+        return []
+    # Không có vector nào của model đang dùng (vừa đổi model, chưa embed lại —
+    # production 12/09→19/09: cấu hình bge-m3, kho toàn vector Gemini) thì KHÔNG
+    # gọi embedding: kết quả chắc chắn rỗng mà mỗi lượt hỏi vẫn mất vài giây cho
+    # sáu lời gọi mạng. `coverage()` nói rõ trạng thái này trong trace.
+    if not has_vectors_for(current_model()):
         return []
     vector, model = embed(query, task_type="RETRIEVAL_QUERY")
     if not vector:

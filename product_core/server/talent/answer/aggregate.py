@@ -18,6 +18,12 @@ import unicodedata
 CONFIDENCE_FLOOR = 0.35
 #: Người không thoả nhưng gần đúng — giữ lại tối đa ngần này để nói "gần giống".
 NEAR_MISS = 5
+#: Sàn để được gọi là "gần đúng". Bản cũ nhận MỌI người bị loại có ghi lý do
+#: (`confidence > 0 or why`) — production 19/09 giới thiệu 5 "ứng viên gần phù
+#: hợp nhất" mà dòng nào cũng ghi "không có bằng chứng về SQL, Python hoặc bất
+#: kỳ vai trò phân tích dữ liệu nào". `do_tin` nay là mức khớp (xem prompt ③):
+#: dưới sàn này là không liên quan, không phải gần đúng.
+NEAR_FLOOR = 0.35
 
 _YEAR = re.compile(r"(19|20)\d{2}")
 _NUMBER = re.compile(r"-?\d+(?:[.,]\d+)?")
@@ -104,7 +110,8 @@ def aggregate(query_plan, judgements):
     for judgement in judgements:
         if judgement.relevant and judgement.confidence >= CONFIDENCE_FLOOR:
             kept.append(judgement)
-        elif judgement.confidence > 0 or judgement.why:
+        elif judgement.relevant or judgement.confidence >= NEAR_FLOOR:
+            # thoả nhưng thiếu trích dẫn đủ tin (bị hạ độ tin) vẫn là gần đúng
             near.append(judgement)
 
     sort_by = query_plan.sort_by

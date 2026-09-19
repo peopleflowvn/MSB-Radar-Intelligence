@@ -23,10 +23,16 @@ class HaystackBM25Ranker:
     only bites as an actual circuit breaker, not a day-to-day filter.
     """
 
-    def __init__(self, candidate_limit: int = 100_000) -> None:
-        if candidate_limit < 1:
-            raise ValueError("candidate_limit must be positive")
+    def __init__(self, candidate_limit: int = 100_000, rank_limit: int = 1_000) -> None:
+        if candidate_limit < 1 or rank_limit < 1:
+            raise ValueError("candidate_limit and rank_limit must be positive")
         self._candidate_limit = candidate_limit
+        # How many top-scoring chunks a query returns. Haystack materialises every
+        # returned Document through to_dict/from_dict; returning the whole corpus
+        # (66k chunks in production, Sept 2026) cost ~2.7 s per query versus
+        # ~0.7 s for the top 1000, and ranks beyond that contribute ~nothing to
+        # reciprocal-rank fusion (1/(60+1000)).
+        self._rank_limit = rank_limit
         # (key, prepared_records, retriever, tokens_by_id) swapped in one
         # assignment so a concurrent rank() call on another thread never
         # observes a retriever built from one candidate set paired with a
@@ -60,14 +66,14 @@ class HaystackBM25Ranker:
         bounded = tuple(sorted(
             prepared_records, key=lambda row: row[0].chunk.evidence.evidence_id
         ))[:self._candidate_limit]
-        retriever = self._build_retriever(bounded)
+        retriever = self._build_retriever(bounded, self._rank_limit)
         tokens_by_id = {
             record.chunk.evidence.evidence_id: tokens for record, _, tokens in prepared_records
         }
         self._prepared = (key, prepared_records, retriever, tokens_by_id)
 
     @staticmethod
-    def _build_retriever(bounded):
+    def _build_retriever(bounded, rank_limit=1_000):
         os.environ.setdefault("HAYSTACK_TELEMETRY_ENABLED", "false")
         try:
             from haystack import Document
@@ -80,7 +86,8 @@ class HaystackBM25Ranker:
             Document(id=record.chunk.evidence.evidence_id, content=content)
             for record, content, _ in bounded
         ])
-        return InMemoryBM25Retriever(store, top_k=len(bounded), scale_score=False)
+        return InMemoryBM25Retriever(store, top_k=max(1, min(len(bounded), rank_limit)),
+                                     scale_score=False)
 
     def rank(self, query: str, records: Sequence[RetrievalRecord]) -> Sequence[tuple[str, float]]:
         query_tokens = set(normalize_text(query).split())
