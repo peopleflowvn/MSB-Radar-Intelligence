@@ -455,7 +455,13 @@ class Command(BaseCommand):
                 result = answer_fn(case["q"], user=user)
                 if case.get("follow_up"):
                     # Lượt tiếp phải bám được kết quả lượt trước.
-                    history = [{"question": case["q"], "answer": result.text}]
+                    # Kèm kế hoạch lượt trước như production lưu (`criteria`) — câu
+                    # tinh chỉnh ("nới lỏng…") dựa vào nó để biết tìm lại cái gì.
+                    plan = (result.trace or {}).get("plan") or {}
+                    history = [{"question": case["q"], "answer": result.text,
+                                "criteria": {k: plan.get(k) for k in (
+                                    "information_need", "must_have", "should_have",
+                                    "search_queries", "limit")} if plan else {}}]
                     result = answer_fn(case["follow_up"], history=history, user=user)
             except Exception as exc:                # noqa: BLE001
                 rows.append({"n": index, "q": case["q"], "ok": False,

@@ -4,19 +4,49 @@
     {
       "q": "Tìm Senior Data Analyst ở Hà Nội biết SQL và Python, trên 3 năm kinh nghiệm",
       "note": "Kho KHÔNG có ai đạt đủ (đa số là sinh viên/1-2 năm). Đúng: nêu người làm phân tích dữ liệu gần nhất. Lỗi 19/09: 5 chuyên viên ngân hàng được giới thiệu là 'gần phù hợp' vì 'senior' khớp lỏng cấp bậc.",
-      "must_include_any": [174, 304, 295, 794, 161, 928, 939, 800],
-      "must_not_include": ["Nguyễn Hà Anh Thư", "Trần Thị Hiền", "Nguyễn Khắc Thành", "LÊ THỊ MINH HẰNG", "Luong Thanh Tung"],
-      "must_not_say": ["đối soát trong kho", "ưu tiên ứng viên nữ"],
+      "must_include_any": [
+        174,
+        304,
+        295,
+        794,
+        161,
+        928,
+        939,
+        800
+      ],
+      "must_not_include": [
+        "Nguyễn Hà Anh Thư",
+        "Trần Thị Hiền",
+        "Nguyễn Khắc Thành",
+        "LÊ THỊ MINH HẰNG",
+        "Luong Thanh Tung"
+      ],
+      "must_not_say": [
+        "đối soát trong kho",
+        "ưu tiên ứng viên nữ"
+      ],
       "max_seconds": 150
     },
     {
       "q": "ai biết SQL và Python?",
-      "must_include_any": [304, 174, 794, 939, 800, 295],
+      "must_include_any": [
+        304,
+        174,
+        794,
+        939,
+        800,
+        295
+      ],
       "max_seconds": 150
     },
     {
       "q": "Tìm chuyên viên quan hệ khách hàng doanh nghiệp trên 5 năm kinh nghiệm",
-      "must_include_any": [990, 1008, 22, 59],
+      "must_include_any": [
+        990,
+        1008,
+        22,
+        59
+      ],
       "max_seconds": 150
     },
     {
@@ -25,31 +55,70 @@
       "max_seconds": 150
     },
     {
+      "q": "Tìm Senior Data Analyst ở Hà Nội biết SQL và Python, trên 3 năm kinh nghiệm",
+      "follow_up": "Nới lỏng tiêu chí số năm kinh nghiệm để tìm thêm ứng viên tiềm năng",
+      "note": "Lỗi 19/09: câu gợi ý bị xếp hội thoại, model bịa 'đã tìm kiếm lại' + 3 ứng viên.",
+      "expect_people": true,
+      "must_not_say": [
+        "đã thực hiện tìm kiếm lại",
+        "đã tìm kiếm lại"
+      ],
+      "max_seconds": 300
+    },
+    {
+      "q": "Thống kê số lượng ứng viên theo từng khu vực",
+      "note": "Lỗi 19/09: đọc sâu 60 hồ sơ rồi trả 'Hà Nội: 5 ứng viên'; thật ~500 hồ sơ có địa điểm.",
+      "must_not_say": [
+        "được chọn đọc sâu",
+        "Hà Nội: 5 ứng viên"
+      ],
+      "max_seconds": 150
+    },
+    {
       "engine": "rb",
       "q": "Tìm quản lý hoặc chuyên gia từ 5 năm kinh nghiệm có thể tiếp cận vay mua nhà",
       "expect_people": true,
-      "must_not_say": ["thu nhập", "INFERENCE", "kết hôn", "phân khúc cao cấp"],
+      "must_not_say": [
+        "thu nhập",
+        "INFERENCE",
+        "kết hôn",
+        "phân khúc cao cấp"
+      ],
       "max_seconds": 150
     },
     {
       "engine": "rb",
       "q": "Tìm quản lý, giám đốc hoặc chuyên gia quan tâm thẻ tín dụng hạn mức cao",
       "expect_people": true,
-      "must_not_say": ["thu nhập", "INFERENCE", "chi tiêu lớn", "phân khúc cao cấp"],
+      "must_not_say": [
+        "thu nhập",
+        "INFERENCE",
+        "chi tiêu lớn",
+        "phân khúc cao cấp"
+      ],
       "max_seconds": 150
     },
     {
       "engine": "rb",
       "q": "Tìm chủ doanh nghiệp, CEO, kế toán trưởng để chào gói vốn kinh doanh và chi lương",
       "expect_people": true,
-      "must_include_any": ["HA HOANG TRANG", "Hoàng Anh", "Hoàng Thị Như"],
-      "must_not_say": ["thu nhập", "INFERENCE"],
+      "must_include_any": [
+        "HA HOANG TRANG",
+        "Hoàng Anh",
+        "Hoàng Thị Như"
+      ],
+      "must_not_say": [
+        "thu nhập",
+        "INFERENCE"
+      ],
       "max_seconds": 150
     },
     {
       "engine": "rb",
       "q": "Kho mình có bao nhiêu khách hàng?",
-      "must_not_say": ["không có dữ liệu"],
+      "must_not_say": [
+        "không có dữ liệu"
+      ],
       "max_seconds": 150
     }
   ]
