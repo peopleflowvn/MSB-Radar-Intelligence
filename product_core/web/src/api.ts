@@ -294,6 +294,17 @@ export interface TalentCard {
   source_count: number;
   active_worklists: ActiveWorklist[];
   updated_at: string;
+  /** Chỉ có khi tìm ở góc nhìn Khách hàng (`domain=rb`). */
+  rb?: TalentCardRb | null;
+}
+
+export interface TalentCardRb {
+  lead_status: string;
+  lead_status_label: string;
+  segment: string;
+  occupation: string;
+  sales_owner_name: string;
+  open_opportunity_products: string[];
 }
 
 export interface ActiveWorklist {
@@ -1288,6 +1299,7 @@ export interface SearchFilters {
   relationship?: string;
   product?: string;
   lead_status?: string;
+  segment?: string;
   open_opportunity?: string;
   tags?: string;
   pool?: string;
@@ -1409,6 +1421,7 @@ export interface TalentFacets {
   relationships: Array<{ value: string; label: string }>;
   products: Array<{ value: string; label: string }>;
   lead_statuses: Array<{ value: string; label: string }>;
+  segments?: Array<{ value: string; label: string }>;
 }
 
 export interface UserRow {

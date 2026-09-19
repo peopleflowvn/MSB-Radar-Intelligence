@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   api,
+  ApiError,
   SavedView,
   SearchFilters,
   TalentCard,
@@ -242,6 +243,10 @@ const PRODUCT_OPTIONS: Array<[string, string]> = [
   ["payroll", "Tài khoản lương"],
 ];
 
+function productLabel(code: string) {
+  return PRODUCT_OPTIONS.find(([value]) => value === code)?.[1] ?? code;
+}
+
 interface BulkActionProps {
   selectedIds: number[];
   /** Xong một thao tác: bỏ chọn và báo kết quả lên banner chung. */
@@ -255,17 +260,27 @@ function ProspectBulkActions({ selectedIds, onDone }: BulkActionProps) {
   const [need, setNeed] = useState("");
 
   const create = useMutation({
-    mutationFn: async () => settledCount(await Promise.allSettled(
-      selectedIds.map((personId) =>
-        api.rbOpportunityCreate({
-          person_id: personId,
-          product: product || "credit_card",
-          need: need.trim() || "Tạo hàng loạt từ bộ lọc đa chiều",
-        })
-      )
-    )),
-    onSuccess: ({ ok, failed }) => {
-      onDone(`✓ Đã tạo ${ok} cơ hội tiếp cận cho khách hàng đã chọn${failedSuffix(failed)}`);
+    mutationFn: async () => {
+      const results = await Promise.allSettled(
+        selectedIds.map((personId) =>
+          api.rbOpportunityCreate({
+            person_id: personId,
+            product: product || "credit_card",
+            need: need.trim() || "Tạo hàng loạt từ bộ lọc đa chiều",
+          })
+        )
+      );
+      // 409 = đã có cơ hội mở cho sản phẩm này hoặc khách yêu cầu không liên hệ:
+      // thử lại cũng không bao giờ thành công, không được gộp vào "thử lại sau".
+      const skipped = results.filter((r) =>
+        r.status === "rejected" && r.reason instanceof ApiError && r.reason.status === 409).length;
+      const { ok, failed } = settledCount(results);
+      return { ok, failed: failed - skipped, skipped };
+    },
+    onSuccess: ({ ok, failed, skipped }) => {
+      const skippedNote = skipped > 0
+        ? ` (${skipped} khách bỏ qua vì đã có cơ hội mở hoặc yêu cầu không liên hệ)` : "";
+      onDone(`✓ Đã tạo ${ok} cơ hội tiếp cận cho khách hàng đã chọn${skippedNote}${failedSuffix(failed)}`);
       qc.invalidateQueries({ queryKey: ["rb-customer-tasks"] });
       qc.invalidateQueries({ queryKey: ["rb-opportunities"] });
       qc.invalidateQueries({ queryKey: ["search-filter-results"] });
@@ -607,7 +622,7 @@ export default function SearchFilterWorkspace({
   function filterSummary(filters: SearchFilters) {
     const labels: Partial<Record<keyof SearchFilters, string>> = {
       q: "Từ khoá", skills: "Kỹ năng/Nghề", title: "Chức danh", location: "Khu vực",
-      company: "Công ty", product: "Sản phẩm", lead_status: "Trạng thái",
+      company: "Công ty", product: "Sản phẩm", lead_status: "Trạng thái", segment: "Phân khúc", open_opportunity: "Cơ hội mở",
       pool: "Nhóm khách", owner: "RM", min_years: "KN/Tuổi từ", max_years: "Đến",
       has_email: "Có email", has_phone: "Có SĐT",
     };
@@ -673,7 +688,7 @@ export default function SearchFilterWorkspace({
 
   const filterLabels: Partial<Record<keyof SearchFilters, string>> = {
     q: "Từ khoá", skills: "Kỹ năng/Nghề", title: "Chức danh", location: "Khu vực",
-    company: "Công ty", product: "Sản phẩm", lead_status: "Trạng thái",
+    company: "Công ty", product: "Sản phẩm", lead_status: "Trạng thái", segment: "Phân khúc", open_opportunity: "Cơ hội mở",
     pool: "Nhóm khách", owner: "RM", min_years: "Từ", max_years: "Đến",
     has_email: "Có email", has_phone: "Có SĐT",
   };
@@ -767,16 +782,29 @@ export default function SearchFilterWorkspace({
             </button>
             {isProspect ? (
               <>
+                {/* Bản cũ là `min_years=5` mang nhãn "VIP / Priority" — lọc theo
+                    số năm kinh nghiệm, không liên quan phân khúc. */}
                 <button
                   type="button"
-                  className={`quick-tag-btn ${draft.min_years === "5" ? "active" : ""}`}
+                  className={`quick-tag-btn ${draft.segment === "priority" ? "active" : ""}`}
                   onClick={() =>
                     applyQuickFilter({
-                      min_years: draft.min_years === "5" ? undefined : "5",
+                      segment: draft.segment === "priority" ? "" : "priority",
                     })
                   }
                 >
-                  💼 VIP / Priority
+                  💎 Khách Ưu tiên
+                </button>
+                <button
+                  type="button"
+                  className={`quick-tag-btn ${draft.open_opportunity === "0" ? "active" : ""}`}
+                  onClick={() =>
+                    applyQuickFilter({
+                      open_opportunity: draft.open_opportunity === "0" ? "" : "0",
+                    })
+                  }
+                >
+                  🆕 Chưa có cơ hội mở
                 </button>
                 <button
                   type="button"
@@ -917,6 +945,10 @@ export default function SearchFilterWorkspace({
                 value={draft.company ?? ""}
                 onChange={(event) => setDraft((prev) => ({ ...prev, company: event.target.value }))}
               />
+              {/* Trường chỉ có nghĩa với ứng viên (bóc từ CV) — ẩn ở góc nhìn
+                  Khách hàng. Điều kiện đã áp từ góc nhìn kia vẫn hiện ở chip
+                  "đang áp dụng" nên không lọc ngầm. */}
+              {!isProspect && (<>
               <Field
                 label="Nơi làm việc mong muốn"
                 icon="🧭"
@@ -952,6 +984,7 @@ export default function SearchFilterWorkspace({
                 value={draft.foreign_language ?? ""}
                 onChange={(event) => setDraft((prev) => ({ ...prev, foreign_language: event.target.value }))}
               />
+              </>)}
 
               <div className="filter-col">
                 <label className="filter-label">
@@ -1037,21 +1070,40 @@ export default function SearchFilterWorkspace({
 
               <div className="filter-col">
                 <label className="filter-label">
-                  <span>📊 Trạng thái cơ hội</span>
+                  <span>📊 Trạng thái khách</span>
                 </label>
+                {/* Giá trị lấy từ máy chủ (`RBProfile.LEAD_CHOICES`). Bản cũ gõ tay
+                    new/contacted/won/lost — không khớp giá trị nào trong CSDL
+                    ngoài `qualified`, chọn là ra rỗng. */}
                 <select
                   className="config-select"
                   value={draft.lead_status ?? ""}
                   onChange={(event) => setDraft((prev) => ({ ...prev, lead_status: event.target.value }))}
                 >
                   <option value="">Tất cả trạng thái</option>
-                  <option value="new">Mới phát hiện</option>
-                  <option value="contacted">Đã tiếp cận</option>
-                  <option value="qualified">Đủ điều kiện</option>
-                  <option value="won">Thành công</option>
-                  <option value="lost">Chưa chốt được</option>
+                  {(facets.data?.lead_statuses ?? []).map((row) => (
+                    <option key={row.value} value={row.value}>{row.label}</option>
+                  ))}
                 </select>
               </div>
+
+              {isProspect && (
+                <div className="filter-col">
+                  <label className="filter-label">
+                    <span>💎 Phân khúc</span>
+                  </label>
+                  <select
+                    className="config-select"
+                    value={draft.segment ?? ""}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, segment: event.target.value }))}
+                  >
+                    <option value="">Tất cả phân khúc</option>
+                    {(facets.data?.segments ?? []).map((row) => (
+                      <option key={row.value} value={row.value}>{row.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="filter-col">
                 <label className="filter-label">
@@ -1438,7 +1490,7 @@ export default function SearchFilterWorkspace({
                         </div>
                         <div className="talent-title" style={{ marginTop: "2px" }}>
                           <span className="title-text">
-                            {card.talent?.current_title || card.headline
+                            {card.rb?.occupation || card.talent?.current_title || card.headline
                               || copy.titleFallback}
                           </span>
                           {!isProspect && card.talent?.current_company && (
@@ -1458,6 +1510,22 @@ export default function SearchFilterWorkspace({
                     )}
                     {!isProspect && card.talent?.owner_name && (
                       <span className="meta-item">👤 Phụ trách: {card.talent.owner_name}</span>
+                    )}
+                    {isProspect && (
+                      <span className="meta-item">
+                        👔 {card.rb?.sales_owner_name ? `RM: ${card.rb.sales_owner_name}` : "Chưa có RM phụ trách"}
+                      </span>
+                    )}
+                    {isProspect && card.rb?.lead_status_label && (
+                      <span className="meta-item">📊 {card.rb.lead_status_label}</span>
+                    )}
+                    {isProspect && (card.rb?.open_opportunity_products.length ?? 0) > 0 && (
+                      <span
+                        className="badge"
+                        style={{ background: "rgba(245, 158, 11, 0.12)", color: "#b45309", border: "1px solid rgba(245, 158, 11, 0.3)" }}
+                      >
+                        Đã có cơ hội mở: {card.rb!.open_opportunity_products.map(productLabel).join(", ")}
+                      </span>
                     )}
                     {!isProspect && card.talent?.last_source_at && (
                       <span className="meta-item">
@@ -1583,7 +1651,7 @@ export default function SearchFilterWorkspace({
                         </div>
                       </td>
                       <td className="table-col-title">
-                        <div>{card.talent?.current_title || card.headline || "—"}</div>
+                        <div>{card.rb?.occupation || card.talent?.current_title || card.headline || "—"}</div>
                         {!isProspect && (
                           <small className="muted">{card.talent?.current_company || "—"}</small>
                         )}

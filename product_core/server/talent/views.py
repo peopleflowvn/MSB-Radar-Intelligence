@@ -15,7 +15,7 @@ from accounts.permissions import (RequiresAiSettings, RequiresCandidateWork,
 from accounts import privacy, roles
 from core.storage import StorageError, get_storage
 from core.document_preview import is_safe_inline
-from django.db.models import Prefetch
+from django.db.models import Prefetch, prefetch_related_objects
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -64,6 +64,7 @@ def _search_kwargs(params):
         "relationship_state": params.get("relationship", ""),
         "product_interest": params.get("product", ""),
         "lead_status": params.get("lead_status", ""),
+        "segment": params.get("segment", ""),
         "has_open_opportunity": (True if params.get("open_opportunity") == "1"
                                  else False if params.get("open_opportunity") == "0"
                                  else None),
@@ -109,6 +110,12 @@ def talent_search(request):
     denied = _pool_denied(request, kwargs["pool"])
     if denied:
         return denied
+    is_rb = kwargs["domain"] == "rb"
+    # Góc nhìn Khách hàng trả thêm dữ liệu bán lẻ (RM, lead, cơ hội) trên từng
+    # thẻ — người không có module RB thì không được đọc phần đó.
+    if is_rb and not roles.can_access(request.user, roles.MODULE_RB):
+        return Response({"detail": "Bạn không có quyền xem góc nhìn Khách hàng."},
+                        status=status.HTTP_403_FORBIDDEN)
     if (kwargs["min_years"] is not None and kwargs["max_years"] is not None
             and kwargs["min_years"] > kwargs["max_years"]):
         return Response({"detail": "Số năm tối thiểu không được lớn hơn tối đa."},
@@ -118,9 +125,12 @@ def talent_search(request):
         limit=_number(params.get("limit"), 50),
         offset=_number(params.get("offset"), 0),
     )
+    if is_rb:
+        prefetch_related_objects(people, "rb_profile__sales_owner", "rb_opportunities")
     return Response({
         "count": total,
-        "results": TalentCardSerializer(people, many=True).data,
+        "results": TalentCardSerializer(people, many=True,
+                                        context={"domain": kwargs["domain"]}).data,
     })
 
 
@@ -823,6 +833,8 @@ def talent_facets(request):
                         for value, label in PRODUCT_CHOICES]
     data["lead_statuses"] = [{"value": value, "label": label}
                              for value, label in RBProfile.LEAD_CHOICES]
+    data["segments"] = [{"value": value, "label": label}
+                        for value, label in RBProfile.SEGMENT_CHOICES]
     return Response(data)
 
 

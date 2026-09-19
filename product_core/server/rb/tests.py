@@ -364,6 +364,25 @@ class OpportunityApiTest(TestCase):
         _, owned = talent_search.search(domain="rb", owner=self.rm.pk, limit=50)
         self.assertEqual([p.pk for p in owned], [self.an.pk])
 
+    def test_API_tim_goc_nhin_khach_hang_tra_tom_tat_ban_le(self):
+        RBProfile.objects.create(person=self.an, sales_owner=self.rm,
+                                 lead_status="warm", segment="priority")
+        body = self.client.get(reverse("talent-search"),
+                               {"domain": "rb", "segment": "priority"}).json()
+        self.assertEqual([row["id"] for row in body["results"]], [self.an.pk])
+        rb = body["results"][0]["rb"]
+        self.assertEqual(rb["lead_status_label"], "Đã tiếp cận")
+        self.assertEqual(rb["open_opportunity_products"], [PRODUCT_MORTGAGE])
+        self.assertTrue(rb["sales_owner_name"])
+        # Góc nhìn Tuyển dụng không kèm dữ liệu bán lẻ.
+        talent_body = self.client.get(reverse("talent-search")).json()
+        self.assertIsNone(talent_body["results"][0]["rb"])
+
+    def test_API_tim_goc_nhin_khach_hang_chan_nguoi_khong_co_module_RB(self):
+        self.client.force_login(make_user("tuyen-dung", roles.RECRUITER))
+        response = self.client.get(reverse("talent-search"), {"domain": "rb"})
+        self.assertEqual(response.status_code, 403)
+
     def test_goi_y_san_pham_qua_API(self):
         response = self.client.post(
             reverse("rb-suggest"),

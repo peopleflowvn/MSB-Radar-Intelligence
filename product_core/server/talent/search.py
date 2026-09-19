@@ -110,6 +110,7 @@ def search(
     relationship_state="",
     product_interest="",
     lead_status="",
+    segment="",
     has_open_opportunity=None,
     has_email=None,
     has_phone=None,
@@ -294,6 +295,8 @@ def search(
         queryset = queryset.filter(rb_profile__interests__product=product_interest)
     if lead_status:
         queryset = queryset.filter(rb_profile__lead_status=lead_status)
+    if segment:
+        queryset = queryset.filter(rb_profile__segment=segment)
     if has_open_opportunity is True:
         queryset = queryset.filter(
             rb_opportunities__status__in=("new", "accepted", "contacting"))

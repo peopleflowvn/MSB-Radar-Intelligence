@@ -36,7 +36,31 @@ class TalentCardSerializer(serializers.ModelSerializer):
         fields = ["id", "display_name", "primary_email", "primary_phone",
                   "contact_masked", "headline",
                   "location", "needs_review", "talent", "source_count",
-                  "active_worklists", "updated_at"]
+                  "active_worklists", "updated_at", "rb"]
+
+    rb = serializers.SerializerMethodField()
+
+    def get_rb(self, person):
+        """Tóm tắt bán lẻ cho góc nhìn Khách hàng — `None` ở mọi chỗ khác.
+
+        Chỉ bật khi view đặt `context["domain"] = "rb"` (view đã kiểm quyền module
+        RB); recruiter thuần không nhận được dữ liệu bán lẻ qua đường này.
+        """
+        if self.context.get("domain") != "rb":
+            return None
+        from rb.models import RBOpportunity
+        profile = getattr(person, "rb_profile", None)
+        open_products = sorted({row.product for row in person.rb_opportunities.all()
+                                if row.status in RBOpportunity.OPEN_STATUSES})
+        return {
+            "lead_status": profile.lead_status if profile else "",
+            "lead_status_label": profile.get_lead_status_display() if profile else "",
+            "segment": profile.segment if profile else "",
+            "occupation": profile.occupation if profile else "",
+            "sales_owner_name": ((profile.sales_owner and str(profile.sales_owner))
+                                 or profile.sales_owner_name) if profile else "",
+            "open_opportunity_products": open_products,
+        }
 
     def get_primary_email(self, person):
         return privacy.mask_email(person.primary_email)

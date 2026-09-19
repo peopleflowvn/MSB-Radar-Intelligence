@@ -155,7 +155,10 @@ export function getProspectFollowUps(turn: AnswerTurn<ProspectAnswerPerson>, que
 export default function ProspectAiSearch() {
   const qc = useQueryClient();
   const chatState = useProspectChatState();
-  const [creatingFor, setCreatingFor] = useState<number | null>(null);
+  // Khoá theo `lượt:người`: cùng một khách có thể xuất hiện ở hai lượt chat, khoá
+  // theo mỗi `person_id` thì bấm một chỗ mở cả hai ô chọn cùng lúc.
+  const [creatingFor, setCreatingFor] = useState<string | null>(null);
+  const [creatingProduct, setCreatingProduct] = useState("credit_card");
   const [createdMsg, setCreatedMsg] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [aiViewMode, setAiViewMode] = useState<"cards" | "table">("cards");
@@ -178,14 +181,19 @@ export default function ProspectAiSearch() {
 
   return (
     <>
+      {/* Dính ở đầu vùng nhìn: nút tạo cơ hội thường nằm giữa một cuộc chat dài,
+          banner đặt tĩnh ở đầu trang thì người dùng không bao giờ thấy. */}
       {createdMsg && (
-        <div className="talent-success-banner" style={{ marginBottom: "16px" }}>
+        <div className="talent-success-banner" role="status" style={{ marginBottom: "16px", position: "sticky", top: 8, zIndex: 20 }}>
           <span>{createdMsg}</span>
         </div>
       )}
       {createError && (
-        <div className="err-box" role="alert" style={{ marginBottom: "16px" }}>
+        <div className="err-box" role="alert" style={{ marginBottom: "16px", position: "sticky", top: 8, zIndex: 20 }}>
           ⚠ Không tạo được cơ hội: {createError}
+          <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 8 }} onClick={() => setCreateError(null)}>
+            Đóng
+          </button>
         </div>
       )}
 
@@ -214,6 +222,19 @@ export default function ProspectAiSearch() {
           const textOnly = Boolean(traceMeta?.keeps_last_result) || Boolean(traceMeta?.count?.exact);
           const showPayload = Boolean(plan) && !textOnly;
           const rows = (ans?.people ?? []).map(prospectRowFromAnswer);
+          const createKey = (row: ProspectRow) => `${mi}:${row.person_id}`;
+          const startCreate = (row: ProspectRow) => {
+            setCreateError(null);
+            setCreatingProduct(row.product || "credit_card");
+            setCreatingFor(createKey(row));
+          };
+          // Nhu cầu lưu vào cơ hội lấy từ lý do AI đề xuất CHÍNH khách này; câu hỏi
+          // chỉ là dự phòng — câu hỏi tiếp kiểu "còn ai nữa không?" không nói gì về khách.
+          const confirmCreate = (row: ProspectRow) => createOpportunity.mutate({
+            personId: row.person_id,
+            product: creatingProduct,
+            need: `Đề xuất từ Growth Radar: ${row.why[0] || question || ""}`,
+          });
 
           return (
             <>
@@ -369,13 +390,14 @@ export default function ProspectAiSearch() {
                                   >
                                     Hồ sơ 360° →
                                   </Link>
-                                  {creatingFor === row.person_id ? (
+                                  {creatingFor === createKey(row) ? (
                                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                                       <select
                                         className="config-select"
                                         style={{ fontSize: "12px", padding: "4px 8px" }}
-                                        defaultValue={row.product || "credit_card"}
-                                        id={`prod-select-card-${row.person_id}`}
+                                        aria-label="Sản phẩm cho cơ hội"
+                                        value={creatingProduct}
+                                        onChange={(e) => setCreatingProduct(e.target.value)}
                                       >
                                         {PRODUCTS.filter(([p]) => Boolean(p)).map(([code, label]) => (
                                           <option key={code} value={code}>{label}</option>
@@ -385,16 +407,7 @@ export default function ProspectAiSearch() {
                                         type="button"
                                         className="btn btn-primary btn-sm"
                                         disabled={createOpportunity.isPending}
-                                        onClick={() => {
-                                          const sel = document.getElementById(
-                                            `prod-select-card-${row.person_id}`,
-                                          ) as HTMLSelectElement;
-                                          createOpportunity.mutate({
-                                            personId: row.person_id,
-                                            product: sel?.value || "credit_card",
-                                            need: `Đề xuất từ Growth Radar: ${question ?? ""}`,
-                                          });
-                                        }}
+                                        onClick={() => confirmCreate(row)}
                                       >
                                         Xác nhận
                                       </button>
@@ -410,7 +423,7 @@ export default function ProspectAiSearch() {
                                     <button
                                       type="button"
                                       className="btn btn-primary btn-sm"
-                                      onClick={() => setCreatingFor(row.person_id)}
+                                      onClick={() => startCreate(row)}
                                     >
                                       ⚡ Tạo cơ hội
                                     </button>
@@ -523,13 +536,14 @@ export default function ProspectAiSearch() {
                                       )}
                                     </td>
                                     <td style={{ textAlign: "right" }}>
-                                      {creatingFor === row.person_id ? (
+                                      {creatingFor === createKey(row) ? (
                                         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                                           <select
                                             className="config-select"
                                             style={{ fontSize: "11.5px" }}
-                                            defaultValue={row.product || "credit_card"}
-                                            id={`prod-select-table-${row.person_id}`}
+                                            aria-label="Sản phẩm cho cơ hội"
+                                            value={creatingProduct}
+                                            onChange={(e) => setCreatingProduct(e.target.value)}
                                           >
                                             {PRODUCTS.filter(([p]) => Boolean(p)).map(([code, label]) => (
                                               <option key={code} value={code}>{label}</option>
@@ -540,16 +554,7 @@ export default function ProspectAiSearch() {
                                             className="btn btn-primary btn-sm"
                                             style={{ fontSize: "11px", padding: "3px 8px" }}
                                             disabled={createOpportunity.isPending}
-                                            onClick={() => {
-                                              const sel = document.getElementById(
-                                                `prod-select-table-${row.person_id}`,
-                                              ) as HTMLSelectElement;
-                                              createOpportunity.mutate({
-                                                personId: row.person_id,
-                                                product: sel?.value || "credit_card",
-                                                need: `Đề xuất từ Growth Radar: ${question ?? ""}`,
-                                              });
-                                            }}
+                                            onClick={() => confirmCreate(row)}
                                           >
                                             Xác nhận
                                           </button>
@@ -559,7 +564,7 @@ export default function ProspectAiSearch() {
                                           type="button"
                                           className="btn btn-secondary btn-sm"
                                           style={{ fontSize: "11.5px", padding: "4px 10px", whiteSpace: "nowrap" }}
-                                          onClick={() => setCreatingFor(row.person_id)}
+                                          onClick={() => startCreate(row)}
                                         >
                                           ⚡ Tạo cơ hội
                                         </button>
