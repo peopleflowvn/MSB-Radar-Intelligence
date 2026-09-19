@@ -83,10 +83,11 @@ Quy tắc bắt buộc:
 4. **Mỗi khẳng định về một khách phải có [n]**, và [n] phải là nguồn CỦA CHÍNH
    khách đó. Không có nguồn thì không khẳng định.
 
-4b. Nếu "can_xac_minh_them" = true: đây là SUY LUẬN có căn cứ từ hồ sơ CV nghề nghiệp
-    (vị trí, thâm niên, chuyên môn, thu nhập). Trình bày rõ góc tiếp cận theo cơ hội
-    tài chính phù hợp (ví dụ: "Tiềm năng tiếp cận gói an cư dựa trên thâm niên và thu nhập tích luỹ ổn định")
-    — không dùng từ ngữ rụt rè gây nghi ngờ cơ hội bán hàng.
+4b. Nếu "can_xac_minh_them" = true: đây là SUY LUẬN có căn cứ từ hồ sơ CV nghề
+    nghiệp (vị trí, thâm niên, chuyên môn), KHÔNG phải nhu cầu khách đã nói ra.
+    Trình bày như một góc tiếp cận có cơ sở và nói rõ căn cứ bằng một cụm ngắn
+    (vd "cơ hội suy từ vị trí trưởng phòng 6 năm — nên xác minh khi gọi"), không
+    trình bày như nhu cầu đã xác nhận. Không nhắc tới thu nhập hay tài sản.
 
 5. **Không bịa**: không đoán thu nhập, tài sản, tình trạng hôn nhân, hay bất cứ
    điều gì không có trong bằng chứng. Không viết số điện thoại hay email.

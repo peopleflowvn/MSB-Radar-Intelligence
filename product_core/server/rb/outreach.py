@@ -104,8 +104,6 @@ def _facts(opportunity):
             skills = [str(s) for s in tp.skills[:5] if str(s).strip()]
             if skills:
                 facts.append(f"Chuyên môn/kỹ năng: {', '.join(skills)}")
-        if tp.marital_status:
-            facts.append(f"Tình trạng hôn nhân: {tp.marital_status}")
         if tp.summary:
             facts.append(f"Đặc thù công việc & sở thích từ CV: {tp.summary[:200]}")
 

@@ -150,6 +150,19 @@ class SearchTest(TestCase):
     def _criteria(self, **kwargs):
         return dict(prospects._empty(), **kwargs)
 
+    def test_khong_ai_quan_tam_san_pham_thi_noi_ra_la_da_noi(self):
+        rows = prospects.search(self._criteria(products=["mortgage"]))
+        self.assertTrue(rows)
+        self.assertTrue(rows.coverage["product_relaxed"])
+
+    def test_co_nguoi_quan_tam_san_pham_thi_loc_cung(self):
+        from .models import ProductInterest
+        ProductInterest.objects.create(profile=self.an.rb_profile, product="mortgage",
+                                       confidence=0.8, observed_at=timezone.now())
+        rows = prospects.search(self._criteria(products=["mortgage"]))
+        self.assertEqual([row["person_id"] for row in rows], [self.an.pk])
+        self.assertFalse(rows.coverage["product_relaxed"])
+
     def test_loc_theo_dia_diem(self):
         rows = prospects.search(self._criteria(location="Hà Nội"))
         self.assertEqual([row["person_id"] for row in rows], [self.an.pk])
@@ -233,7 +246,8 @@ class SearchTest(TestCase):
         """Nhóm lọc vượt ngân sách chấm điểm phải NÓI RA, không im lặng."""
         rows = prospects.search(self._criteria(location="Hà Nội"))
         self.assertFalse(rows.truncated)
-        self.assertEqual(rows.coverage, {"scanned": rows.scanned, "truncated": False})
+        self.assertEqual(rows.coverage, {"scanned": rows.scanned, "truncated": False,
+                                         "product_relaxed": False})
 
         with mock.patch.object(prospects, "SCORING_BUDGET", 1):
             chat = prospects.search(self._criteria(location="Hà Nội", limit=10))

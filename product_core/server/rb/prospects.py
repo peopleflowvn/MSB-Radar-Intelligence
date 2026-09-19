@@ -344,14 +344,19 @@ class ProspectList(list):
     lần chạy mà không ép người gọi phải bóc tuple.
     """
 
-    def __init__(self, rows, *, scanned=0, truncated=False):
+    def __init__(self, rows, *, scanned=0, truncated=False, product_relaxed=False):
         super().__init__(rows)
         self.scanned = scanned
         self.truncated = truncated
+        #: Không ai có dấu hiệu quan tâm sản phẩm được hỏi, nên đã bỏ điều kiện
+        #: sản phẩm và chấm điểm trên nhóm còn lại. Phải nói ra: danh sách trông
+        #: y hệt "những người quan tâm X" trong khi thực ra không phải.
+        self.product_relaxed = product_relaxed
 
     @property
     def coverage(self):
-        return {"scanned": self.scanned, "truncated": self.truncated}
+        return {"scanned": self.scanned, "truncated": self.truncated,
+                "product_relaxed": self.product_relaxed}
 
 
 def search(criteria, user=None):
@@ -395,10 +400,15 @@ def search(criteria, user=None):
         queryset = queryset.filter(condition)
 
     products = criteria.get("products") or []
+    product_relaxed = False
     if products:
         product_matches = queryset.filter(rb_profile__interests__product__in=products)
         if product_matches.exists():
             queryset = product_matches
+        else:
+            # Hồ sơ chỉ có CV thì chưa bao giờ có `ProductInterest` — lọc cứng là
+            # trả rỗng cho cả kho CV. Nới ra thì được, nhưng phải đánh dấu.
+            product_relaxed = True
 
     days = criteria.get("signal_recency_days") or 0
     if days:
@@ -440,7 +450,8 @@ def search(criteria, user=None):
     # điểm rời rạc), và không có khoá phụ ổn định thì cùng một câu hỏi trả về
     # thứ tự khác nhau giữa hai lần chạy.
     scored.sort(key=lambda item: (-item["priority_score"], item["person_id"]))
-    return ProspectList(scored[:limit], scanned=len(rows), truncated=truncated)
+    return ProspectList(scored[:limit], scanned=len(rows), truncated=truncated,
+                        product_relaxed=product_relaxed)
 
 
 def _score(person, products):

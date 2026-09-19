@@ -49,7 +49,10 @@ TASK = "rb_prospect_search"
 #: model vượt trần token và trả JSON cụt, parse ra rỗng, rồi ⑤ đi báo "không có
 #: khách nào" trong khi ② đã tìm được vài chục người.
 BATCH = 8
-MAX_TOKENS = 3500
+#: 8 khách × (vi_sao 2–3 câu + trích dẫn + boc_duoc) cần chừng 4–5 nghìn token
+#: đầu ra. Hạ trần xuống 3500 (bản 18/09) làm JSON bị cắt cụt ở lô đông — lô đó
+#: parse ra thiếu người, và ⑤ báo "chưa đọc hết" dù ② đã tìm đúng người.
+MAX_TOKENS = 6000
 #: Số lô đọc song song. Vừa phải: bắn quá nhiều lượt cùng lúc vào một khoá nhà
 #: cung cấp thì dính hạn mức, đổi chậm lấy lỗi 429.
 WORKERS = 4
@@ -69,39 +72,57 @@ Bạn nhận: một NHU CẦU TÌM KIẾM và một DANH SÁCH khách hàng, m�
     [outcome]  KẾT QUẢ lần MSB đã tiếp cận trước đây
     [profile]  thông tin hồ sơ (nghề nghiệp, phân khúc) — nền tĩnh, yếu nhất
 
-Với TỪNG khách hàng, quyết định dựa trên bằng chứng được cấp với TƯ DUY KINH DOANH của chuyên viên quan hệ khách hàng (RM) ngân hàng:
+Với TỪNG khách hàng, quyết định dựa trên bằng chứng được cấp, bằng tư duy kinh
+doanh của một RM — "chỉ cần có cơ hội là có thể xem xét tiếp cận", nhưng phải
+nói đúng cơ hội đó chắc tới đâu:
 
-1. **Nguyên tắc cơ hội tiếp cận & Bán chéo ("Chỉ cần có cơ hội là có thể xem xét tiếp cận"):**
-   - Dữ liệu thực tế gồm hồ sơ CV (chức danh, công ty, thâm niên, học vấn, hôn nhân, mức lương, ngoại ngữ, kỹ năng, ngành nghề, hình thức làm việc, sở thích & đặc thù công việc) kèm bài đăng và tín hiệu. Khách hàng KHÔNG ghi "tôi muốn vay tiền" trong CV.
-   - Với các nhu cầu tìm kiếm hoặc sản phẩm tài chính, bạn PHẢI **VẬN DỤNG TƯ DUY KINH DOANH ĐỂ SUY LUẬN TOÀN DIỆN TỪ CV**:
-     * **Sở thích cao cấp (Golf, Tennis, Du lịch, Thể thao, Nghỉ dưỡng...):**
-       -> Khách hàng có gu sống và chi tiêu cao -> Tiềm năng mở Thẻ tín dụng Cashback/Platinum hoàn tiền du lịch/ẩm thực, phòng chờ sân bay, đặc quyền sân golf -> **Combo bán chéo:** Thẻ tín dụng + Bảo hiểm du lịch/sức khoẻ + Gói tài khoản ưu tiên (Priority).
-     * **Đặc thù công nghệ, Freelancer, Remote, Ngoại ngữ (Tiếng Nhật, Anh, Hàn, Trung, cty FDI):**
-       -> Nhu cầu nhận kiều hối/lương ngoại tệ, chi tiêu công cụ số (Cloud, SaaS), du lịch/công tác nước ngoài -> Tiềm năng Giao dịch ngoại tệ (FX), Thẻ thanh toán quốc tế không phí chuyển đổi -> **Combo bán chéo:** Tài khoản ngoại tệ + Thẻ tín dụng hoàn tiền chi tiêu số + Tiết kiệm tích luỹ linh hoạt.
-     * **Ngành nghề Xuất nhập khẩu, Logistics, BĐS, Thương mại, Xây dựng, E-commerce:**
-       -> Dòng tiền kinh doanh luân chuyển lớn -> Tiềm năng Vay vốn kinh doanh, Thấu chi, Tài trợ thương mại/FX -> **Combo bán chéo:** Vay kinh doanh + Thẻ doanh nhân + Dịch vụ chi lương (Payroll).
-     * **Quản lý, Trưởng phòng, Senior, Kỹ sư thâm niên >3-5 năm, người đã kết hôn:**
-       -> Giai đoạn an cư lạc nghiệp, thu nhập tích luỹ ổn định -> Tiềm năng Vay mua nhà (Mortgage), Vay mua ô tô gia đình (Auto loan) -> **Combo bán chéo:** Khoản vay an cư + Bảo hiểm nhân thọ/bảo vệ khoản vay + Thẻ tín dụng sắm sửa nội thất.
-     * **Founder, CEO, Giám đốc, Kế toán trưởng, HR Manager:**
-       -> Tiềm năng Vay vốn SME, Tài khoản chi lương doanh nghiệp (Payroll), Thấu chi doanh nghiệp -> **Combo bán chéo:** Chi lương CBNV + Tiết kiệm doanh nghiệp/cá nhân + Thẻ tín dụng doanh nghiệp.
-     * **Chuyên gia thâm niên >10 năm, C-level, Bác sĩ, Luật sư, thu nhập cao:**
-       -> Dòng tiền thặng dư lớn -> Tiềm năng Gửi tiết kiệm, Đầu tư chứng chỉ quỹ, Quản lý tài sản (Affluent/Priority).
-   - Khi suy luận: Trích nguyên văn đoạn CĂN CỨ (chức danh, công ty, thâm niên, sở thích, kỹ năng, ngoại ngữ...) trong hồ sơ làm trích dẫn, đặt "loai_bang_chung": "suy_luan".
-   - **VỀ ĐỘ TIN CẬY ("do_tin"):** Với mọi ứng viên khớp tiêu chí vị trí/thâm niên hoặc có góc tiếp cận khả thi, BẮT BUỘC đánh "thoa": true và gán "do_tin" từ 0.70 đến 0.85 (tuyệt đối KHÔNG gán dưới 0.60 vì hệ thống sẽ loại khỏi danh sách). Hãy tự tin nhận diện cơ hội bán hàng!
+1. **Hai loại ràng buộc trong "bat_buoc", xử lý khác nhau:**
+   - **Thuộc tính định danh** (chức danh, khu vực, thâm niên, kênh liên hệ):
+     bằng chứng phải NÊU TRỰC TIẾP. Không cho qua vì "có vẻ hợp".
+   - **Nhu cầu sản phẩm tài chính**: CV gần như KHÔNG BAO GIỜ nói thẳng "tôi
+     muốn vay" — đòi bằng chứng trực tiếp là tự đảm bảo "không ai thoả". Được
+     SUY LUẬN có căn cứ từ chân dung nghề nghiệp trong [profile]/[signal]:
+       * quản lý, trưởng phòng, kỹ sư/chuyên viên thâm niên → vay mua nhà, vay mua xe, thẻ hạn mức cao
+       * founder, CEO, giám đốc, kế toán trưởng, HR manager → vay SME, chi lương, thấu chi
+       * xuất nhập khẩu, logistics, thương mại, công ty FDI, ngoại ngữ, remote → ngoại tệ, thẻ quốc tế
+       * sở thích du lịch, golf, thể thao ghi trong CV → thẻ tín dụng, bảo hiểm du lịch
+       * chuyên gia thâm niên cao, bác sĩ, luật sư, C-level → tiết kiệm, đầu tư, Priority
+     Khi suy luận: trích nguyên văn câu CĂN CỨ (chức danh/ngành/sở thích có
+     sẵn trong hồ sơ), không trích câu kết luận của bạn, và đặt
+     "loai_bang_chung": "suy_luan". Một cơ hội đáng xem xét là đủ để "thoa":
+     true — RM sẽ tự thẩm định trước khi gọi.
 
-2. **Cân nhắc THỜI GIAN.** Đoạn trích từ bài đăng/tín hiệu có ghi rõ số ngày trước. Với hồ sơ CV, thời điểm cập nhật mới (trong 30-90 ngày) là lúc ứng viên đang chuyển biến sự nghiệp (thời điểm vàng mở thẻ/chuyển tài khoản). Thâm niên nhiều năm là tích luỹ tài chính ổn định.
+   TUYỆT ĐỐI không suy luận thu nhập, tài sản, tình trạng hôn nhân hay tình
+   trạng tài chính cụ thể của khách, kể cả khi "có vẻ hợp lý" từ chức danh.
+   Đây là ranh giới tuân thủ, không được nới.
 
-3. **Phân biệt NHU CẦU với TRẠNG THÁI.** "Đang tìm hiểu vay mua nhà" là nhu cầu trực tiếp. "Trưởng phòng CNTT 5 năm thích du lịch" là cơ hội suy luận theo chân dung và sở thích. Nói rõ trong "vi_sao".
+2. **"do_tin" phải PHÂN BIỆT được người với người** — hệ thống xếp hạng bằng
+   chính con số này, chấm ai cũng như nhau là mất thứ tự:
+     0.80–0.95  bằng chứng trực tiếp: khách tự nói ra nhu cầu, tín hiệu rõ
+     0.50–0.70  suy luận từ chân dung khớp RẤT sát nhu cầu được hỏi
+     0.30–0.50  suy luận yếu, chỉ khớp một phần
+     < 0.30     không thoả
 
-4. **Đọc kỹ đoạn [outcome].** Nếu MSB đã tiếp cận và khách nói KHÔNG QUAN TÂM hoặc ĐANG DÙNG RỒI cho đúng nhóm sản phẩm này, đặt "da_tu_choi": true.
+3. **Cân nhắc THỜI GIAN.** Mỗi đoạn ghi cách đây bao nhiêu ngày. Nhu cầu tài
+   chính hết hạn: hỏi vay mua nhà 5 ngày trước là đang cần; 400 ngày trước thì
+   gần như đã xong. Nói rõ trong "vi_sao" nếu bằng chứng đã cũ.
 
-5. **Trích NGUYÊN VĂN đoạn chứng minh** (copy đúng chữ từ đoạn được cấp). Người nào thoa=true thì BẮT BUỘC có ít nhất một trích dẫn căn cứ.
+4. **Phân biệt NHU CẦU với TRẠNG THÁI.** "Đang tìm hiểu vay mua nhà" là nhu cầu.
+   "Đã mua nhà rồi" là trạng thái — có thể mở ra sản phẩm khác, nhưng KHÔNG
+   phải cùng một nhu cầu.
 
-6. **TƯ DUY KINH DOANH TRONG "vi_sao":**
-   Viết 2-3 câu MỘT DÒNG (không xuống dòng trong chuỗi JSON) theo cấu trúc chuẩn:
-   - (a) **Chân dung & Đặc thù CV:** Vị trí, công ty, kỹ năng, ngoại ngữ hoặc sở thích nổi bật trong CV.
-   - (b) **Cơ hội & Combo bán chéo:** Lý do phù hợp với sản phẩm chính + gợi ý 1 sản phẩm bán chéo liền kề.
-   - (c) **Góc mở lời cho RM (Sales Hook):** 1 câu kịch bản tự nhiên, tinh tế để RM mở đầu cuộc gọi/tin nhắn (ví dụ: "Chào gói vay an cư cho cán bộ quản lý", "Mở thẻ hoàn tiền du lịch/phòng chờ sân bay", "Tư vấn gói chuyển tiền ngoại tệ ưu đãi tỷ giá cho chuyên gia công nghệ").
+5. **Đọc kỹ đoạn [outcome].** MSB đã tiếp cận và khách nói KHÔNG QUAN TÂM hoặc
+   ĐANG DÙNG RỒI cho đúng nhóm sản phẩm này → "da_tu_choi": true.
+
+6. **Trích NGUYÊN VĂN** (copy đúng chữ từ đoạn được cấp). thoa=true thì BẮT
+   BUỘC có ít nhất một trích dẫn, và "doan" là số thứ tự đoạn chứa câu đó.
+
+7. Bóc các thuộc tính trong "can_boc" nếu bằng chứng có nói, không có thì null.
+
+8. **"vi_sao"**: 2–3 câu MỘT DÒNG (không xuống dòng trong chuỗi JSON): điều cụ
+   thể đọc được và nó khớp điều kiện nào (nếu là suy luận thì nói suy từ đâu),
+   sản phẩm chính kèm một sản phẩm bán chéo liền kề nếu hợp lý, và một câu mở
+   lời gợi ý cho RM. Người bị loại: một câu vì sao loại.
 
 Chỉ trả JSON:
 {"ket_qua": [{
@@ -111,7 +132,7 @@ Chỉ trả JSON:
   "loai_bang_chung": "truc_tiep"|"suy_luan",
   "da_tu_choi": true|false,
   "nhu_cau_hay_trang_thai": "nhu_cau"|"trang_thai"|"khong_ro",
-  "vi_sao": "<Chân dung & Đặc thù CV. Cơ hội & Combo bán chéo. Góc mở lời cho RM>",
+  "vi_sao": "<2-3 câu một dòng — xem mục 8>",
   "trich_dan": [{"doan": <số thứ tự đoạn>, "nguyen_van": "<copy đúng chữ>"}],
   "boc_duoc": {"<tên thuộc tính>": <giá trị hoặc null>},
   "con_thieu": "<điều chưa rõ, để trống nếu không>"

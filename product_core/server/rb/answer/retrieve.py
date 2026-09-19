@@ -80,6 +80,9 @@ BRANCH_WEIGHTS = {
     "interest": 1.0,    # suy ra có căn cứ
     "outcome": 0.9,     # chuyện đã xảy ra — mạnh, nhưng là quá khứ
     "profile": 0.6,     # thuộc tính tĩnh, yếu nhất
+    # Hồ sơ CV: nền nghề nghiệp để SUY LUẬN nhu cầu, không phải lời khách nói ra.
+    # Ngang `profile` — cùng là thuộc tính tĩnh, chỉ giàu chữ hơn.
+    "cv": 0.6,
 }
 
 
@@ -284,10 +287,7 @@ def _outcome_ids(allowed_ids, limit):
 
 def _profile_ids(allowed_ids, terms, limit):
     from ..models import RBProfile
-    from people.models import Person
 
-    p_ids = []
-    # 1. Tìm trong RBProfile
     queryset = RBProfile.objects.filter(person_id__in=allowed_ids)
     if terms:
         where = Q()
@@ -296,46 +296,63 @@ def _profile_ids(allowed_ids, terms, limit):
             where |= Q(employer__icontains=term)
             where |= Q(interaction_summary__icontains=term)
         queryset = queryset.filter(where)
-    p_ids.extend(list(queryset.order_by("-updated_at")
-                     .values_list("person_id", flat=True)[:limit]))
+    return list(queryset.order_by("-updated_at")
+                .values_list("person_id", flat=True)[:limit])
 
-    # 2. Tìm trong hồ sơ CV (Person & TalentProfile)
-    if terms and len(p_ids) < limit:
-        from django.db.models import TextField
-        from django.db.models.functions import Cast
 
-        # Mở rộng từ đồng nghĩa chức danh quản lý và chuyên gia
-        all_terms = list(terms)
-        terms_lower = [t.lower() for t in terms]
-        if any(t in terms_lower for t in ("quan", "ly", "manager")):
-            all_terms.extend(["truong", "phong", "giam", "doc", "lead", "head", "director"])
-        if any(t in terms_lower for t in ("chuyen", "gia", "expert")):
-            all_terms.extend(["senior", "architect", "specialist", "chinh"])
-        all_terms = list(dict.fromkeys(all_terms))
+def _cv_ids(allowed_ids, queries, limit):
+    """Khớp chữ trên hồ sơ CV, qua projection `PersonSearchDocument` của Talent.
 
-        where_cv = Q()
-        for term in all_terms:
-            where_cv |= Q(headline__icontains=term)
-            where_cv |= Q(talent_profile__current_title__icontains=term)
-            where_cv |= Q(talent_profile__current_company__icontains=term)
-            where_cv |= Q(talent_profile__seniority__icontains=term)
-            where_cv |= Q(talent_profile__education__icontains=term)
-            where_cv |= Q(talent_profile__foreign_language__icontains=term)
-            where_cv |= Q(talent_profile__job_type__icontains=term)
-            where_cv |= Q(talent_profile__marital_status__icontains=term)
-            where_cv |= Q(talent_profile__summary__icontains=term)
-            where_cv |= Q(_skills_text__icontains=term)
-            where_cv |= Q(_ind_text__icontains=term)
+    Là nhánh RIÊNG, không nhét vào `profile`: bản 18/09 nối kết quả CV vào đuôi
+    `_profile_ids` nên hai nguồn khác bản chất bị tính chung một phiếu RRF, và
+    phần CV được xếp theo SỐ NĂM KINH NGHIỆM — tức người thâm niên nhất kho luôn
+    đứng đầu, bất kể có khớp câu hỏi hay không.
 
-        annotated_cv = (Person.objects.filter(pk__in=allowed_ids)
-                        .annotate(_skills_text=Cast("talent_profile__skills", TextField()),
-                                  _ind_text=Cast("talent_profile__industries", TextField())))
-        cv_ids = list(annotated_cv.filter(where_cv)
-                      .order_by("-talent_profile__years_experience", "-updated_at")
-                      .values_list("pk", flat=True)[:limit * 2])
-        p_ids.extend(cv_ids)
+    Tìm trên `content_norm` (đã bỏ dấu) bằng full-text có chỉ mục GIN, xếp theo
+    độ khớp. Bản cũ đem token đã BỎ DẤU ("giam", "doc") đi `icontains` trên cột
+    CÒN DẤU ("Giám đốc") nên gần như không khớp đúng, chỉ khớp nhầm chuỗi con
+    ("doc" trong "document"), và quét 11 cột không chỉ mục trên cả tập được
+    phép — chậm theo kích thước kho.
+    """
+    from talent.models import CVChunk, PersonSearchDocument
+    from talent.vector_index import fts_tokens
 
-    return list(dict.fromkeys(p_ids))[:limit]
+    tokens = fts_tokens(" ".join(queries or []), limit=24)
+    if not tokens or not allowed_ids:
+        return []
+    # Projection trước (trường có cấu trúc: chức danh, công ty, kỹ năng, ngành),
+    # rồi tới đoạn CV gốc — nơi duy nhất có ngoại ngữ, hình thức làm việc, sở
+    # thích… mà projection không chép sang.
+    out = []
+    for model, field in ((PersonSearchDocument, "content_norm"), (CVChunk, "text_norm")):
+        base = model.objects.filter(person_id__in=allowed_ids)
+        for person_id in _ranked_fts(base, field, tokens, limit):
+            if person_id not in out:
+                out.append(person_id)
+    return out[:limit]
+
+
+def _ranked_fts(queryset, field, tokens, limit):
+    """person_id khớp full-text, xếp theo độ khớp; SQLite lùi về icontains."""
+    from django.db import connection
+
+    if connection.vendor == "postgresql":
+        from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
+        vector = SearchVector(field, config="simple")
+        query = SearchQuery(" | ".join(tokens), config="simple", search_type="raw")
+        rows = (queryset.annotate(_sv=vector).filter(_sv=query)
+                .annotate(_rank=SearchRank(vector, query))
+                .order_by("-_rank", "person_id"))
+    else:
+        where = Q()
+        for token in tokens:
+            if len(token) >= 3:
+                where |= Q(**{f"{field}__icontains": token})
+        if not where:
+            return []
+        rows = queryset.filter(where).order_by("person_id")
+    # Một người nhiều đoạn khớp: lấy dư rồi bỏ trùng, giữ thứ hạng tốt nhất.
+    return list(dict.fromkeys(rows.values_list("person_id", flat=True)[:limit * 3]))[:limit]
 
 
 #: Số truy vấn của ① được đem đi tìm theo nghĩa — mỗi cái là một lời gọi embedding.
@@ -379,6 +396,22 @@ class _DenseBranch:
         return merged[:limit]
 
 
+def _prioritised(queryset):
+    from django.db.models import BooleanField, Exists, ExpressionWrapper, OuterRef
+    from social.models import SocialPost
+
+    from ..models import RBProfile
+
+    has_retail = ExpressionWrapper(
+        Q(Exists(RBProfile.objects.filter(person_id=OuterRef("pk"))))
+        | Q(Exists(Signal.objects.filter(person_id=OuterRef("pk"),
+                                         domain=Signal.DOMAIN_RB)))
+        | Q(Exists(SocialPost.objects.filter(person_id=OuterRef("pk")))),
+        output_field=BooleanField())
+    return (queryset.annotate(_has_retail=has_retail)
+            .order_by("-_has_retail", "-updated_at", "-pk"))
+
+
 def retrieve(query_plan, *, user=None, pool=None, pinned_ids=()):
     """`ProspectPlan` → danh sách `Candidate` xếp theo mức đáng xem giảm dần.
 
@@ -397,7 +430,11 @@ def retrieve(query_plan, *, user=None, pool=None, pinned_ids=()):
     # Có `order_by`: cắt không thứ tự trên bảng lớn trả một tập con TUỲ Ý, khác
     # nhau giữa hai lần chạy. Mới nhất trước — khách mới tạo/cập nhật gần đây
     # có tín hiệu mới hơn. Chạm trần thì nói ra trong log thay vì im lặng.
-    allowed_ids = list(allowed.order_by("-updated_at", "-pk")
+    # Người có dấu vết bán lẻ (hồ sơ RB, tín hiệu RB, bài đăng) đứng TRƯỚC người
+    # chỉ có CV. Từ khi `population.customers()` gộp cả kho CV, tập được phép dễ
+    # vượt trần — cắt thuần theo `updated_at` thì một đợt nhập CV hàng loạt đẩy
+    # văng đúng những khách có bằng chứng mạnh nhất ra khỏi lượt tìm.
+    allowed_ids = list(_prioritised(allowed)
                        .values_list("pk", flat=True)[:MAX_ELIGIBLE + 1])
     if len(allowed_ids) > MAX_ELIGIBLE:
         log.warning("rb.answer.retrieve: tập khách được phép vượt %s, chỉ xét phần mới "
@@ -439,6 +476,7 @@ def retrieve(query_plan, *, user=None, pool=None, pinned_ids=()):
         ("interest", _interest_ids(allowed_ids, products, PER_BRANCH)),
         ("outcome", _outcome_ids(allowed_ids, PER_BRANCH)),
         ("profile", _profile_ids(allowed_ids, terms, PER_BRANCH)),
+        ("cv", _cv_ids(allowed_ids, queries, PER_BRANCH)),
     ]
     ranked, weights = [], []
     allowed_set = set(allowed_ids)

@@ -61,6 +61,14 @@ def _customer(name, *, location="Hà Nội", phone="", email="", occupation="",
     return person
 
 
+def _index_cv(*people):
+    """Dựng projection CV như pipeline nhập hồ sơ — chỉ ứng viên mới có CV."""
+    from talent.vector_index import index_person
+    for person in people:
+        Person.objects.filter(pk=person.pk).update(is_applicant=True)
+        index_person(person.pk, with_embeddings=False)
+
+
 def _post(person, content, *, days=1):
     from social.models import SocialPost
     return SocialPost.objects.create(
@@ -1003,7 +1011,10 @@ class BusinessProspectingReasoningTest(TestCase):
         self.assertIn("Tập đoàn FPT", text)
         self.assertIn("7.5", text)
         self.assertIn("manager", text)
-        self.assertIn("Đã kết hôn", text)
+        # Ranh giới tuân thủ: ③ không được suy luận hôn nhân/thu nhập, nên dữ liệu
+        # đó không được tới tay model ngay từ đầu.
+        self.assertNotIn("kết hôn", text)
+        self.assertNotIn("40 triệu", text)
 
     def test_score_fit_fallback_to_talent_profile(self):
         """score_fit đọc được chức danh và thâm niên từ TalentProfile khi RBProfile trống."""
@@ -1034,8 +1045,8 @@ class BusinessProspectingReasoningTest(TestCase):
         self.assertEqual(score, 65.0)
         self.assertIn("AI suy luận cơ hội", reasons[0])
 
-    def test_retrieve_profile_ids_matches_cv_title(self):
-        """_profile_ids tìm ra người khớp chức danh trong TalentProfile."""
+    def test_retrieve_cv_ids_matches_cv_title_regardless_of_accents(self):
+        """Nhánh CV khớp chức danh trong CV, kể cả khi truy vấn viết không dấu."""
         from talent.models import TalentProfile
         from .answer import retrieve as retrieve_stage
 
@@ -1045,8 +1056,44 @@ class BusinessProspectingReasoningTest(TestCase):
             current_title="Trưởng phòng Tài chính",
             current_company="Masan Group",
         )
-        found = retrieve_stage._profile_ids([person.pk], ["tài", "chính", "trưởng", "phòng"], limit=10)
-        self.assertIn(person.pk, found)
+        _index_cv(person)
+        self.assertIn(person.pk, retrieve_stage._cv_ids(
+            [person.pk], ["trưởng phòng tài chính"], limit=10))
+        self.assertIn(person.pk, retrieve_stage._cv_ids(
+            [person.pk], ["truong phong tai chinh"], limit=10))
+
+    def test_retrieve_cv_ids_does_not_rank_by_seniority(self):
+        """Người thâm niên nhất kho không được tự đứng đầu khi KHÔNG khớp câu hỏi."""
+        from talent.models import TalentProfile
+        from .answer import retrieve as retrieve_stage
+
+        veteran = _customer("Lão Làng")
+        TalentProfile.objects.create(person=veteran, current_title="Kế toán viên",
+                                     years_experience=25)
+        match = _customer("Người Khớp")
+        TalentProfile.objects.create(person=match, current_title="Kỹ sư logistics",
+                                     summary="xuất nhập khẩu", years_experience=2)
+        for person in (veteran, match):
+            _index_cv(person)
+        found = retrieve_stage._cv_ids([veteran.pk, match.pk],
+                                       ["logistics xuất nhập khẩu"], limit=10)
+        self.assertEqual(found, [match.pk])
+
+    def test_allowed_ids_put_retail_customers_before_cv_only(self):
+        """Chạm trần tập được phép thì khách có dấu vết bán lẻ không bị CV mới đẩy văng."""
+        from talent.models import TalentProfile
+        from .answer import retrieve as retrieve_stage
+        from .answer.population import customers
+
+        retail = _customer("Khách Bán Lẻ")
+        cv_only = Person.objects.create(display_name="Chỉ Có CV", is_applicant=True)
+        TalentProfile.objects.create(person=cv_only, current_title="Kỹ sư")
+        Person.objects.filter(pk=cv_only.pk).update(updated_at=timezone.now()
+                                                     + timezone.timedelta(days=1))
+        ordered = list(retrieve_stage._prioritised(customers())
+                       .filter(pk__in=[retail.pk, cv_only.pk])
+                       .values_list("pk", flat=True))
+        self.assertEqual(ordered, [retail.pk, cv_only.pk])
 
     def test_cv_profile_evidence_passages_with_hobbies_and_skills(self):
         """Bằng chứng trích xuất trọn vẹn kỹ năng, ngoại ngữ, hình thức làm việc, sở thích và last_source_at."""
@@ -1102,8 +1149,8 @@ class BusinessProspectingReasoningTest(TestCase):
         self.assertEqual(score2, 60.0)
         self.assertIn("chín muồi", reasons2[0])
 
-    def test_retrieve_profile_ids_matches_skills_and_hobbies(self):
-        """_profile_ids truy hồi được ứng viên qua kỹ năng (skills), ngoại ngữ và sở thích."""
+    def test_retrieve_cv_ids_matches_skills_and_hobbies(self):
+        """Nhánh CV truy hồi được ứng viên qua kỹ năng (skills), ngoại ngữ và sở thích."""
         from talent.models import TalentProfile
         from .answer import retrieve as retrieve_stage
 
@@ -1121,16 +1168,23 @@ class BusinessProspectingReasoningTest(TestCase):
             skills=["Python", "AWS", "Docker"],
             foreign_language="Tiếng Nhật N2",
         )
+        # Ngoại ngữ không nằm trong projection — nó được tìm thấy qua đoạn CV gốc.
+        from people.models import Document
+        Document.objects.create(person=person_aws, sha256="cv-aws", parse_status="done",
+                                parsed_text="Software Engineer. Ngoại ngữ: Tiếng Nhật N2.")
+
+        for person in (person_golf, person_aws):
+            _index_cv(person)
 
         # Tìm người chơi golf
-        found_golf = retrieve_stage._profile_ids([person_golf.pk, person_aws.pk], ["golf"], limit=5)
+        found_golf = retrieve_stage._cv_ids([person_golf.pk, person_aws.pk], ["golf"], limit=5)
         self.assertIn(person_golf.pk, found_golf)
 
         # Tìm người có kỹ năng AWS hoặc ngoại ngữ tiếng Nhật
-        found_aws = retrieve_stage._profile_ids([person_golf.pk, person_aws.pk], ["aws"], limit=5)
+        found_aws = retrieve_stage._cv_ids([person_golf.pk, person_aws.pk], ["aws"], limit=5)
         self.assertIn(person_aws.pk, found_aws)
 
-        found_japanese = retrieve_stage._profile_ids([person_golf.pk, person_aws.pk], ["nhật"], limit=5)
+        found_japanese = retrieve_stage._cv_ids([person_golf.pk, person_aws.pk], ["nhật"], limit=5)
         self.assertIn(person_aws.pk, found_japanese)
 
     def test_outreach_facts_includes_cv_details(self):
@@ -1162,3 +1216,22 @@ class BusinessProspectingReasoningTest(TestCase):
         self.assertIn("Tiếng Anh", facts_str)
         self.assertIn("du lịch nước ngoài", facts_str)
 
+
+
+class JudgePromptCalibrationTest(TestCase):
+    """Prompt ③ phải để model PHÂN BIỆT người với người và giữ ranh giới tuân thủ."""
+
+    def test_khong_ep_moi_nguoi_cung_mot_do_tin(self):
+        from .answer import judge
+        # Bản 18/09 ép "do_tin từ 0.70 đến 0.85" cho mọi người khớp: ④ xếp hạng
+        # bằng chính con số đó nên mọi người hoà nhau và thứ tự thành ngẫu nhiên.
+        self.assertNotIn("0.70 đến 0.85", judge.SYSTEM)
+        self.assertIn("PHÂN BIỆT", judge.SYSTEM)
+
+    def test_giu_ranh_gioi_khong_suy_luan_thu_nhap_hon_nhan(self):
+        from .answer import judge
+        self.assertIn("không suy luận thu nhập", judge.SYSTEM)
+
+    def test_du_tran_token_cho_lo_tam_nguoi(self):
+        from .answer import judge
+        self.assertGreaterEqual(judge.MAX_TOKENS, 6000)

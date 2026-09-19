@@ -144,8 +144,9 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
   Riêng câu ĐẾM: mọi điều kiện xác định nhóm cần đếm, kể cả phủ định, đều là must_have.
 
 - "should_have": mảng câu chữ — tiêu chí mong muốn, dùng để xếp hạng và định hướng
-  tìm kiếm (ví dụ "cấp quản lý hoặc chuyên môn cao", "thâm niên trên 5 năm", "đã kết hôn",
-  "làm việc tại công ty uy tín").
+  tìm kiếm (ví dụ "cấp quản lý hoặc chuyên môn cao", "thâm niên trên 5 năm",
+  "làm việc tại công ty uy tín"). KHÔNG dùng tình trạng hôn nhân, thu nhập hay
+  tài sản làm tiêu chí — đó là ranh giới tuân thủ.
 
 - "extract": mảng tên thuộc tính cần BÓC RA TỪ BẰNG CHỨNG để trả lời được câu
   hỏi (ví dụ "sản phẩm đang quan tâm", "thời điểm phát sinh nhu cầu", "nghề
@@ -161,7 +162,7 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
     - Xuất nhập khẩu, logistics, thương mại -> ["xuất nhập khẩu", "logistics", "vốn kinh doanh", "ngoại tệ"] (gợi ý san_pham: ["fx", "consumer_loan"])
     - Cty nước ngoài, FDI, ngoại ngữ tiếng Nhật/Anh/Hàn/Trung -> ["tiếng nhật", "tiếng anh", "fdi", "chuyển tiền", "ngoại tệ"] (gợi ý san_pham: ["fx", "credit_card"])
   * Vay mua nhà (mortgage):
-    - Quản lý, trưởng phòng, kỹ sư, thâm niên >3-5 năm, đã kết hôn -> ["trưởng phòng", "manager", "kỹ sư", "kết hôn", "vay mua nhà", "an cư"] (gợi ý san_pham: ["mortgage"])
+    - Quản lý, trưởng phòng, kỹ sư, thâm niên >3-5 năm -> ["trưởng phòng", "manager", "kỹ sư", "vay mua nhà", "an cư"] (gợi ý san_pham: ["mortgage"])
   * Thẻ tín dụng VIP / Chi tiêu (credit_card):
     - Quản lý, giám đốc, tech lead, sales, marketing, du lịch -> ["quản lý", "giám đốc", "tech lead", "marketing", "thẻ tín dụng"] (gợi ý san_pham: ["credit_card"])
   * Vay kinh doanh / Vốn SME (consumer_loan):
@@ -170,12 +171,15 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
     - Giám đốc, bác sĩ, chuyên gia thâm niên cao -> ["giám đốc", "bác sĩ", "chuyên gia", "tiết kiệm", "đầu tư"] (gợi ý san_pham: ["savings", "investment"])
   * Tài khoản chi lương (payroll):
     - Trưởng phòng nhân sự, hr manager, kế toán trưởng -> ["hr manager", "trưởng phòng nhân sự", "kế toán trưởng", "chi lương", "payroll"] (gợi ý san_pham: ["payroll"])
-  * Bảo hiểm & An toàn tài chính gia đình (insurance):
-    - Đã kết hôn, có gia đình, trụ cột kinh tế -> ["kết hôn", "gia đình", "bảo hiểm", "bảo vệ"] (gợi ý san_pham: ["insurance"])
+  * Bảo hiểm (insurance):
+    - Quản lý, chuyên gia, người hay đi công tác/du lịch -> ["bảo hiểm", "bảo vệ", "công tác", "du lịch"] (gợi ý san_pham: ["insurance"])
 
 - "san_pham": mảng mã sản phẩm, CHỈ chọn trong credit_card, mortgage, auto_loan,
-  consumer_loan, savings, investment, insurance, fx, payroll. Chọn sản phẩm mà câu hỏi
-  hướng tới hoặc sản phẩm phù hợp nhất với chân dung khách RM đang tìm.
+  consumer_loan, savings, investment, insurance, fx, payroll. Chỉ điền khi câu
+  hỏi NÓI TỚI sản phẩm (trực tiếp, hoặc qua nhu cầu rõ như "mua nhà", "đi du
+  lịch nước ngoài"). Câu hỏi chung chung ("tìm khách tiềm năng") thì để trống —
+  đoán một sản phẩm ở đây làm nhánh `interest` và điểm `fit` lệch theo sản phẩm
+  đoán, kết quả trông chắc chắn mà sai hướng.
 
 - "bo_loc": object các bộ lọc khớp thẳng cột dữ liệu. Chỉ điền khoá nào suy ra
   CHẮC CHẮN được, bỏ qua phần còn lại:

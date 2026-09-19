@@ -250,8 +250,13 @@ def _profile_passages(person_ids, now, depth=1):
 
 def _cv_profile_passages(person_ids, now, depth=1):
     """Hồ sơ nghề nghiệp và CV ứng viên: chức danh, công ty, thâm niên, học vấn,
-    hôn nhân, mức lương, ngoại ngữ, kỹ năng, ngành nghề, hình thức làm việc,
-    đặc thù công việc và sở thích cá nhân.
+    ngoại ngữ, kỹ năng, ngành nghề, hình thức làm việc, đặc thù công việc và sở
+    thích cá nhân.
+
+    CỐ Ý KHÔNG đưa lương và tình trạng hôn nhân vào bằng chứng: ③ bị cấm suy luận
+    thu nhập/hôn nhân để chào sản phẩm tài chính (ranh giới tuân thủ), mà cấp dữ
+    liệu đó cho model rồi dặn "đừng dùng" là một ràng buộc chưa có. Dữ liệu CV
+    thu cho mục đích tuyển dụng, không phải để định giá khách.
 
     Đây là nguồn dữ liệu cốt lõi giúp AI phán đoán cơ hội sản phẩm ngân hàng
     (vay mua nhà, thẻ tín dụng, vay kinh doanh, tiết kiệm, bảo hiểm, ngoại tệ, chi lương)
@@ -265,9 +270,7 @@ def _cv_profile_passages(person_ids, now, depth=1):
               .only("id", "display_name", "headline", "location",
                     "talent_profile__current_title", "talent_profile__current_company",
                     "talent_profile__years_experience", "talent_profile__seniority",
-                    "talent_profile__education", "talent_profile__current_salary",
-                    "talent_profile__expected_salary", "talent_profile__marital_status",
-                    "talent_profile__foreign_language", "talent_profile__job_type",
+                    "talent_profile__education", "talent_profile__foreign_language", "talent_profile__job_type",
                     "talent_profile__skills", "talent_profile__industries",
                     "talent_profile__summary", "talent_profile__last_source_at"))
     for p in people:
@@ -299,12 +302,6 @@ def _cv_profile_passages(person_ids, now, depth=1):
                     parts.append(f"ngành từng làm: {', '.join(top_inds)}")
             if tp.education:
                 parts.append(f"học vấn {tp.education}")
-            if tp.marital_status:
-                parts.append(f"tình trạng hôn nhân: {tp.marital_status}")
-            if tp.current_salary:
-                parts.append(f"mức thu nhập/lương hiện tại: {tp.current_salary}")
-            elif tp.expected_salary:
-                parts.append(f"mức lương kỳ vọng: {tp.expected_salary}")
             if p.location:
                 parts.append(f"địa bàn: {p.location}")
             if tp.summary:

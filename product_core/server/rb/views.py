@@ -1223,6 +1223,9 @@ def prospect_search(request):
             "anh/chị thu hẹp thêm để danh sách sát hơn.")
     else:
         response_answer = f"Đã tìm thấy {payload['count']} khách hàng tiềm năng."
+    if payload["count"] and coverage.get("product_relaxed"):
+        response_answer += (" Chưa ai có dấu hiệu quan tâm đúng sản phẩm đã hỏi — "
+                            "danh sách xếp theo mức phù hợp chung, cần xác minh nhu cầu.")
     thread = conversation_state.record(
         request.user, "prospect", conversation_id, question, response_answer,
         criteria=payload.get("criteria"), mode="search",
