@@ -6,7 +6,7 @@ from io import StringIO
 from unittest import mock
 
 from django.core.management import CommandError, call_command
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 
 from people.models import Document, Person
 from talent.models import CVChunk, PersonSearchDocument
@@ -66,3 +66,41 @@ class ApplyFixesGapsTest(TestCase):
 
         self.assertEqual(
             Person.applicants().filter(search_document__isnull=True).count(), 1)
+
+
+class RateLimitBackoffTest(SimpleTestCase):
+    """429 là provider đang giới hạn tốc độ, không phải hàng hỏng."""
+
+    def test_429_thi_cho_roi_thu_lai_dung_hang(self):
+        from unittest import mock
+        from talent import vector_index
+        from talent.management.commands.reconcile_talent_index import Command
+
+        calls = {"n": 0}
+
+        def fake_embed(text, task_type=""):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                vector_index._set_embed_error("rate_limited")
+                return None, "m"
+            vector_index._set_embed_error("")
+            return [0.1] * 64, "m"
+
+        with mock.patch.object(vector_index, "embed", fake_embed),                 mock.patch("talent.management.commands.reconcile_talent_index.time.sleep") as sleep:
+            vector, model, limited = Command()._embed("x")
+        self.assertEqual((len(vector), model, limited), (64, "m", False))
+        self.assertEqual(calls["n"], 3)
+        self.assertEqual([c.args[0] for c in sleep.call_args_list], [5.0, 10.0])
+
+    def test_loi_that_thi_khong_cho(self):
+        from unittest import mock
+        from talent import vector_index
+        from talent.management.commands.reconcile_talent_index import Command
+
+        def fake_embed(text, task_type=""):
+            vector_index._set_embed_error("error")
+            return None, "m"
+
+        with mock.patch.object(vector_index, "embed", fake_embed),                 mock.patch("talent.management.commands.reconcile_talent_index.time.sleep") as sleep:
+            self.assertEqual(Command()._embed("x"), (None, "m", False))
+        sleep.assert_not_called()

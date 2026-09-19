@@ -12,6 +12,7 @@ import math
 import re
 import time
 import unicodedata
+import urllib.error
 import urllib.request
 
 from django.conf import settings
@@ -189,6 +190,13 @@ def _instruction_prefix(model, task_type):
     return ""
 
 
+#: Lý do lần `embed()` gần nhất thất bại: "" (thành công), "rate_limited"
+#: (HTTP 429) hoặc "error". `embed()` cố ý không ném lỗi (tìm kiếm không được vỡ
+#: vì embedding), nên worker nền cần kênh này để phân biệt "provider đang giới
+#: hạn tốc độ — chờ rồi thử lại ĐÚNG hàng này" với "hàng này hỏng — bỏ qua".
+LAST_EMBED_ERROR = ""
+
+
 def embed(text, *, task_type="RETRIEVAL_DOCUMENT"):
     """Gọi endpoint embedding (OpenAI-compatible hoặc Gemini). Trả (vector, model)
     hoặc (None, model) khi không dùng được — search KHÔNG bao giờ được vỡ vì việc này."""
@@ -231,8 +239,13 @@ def embed(text, *, task_type="RETRIEVAL_DOCUMENT"):
                 and all(type(value) in (int, float) and math.isfinite(value)
                         for value in vector)):
             entry["ok"] = True
+            _set_embed_error("")
             return vector, model
+    except urllib.error.HTTPError as exc:
+        _set_embed_error("rate_limited" if exc.code == 429 else "error")
+        return None, model
     except Exception:  # background rebuild records coverage; search must never break
+        _set_embed_error("error")
         return None, model
     finally:
         from ai import telemetry
@@ -240,6 +253,11 @@ def embed(text, *, task_type="RETRIEVAL_DOCUMENT"):
         entry["error"] = "" if entry["ok"] else "embedding_failed"
         telemetry.record(entry)
     return None, model
+
+
+def _set_embed_error(kind):
+    global LAST_EMBED_ERROR
+    LAST_EMBED_ERROR = kind
 
 
 def index_person(person_id, *, with_embeddings=True):

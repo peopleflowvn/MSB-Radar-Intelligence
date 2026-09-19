@@ -61,6 +61,7 @@ def _save_vector(row, fields):
 
 
 class Command(BaseCommand):
+    _pace = 0.0
     help = "Tự phát hiện + tự sửa chỉ mục Talent thiếu (projection/chunk/embedding/HNSW)."
 
     def add_arguments(self, parser):
@@ -72,6 +73,9 @@ class Command(BaseCommand):
                             help="Chạy liên tục tới khi hết hàng đợi hoặc gặp cờ dừng.")
         parser.add_argument("--sleep", type=float, default=2.0,
                             help="Giây nghỉ giữa các lượt bận khi --loop.")
+        parser.add_argument("--pace", type=float, default=1.0,
+                            help="Giây nghỉ giữa hai lời gọi embedding (giữ dưới hạn mức "
+                                 "của provider thay vì gọi dồn rồi ăn 429).")
         parser.add_argument("--idle-sleep", type=float, default=5.0,
                             help="Giây nghỉ khi hàng đợi rỗng (mặc định 5s, tối thiểu --sleep).")
         parser.add_argument("--deep-scan-every", type=int, default=300,
@@ -90,6 +94,7 @@ class Command(BaseCommand):
             raise SystemExit("--loop chỉ có ý nghĩa cùng --apply (nếu không sẽ lặp vô ích).")
 
         batch = max(1, options["batch_size"])
+        self._pace = max(0.0, float(options.get("pace") or 0.0))
         stop_file = options["stop_file"]
         as_json = options["json"]
 
@@ -175,6 +180,26 @@ class Command(BaseCommand):
                 skip_ids.add(person_id)
         return len(ids)
 
+    def _embed(self, text):
+        """`embed()` có lùi dần khi provider trả 429.
+
+        Trả `(vector, model, rate_limited)`. Bị giới hạn tốc độ KHÔNG phải lỗi của
+        hàng — không được đưa hàng vào `skip_keys` (production 19/09: gần như cả
+        lô bị đánh dấu bỏ qua tới lượt quét sâu, 300 lượt sau).
+        """
+        delay = 5.0
+        for _attempt in range(6):
+            vector, model = vector_index.embed(text, task_type="RETRIEVAL_DOCUMENT")
+            if vector:
+                if self._pace:
+                    time.sleep(self._pace)
+                return vector, model, False
+            if vector_index.LAST_EMBED_ERROR != "rate_limited":
+                return None, model, False
+            time.sleep(delay)
+            delay = min(120.0, delay * 2)
+        return None, "", True
+
     def _fill_embeddings(self, batch, skip_keys):
         """Y hệt logic của `embed_talent_index` — bù vector cho hàng đã stale."""
         processed = failed = 0
@@ -185,9 +210,10 @@ class Command(BaseCommand):
             key = ("doc", row.pk)
             if key in skip_keys:
                 continue
-            vector, model = vector_index.embed(
-                row.content[:vector_index.PROJECTION_EMBED_CHARS],
-                task_type="RETRIEVAL_DOCUMENT")
+            vector, model, limited = self._embed(
+                row.content[:vector_index.PROJECTION_EMBED_CHARS])
+            if limited:
+                return processed, failed + 1
             if vector:
                 row.embedding = vector
                 row.embedding_model = model
@@ -206,7 +232,9 @@ class Command(BaseCommand):
                 key = ("chunk", row.pk)
                 if key in skip_keys:
                     continue
-                vector, model = vector_index.embed(row.text, task_type="RETRIEVAL_DOCUMENT")
+                vector, model, limited = self._embed(row.text)
+                if limited:
+                    return processed, failed + 1
                 if vector:
                     row.embedding = vector
                     row.embedding_model = model
