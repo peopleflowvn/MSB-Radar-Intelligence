@@ -126,8 +126,11 @@ def _retrieve_all(active_plan, *, user, envelope, pool, pinned_ids, structured_i
         v2_future = executor.submit(_in_thread, intelligence_retrieve, user, active_plan,
                                     limit=pool, conversation_id=conversation_id)
 
+    # V2 đã phủ đoạn CV (BM25 + vector); local lo phần V2 không có: hồ sơ của
+    # người không có file CV. Quét lại bảng đoạn CV ở đây là trả thêm ~1.6 s mỗi
+    # truy vấn cho cùng một thông tin — chỉ làm khi V2 không chạy.
     local = retrieve_stage.retrieve(active_plan, pinned_ids=pinned_ids, search_queries=queries,
-                                    pool=pool)
+                                    pool=pool, cv_chunks=v2_future is None)
     structured = (retrieve_stage.retrieve(active_plan, pinned_ids=structured_ids,
                                           search_queries=[], pool=len(structured_ids))
                   if structured_ids else [])
@@ -146,6 +149,9 @@ def _retrieve_all(active_plan, *, user, envelope, pool, pinned_ids, structured_i
         except Exception as exc:                   # noqa: BLE001
             log.warning("answer: Intelligence retrieval failed; local only: %s", exc)
             engine = "product-core-fallback"
+            # Local vừa chạy thiếu bảng đoạn CV (trông vào V2) — chạy lại đủ.
+            local = retrieve_stage.retrieve(active_plan, pinned_ids=pinned_ids,
+                                            search_queries=queries, pool=pool)
         finally:
             executor.shutdown(wait=False)
     sources.append((local, SOURCE_WEIGHTS["local"]))

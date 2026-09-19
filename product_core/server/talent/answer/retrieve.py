@@ -154,9 +154,16 @@ mot trong ve can muon the and or in of with for years year experience
 experienced candidate candidates""".split())
 
 
+#: Viết tắt 2 chữ cái có nghĩa trong CV. Mọi token 2 chữ khác ("du", "ha", "hn")
+#: là mảnh của từ tiếng Việt đã bỏ dấu — "dữ liệu" → "du", "Hà Nội" → "ha" —
+#: khớp gần như mọi đoạn CV (production: 1878/2196) và làm phép xếp hạng chậm.
+_SHORT_OK = frozenset("ai bi ba qa ui ux ml pm hr it c r go js ts vb".split())
+
+
 def _search_tokens(query):
-    tokens = [t for t in vector_index.fts_tokens(query, limit=24) if t not in _FTS_STOP]
-    return tokens or vector_index.fts_tokens(query, limit=24)
+    raw = vector_index.fts_tokens(query, limit=24)
+    tokens = [t for t in raw if t not in _FTS_STOP and (len(t) >= 3 or t in _SHORT_OK)]
+    return tokens or raw
 
 
 def _ranked_fts(queryset, field, query, limit):
@@ -173,11 +180,18 @@ def _ranked_fts(queryset, field, query, limit):
     if not tokens:
         return []
     if connection.vendor == "postgresql":
-        from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
-        vector = SearchVector(field, config="simple")
-        tsquery = SearchQuery(" | ".join(tokens), config="simple", search_type="raw")
-        rows = (queryset.annotate(_sv=vector).filter(_sv=tsquery)
-                .annotate(_rank=SearchRank(vector, tsquery, cover_density=True))
+        # Biểu thức PHẢI trùng chỉ mục GIN (`to_tsvector('simple', <cột>)`).
+        # `SearchVector` của Django bọc cột trong COALESCE nên Postgres bỏ chỉ
+        # mục và tính to_tsvector trên từng hồ sơ (tới 120k ký tự): đo trên
+        # production 3.6–6 s/truy vấn, so với ~0.4–1.6 s theo cách này.
+        column = f'"{queryset.model._meta.db_table}"."{field}"'
+        tsquery = " | ".join(tokens)
+        rows = (queryset.extra(
+                    where=[f"to_tsvector('simple', {column}) @@ to_tsquery('simple', %s)"],
+                    params=[tsquery],
+                    select={"_rank": f"ts_rank_cd(to_tsvector('simple', {column}), "
+                                     f"to_tsquery('simple', %s))"},
+                    select_params=[tsquery])
                 .order_by("-_rank", "person_id"))
         ids = rows.values_list("person_id", flat=True)[:limit * 3]
         return list(dict.fromkeys(ids))[:limit]
@@ -195,14 +209,15 @@ def _ranked_fts(queryset, field, query, limit):
     return sorted(scores, key=lambda pid: (-scores[pid], pid))[:limit]
 
 
-def _fts_person_ids(query, limit):
+def _fts_person_ids(query, limit, *, chunks=True):
     """Full-text trên đoạn CV và projection hồ sơ, xếp theo độ khớp.
 
     Hai danh sách được HỢP bằng RRF chứ không nối đuôi: nối đuôi thì mọi người
     khớp đoạn CV luôn đứng trên mọi người chỉ có projection — tức 462 ứng viên
     không có file CV (chỉ có hồ sơ từ Edge) gần như không bao giờ vào pool.
     """
-    chunks = _ranked_fts(CVChunk.objects.filter(**VISIBLE), "text_norm", query, limit)
+    chunks = (_ranked_fts(CVChunk.objects.filter(**VISIBLE), "text_norm", query, limit)
+              if chunks else [])
     docs = _ranked_fts(PersonSearchDocument.objects.filter(**VISIBLE),
                        "content_norm", query, limit)
     ranked = [ids for ids in (chunks, docs) if ids]
@@ -340,7 +355,7 @@ def pool_for(query_plan, cap=POOL):
     return max(MIN_POOL, min(cap, limit * 6))
 
 
-def retrieve(query_plan, *, pool=None, pinned_ids=(), search_queries=None):
+def retrieve(query_plan, *, pool=None, pinned_ids=(), search_queries=None, cv_chunks=True):
     """`QueryPlan` → danh sách `Candidate` xếp theo độ liên quan giảm dần.
 
     KHÔNG nhận `user`. Tham số đó từng có mặt suốt và không được đọc lần nào —
@@ -385,7 +400,7 @@ def retrieve(query_plan, *, pool=None, pinned_ids=(), search_queries=None):
     # Full-text chạy tuần tự: đây là truy vấn CSDL, và luồng phụ dùng ORM sẽ mở
     # thêm kết nối PostgreSQL cho mỗi luồng — không đáng cho vài chục mili-giây.
     for query in queries:
-        fts = _fts_person_ids(query, PER_QUERY)
+        fts = _fts_person_ids(query, PER_QUERY, chunks=cv_chunks)
         if fts:
             ranked_lists.append(fts)
 
