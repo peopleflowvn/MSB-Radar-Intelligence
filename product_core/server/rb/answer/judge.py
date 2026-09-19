@@ -43,7 +43,9 @@ from ai.router import complete
 
 log = logging.getLogger(__name__)
 
-TASK = "rb_prospect_search"
+#: Task riêng (không dùng chung `rb_prospect_search` với ① và ⑤) để `/settings`
+#: đổi model của chặng chậm nhất mà không đụng tới hai chặng kia.
+TASK = "rb_answer_judge"
 
 #: Số hồ sơ mỗi lượt đọc. Giữ NHỎ có chủ ý — cùng lý do với Talent: lô lớn khiến
 #: model vượt trần token và trả JSON cụt, parse ra rỗng, rồi ⑤ đi báo "không có

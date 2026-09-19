@@ -75,7 +75,7 @@ def _extra_plan_marker(query_plan):
 _CACHE = TurnCache(
     prefix=PREFIX,
     prompts=_prompts,
-    tasks=("rb_prospect_search",),
+    tasks=("rb_prospect_search", "rb_answer_judge"),
     corpus_fingerprint=corpus_fingerprint,
     row_to_judgement=from_row,
     extra_plan_marker=_extra_plan_marker,

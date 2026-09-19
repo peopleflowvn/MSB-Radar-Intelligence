@@ -15,6 +15,13 @@ Khách hàng = người chưa bị gộp, có ÍT NHẤT MỘT trong:
     hồ sơ bán lẻ (`RBProfile`)
     tín hiệu domain bán lẻ (`Signal.domain = rb`)
     bài mạng xã hội đã gắn người (`SocialPost.person`)
+    hồ sơ ứng viên (`TalentProfile`)
+
+Nhánh cuối đưa ỨNG VIÊN vào tập tìm khách. Căn cứ: pháp chế MSB đồng ý
+(19/09/2026) cho dùng dữ liệu ứng viên để tìm kiếm khách hàng. Cổng không liên
+hệ (`do_not_contact_ids`) vẫn áp như mọi khách khác. Nhận xét về giới tính/tuổi/
+hôn nhân/thu nhập suy đoán vẫn bị cắt ở ⑤ (`compose`) — đồng ý dùng dữ liệu
+không có nghĩa là được phân biệt theo các thuộc tính đó.
 
 Dùng `pk__in` với truy vấn con thay vì JOIN: không nhân dòng, không cần
 `distinct()`, và `count()` ra đúng số người.

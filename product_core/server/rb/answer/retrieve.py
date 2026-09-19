@@ -58,8 +58,11 @@ from .evidence import Candidate
 
 log = logging.getLogger(__name__)
 
-#: Trần số khách ĐỌC KỸ ở ③ (ngân sách token một lượt).
-POOL = 60
+#: Trần số khách ĐỌC KỸ ở ③. 32 = 4 lô × 8 khách = đúng MỘT đợt 4 luồng của
+#: `judge.WORKERS`, và nằm trong hạn mức ~5 lượt/phút của GreenNode cho model
+#: đọc (qwen3.7-plus). Đo prod 19/09: 60 khách = 8 lô = hai đợt, 52–100 s và
+#: đợt sau bị 429 đẩy sang Gemini; 32 khách = 38 s, cả 4 lô đúng model.
+POOL = 32
 #: Sàn — dưới mức này ③ không còn gì để loại, và câu "có ai … không?" cần mẫu
 #: đủ rộng mới trả lời trung thực được.
 MIN_POOL = 16

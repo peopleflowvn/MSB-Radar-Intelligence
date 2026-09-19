@@ -145,7 +145,12 @@ _ROWS = [
 
     # --- Khách hàng (RB) -----------------------------------------------------
     AiTask("rb_prospect_search", "Bóc tiêu chí tìm khách",
-           "Câu hỏi tự nhiên → bộ lọc khách hàng tiềm năng.", GROUP_RB, "json"),
+           "Câu hỏi tự nhiên → bộ lọc khách hàng tiềm năng; cũng viết câu trả lời "
+           "của Growth.", GROUP_RB, "json"),
+    AiTask("rb_answer_judge", "Đọc bằng chứng khách hàng",
+           "Đọc hồ sơ và bằng chứng của từng khách, quyết định ai phù hợp. Chặng "
+           "chậm nhất của tìm khách bằng AI — đổi model ở đây là đổi tốc độ lấy "
+           "độ chính xác.", GROUP_RB, "doc"),
     AiTask("rb_outreach_draft", "Soạn thư tiếp cận (RB)",
            "Soạn nháp tin nhắn cho khách hàng tiềm năng.", GROUP_RB, "viet"),
     AiTask("rb_suggest_product_reasoning", "Tự luận gợi ý sản phẩm (tool, dự phòng)",
@@ -244,7 +249,8 @@ DEFAULT_ROUTE = {
     "jd_parse": _QWEN,
     "outreach_draft": _QWEN,             # hạn mức 1200
 
-    "rb_prospect_search": _QWEN_PLUS,    # một task cho cả ①③⑤ của Growth
+    "rb_prospect_search": _QWEN_PLUS,    # ① hiểu câu hỏi và ⑤ viết của Growth
+    "rb_answer_judge": _QWEN_PLUS,       # ③ đọc bằng chứng — xem DEFAULT_REASON
     "rb_outreach_draft": _QWEN,          # hạn mức 800
     "rb_suggest_product_reasoning": _QWEN,  # JSON ngắn, hạn mức 400
 
@@ -292,8 +298,12 @@ DEFAULT_REASON = {
     "candidate_extraction": "Benchmark 19/09 (10 CV thật × 2 lần): số năm kinh nghiệm khớp Edge "
                             "10/10 (flash 8/8, bỏ sót 2), nhiều trường hơn, ổn định hơn; ~13 s/CV. "
                             "deepseek-v4-flash hỏng JSON 10/10.",
-    "rb_prospect_search": "Một task cho cả ba chặng hiểu câu hỏi/đọc bằng chứng/viết của Growth — "
-                          "cùng lý do với talent_answer_judge.",
+    "rb_prospect_search": "Hiểu câu hỏi và viết câu trả lời của Growth — cùng lý do với "
+                          "talent_answer_plan.",
+    "rb_answer_judge": "Cùng lý do với talent_answer_judge. Đo prod 19/09: ~20 s/lô 8 khách, "
+                       "GreenNode chỉ cho ~5 lượt/phút với model này — quá hạn mức thì lô bị "
+                       "đẩy sang Gemini. Chọn model flash để nhanh hơn (~8 s/lô), đổi lại "
+                       "dễ nhận nhầm hồ sơ nhiễu.",
 }
 
 

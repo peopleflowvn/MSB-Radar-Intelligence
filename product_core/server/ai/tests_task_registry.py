@@ -195,7 +195,7 @@ class BenchmarkDefaultsTest(TestCase):
 
     def test_doc_cv_va_hieu_cau_hoi_dung_qwen_plus(self):
         for task in ("talent_answer_plan", "talent_answer_judge", "rb_prospect_search",
-                     "candidate_extraction"):
+                     "rb_answer_judge", "candidate_extraction"):
             self.assertEqual(tasks_registry.default_route(task), ("greennode", "qwen/qwen3.7-plus"))
             self.assertTrue(tasks_registry.DEFAULT_REASON.get(task))
 

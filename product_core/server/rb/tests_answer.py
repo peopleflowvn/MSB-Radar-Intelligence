@@ -396,6 +396,8 @@ class JudgeRefusesUnbackedClaimsTest(SimpleTestCase):
             seen.update(kwargs)
             return FakeCompletion("{}")
         judge_stage.judge(ProspectPlan(), [self._candidate()], complete_fn=caller)
+        # Task riêng — đổi model của chặng này trong /settings không đụng ① và ⑤.
+        self.assertEqual(seen["task"], "rb_answer_judge")
         self.assertEqual(seen["budget_seconds"], judge_stage.JUDGE_BUDGET_SECONDS)
         self.assertGreater(seen["budget_seconds"], 25)
         self.assertEqual(seen["reasoning_effort"], "none")
