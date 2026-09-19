@@ -128,3 +128,30 @@ class PreambleTest(SimpleTestCase):
         plan = QueryPlan(information_need="Tìm Data Analyst trên 3 năm.", shape="find_people",
                          search_queries=["a", "b"])
         self.assertNotIn("..", engine._preamble(plan, "q"))
+
+
+class AnswerEvalChecksTest(SimpleTestCase):
+    """Ba phép kiểm hồi quy mới của `answer_eval`."""
+
+    def _result(self, people, text="Có kết quả phù hợp cho câu hỏi này [1]."):
+        from types import SimpleNamespace
+        return SimpleNamespace(text=text, people=people, sources=[], all_sources=[])
+
+    def test_must_include_any_theo_id_va_ten(self):
+        from talent.management.commands.answer_eval import _check
+        result = self._result([{"person_id": 174, "name": "Phan Thành Vinh"}])
+        checks, _ = _check({"must_include_any": [999, 174]}, result, engine_name="rb")
+        self.assertTrue(checks["must_include_any"])
+        checks, _ = _check({"must_include_any": ["phan thanh vinh"]}, result, engine_name="rb")
+        self.assertTrue(checks["must_include_any"])
+        checks, problems = _check({"must_include_any": [1, 2]}, result, engine_name="rb")
+        self.assertFalse(checks["must_include_any"])
+
+    def test_must_not_include_va_max_seconds(self):
+        from talent.management.commands.answer_eval import _check
+        result = self._result([{"person_id": 7, "name": "Trần Thị Hiền"}])
+        checks, problems = _check({"must_not_include": ["Trần Thị Hiền"], "max_seconds": 10},
+                                  result, elapsed=20, engine_name="rb")
+        self.assertFalse(checks["must_not_include"])
+        self.assertFalse(checks["max_seconds"])
+        self.assertEqual(len(problems), 2)

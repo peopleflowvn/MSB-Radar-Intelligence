@@ -25,6 +25,22 @@ trả lời để soi, và ghi JSON để so hai lần chạy khác nhau.
     python manage.py answer_eval                     # bộ 30 câu mặc định
     python manage.py answer_eval --only 3,7 -v 2     # chạy vài câu, in cả bài
     python manage.py answer_eval --out /tmp/eval.json
+
+Bộ câu HỒI QUY trên kho production (`docs/benchmark/answer_eval_prod_cases.json`)
+thêm ba phép kiểm mà bộ mặc định không có — đúng ba thứ đã hỏng 18–19/09 mà
+không test nào bắt được:
+
+    must_include_any  ít nhất một người trong danh sách (id hoặc tên) phải có mặt
+                      trong `people` — kể cả nhóm "gần đúng"
+    must_not_include  không người nào trong danh sách được có mặt (hồ sơ nhiễu)
+    max_seconds       trần thời gian cả lượt
+
+    python manage.py answer_eval --cases docs/benchmark/answer_eval_prod_cases.json \
+        --user <admin> --out /tmp/eval.json
+
+`--user` để chạy ĐÚNG đường production: truy hồi Intelligence V2 cần danh tính
+người hỏi; không có nó thì eval âm thầm đo đường dự phòng local. `--engine rb`
+chạy các câu `engine: "rb"` qua Answer Engine của Growth.
 """
 import json
 import re
@@ -250,15 +266,46 @@ def _sorted_values(result, key):
     return out
 
 
-def _check(case, result):
+def _people_keys(result):
+    keys = set()
+    for person in result.people or []:
+        if person.get("person_id") is not None:
+            keys.add(str(person["person_id"]))
+        if person.get("name"):
+            keys.add(_norm(person["name"]))
+    return keys
+
+
+def _matches(keys, wanted):
+    return [w for w in wanted if (str(w) if isinstance(w, int) else _norm(str(w))) in keys]
+
+
+def _check(case, result, *, elapsed=None, engine_name="talent"):
     """Trả (dict các phép kiểm, danh sách lỗi)."""
     checks, problems = {}, []
+
+    if case.get("must_include_any"):
+        hit = _matches(_people_keys(result), case["must_include_any"])
+        checks["must_include_any"] = bool(hit)
+        if not hit:
+            problems.append("không có ai trong danh sách bắt buộc: "
+                            f"{case['must_include_any'][:5]}")
+    if case.get("must_not_include"):
+        hit = _matches(_people_keys(result), case["must_not_include"])
+        checks["must_not_include"] = not hit
+        if hit:
+            problems.append(f"có hồ sơ bị cấm: {hit[:5]}")
+    if case.get("max_seconds") and elapsed is not None:
+        checks["max_seconds"] = elapsed <= float(case["max_seconds"])
+        if not checks["max_seconds"]:
+            problems.append(f"chậm {elapsed:.0f}s > {case['max_seconds']}s")
 
     checks["has_answer"] = bool(result.text and len(result.text) > 20)
     if not checks["has_answer"]:
         problems.append("câu trả lời rỗng hoặc quá ngắn")
 
-    bad = [s for s in result.all_sources if not _citation_is_real(s)]
+    bad = ([] if engine_name != "talent" else
+           [s for s in result.all_sources if not _citation_is_real(s)])
     checks["citations_real"] = not bad
     if bad:
         problems.append(f"{len(bad)}/{len(result.all_sources)} trích dẫn KHÔNG có thật")
@@ -276,9 +323,9 @@ def _check(case, result):
     if not checks["grounded"]:
         problems.append(f"nêu tên {named[0]['name']} nhưng không trích dẫn nguồn nào")
 
-    citation_audit = verify.citation_audit(
+    citation_audit = ({"status": "PASS"} if engine_name != "talent" else verify.citation_audit(
         [SimpleNamespace(person_id=person.get("person_id"), name=person.get("name", ""))
-         for person in result.people], result.text, result.all_sources)
+         for person in result.people], result.text, result.all_sources))
     checks["citations_owned"] = citation_audit["status"] == "PASS"
     if not checks["citations_owned"]:
         problems.append(
@@ -353,6 +400,21 @@ def _check(case, result):
     return checks, problems
 
 
+def _eval_user(username):
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    if username:
+        return User.objects.get(username=username)
+    return User.objects.filter(is_superuser=True, is_active=True).order_by("pk").first()
+
+
+def _engine(name):
+    if name == "rb":
+        from rb.answer import engine as rb_engine
+        return rb_engine.answer
+    return engine.answer
+
+
 class Command(BaseCommand):
     help = ("Chạy bộ câu hỏi thật qua Answer Engine và kiểm những gì máy tự kiểm "
             "được (trích dẫn có thật, đúng thứ tự, đúng số lượng).")
@@ -364,22 +426,37 @@ class Command(BaseCommand):
                             help="Ghi kết quả đầy đủ ra tệp JSON để so hai lần chạy.")
         parser.add_argument("--gate", type=int, default=0,
                             help="Số câu tối thiểu phải đạt; thiếu thì thoát mã 1.")
+        parser.add_argument("--cases", default="",
+                            help="Tệp JSON bộ câu hỏi thay cho bộ mặc định.")
+        parser.add_argument("--user", default="",
+                            help="Tên đăng nhập chạy thay (mặc định: superuser đầu tiên).")
+        parser.add_argument("--engine", default="",
+                            help="Chỉ chạy câu của engine này: talent | rb.")
 
     def handle(self, *args, **options):
         picked = {int(n) for n in options["only"].split(",") if n.strip().isdigit()}
-        cases = [(i, c) for i, c in enumerate(QUESTIONS, start=1)
-                 if not picked or i in picked]
+        questions = QUESTIONS
+        if options["cases"]:
+            with open(options["cases"], encoding="utf-8") as handle:
+                questions = json.load(handle)["cases"]
+        only_engine = options["engine"]
+        cases = [(i, c) for i, c in enumerate(questions, start=1)
+                 if (not picked or i in picked)
+                 and (not only_engine or c.get("engine", "talent") == only_engine)]
+        user = _eval_user(options["user"])
         verbosity = options["verbosity"]
 
         rows, passed = [], 0
         for index, case in cases:
             started = time.monotonic()
+            engine_name = case.get("engine", "talent")
+            answer_fn = _engine(engine_name)
             try:
-                result = engine.answer(case["q"])
+                result = answer_fn(case["q"], user=user)
                 if case.get("follow_up"):
                     # Lượt tiếp phải bám được kết quả lượt trước.
                     history = [{"question": case["q"], "answer": result.text}]
-                    result = engine.answer(case["follow_up"], history=history)
+                    result = answer_fn(case["follow_up"], history=history, user=user)
             except Exception as exc:                # noqa: BLE001
                 rows.append({"n": index, "q": case["q"], "ok": False,
                              "problems": [f"NỔ: {exc}"]})
@@ -387,7 +464,7 @@ class Command(BaseCommand):
                 continue
 
             elapsed = time.monotonic() - started
-            checks, problems = _check(case, result)
+            checks, problems = _check(case, result, elapsed=elapsed, engine_name=engine_name)
             ok = all(checks.values())
             passed += 1 if ok else 0
 

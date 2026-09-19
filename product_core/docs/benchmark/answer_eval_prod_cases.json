@@ -1,0 +1,56 @@
+{
+  "about": "Bộ câu hồi quy trên KHO PRODUCTION (id/tên hồ sơ là của kho production, không dùng được ở môi trường khác). Dựng 19/09/2026 từ các lỗi đã gặp thật; đáp án đã xác minh bằng cách chấm từng hồ sơ liên quan. Chạy: python manage.py answer_eval --cases docs/benchmark/answer_eval_prod_cases.json --out /tmp/eval.json",
+  "cases": [
+    {
+      "q": "Tìm Senior Data Analyst ở Hà Nội biết SQL và Python, trên 3 năm kinh nghiệm",
+      "note": "Kho KHÔNG có ai đạt đủ (đa số là sinh viên/1-2 năm). Đúng: nêu người làm phân tích dữ liệu gần nhất. Lỗi 19/09: 5 chuyên viên ngân hàng được giới thiệu là 'gần phù hợp' vì 'senior' khớp lỏng cấp bậc.",
+      "must_include_any": [174, 304, 295, 794, 161, 928, 939, 800],
+      "must_not_include": ["Nguyễn Hà Anh Thư", "Trần Thị Hiền", "Nguyễn Khắc Thành", "LÊ THỊ MINH HẰNG", "Luong Thanh Tung"],
+      "must_not_say": ["đối soát trong kho", "ưu tiên ứng viên nữ"],
+      "max_seconds": 150
+    },
+    {
+      "q": "ai biết SQL và Python?",
+      "must_include_any": [304, 174, 794, 939, 800, 295],
+      "max_seconds": 150
+    },
+    {
+      "q": "Tìm chuyên viên quan hệ khách hàng doanh nghiệp trên 5 năm kinh nghiệm",
+      "must_include_any": [990, 1008, 22, 59],
+      "max_seconds": 150
+    },
+    {
+      "q": "tìm phi hành gia người Việt trong kho",
+      "expect_people": false,
+      "max_seconds": 150
+    },
+    {
+      "engine": "rb",
+      "q": "Tìm quản lý hoặc chuyên gia từ 5 năm kinh nghiệm có thể tiếp cận vay mua nhà",
+      "expect_people": true,
+      "must_not_say": ["thu nhập", "INFERENCE", "kết hôn", "phân khúc cao cấp"],
+      "max_seconds": 150
+    },
+    {
+      "engine": "rb",
+      "q": "Tìm quản lý, giám đốc hoặc chuyên gia quan tâm thẻ tín dụng hạn mức cao",
+      "expect_people": true,
+      "must_not_say": ["thu nhập", "INFERENCE", "chi tiêu lớn", "phân khúc cao cấp"],
+      "max_seconds": 150
+    },
+    {
+      "engine": "rb",
+      "q": "Tìm chủ doanh nghiệp, CEO, kế toán trưởng để chào gói vốn kinh doanh và chi lương",
+      "expect_people": true,
+      "must_include_any": ["HA HOANG TRANG", "Hoàng Anh", "Hoàng Thị Như"],
+      "must_not_say": ["thu nhập", "INFERENCE"],
+      "max_seconds": 150
+    },
+    {
+      "engine": "rb",
+      "q": "Kho mình có bao nhiêu khách hàng?",
+      "must_not_say": ["không có dữ liệu"],
+      "max_seconds": 150
+    }
+  ]
+}
