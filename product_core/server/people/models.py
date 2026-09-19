@@ -229,6 +229,10 @@ class Document(models.Model):
     PARSE_PENDING = "pending"
     PARSE_DONE = "done"
     PARSE_FAILED = "failed"
+    #: Đã thử hết cách (trích cục bộ + OCR) mà file thật sự không có chữ — trang
+    #: trắng, ảnh không có nội dung. Là trạng thái CUỐI để worker không gọi OCR
+    #: mãi, nhưng vẫn hiện trong `audit_data_pipeline` để người xem lại được.
+    PARSE_UNREADABLE = "unreadable"
 
     person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="documents")
     document_type = models.CharField(max_length=40, default="cv")
@@ -259,6 +263,12 @@ class Document(models.Model):
     parse_model = models.CharField(max_length=100, blank=True, default="")
     parse_error = models.CharField(max_length=500, blank=True, default="")
     parsed_at = models.DateTimeField(null=True, blank=True)
+    #: Số lần Hub đã kiểm/parse bù file này (`core/cv_parsing.py`). > 0 cũng có
+    #: nghĩa "Hub đã xác nhận text dùng được", để worker không kiểm lại mãi.
+    parse_attempts = models.PositiveSmallIntegerField(default=0)
+    #: Lịch thử lại khi lần trước lỗi (lùi dần), đồng thời là lease giữa các
+    #: tiến trình gunicorn: tiến trình nào đặt được mốc này thì tiến trình đó xử lý.
+    next_parse_at = models.DateTimeField(null=True, blank=True, db_index=True)
     preview_key = models.CharField(max_length=500, blank=True, default="",
                                    help_text="Bản PDF xem trước do Hub tạo, tách khỏi file gốc")
     preview_status = models.CharField(max_length=20, default=PARSE_PENDING)

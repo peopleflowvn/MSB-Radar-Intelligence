@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Count, F, Q
 from django.utils import timezone
 
+from core.cv_parsing import needs_parsing
 from core.models import Edge, SourceRecord
 from intake.models import ImportBatch, ImportRow
 from intel.models import ExtractedFact, ExtractionJob, ExtractionRun
@@ -163,6 +164,11 @@ def collect_pipeline_audit():
             "without_text": documents.exclude(storage_key="").filter(
                 primary_text_version__isnull=True, parsed_text="").count(),
             "by_parse_status": _grouped(documents, "parse_status"),
+            # Hàng đợi parse bù thật sự: gồm cả CV "có text" nhưng text hỏng
+            # (trang bìa, OCR trả "không có chữ") — `without_text` không thấy.
+            "parse_queue": needs_parsing().count(),
+            "unreadable": documents.filter(
+                parse_status=Document.PARSE_UNREADABLE).count(),
             "by_source": _grouped(documents, "source"),
             "text_origins": _grouped(DocumentTextLink.objects.all(), "origins"),
         },

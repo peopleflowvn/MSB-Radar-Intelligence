@@ -44,27 +44,25 @@ def _resolve_pending():
 
 
 def _parse_documents():
-    from django.db.models import Q
     from people.models import Document
 
-    from .cv_parsing import parse_missing_document
+    from .cv_parsing import parse_due_documents
     from .document_preview import prepare_preview
 
-    rows = list(Document.objects
-                .exclude(storage_key="")
-                .filter(Q(primary_text_version__isnull=True, parsed_text="") |
-                        Q(preview_status=Document.PARSE_PENDING) |
-                        Q(preview_status=""))
-                .order_by("created_at")[:PARSE_BATCH])
-    for document in rows:
+    # Bản xem trước và parse bù là hai hàng đợi RIÊNG. Trước đây chung một truy
+    # vấn: file parse lỗi vẫn khớp "chưa có text" nên được chọn lại mỗi 3 giây,
+    # mãi mãi, ở cả 3 tiến trình gunicorn — log prod 20/09 lặp đúng 3 file hỏng.
+    previews = list(Document.objects.exclude(storage_key="")
+                    .filter(preview_status__in=[Document.PARSE_PENDING, ""])
+                    .order_by("created_at")[:PARSE_BATCH])
+    for document in previews:
         if _stop.is_set():
             break
         try:
             prepare_preview(document)
-            parse_missing_document(document)
         except Exception:                        # noqa: BLE001
-            log.exception("Worker: không parsing bù được Document %s", document.pk)
-    return len(rows)
+            log.exception("Worker: không dựng được bản xem trước Document %s", document.pk)
+    return len(previews) + parse_due_documents(PARSE_BATCH, stop=_stop)
 
 
 def _run_extraction():
