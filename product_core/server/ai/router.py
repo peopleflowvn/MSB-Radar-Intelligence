@@ -19,6 +19,7 @@ một nhà cung cấp mà không ai biết.
 """
 import logging
 import os
+import threading
 import time
 
 from . import tasks as tasks_registry
@@ -79,6 +80,40 @@ def _provider_from_config(config, transport=None):
         transport=transport)
 
 
+#: Hạn mức tốc độ tự áp phía mình, theo provider, tính theo phút. 0 = tắt.
+#: Vì sao cần dù provider đã có 429: hạn mức tính theo KHOÁ, và production chỉ có
+#: một khoá GreenNode. Đo 20/09: hai lời gọi liên tiếp được, các lời gọi sau bị
+#: chặn — trong khi judge bắn 4 lô song song. Tự xếp hàng thì phần lớn lô chạy
+#: được; bắn hết rồi nhận 429 thì mất cả lô và người dùng mất phần đọc sâu.
+_RATE_WINDOW = 60.0
+
+
+class _RateBucket:
+    """Cửa sổ trượt đơn giản: cho phép `limit` lời gọi trong 60 giây."""
+
+    def __init__(self, limit):
+        self.limit = max(0, int(limit or 0))
+        self.hits = []
+        self.lock = threading.Lock()
+
+    def take(self, wait_budget):
+        """`True` nếu được phép gọi ngay hoặc sau khi đợi trong ngân sách."""
+        if not self.limit:
+            return True
+        deadline = time.monotonic() + max(0.0, float(wait_budget or 0))
+        while True:
+            with self.lock:
+                now = time.monotonic()
+                self.hits = [t for t in self.hits if now - t < _RATE_WINDOW]
+                if len(self.hits) < self.limit:
+                    self.hits.append(now)
+                    return True
+                sleep_for = _RATE_WINDOW - (now - self.hits[0]) + 0.05
+            if time.monotonic() + sleep_for > deadline:
+                return False
+            time.sleep(min(sleep_for, max(0.1, deadline - time.monotonic())))
+
+
 class NoProviderConfigured(LLMError):
     """Chưa khai báo khoá cho bất kỳ nhà cung cấp nào."""
 
@@ -114,6 +149,7 @@ class Router:
         self._cache = {}
         self._breaker = {}          # name -> {"fails": int, "until": monotonic ts}
         self._model_breaker = {}    # (name, model) -> {"fails": int, "until": ts}
+        self._buckets = {}          # name -> _RateBucket
         self._config_checked_at = 0.0
         self._config_stamp = None
 
@@ -158,6 +194,29 @@ class Router:
     def _breaker_open(self, name):
         state = self._breaker.get(name)
         return bool(state and state.get("until", 0) > time.monotonic())
+
+    def _rate_limit_for(self, name):
+        for key in (f"MSB_AI_RATE_PER_MINUTE_{name.upper()}",
+                    "MSB_AI_RATE_PER_MINUTE"):
+            value = str(self.env.get(key, "") or "").strip()
+            if value:
+                try:
+                    return int(value)
+                except ValueError:
+                    return 0
+        return 0
+
+    def _rate_allow(self, name, remaining):
+        """Tự xếp hàng theo hạn mức của provider, trong ngân sách còn lại."""
+        limit = self._rate_limit_for(name)
+        if not limit:
+            return True
+        bucket = self._buckets.get(name)
+        if bucket is None or bucket.limit != limit:
+            bucket = self._buckets[name] = _RateBucket(limit)
+        # Chừa 1 giây cho chính lời gọi; `remaining=None` nghĩa là không có deadline.
+        budget = 30.0 if remaining is None else max(0.0, remaining - 1.0)
+        return bucket.take(budget)
 
     def _model_key(self, name, model):
         return (str(name or "").lower(), str(model or "").lower())
@@ -578,8 +637,20 @@ class Router:
             call_kwargs = dict(kwargs)
             # Model theo tác vụ (nếu người gọi chưa chỉ định rõ).
             picked_model = call_kwargs.get("model") or self._model_for(name, task)
-            if picked_model and self._model_blocked(name, picked_model):
-                skipped.append(f"{name}:{picked_model}(blocked)")
+            # Model THẬT SỰ được gửi: người gọi ghim, hoặc route theo tác vụ,
+            # hoặc model mặc định của provider. Bản đầu chỉ kiểm `picked_model`,
+            # nên với provider dự phòng (`_model_for` trả None) điều kiện chặn
+            # không bao giờ đúng — production 20/09 vẫn gọi Gemini 402 mười lần
+            # liên tiếp dù đã "ghi nhận" cặp đó hai lần.
+            effective_model = picked_model or getattr(provider, "model", "")
+            if effective_model and self._model_blocked(name, effective_model):
+                skipped.append(f"{name}:{effective_model}(blocked)")
+                log.info("Bỏ qua %s/%s: đã bị từ chối gần đây", name, effective_model)
+                continue
+            if not self._rate_allow(name, remaining):
+                # Hết hạn mức tốc độ của provider này trong ngân sách còn lại:
+                # bỏ qua còn hơn tiêu một lời gọi để nhận 429.
+                skipped.append(f"{name}(rate_limited_locally)")
                 continue
             if picked_model:
                 call_kwargs["model"] = picked_model

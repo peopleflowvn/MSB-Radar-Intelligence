@@ -375,6 +375,54 @@ class RouterTest(TestCase):
         self.assertTrue(r._model_blocked("gemini", "gemini-3.5-flash"))
         self.assertFalse(r._model_blocked("gemini", "gemini-3.5-pro"))
 
+    def test_model_mac_dinh_cua_provider_cung_bi_chan_sau_khi_bi_tu_choi(self):
+        """Loi H5 ban dau: `_model_for` tra None cho provider du phong nen dieu
+        kien chan khong bao gio dung — production goi Gemini 402 muoi lan lien
+        tiep du da ghi nhan cap do hai lan."""
+        self._khong_route_db("talent_answer_judge")
+        ProviderConfig.objects.all().delete()
+        calls = []
+        r = Router(env={"MSB_AI_GEMINI_API_KEY": "k",
+                        "MSB_AI_PROVIDER_DEFAULT": "gemini"},
+                   transport=fake_transport(
+                       status=LLMUnavailable("gemini: yeu cau bi tu choi (HTTP 402)."),
+                       record=calls))
+        for _ in range(2):
+            with self.assertRaises(LLMUnavailable):
+                r.complete(MESSAGES, task="talent_answer_judge", budget_seconds=2)
+        goi_truoc_khi_chan = len(calls)
+        with self.assertRaises(LLMUnavailable) as ctx:
+            r.complete(MESSAGES, task="talent_answer_judge", budget_seconds=2)
+        # Khong ton them mot loi goi nao nua, va thong bao noi ro vi sao.
+        self.assertEqual(len(calls), goi_truoc_khi_chan)
+        self.assertIn("blocked", str(ctx.exception))
+
+    def test_tu_xep_hang_theo_han_muc_thay_vi_ban_het_roi_nhan_429(self):
+        """Han muc tinh theo KHOA va production chi co mot khoa GreenNode."""
+        calls = []
+        r = Router(env={"MSB_AI_GEMINI_API_KEY": "k",
+                        "MSB_AI_PROVIDER_DEFAULT": "gemini",
+                        "MSB_AI_RATE_PER_MINUTE_GEMINI": "2"},
+                   transport=fake_transport(record=calls))
+        self.assertEqual(r._rate_limit_for("gemini"), 2)
+        r.complete(MESSAGES, task="talent_answer_judge", budget_seconds=5)
+        r.complete(MESSAGES, task="talent_answer_judge", budget_seconds=5)
+        self.assertEqual(len(calls), 2)
+        # Loi goi thu ba vuot han muc: khong duoc ban di, va bao dung ly do.
+        with self.assertRaises(LLMUnavailable) as ctx:
+            r.complete(MESSAGES, task="talent_answer_judge", budget_seconds=3)
+        self.assertEqual(len(calls), 2)
+        self.assertIn("rate_limited_locally", str(ctx.exception))
+
+    def test_khong_dat_han_muc_thi_khong_doi_hanh_vi(self):
+        calls = []
+        r = Router(env={"MSB_AI_GEMINI_API_KEY": "k",
+                        "MSB_AI_PROVIDER_DEFAULT": "gemini"},
+                   transport=fake_transport(record=calls))
+        for _ in range(3):
+            r.complete(MESSAGES, task="talent_answer_judge", budget_seconds=5)
+        self.assertEqual(len(calls), 3)
+
     def test_doi_provider_mac_dinh_KHONG_lam_mat_greennode(self):
         """Đặt default=gemini không được âm thầm loại GreenNode khỏi chuỗi.
 
