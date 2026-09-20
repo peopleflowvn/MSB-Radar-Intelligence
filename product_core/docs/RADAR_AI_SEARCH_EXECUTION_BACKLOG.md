@@ -830,6 +830,21 @@ Một lượt phải chứng minh được bằng trace máy đọc được:
   `SEARCH_PLAN_V2_MODE` mặc định vẫn là `off`; chưa được coi là đã canary hoặc
   đã thay đường tìm kiếm production hiện hành.
 
+### 17.1b. Quy tắc ghi nhật ký (bắt buộc sau mỗi phiên làm việc)
+
+Mỗi phiên làm việc — dù chỉ sửa một dòng — phải để lại bốn thứ, nếu không thì
+lần sau không ai biết cái gì đã xong:
+
+1. **Mức độ** của từng ticket bị ảnh hưởng trong bảng 17.2b, kèm việc còn lại
+   gần nhất. Không nâng mức khi chưa có bằng chứng tương ứng ở 17.2.
+2. **Một dòng changelog** ở 17.7: commit, ticket, nội dung chính, bằng chứng test.
+3. **Bằng chứng**: số test đạt, hoặc truy vấn/log trên production, hoặc run id
+   của workflow. Không có bằng chứng thì ghi rõ "chưa xác minh".
+4. **Việc còn lại** ở 17.11, theo đúng thứ tự dependency.
+
+Ghi cả thứ chưa làm được và lý do (thiếu quyền, thiếu hạ tầng, chờ phê duyệt).
+Một tài liệu chỉ ghi thành công sẽ khiến lần sau lặp lại đúng chỗ đã vướng.
+
 ### 17.2. Thang mức độ hoàn thành
 
 Một ticket đi qua năm mức. Mức chỉ được nâng khi có bằng chứng, và bằng chứng
@@ -854,7 +869,7 @@ khi mọi ticket của nó ở L4.
 | H2 chặn lệch chiều vector | **L3** | sửa `EmbeddingConfig.dimensions` 768 → 1024; hiện nhánh ngữ nghĩa tắt mọi lượt |
 | H3 FTS giữ phép giao cho must | **L2** | chạy case 12/12 và EXPLAIN trên prod |
 | H4 unknown ≠ not matched | **L2** | audit câu trả lời thật, chốt ngưỡng unknown |
-| H5 fallback không mang model hub khác | **L1** | deploy rồi đối chiếu 404 về 0 trong 24h |
+| H5 fallback không mang model hub khác | **L1** | đã push `a0d8e7d`, **chờ deploy**; sau deploy đối chiếu 404 về 0 trong 24h |
 | P0-00 baseline/manifest/ADR | **L3** | manifest hai revision + ADR SLO/cost được duyệt |
 | P0-01 provider capacity | **L1** | quota/billing thật, fallback drill, quan sát 24h |
 | P0-02 dimension + ADR vector | **L3** | ADR halfvec/HNSW/filtered ANN + dung lượng ở 500k |
@@ -971,7 +986,8 @@ ticket xem 17.3, trạng thái slice xem hai bảng ở mục 9.
 | `4da3e60` | P0-04, P1-11, P1-12 | Coverage ở mọi exit path của people pipeline; API estimate/create/status/cancel/resume cho CandidateSet; T2 qua API chỉ một batch 500/request; sửa `complete=true` khi còn candidate chưa qua cursor; nhãn UI tách "tính bằng SQL" / "kiểm bằng code" / "đọc sâu" | `ai+talent` 918; frontend 142 |
 | `b9266d0` | P1-00, P1-02 | Boolean AST lồng trong `where` + validator depth 8 / 50 leaves; `NOT` đúng một child; unresolved fail-closed và không bị `NOT` đảo thành cho qua toàn kho; `classification` strict vào fingerprint; compiler chỉ đẩy hard-deterministic xuống SQL; branch chưa có báo `not_implemented` | `ai+talent` 923 |
 | `8d5d0a1` | P0-05, P1-02C/D, P1-03A/C/E/F/G, P1-06, P1-07 | Mục 17.9 | `ai+talent` 935; `tests_search_v2` 30 |
-| chưa commit | H5, P0-04, P0-00/P0-02 (bằng chứng prod) | Router lọc chuỗi provider theo model đã ghim + nhớ cặp bị từ chối 404/402; `AnswerRun.coverage` lưu coverage để audit hồi tố (migration `ai/0027`, chỉ các khoá đã biết, không nội dung nghiệp vụ); baseline mục 2 đo lại trên prod; bảng tiến độ 17.2b | `ai.tests.RouterTest` 23; `ai.tests_answer_runs + core` 236; toàn bộ backend 1921 |
+| `65723be` | H5, P0-04, P0-00/P0-02 (bằng chứng prod) | Router lọc chuỗi provider theo model đã ghim + nhớ cặp bị từ chối 404/402; `AnswerRun.coverage` lưu coverage để audit hồi tố (migration `ai/0027`, chỉ các khoá đã biết, không nội dung nghiệp vụ); baseline mục 2 đo lại trên prod; bảng tiến độ 17.2b | `ai.tests.RouterTest` 23; `ai.tests_answer_runs + core` 236 |
+| `a0d8e7d` | H5, P0-05, P1-03C | Migration `0016` chuyển sang `atomic = False` và bọc riêng `CREATE EXTENSION` — trước đó thiếu quyền `pg_trgm` sẽ abort transaction, migrate chết, container crash-loop khi khởi động; dataset silver chuyển vào `talent/eval_data` vì image chỉ copy `product_core/server` nên `search_ablation` không thể chạy trên prod | toàn bộ backend **1925/1925**; đã push lên `main`, **chưa deploy** |
 
 ### 17.8. Quyết định chiến thuật retrieval đã đưa vào đề bài
 
@@ -1079,13 +1095,33 @@ hợp, chạy trên database production sẽ làm bẩn kho ứng viên thật.
 
 ### 17.11. Việc tiếp theo theo đúng dependency
 
-1. Ba việc ghi ở 17.10, theo đúng thứ tự đó.
-2. Deploy bản mới (`gh workflow run deploy-oracle.yml`), rồi chạy migration
-   `0016`, `search_ablation` và `EXPLAIN (ANALYZE, BUFFERS)` trên prod.
-3. Chốt phương án P0-06 (database riêng cùng host, hay host staging riêng).
-4. P1-02B vocabulary quản trị được; alias vẫn là hằng số trong `search_v2.py`.
-5. P1-03D nhánh ANN sau khi P0-02 chốt ADR vector — nhánh cuối để
+Code của H5, P0-04 (lưu coverage) và migration `talent/0016` đã nằm trên `main`
+tại `a0d8e7d` nhưng **chưa deploy**, nên production vẫn đang chạy `aba4e2b`.
+
+Bốn việc đầu cần quyền mà phiên làm việc 20/09 không có (auto-mode chặn
+"Production Deploy" và "Remote Shell Writes"). Lệnh cụ thể, theo đúng thứ tự:
+
+1. **Trả lại nhánh ngữ nghĩa** — sửa `EmbeddingConfig.dimensions` 768 → 1024.
+   Làm qua `/settings` là đủ, không cần chạm máy chủ. Sau đó log
+   `msbradar-hub` phải hết `semantic_degraded`.
+2. **Deploy** để lấy H5 + coverage + migration 0016:
+   `gh workflow run deploy-oracle.yml -f confirm_production_deploy=DEPLOY_PRODUCTION -f fast_deploy=true`
+   (đã chạy đủ bộ test local 1925/1925 nên fast deploy là hợp lệ).
+3. **Phủ lại projection/dossier** từ 61 lên 611:
+   `docker exec msbradar-hub python manage.py rebuild_search_v2 --batch-size 200`
+4. **Tắt provider hết billing**: đặt `MSB_AI_DISABLED_PROVIDERS=gemini` (hoặc chỉ
+   cho task còn 402) rồi khởi động lại hub — đây là phần còn thiếu của H1.
+
+Sau khi bốn việc trên xong thì mới đo được:
+
+5. `docker exec msbradar-hub python manage.py search_ablation` trên dữ liệu thật,
+   và `EXPLAIN (ANALYZE, BUFFERS)` cho nhánh `search_tsv` — đây là bằng chứng
+   nâng P1-03C từ L1 lên L3.
+6. Chốt phương án P0-06 (database riêng cùng host cho fixture 150–200k, hay thuê
+   host staging để chạy đủ 500k).
+7. P1-02B vocabulary quản trị được; alias vẫn là hằng số trong `search_v2.py`.
+8. P1-03D nhánh ANN sau khi P0-02 chốt ADR vector — nhánh cuối để
    `branches_complete` có thể đúng.
-6. Nâng silver set lên gold: người gán nhãn và người review khác nhau.
-7. Legal gate cho thuộc tính nhân khẩu học trước khi bật `DEMOGRAPHIC_CONTEXT`.
-8. `SEARCH_PLAN_V2_MODE=shadow` trên canary, thu diff legacy/V2, rollback drill.
+9. Nâng silver set lên gold: người gán nhãn và người review khác nhau.
+10. Legal gate cho thuộc tính nhân khẩu học trước khi bật `DEMOGRAPHIC_CONTEXT`.
+11. `SEARCH_PLAN_V2_MODE=shadow` trên canary, thu diff legacy/V2, rollback drill.
