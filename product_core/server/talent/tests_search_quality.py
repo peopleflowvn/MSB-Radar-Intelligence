@@ -11,6 +11,7 @@ from django.test import SimpleTestCase, TestCase
 from people.models import Person
 
 from .answer import aggregate, engine, retrieve
+from . import vector_index
 from .answer.judge import Judgement
 from .answer.plan import QueryPlan, split_seniority, useful_queries
 from .answer.retrieve import Candidate, Passage, fuse_candidates
@@ -121,6 +122,24 @@ class RankedFtsTest(TestCase):
         # là lý do để một chuyên viên ngân hàng khớp câu tìm Data Analyst.
         self._doc("Nhiễu", "Chuyên viên ngân hàng 5 năm kinh nghiệm")
         self.assertEqual(retrieve._fts_person_ids("ứng viên Data Analyst có kinh nghiệm trên 3 năm", 10), [])
+
+
+    def test_must_tokens_giu_phep_giao(self):
+        both = self._doc("Du", "Data Analyst biet SQL va Python")
+        self._doc("Thieu Python", "Data Analyst chuyen SQL")
+        self._doc("Thieu SQL", "Data Analyst chuyen Python")
+        self.assertEqual(
+            retrieve._fts_person_ids("SQL Python", 10, require_all=True),
+            [both.pk])
+
+
+class VectorContractTest(TestCase):
+    def test_doc_dimension_duoc_do_tu_vector_da_luu(self):
+        person = Person.objects.create(display_name="Vector", is_applicant=True)
+        PersonSearchDocument.objects.create(
+            person=person, fingerprint="v", content="x", content_norm="x",
+            embedding=[0.1, 0.2, 0.3], embedding_model="model-v")
+        self.assertEqual(vector_index._stored_dimension("model-v"), 3)
 
 
 class PreambleTest(SimpleTestCase):

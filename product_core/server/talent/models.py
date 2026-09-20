@@ -6,6 +6,8 @@ sẽ có RBProfile riêng gắn lên cùng một Person. Đó là Nguyên tắc 
 nhiều nghiệp vụ — không sao chép con người sang cơ sở dữ liệu thứ hai.
 """
 from django.conf import settings
+import uuid
+
 from django.db import models
 from django.utils import timezone
 from pgvector.django import VectorField
@@ -459,3 +461,125 @@ class IntelligenceDocumentTombstone(models.Model):
     class Meta:
         ordering = ["deleted_at", "pk"]
         indexes = [models.Index(fields=["deleted_at", "id"])]
+
+
+class SearchProjection(models.Model):
+    """Typed, rebuildable search row for one Person; never a second people DB."""
+
+    person = models.OneToOneField(Person, on_delete=models.CASCADE,
+                                  related_name="typed_search_projection")
+    version = models.PositiveSmallIntegerField(default=1, db_index=True)
+    fingerprint = models.CharField(max_length=64, db_index=True)
+    title_norm = models.CharField(max_length=240, blank=True, default="", db_index=True)
+    company_norm = models.CharField(max_length=240, blank=True, default="", db_index=True)
+    location_norm = models.CharField(max_length=240, blank=True, default="", db_index=True)
+    education_norm = models.CharField(max_length=240, blank=True, default="", db_index=True)
+    skills_norm = models.JSONField(default=list, blank=True)
+    industries_norm = models.JSONField(default=list, blank=True)
+    source_channels = models.JSONField(default=list, blank=True)
+    application_positions = models.JSONField(default=list, blank=True)
+    years_experience = models.FloatField(null=True, blank=True, db_index=True)
+    last_application_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    searchable_text = models.TextField(blank=True, default="")
+    scope = models.JSONField(default=dict, blank=True)
+    built_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["version", "title_norm"]),
+            models.Index(fields=["version", "location_norm"]),
+            models.Index(fields=["version", "years_experience"]),
+        ]
+
+
+class CandidateSetRun(models.Model):
+    """Durable snapshot of retrieval membership and truthful coverage counts."""
+
+    MODE_INTERACTIVE = "interactive"
+    MODE_EXHAUSTIVE = "exhaustive"
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                             on_delete=models.SET_NULL, related_name="candidate_set_runs")
+    mode = models.CharField(max_length=20, default=MODE_INTERACTIVE, db_index=True)
+    state = models.CharField(max_length=20, default="pending", db_index=True)
+    plan = models.JSONField(default=dict)
+    scope_token = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    population = models.PositiveIntegerField(default=0)
+    candidate_total = models.PositiveIntegerField(default=0)
+    scheduled = models.PositiveIntegerField(default=0)
+    judged = models.PositiveIntegerField(default=0)
+    unknown = models.PositiveIntegerField(default=0)
+    not_read = models.PositiveIntegerField(default=0)
+    pending = models.PositiveIntegerField(default=0)
+    failed = models.PositiveIntegerField(default=0)
+    retrieval_degraded = models.BooleanField(default=False)
+    semantic_available = models.BooleanField(default=False)
+    complete = models.BooleanField(default=False)
+    cost_used = models.JSONField(default=dict, blank=True)
+    explain = models.JSONField(default=dict, blank=True)
+    cursor = models.PositiveIntegerField(default=0)
+    cancel_requested = models.BooleanField(default=False)
+    heartbeat_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    error = models.CharField(max_length=500, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class CandidateSetMember(models.Model):
+    run = models.ForeignKey(CandidateSetRun, on_delete=models.CASCADE,
+                            related_name="members")
+    person = models.ForeignKey(Person, on_delete=models.CASCADE,
+                               related_name="candidate_set_memberships")
+    ordinal = models.PositiveIntegerField(db_index=True)
+    provenance = models.JSONField(default=dict, blank=True)
+    structured_score = models.FloatField(null=True, blank=True)
+    lexical_score = models.FloatField(null=True, blank=True)
+    semantic_score = models.FloatField(null=True, blank=True)
+    deterministic_status = models.CharField(max_length=20, blank=True, default="unknown",
+                                            db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["run", "person"],
+                                                name="uq_candidate_set_run_person")]
+        indexes = [models.Index(fields=["run", "ordinal"]),
+                   models.Index(fields=["run", "deterministic_status"])]
+
+
+class BaseDossier(models.Model):
+    """Versioned, source-linked materialization used to build query evidence views."""
+
+    person = models.OneToOneField(Person, on_delete=models.CASCADE,
+                                  related_name="base_dossier")
+    version = models.PositiveSmallIntegerField(default=1, db_index=True)
+    fingerprint = models.CharField(max_length=64, db_index=True)
+    profile = models.JSONField(default=dict, blank=True)
+    applications = models.JSONField(default=list, blank=True)
+    edge = models.JSONField(default=list, blank=True)
+    facts = models.JSONField(default=list, blank=True)
+    sections = models.JSONField(default=list, blank=True)
+    lineage = models.JSONField(default=list, blank=True)
+    status = models.JSONField(default=dict, blank=True)
+    built_at = models.DateTimeField(auto_now=True, db_index=True)
+
+
+class ConstraintJudgementCache(models.Model):
+    """Only complete, scope-bound evidence judgements are reusable."""
+
+    key = models.CharField(max_length=64, unique=True)
+    person = models.ForeignKey(Person, on_delete=models.CASCADE,
+                               related_name="constraint_judgement_cache")
+    dossier_fingerprint = models.CharField(max_length=64, db_index=True)
+    constraint_canonical = models.TextField()
+    scope_token = models.CharField(max_length=64, db_index=True)
+    schema_version = models.PositiveSmallIntegerField(default=1)
+    model = models.CharField(max_length=120, blank=True, default="")
+    prompt_version = models.CharField(max_length=64, blank=True, default="")
+    judgement = models.JSONField(default=dict)
+    complete = models.BooleanField(default=False, db_index=True)
+    token_usage = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["person", "dossier_fingerprint"])]

@@ -348,6 +348,25 @@ class RouterTest(TestCase):
         }).provider_order()
         self.assertEqual(order, ["openai", "gemini"])
 
+    def test_bo_provider_khong_co_billing_khoi_fallback(self):
+        order = self._router({
+            "MSB_AI_PROVIDER_DEFAULT": "deepseek",
+            "MSB_AI_PROVIDER_FALLBACK": "gemini,openai",
+            "MSB_AI_DISABLED_PROVIDERS": "gemini",
+        }).provider_order("talent_answer_compose")
+        self.assertNotIn("gemini", order)
+        self.assertLess(order.index("deepseek"), order.index("openai"))
+
+    def test_disabled_provider_theo_task_khong_anh_huong_embedding(self):
+        env = {
+            "MSB_AI_PROVIDER_DEFAULT": "deepseek",
+            "MSB_AI_PROVIDER_FALLBACK": "gemini",
+            "MSB_AI_DISABLED_PROVIDERS_TALENT_ANSWER_COMPOSE": "gemini",
+        }
+        router = self._router(env)
+        self.assertNotIn("gemini", router.provider_order("talent_answer_compose"))
+        self.assertIn("gemini", router.provider_order("talent_embedding"))
+
     def test_bo_qua_nha_cung_cap_chua_co_khoa(self):
         """Chưa có khoá GreenNode vẫn phát triển được với GPT/Gemini/DeepSeek."""
         router = self._router({"MSB_AI_DEEPSEEK_API_KEY": "k"},

@@ -15349,6 +15349,32 @@ button.chip.active {
   gap: 12px;
 }
 
+.answer-coverage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  align-items: center;
+  margin: 0.75rem 0;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--line, #d9dee8);
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: var(--text-muted, #586174);
+  background: var(--surface-subtle, #f7f8fa);
+}
+
+.answer-coverage.is-partial {
+  border-color: #e7bd64;
+  background: #fff9eb;
+  color: #74510c;
+}
+
+.answer-coverage.is-complete {
+  border-color: #8bc8a5;
+  background: #f0faf4;
+  color: #23643d;
+}
+
 .answer-stage {
   display: inline-flex;
   align-items: center;

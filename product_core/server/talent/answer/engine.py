@@ -568,6 +568,38 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
     # thêm 60 người của truy hồi — production 19/09 đọc 93 hồ sơ, 85 giây, và
     # 40 người ghim (khớp nhầm chữ "senior") chiếm luôn danh sách "gần đúng".
     structured_pins = list(structured_pins or [])
+
+    # Search V2 is introduced as an additive durable shadow first.  In `on`
+    # mode its deterministic CandidateSet contributes recall, while the proven
+    # judge/compose path remains unchanged.  This gives canary rollback without
+    # throwing away the CandidateSet trace needed to explain differences.
+    v2_mode = str(getattr(settings, "SEARCH_PLAN_V2_MODE", "off") or "off").lower()
+    if v2_mode in {"shadow", "on"} and referenced_ids is None:
+        try:
+            from talent.search_v2 import (create_candidate_set, from_legacy_plan,
+                                          process_candidate_set)
+            v2_plan = from_legacy_plan(query_plan)
+            v2_run = create_candidate_set(v2_plan, user=user,
+                                          scope_token=f"user:{getattr(user, 'pk', '')}")
+            v2_run = process_candidate_set(v2_run.pk)
+            v2_ids = list(v2_run.members.order_by("ordinal").values_list(
+                "person_id", flat=True)[:retrieve_stage.POOL])
+            trace["search_v2"] = {
+                "mode": v2_mode, "run_id": str(v2_run.pk),
+                "population": v2_run.population,
+                "candidate_total": v2_run.candidate_total,
+                "judged": v2_run.judged, "unknown": v2_run.unknown,
+                "not_read": v2_run.not_read, "complete": v2_run.complete,
+                "retrieval_degraded": v2_run.retrieval_degraded,
+                "semantic_available": v2_run.semantic_available,
+                "explain": v2_run.explain,
+            }
+            if v2_mode == "on":
+                structured_pins = list(dict.fromkeys(v2_ids + structured_pins))
+        except Exception as exc:                  # shadow/canary must fail open
+            trace["search_v2"] = {"mode": v2_mode, "degraded": True,
+                                  "error": str(exc)[:300]}
+            log.exception("Search V2 %s failed; continuing legacy retrieval", v2_mode)
     if structured_pins:
         trace["structured_pins"] = len(structured_pins)
 
@@ -619,10 +651,12 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         # ② tìm được người mà ③ không đọc nổi ⇒ KHÔNG được kết luận "kho không
         # có ai". Đánh dấu để ⑤ nói đúng chuyện đã xảy ra.
         stats["retrieved"] = len(candidates)
+        stats["candidate_total"] = len(candidates)
         stats["pinned"] = bool(pinned_ids)
         stats["read_failed"] = bool(candidates) and getattr(judgements, "broken", False)
         stats["read_incomplete"] = bool(candidates) and getattr(judgements, "incomplete", False)
         stats["unread"] = max(0, len(candidates) - len(judgements))
+        stats["not_read"] = stats["unread"]
         stats["judge_sent"] = len(unread)
         stats["judge_reused"] = len(candidates) - len(unread)
         stats["deep_read_selection"] = (
@@ -632,6 +666,9 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         if active_plan.shape == "count":
             stats["criteria_unknown"] = sum(any(c["status"] == "UNKNOWN" for c in j.criteria) for j in judgements)
             stats["criteria_contradicted"] = sum(any(c["status"] == "CONTRADICTED" for c in j.criteria) for j in judgements)
+        stats["unknown"] = sum(
+            any(c.get("status") == "UNKNOWN" for c in (j.criteria or []))
+            for j in judgements)
         stats["identified_people"] = [c.name for c in candidates if c.person_id in identified_ids][:8]
         stats["identified_judgements"] = [j.as_dict() for j in judgements if j.person_id in identified_ids][:8]
         if referenced_ids is not None:
@@ -695,6 +732,27 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         trace["widen_skipped"] = "hết ngân sách thời gian"
 
     trace["coverage"] = retrieve_stage.coverage()
+    # One stable contract for API/UI.  CandidateSet size is the search scope;
+    # ``judged`` remains the number actually deep-read by this response.  Never
+    # let a finished deterministic T2 shadow run imply that the LLM read every CV.
+    v2_coverage = trace.get("search_v2") or {}
+    candidate_total = max(int(stats.get("candidate_total") or 0),
+                          int(v2_coverage.get("candidate_total") or 0))
+    judged = min(candidate_total, int(stats.get("judged") or 0))
+    unknown = int(stats.get("unknown") or 0)
+    not_read = max(int(stats.get("not_read") or 0), candidate_total - judged)
+    trace["answer_coverage"] = {
+        "candidate_total": candidate_total,
+        "judged": judged,
+        "unknown": unknown,
+        "not_read": not_read,
+        "complete": bool(candidate_total and not_read == 0 and unknown == 0
+                         and not stats.get("read_failed")
+                         and not stats.get("read_incomplete")),
+        "retrieval_degraded": bool(v2_coverage.get("degraded")
+                                    or v2_coverage.get("retrieval_degraded")
+                                    or trace["coverage"].get("semantic_degraded")),
+    }
     # Chỉ lưu khi ③ thật sự đọc được. Lưu một lượt gãy là đóng đinh câu trả lời
     # sai suốt sáu tiếng.
     if not stats.get("read_failed") and not stats.get("read_incomplete") and stats.get("judged"):

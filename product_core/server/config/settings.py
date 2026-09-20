@@ -323,6 +323,8 @@ TALENT_SCORE_FLOOR = env.float("TALENT_SCORE_FLOOR", default=0.15)
 # Ngân sách dossier cho một lượt rerank AI-native (§18 mục 8 — sẽ thay bằng
 # token-budget động ở GĐ4). Kẹp trong code: pool 10..80, cv_chars 300..3000.
 TALENT_AI_RERANK_POOL = env.int("TALENT_AI_RERANK_POOL", default=60)
+SEARCH_PLAN_V2_MODE = env("SEARCH_PLAN_V2_MODE", default="off")  # off | shadow | on
+SEARCH_V2_T3_TOKEN_LIMIT = env.int("SEARCH_V2_T3_TOKEN_LIMIT", default=500000)
 TALENT_AI_RERANK_CV_CHARS = env.int("TALENT_AI_RERANK_CV_CHARS", default=1500)
 
 # Số chiều YÊU CẦU cho API embedding cần nêu rõ (Gemini output_dimensionality).

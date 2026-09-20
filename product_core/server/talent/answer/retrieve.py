@@ -166,7 +166,7 @@ def _search_tokens(query):
     return tokens or raw
 
 
-def _ranked_fts(queryset, field, query, limit):
+def _ranked_fts(queryset, field, query, limit, *, require_all=False):
     """person_id khớp full-text, XẾP THEO ĐỘ KHỚP.
 
     Bản cũ (`vector_index.fts_filter` + `[:limit]`) không có ORDER BY: trả một
@@ -185,7 +185,10 @@ def _ranked_fts(queryset, field, query, limit):
         # mục và tính to_tsvector trên từng hồ sơ (tới 120k ký tự): đo trên
         # production 3.6–6 s/truy vấn, so với ~0.4–1.6 s theo cách này.
         column = f'"{queryset.model._meta.db_table}"."{field}"'
-        tsquery = " | ".join(tokens)
+        # A mandatory condition must preserve Boolean intersection.  The broad
+        # OR form remains useful for recall queries, but it must never be the
+        # only source for a ``must_have`` condition.
+        tsquery = (" & " if require_all else " | ").join(tokens)
         rows = (queryset.extra(
                     where=[f"to_tsvector('simple', {column}) @@ to_tsquery('simple', %s)"],
                     params=[tsquery],
@@ -201,7 +204,8 @@ def _ranked_fts(queryset, field, query, limit):
         return []
     lexical = Q()
     for term in terms:
-        lexical |= Q(**{f"{field}__icontains": term})
+        clause = Q(**{f"{field}__icontains": term})
+        lexical = (lexical & clause) if require_all else (lexical | clause)
     scores = {}
     for person_id, text in queryset.filter(lexical).values_list("person_id", field):
         score = sum(1 for term in terms if term in (text or ""))
@@ -209,17 +213,18 @@ def _ranked_fts(queryset, field, query, limit):
     return sorted(scores, key=lambda pid: (-scores[pid], pid))[:limit]
 
 
-def _fts_person_ids(query, limit, *, chunks=True):
+def _fts_person_ids(query, limit, *, chunks=True, require_all=False):
     """Full-text trên đoạn CV và projection hồ sơ, xếp theo độ khớp.
 
     Hai danh sách được HỢP bằng RRF chứ không nối đuôi: nối đuôi thì mọi người
     khớp đoạn CV luôn đứng trên mọi người chỉ có projection — tức 462 ứng viên
     không có file CV (chỉ có hồ sơ từ Edge) gần như không bao giờ vào pool.
     """
-    chunks = (_ranked_fts(CVChunk.objects.filter(**VISIBLE), "text_norm", query, limit)
+    chunks = (_ranked_fts(CVChunk.objects.filter(**VISIBLE), "text_norm", query, limit,
+                          require_all=require_all)
               if chunks else [])
     docs = _ranked_fts(PersonSearchDocument.objects.filter(**VISIBLE),
-                       "content_norm", query, limit)
+                       "content_norm", query, limit, require_all=require_all)
     ranked = [ids for ids in (chunks, docs) if ids]
     if not ranked:
         return []
@@ -403,6 +408,15 @@ def retrieve(query_plan, *, pool=None, pinned_ids=(), search_queries=None, cv_ch
         fts = _fts_person_ids(query, PER_QUERY, chunks=cv_chunks)
         if fts:
             ranked_lists.append(fts)
+    # Mandatory conditions get their own AND-preserving lexical branches.
+    # They improve recall of exact intersections while the judge remains the
+    # final hard-condition verifier.
+    if os.getenv("FTS_BOOLEAN_MUST", "1").lower() not in {"0", "false", "off"}:
+        for condition in list(getattr(query_plan, "must_have", None) or []):
+            fts = _fts_person_ids(condition, PER_QUERY, chunks=cv_chunks,
+                                  require_all=True)
+            if fts:
+                ranked_lists.append(fts)
 
     order, hits = _rrf(ranked_lists) if ranked_lists else ([], {})
     top_ids = [person_id for person_id, _score in order[:pool]]
@@ -468,6 +482,9 @@ def retrieve(query_plan, *, pool=None, pinned_ids=(), search_queries=None, cv_ch
 def coverage():
     """Số liệu để trace nói thật về độ phủ chỉ mục, không hứa suông (§8.6)."""
     from django.db.models import F
+    model = vector_index.current_model()
+    configured = vector_index._dimensions()
+    stored = vector_index._stored_dimension(model) if model else None
     return {
         "profiles": PersonSearchDocument.objects.count(),
         "profiles_embedded": PersonSearchDocument.objects.filter(
@@ -475,4 +492,8 @@ def coverage():
         "chunks": CVChunk.objects.count(),
         "chunks_embedded": CVChunk.objects.filter(
             embedding_fingerprint=F("fingerprint")).count(),
+        "embedding_model": model,
+        "dimension_configured": configured,
+        "dimension_stored": stored,
+        "semantic_degraded": bool(model and stored is not None and stored != configured),
     }

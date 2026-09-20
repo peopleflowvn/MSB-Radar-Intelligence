@@ -217,6 +217,10 @@ def build_payload(query_plan, chosen, near_misses, stats, sources):
                      for j in near_misses],
         "da_ra_soat": stats.get("judged", 0),
         "da_tim_thay": stats.get("retrieved", 0),
+        "candidate_total": stats.get("candidate_total", stats.get("retrieved", 0)),
+        "judged": stats.get("judged", 0),
+        "unknown": stats.get("unknown", stats.get("criteria_unknown", 0)),
+        "not_read": stats.get("not_read", stats.get("unread", 0)),
         # Cỡ kho THẬT. Trước đây ⑤ chỉ có `da_ra_soat` (16, 40, 12 tuỳ pool) và
         # viết "đã rà 16 hồ sơ" — người dùng đọc thành "kho chỉ có 16" (ảnh test
         # 04/09, con số nhảy mỗi lượt). Có cả hai số thì mới nói đúng được:
@@ -510,6 +514,15 @@ def fallback_text(query_plan, chosen, stats):
         return (f"Tôi tìm được {stats.get('retrieved', 0)} hồ sơ liên quan tới "
                 f"\"{query_plan.information_need}\" nhưng bước đọc hồ sơ bị lỗi kỹ "
                 "thuật nên chưa kết luận được ai phù hợp. Bạn thử hỏi lại giúp tôi.")
+    if not chosen and (stats.get("unknown", stats.get("criteria_unknown", 0))
+                       or stats.get("not_read", stats.get("unread", 0))):
+        unknown = stats.get("unknown", stats.get("criteria_unknown", 0))
+        not_read = stats.get("not_read", stats.get("unread", 0))
+        return (f"Chưa đủ bằng chứng để kết luận ai thỏa "
+                f"\"{query_plan.information_need}\". Đã đánh giá "
+                f"{stats.get('judged', 0)} hồ sơ; {unknown} hồ sơ còn tiêu chí "
+                f"chưa xác định và {not_read} hồ sơ chưa được đọc sâu. "
+                "Thiếu bằng chứng không có nghĩa là không phù hợp.")
     if not chosen:
         # Câu thống kê không đi qua ②③ nên `chosen` rỗng là BÌNH THƯỜNG — nói
         # "không tìm được ai" ở đây là trả lời sai loại câu hỏi.

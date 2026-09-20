@@ -378,6 +378,52 @@ export interface WorkflowModelItem {
   icon?: string;
 }
 
+export interface AnswerCoverage {
+  candidateTotal: number;
+  judged: number;
+  unknown: number;
+  notRead: number;
+  complete: boolean;
+  degraded: boolean;
+}
+
+/** Normalize both Search V2 and the legacy pass trace into one honest UI contract. */
+export function extractAnswerCoverage<TPerson>(turn: AnswerTurn<TPerson>): AnswerCoverage | null {
+  const trace = turn.trace as any;
+  const source = trace?.answer_coverage || trace?.search_v2 || trace?.pass2 || trace?.pass1;
+  if (!source || typeof source !== "object") return null;
+  const number = (value: unknown) => Math.max(0, Number.isFinite(Number(value)) ? Number(value) : 0);
+  const candidateTotal = number(source.candidate_total ?? source.population ?? source.retrieved);
+  const judged = number(source.judged);
+  const unknown = number(source.unknown ?? source.criteria_unknown);
+  const notRead = number(source.not_read ?? source.unread ?? Math.max(0, candidateTotal - judged));
+  if (!candidateTotal && !judged && !unknown && !notRead) return null;
+  return {
+    candidateTotal,
+    judged,
+    unknown,
+    notRead,
+    complete: Boolean(source.complete ?? (candidateTotal > 0 && notRead === 0 && unknown === 0)),
+    degraded: Boolean(source.degraded || source.retrieval_degraded || source.semantic_degraded),
+  };
+}
+
+function CoverageSummary<TPerson>({ turn }: { turn: AnswerTurn<TPerson> }) {
+  const coverage = extractAnswerCoverage(turn);
+  if (!coverage) return null;
+  const partial = !coverage.complete || coverage.unknown > 0 || coverage.notRead > 0;
+  return (
+    <div className={`answer-coverage ${partial ? "is-partial" : "is-complete"}`}
+         role="status" aria-label="Phạm vi rà soát hồ sơ">
+      <strong>{partial ? "Kết quả theo phạm vi đã đọc" : "Đã hoàn tất phạm vi tìm kiếm"}</strong>
+      <span>Đọc sâu {coverage.judged}/{coverage.candidateTotal} hồ sơ</span>
+      {coverage.unknown > 0 && <span>{coverage.unknown} chưa đủ bằng chứng</span>}
+      {coverage.notRead > 0 && <span>{coverage.notRead} chưa đọc sâu</span>}
+      {coverage.degraded && <span>một nhánh tìm kiếm đang suy giảm</span>}
+    </div>
+  );
+}
+
 export function extractWorkflowModels<TPerson>(turn: AnswerTurn<TPerson>): WorkflowModelItem[] {
   const trace = turn.trace as any;
   if (Array.isArray(trace?.workflow_models) && trace.workflow_models.length > 0) {
@@ -561,6 +607,8 @@ export default function AnswerView<TPerson = AnswerPerson>({
         <FormattedMarkdown content={turn.text} onCitation={openCitation}
                            people={linkablePeople} peopleLinkFrom={personLinkFrom} />
       )}
+
+      <CoverageSummary turn={turn} />
 
       {extraBeforePeople}
 

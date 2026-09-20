@@ -105,6 +105,21 @@ def _dimensions():
 DIMENSIONS = _DEFAULT_DIMENSIONS
 
 
+class VectorDimensionMismatch(RuntimeError):
+    """Query and stored vectors cannot safely participate in the same ANN query."""
+
+
+def _stored_dimension(model):
+    """Observed dimension for the active model, without scanning the index."""
+    for queryset in (PersonSearchDocument.objects, CVChunk.objects):
+        value = (queryset.filter(embedding_model=model)
+                 .exclude(embedding__isnull=True)
+                 .values_list("embedding", flat=True).first())
+        if value is not None:
+            return len(value)
+    return None
+
+
 def _chunks(text):
     clean = " ".join(str(text or "").split())
     for start in range(0, len(clean), max(1, CHUNK_CHARS - CHUNK_OVERLAP)):
@@ -379,6 +394,13 @@ def search(query, *, limit=250):
     vector, model = embed(query, task_type="RETRIEVAL_QUERY")
     if not vector:
         return []
+    configured = _dimensions()
+    stored = _stored_dimension(model)
+    observed = len(vector)
+    if stored is None or observed != stored or observed != configured:
+        raise VectorDimensionMismatch(
+            "semantic_degraded: vector dimension mismatch "
+            f"configured={configured} query={observed} stored={stored} model={model}")
     from pgvector.django import CosineDistance
     # `VISIBLE` là lưới an toàn ở tầng TRUY VẤN, song song với lưới ở tầng lập
     # chỉ mục (`index_person`). Chỉ mục có thể cũ — người vừa bị gộp hoặc vừa bị

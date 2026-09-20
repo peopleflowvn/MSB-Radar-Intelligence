@@ -97,7 +97,50 @@ def _corpus_snapshot():
         snapshot["index"] = retrieve_stage.coverage()
     except Exception:                              # noqa: BLE001
         snapshot["index"] = {}
+    try:
+        from talent.models import BaseDossier, SearchProjection
+        snapshot["search_v2"] = {
+            "projection_rows": SearchProjection.objects.count(),
+            "dossier_rows": BaseDossier.objects.count(),
+            "projection_version": 1, "dossier_version": 1,
+        }
+    except Exception:                              # noqa: BLE001
+        snapshot["search_v2"] = {}
     return snapshot
+
+
+def _operational_snapshot():
+    """Recent cost/provider failures and CandidateSet coverage, without PII."""
+    from datetime import timedelta
+    from django.db.models import Count, Sum
+    from django.utils import timezone
+
+    since = timezone.now() - timedelta(hours=24)
+    result = {"window_hours": 24, "provider": [], "candidate_sets": {}}
+    try:
+        from ai.models import LLMCall
+        result["provider"] = list(
+            LLMCall.objects.filter(created_at__gte=since).values("provider", "task", "ok")
+            .annotate(attempts=Count("id"), prompt_tokens=Sum("prompt_tokens"),
+                      completion_tokens=Sum("completion_tokens"))
+            .order_by("provider", "task", "ok"))
+    except Exception:                              # noqa: BLE001
+        pass
+    try:
+        from talent.models import CandidateSetRun
+        rows = CandidateSetRun.objects.filter(created_at__gte=since)
+        result["candidate_sets"] = {
+            "runs": rows.count(),
+            "population": rows.aggregate(v=Sum("population"))["v"] or 0,
+            "candidates": rows.aggregate(v=Sum("candidate_total"))["v"] or 0,
+            "judged": rows.aggregate(v=Sum("judged"))["v"] or 0,
+            "unknown": rows.aggregate(v=Sum("unknown"))["v"] or 0,
+            "not_read": rows.aggregate(v=Sum("not_read"))["v"] or 0,
+            "degraded_runs": rows.filter(retrieval_degraded=True).count(),
+        }
+    except Exception:                              # noqa: BLE001
+        pass
+    return result
 
 
 def _effective_routes():
@@ -143,4 +186,5 @@ def manifest():
         "prompt_versions": _prompt_versions(),
         "eval_datasets": _eval_dataset_versions(),
         "effective_routes": _effective_routes(),
+        "operations": _operational_snapshot(),
     }

@@ -655,6 +655,21 @@ class ComposeTest(TestCase):
         self.assertEqual(payload["da_tim_thay"], 40)
 
 
+    def test_unknown_va_chua_doc_khong_bi_noi_thanh_khong_phu_hop(self):
+        stats = {"candidate_total": 12, "judged": 4, "unknown": 2,
+                 "not_read": 8, "retrieved": 12}
+        plan_obj = plan_stage.QueryPlan(information_need="SQL va Python")
+        text = compose_stage.fallback_text(plan_obj, [], stats)
+        self.assertIn("2", text)
+        self.assertIn("8", text)
+        self.assertIn("không có nghĩa là không phù hợp", text)
+        payload = compose_stage.build_payload(plan_obj, [], [], stats, [])
+        self.assertEqual(payload["candidate_total"], 12)
+        self.assertEqual(payload["judged"], 4)
+        self.assertEqual(payload["unknown"], 2)
+        self.assertEqual(payload["not_read"], 8)
+
+
 # ------------------------------------------------------- ② + toàn tuyến
 
 class EngineEndToEndTest(TestCase):
@@ -3123,4 +3138,3 @@ class AffirmationContextTest(TestCase):
         # Nhưng không có ngữ cảnh hội thoại thì vẫn là smalltalk bình thường
         self.assertTrue(chat_mod._is_smalltalk("ok"))
         self.assertTrue(chat_mod._is_smalltalk("vâng"))
-

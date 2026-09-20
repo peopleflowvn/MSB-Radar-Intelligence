@@ -7,6 +7,7 @@ from django.db.models.signals import post_save, pre_delete, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 from people.models import Document, Person
+from core.models import SourceRecord
 
 from .models import IntelligenceDocumentTombstone, TalentProfile
 from .semantic_index import index_person
@@ -33,6 +34,11 @@ def _after_commit(person_id):
         # do worker nền `embed_talent_index` bù theo `embedding_fingerprint`.
         from .vector_index import index_person as index_vector_person
         index_vector_person(person_id, with_embeddings=False)
+        # Typed projection and dossier are deterministic and local.  Keep them
+        # in the same post-commit materialization boundary so search never
+        # observes a newer legacy index with a stale V2 projection.
+        from .search_v2 import build_dossier
+        build_dossier(person_id)
     transaction.on_commit(rebuild)
 
 
@@ -46,6 +52,12 @@ def document_index_changed(sender, instance, **kwargs):
     _after_commit(instance.person_id)
     if instance.person.merged_into_id or not instance.person.is_applicant:
         _record_tombstone(instance)
+
+
+@receiver(post_save, sender=SourceRecord)
+def source_record_index_changed(sender, instance, **kwargs):
+    if instance.person_id:
+        _after_commit(instance.person_id)
 
 
 def _record_tombstone(document):

@@ -194,7 +194,17 @@ class Router:
                 # chuỗi — nó là điều kiện tranh giải Best Use of GreenNode.
                 base += [p for p in DEFAULT_ORDER if p not in base]
 
-        return _dedupe(pinned + routed + base)
+        order = _dedupe(pinned + routed + base)
+        # Operational kill switch for providers known to be unusable (for
+        # example billing HTTP 402).  Keeping them in a fallback chain wastes
+        # latency and makes a failed compose look as though it was retried
+        # meaningfully.  Task-specific config wins over the global list.
+        disabled_raw = self.env.get(
+            f"MSB_AI_DISABLED_PROVIDERS_{task.upper()}", "") if task else ""
+        disabled_raw = disabled_raw or self.env.get("MSB_AI_DISABLED_PROVIDERS", "")
+        disabled = {name.strip().lower() for name in disabled_raw.split(",")
+                    if name.strip()}
+        return [name for name in order if name not in disabled]
 
     def _task_route(self, task):
         if not task:
