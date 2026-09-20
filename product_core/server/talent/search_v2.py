@@ -344,7 +344,7 @@ def create_candidate_set(plan: RadarTurnPlan, *, user=None, scope_token=""):
         candidate_total=total, not_read=total, pending=total, explain=explain,
         semantic_available=semantic_available,
         retrieval_degraded=bool(model and not semantic_available),
-        complete=not explain["unresolved"])
+        complete=(total == 0 and not explain["unresolved"]))
     batch = []
     for ordinal, person_id in enumerate(
             queryset.values_list("person_id", flat=True).iterator(chunk_size=2000), 1):
@@ -426,10 +426,11 @@ def enforce_cost_guard(estimate, *, token_limit, confirmed=False):
             "allowed": True}
 
 
-def process_candidate_set(run_id, *, batch_size=500):
-    """Resumable T2 processor. T3 may later consume only remaining UNKNOWN rows."""
+def process_candidate_set(run_id, *, batch_size=500, max_batches=None):
+    """Resumable T2 processor; ``max_batches`` bounds online/API work."""
     from django.utils import timezone
 
+    batches = 0
     while True:
         run = CandidateSetRun.objects.get(pk=run_id)
         if run.cancel_requested:
@@ -459,3 +460,6 @@ def process_candidate_set(run_id, *, batch_size=500):
         run.pending = max(0, run.candidate_total - run.cursor)
         run.heartbeat_at = timezone.now()
         run.save(update_fields=["cursor", "state", "pending", "heartbeat_at", "updated_at"])
+        batches += 1
+        if max_batches is not None and batches >= max(1, int(max_batches)):
+            return run

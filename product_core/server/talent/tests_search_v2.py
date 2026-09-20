@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-from django.test import TestCase
+import json
+
+from django.contrib.auth.models import User
+from django.test import TestCase, override_settings
+
+from accounts import roles
 
 from people.models import Document, Person
 
@@ -10,6 +15,7 @@ from .search_v2 import (Constraint, RadarTurnPlan, build_dossier,
                         create_candidate_set, deterministic_group, evidence_view,
                         enforce_cost_guard, estimate_judgement_cost, rank_rows,
                         process_candidate_set, split_sections)
+from .answer.engine import _set_answer_coverage
 
 
 class PlanCompilerTest(TestCase):
@@ -50,6 +56,23 @@ class PlanCompilerTest(TestCase):
         self.assertEqual(finished.judged, 75)
         self.assertEqual(finished.not_read, 0)
         self.assertTrue(finished.complete)
+
+
+class AnswerCoverageContractTest(TestCase):
+    def test_sql_aggregate_is_complete_without_claiming_deep_read(self):
+        trace = {}
+        value = _set_answer_coverage(trace, {"judged": 0}, candidate_total=120,
+                                     method="sql_aggregate", complete=True)
+        self.assertEqual(value["evaluated"], 120)
+        self.assertEqual(value["judged"], 0)
+        self.assertEqual(value["not_read"], 0)
+        self.assertTrue(value["complete"])
+
+    def test_partial_deep_read_keeps_unread_visible(self):
+        value = _set_answer_coverage({}, {"judged": 55, "unknown": 3},
+                                     candidate_total=120)
+        self.assertEqual(value["not_read"], 65)
+        self.assertFalse(value["complete"])
 
 
 class DossierEvidenceTest(TestCase):
@@ -115,3 +138,68 @@ class JudgementContractTest(TestCase):
             enforce_cost_guard(estimate, token_limit=1_000_000)
         allowed = enforce_cost_guard(estimate, token_limit=1_000_000, confirmed=True)
         self.assertTrue(allowed["allowed"])
+
+
+class CandidateSetApiTest(TestCase):
+    def setUp(self):
+        roles.ensure_groups()
+        self.user = User.objects.create_user("search-owner", password="x")
+        self.user.groups.add(self.user.groups.model.objects.get(name=roles.RECRUITER))
+        self.other = User.objects.create_user("search-other", password="x")
+        self.other.groups.add(self.other.groups.model.objects.get(name=roles.RECRUITER))
+        self.client.force_login(self.user)
+        for index in range(2):
+            person = Person.objects.create(display_name=f"API {index}", is_applicant=True)
+            TalentProfile.objects.create(person=person, current_title="Data Analyst")
+            build_projection(person.pk)
+        self.plan = {"domain": "TALENT", "query_type": "list", "must": [
+            {"field": "title", "value": "Data Analyst"}
+        ]}
+
+    def _post(self, path, payload):
+        return self.client.post(path, json.dumps(payload), content_type="application/json")
+
+    def _patch(self, path, payload):
+        return self.client.patch(path, json.dumps(payload), content_type="application/json")
+
+    def test_estimate_is_read_only_and_exact(self):
+        response = self._post("/api/v1/talent/candidate-sets/estimate/",
+                              {"plan": self.plan})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["candidate_total"], 2)
+        self.assertFalse(CandidateSetMember.objects.exists())
+
+    @override_settings(SEARCH_V2_T3_TOKEN_LIMIT=1)
+    def test_create_requires_cost_confirmation_then_returns_progress(self):
+        blocked = self._post("/api/v1/talent/candidate-sets/", {"plan": self.plan})
+        self.assertEqual(blocked.status_code, 409)
+        self.assertTrue(blocked.json()["requires_confirmation"])
+        self.assertFalse(CandidateSetMember.objects.exists())
+
+        created = self._post("/api/v1/talent/candidate-sets/",
+                             {"plan": self.plan, "confirmed": True})
+        self.assertEqual(created.status_code, 201)
+        body = created.json()
+        self.assertEqual(body["candidate_total"], 2)
+        self.assertEqual(body["state"], "running")
+        self.assertEqual(body["cursor"], 2)
+        resumed = self._patch(f"/api/v1/talent/candidate-sets/{body['id']}/",
+                              {"action": "resume"})
+        self.assertEqual(resumed.status_code, 200)
+        self.assertEqual(resumed.json()["state"], "done")
+        self.assertEqual(resumed.json()["judged"], 2)
+        detail = self.client.get(f"/api/v1/talent/candidate-sets/{body['id']}/")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json()["id"], body["id"])
+
+    def test_run_is_owner_scoped_and_cancel_is_idempotent(self):
+        created = self._post("/api/v1/talent/candidate-sets/",
+                             {"plan": self.plan, "confirmed": True})
+        run_id = created.json()["id"]
+        cancelled = self._patch(f"/api/v1/talent/candidate-sets/{run_id}/",
+                                {"action": "cancel"})
+        self.assertEqual(cancelled.status_code, 200)
+        self.assertTrue(cancelled.json()["cancel_requested"])
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get(
+            f"/api/v1/talent/candidate-sets/{run_id}/").status_code, 404)

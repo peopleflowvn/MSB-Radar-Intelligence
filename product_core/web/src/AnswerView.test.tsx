@@ -11,7 +11,9 @@ describe("answer coverage", () => {
       search_v2: { candidate_total: 120, judged: 120, not_read: 0, complete: true },
       pass1: { candidate_total: 60, judged: 55, unknown: 3, not_read: 5 },
     }))).toEqual({
+      method: "deep_read",
       candidateTotal: 120,
+      evaluated: 120,
       judged: 120,
       unknown: 0,
       notRead: 0,
@@ -26,7 +28,17 @@ describe("answer coverage", () => {
       complete: false, retrieval_degraded: true,
     } }))).toMatchObject({
       candidateTotal: 120, judged: 55, unknown: 3, notRead: 65,
-      complete: false, degraded: true,
+      evaluated: 55, method: "deep_read", complete: false, degraded: true,
+    });
+  });
+
+  it("keeps SQL evaluation distinct from AI deep reading", () => {
+    expect(extractAnswerCoverage(turn({ answer_coverage: {
+      method: "sql_aggregate", candidate_total: 900, evaluated: 900,
+      judged: 0, unknown: 0, not_read: 0, complete: true,
+    } }))).toMatchObject({
+      method: "sql_aggregate", candidateTotal: 900, evaluated: 900,
+      judged: 0, notRead: 0, complete: true,
     });
   });
 });

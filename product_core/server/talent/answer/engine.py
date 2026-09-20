@@ -421,6 +421,36 @@ def _preamble(query_plan, question):
 _drain = drain
 
 
+def _set_answer_coverage(trace, stats, *, candidate_total=None, method="deep_read",
+                         complete=None, degraded=False):
+    """Attach one truthful coverage shape to every people-pipeline exit path."""
+    stats = stats or {}
+    total = max(0, int(candidate_total if candidate_total is not None else
+                       stats.get("candidate_total", stats.get("retrieved", 0)) or 0))
+    judged = min(total, max(0, int(stats.get("judged") or 0)))
+    unknown = max(0, int(stats.get("unknown", stats.get("criteria_unknown", 0)) or 0))
+    if method == "sql_aggregate":
+        evaluated, not_read = total, 0
+    elif method == "deterministic_scan":
+        evaluated = min(total, max(0, int(stats.get("coverage_have") or 0)))
+        not_read = max(0, total - evaluated)
+    else:
+        evaluated = judged
+        not_read = max(int(stats.get("not_read", stats.get("unread", 0)) or 0),
+                       total - judged)
+    if complete is None:
+        complete = bool((method == "sql_aggregate" or total == judged)
+                        and not_read == 0 and unknown == 0
+                        and not stats.get("read_failed")
+                        and not stats.get("read_incomplete"))
+    trace["answer_coverage"] = {
+        "method": method, "candidate_total": total, "evaluated": evaluated,
+        "judged": judged, "unknown": unknown, "not_read": not_read,
+        "complete": bool(complete), "retrieval_degraded": bool(degraded),
+    }
+    return trace["answer_coverage"]
+
+
 def _pipeline(question, *, envelope=None, user=None, history=None,
               complete_fn=None, deadline=None, query_plan=None):
     """Generator: `yield` các sự kiện BƯỚC, `return` `(query_plan, chosen, near,
@@ -444,8 +474,10 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
     trace["ms_plan"] = int((time.monotonic() - started) * 1000)
 
     if not query_plan.needs_people:
-        return query_plan, [], [], {"judged": 0, "relevant": 0, "shown": 0,
-                                    "retrieved": 0, "read_failed": False}, trace
+        stats = {"judged": 0, "relevant": 0, "shown": 0,
+                 "retrieved": 0, "read_failed": False}
+        _set_answer_coverage(trace, stats, complete=True, method="not_applicable")
+        return query_plan, [], [], stats, trace
 
     projection = getattr(envelope, "projection", None)
     referenced_ids = resolve_stage.referenced_people(projection, question)
@@ -457,7 +489,9 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
             scope_kind = "explicit_people"
     if referenced_ids == []:
         trace["reference"] = "out_of_range"
-        return query_plan, [], [], {"reference_unknown": True, "judged": 0}, trace
+        stats = {"reference_unknown": True, "judged": 0}
+        _set_answer_coverage(trace, stats, complete=False)
+        return query_plan, [], [], stats, trace
 
     if query_plan.shape == "count" and referenced_ids is not None:
         from dataclasses import replace
@@ -486,6 +520,9 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
             trace["count"] = {"method": "name_index", "exact": True,
                               "matched": name_count["matched"],
                               "scope_total": name_count["scope_total"]}
+            _set_answer_coverage(trace, stats,
+                                 candidate_total=name_count["scope_total"],
+                                 method="sql_aggregate", complete=True)
             return query_plan, [], [], stats, trace
         if not query_plan.must_have and re.fullmatch(
                 r"(?:kho |trong kho |toan kho )?(?:hien tai |hien )?(?:co )?bao nhieu "
@@ -495,6 +532,8 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
             trace["fast_path"] = "count — SQL applicant population"
             trace["count"] = {"method": "sql_population", "exact": True,
                               "matched": stats["total_count"], "scope_total": stats["total_count"]}
+            _set_answer_coverage(trace, stats, candidate_total=stats["total_count"],
+                                 method="sql_aggregate", complete=True)
             return query_plan, [], [], stats, trace
 
     def finish_count(stats):
@@ -536,6 +575,11 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         trace["fast_path"] = f"cực trị toàn kho theo '{_sup_attr}'"
         trace["superlative"] = {"attr": _sup_attr, **{k: stats.get(k) for k in
                                 ("coverage_have", "coverage_total")}}
+        _set_answer_coverage(trace, stats,
+                             candidate_total=stats.get("coverage_total", 0),
+                             method="deterministic_scan",
+                             complete=(stats.get("coverage_have", 0)
+                                       == stats.get("coverage_total", 0)))
         yield _step(f"Đã xét {stats.get('coverage_have', 0)}/"
                     f"{stats.get('coverage_total', 0)} hồ sơ có dữ liệu", "done")
         return query_plan, chosen, [], stats, trace
@@ -711,6 +755,7 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         trace["cache"] = "hit"
         trace["pass1"] = dict(stats)
         finish_count(stats)
+        _set_answer_coverage(trace, stats)
         return query_plan, chosen, near, stats, trace
     trace["cache"] = "miss"
 
@@ -741,18 +786,12 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
     judged = min(candidate_total, int(stats.get("judged") or 0))
     unknown = int(stats.get("unknown") or 0)
     not_read = max(int(stats.get("not_read") or 0), candidate_total - judged)
-    trace["answer_coverage"] = {
-        "candidate_total": candidate_total,
-        "judged": judged,
-        "unknown": unknown,
-        "not_read": not_read,
-        "complete": bool(candidate_total and not_read == 0 and unknown == 0
-                         and not stats.get("read_failed")
-                         and not stats.get("read_incomplete")),
-        "retrieval_degraded": bool(v2_coverage.get("degraded")
-                                    or v2_coverage.get("retrieval_degraded")
-                                    or trace["coverage"].get("semantic_degraded")),
-    }
+    _set_answer_coverage(
+        trace, {**stats, "candidate_total": candidate_total, "judged": judged,
+                "unknown": unknown, "not_read": not_read},
+        degraded=bool(v2_coverage.get("degraded")
+                      or v2_coverage.get("retrieval_degraded")
+                      or trace["coverage"].get("semantic_degraded")))
     # Chỉ lưu khi ③ thật sự đọc được. Lưu một lượt gãy là đóng đinh câu trả lời
     # sai suốt sáu tiếng.
     if not stats.get("read_failed") and not stats.get("read_incomplete") and stats.get("judged"):

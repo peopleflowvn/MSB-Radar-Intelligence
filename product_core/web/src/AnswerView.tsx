@@ -379,7 +379,9 @@ export interface WorkflowModelItem {
 }
 
 export interface AnswerCoverage {
+  method: string;
   candidateTotal: number;
+  evaluated: number;
   judged: number;
   unknown: number;
   notRead: number;
@@ -395,11 +397,15 @@ export function extractAnswerCoverage<TPerson>(turn: AnswerTurn<TPerson>): Answe
   const number = (value: unknown) => Math.max(0, Number.isFinite(Number(value)) ? Number(value) : 0);
   const candidateTotal = number(source.candidate_total ?? source.population ?? source.retrieved);
   const judged = number(source.judged);
+  const method = String(source.method || "deep_read");
+  const evaluated = number(source.evaluated ?? (method === "deep_read" ? judged : candidateTotal));
   const unknown = number(source.unknown ?? source.criteria_unknown);
   const notRead = number(source.not_read ?? source.unread ?? Math.max(0, candidateTotal - judged));
   if (!candidateTotal && !judged && !unknown && !notRead) return null;
   return {
+    method,
     candidateTotal,
+    evaluated,
     judged,
     unknown,
     notRead,
@@ -412,11 +418,16 @@ function CoverageSummary<TPerson>({ turn }: { turn: AnswerTurn<TPerson> }) {
   const coverage = extractAnswerCoverage(turn);
   if (!coverage) return null;
   const partial = !coverage.complete || coverage.unknown > 0 || coverage.notRead > 0;
+  const evaluationLabel = coverage.method === "sql_aggregate"
+    ? `Đã tính bằng SQL ${coverage.evaluated}/${coverage.candidateTotal} hồ sơ`
+    : coverage.method === "deterministic_scan"
+    ? `Đã kiểm tra bằng code ${coverage.evaluated}/${coverage.candidateTotal} hồ sơ`
+    : `Đọc sâu ${coverage.judged}/${coverage.candidateTotal} hồ sơ`;
   return (
     <div className={`answer-coverage ${partial ? "is-partial" : "is-complete"}`}
          role="status" aria-label="Phạm vi rà soát hồ sơ">
       <strong>{partial ? "Kết quả theo phạm vi đã đọc" : "Đã hoàn tất phạm vi tìm kiếm"}</strong>
-      <span>Đọc sâu {coverage.judged}/{coverage.candidateTotal} hồ sơ</span>
+      <span>{evaluationLabel}</span>
       {coverage.unknown > 0 && <span>{coverage.unknown} chưa đủ bằng chứng</span>}
       {coverage.notRead > 0 && <span>{coverage.notRead} chưa đọc sâu</span>}
       {coverage.degraded && <span>một nhánh tìm kiếm đang suy giảm</span>}

@@ -10,6 +10,12 @@ urlpatterns = [
     # Lấy lại kết quả một lượt khi mobile rớt kết nối giữa chừng.
     path("ask/turn/<str:client_turn_id>/", answer_views.talent_ask_turn,
          name="talent-ask-turn"),
+    path("candidate-sets/estimate/", views.candidate_set_estimate,
+         name="talent-candidate-set-estimate"),
+    path("candidate-sets/", views.candidate_set_create,
+         name="talent-candidate-set-create"),
+    path("candidate-sets/<uuid:run_id>/", views.candidate_set_detail,
+         name="talent-candidate-set-detail"),
     path("intelligence/scope/", intelligence_views.intelligence_scope,
          name="intelligence-scope"),
     path("intelligence/scope/validate/", intelligence_views.validate_scope,

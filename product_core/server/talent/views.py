@@ -10,6 +10,7 @@ Mọi lượt ĐỌC ở đây được `accounts.middleware.AccessLogMiddleware
 import csv
 from urllib.parse import quote
 
+from django.conf import settings
 from accounts.permissions import (RequiresAiSettings, RequiresCandidateWork,
                                   RequiresRecruiting, RequiresTalent)
 from accounts import privacy, roles
@@ -31,9 +32,126 @@ from rest_framework.response import Response
 from . import derive as derive_module
 from . import person_qa
 from . import search as search_module
-from .models import EmbeddingConfig, Pool, PoolMembership, Tag, TalentProfile
+from .models import (CandidateSetRun, EmbeddingConfig, Pool, PoolMembership, Tag,
+                     TalentProfile)
 from .serializers import (PersonDetailSerializer, PoolSerializer, TalentCardSerializer,
                           TalentProfileUpdateSerializer, TagSerializer)
+
+
+def _candidate_plan(data, *, exhaustive=True):
+    """Validate the public V2 plan without accepting arbitrary model fields."""
+    from .search_v2 import RadarTurnPlan
+
+    if not isinstance(data, dict):
+        raise ValueError("plan phải là object.")
+    allowed = {"domain", "query_type", "must", "prefer", "exclude",
+               "semantic_concepts", "exhaustive", "version"}
+    unknown = set(data) - allowed
+    if unknown:
+        raise ValueError(f"Trường plan không hỗ trợ: {', '.join(sorted(unknown))}")
+    if sum(len(data.get(key) or []) for key in ("must", "prefer", "exclude")) > 50:
+        raise ValueError("Mỗi plan chỉ được tối đa 50 constraints.")
+    raw = {**data, "exhaustive": exhaustive}
+    plan = RadarTurnPlan.from_dict(raw)
+    if plan.domain != "TALENT":
+        raise ValueError("Endpoint này chỉ nhận plan TALENT.")
+    return plan
+
+
+def _candidate_run_data(run, *, include_plan=False):
+    data = {
+        "id": str(run.pk), "mode": run.mode, "state": run.state,
+        "population": run.population, "candidate_total": run.candidate_total,
+        "scheduled": run.scheduled, "judged": run.judged,
+        "unknown": run.unknown, "not_read": run.not_read,
+        "pending": run.pending, "failed": run.failed,
+        "complete": run.complete, "cancel_requested": run.cancel_requested,
+        "retrieval_degraded": run.retrieval_degraded,
+        "semantic_available": run.semantic_available,
+        "cost_used": run.cost_used, "explain": run.explain,
+        "cursor": run.cursor, "heartbeat_at": run.heartbeat_at,
+        "created_at": run.created_at, "updated_at": run.updated_at,
+    }
+    if include_plan:
+        data["plan"] = run.plan
+    return data
+
+
+@api_view(["POST"])
+@permission_classes([RequiresTalent])
+def candidate_set_estimate(request):
+    """Read-only exact T0 count plus conservative T3 token preflight."""
+    from .search_v2 import (compile_projection_query,
+                            estimate_judgement_cost)
+    try:
+        plan = _candidate_plan(request.data.get("plan", request.data))
+        queryset, explain = compile_projection_query(plan)
+        count = queryset.count()
+    except (TypeError, ValueError) as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+    estimate = estimate_judgement_cost(candidates=count)
+    limit = int(getattr(settings, "SEARCH_V2_T3_TOKEN_LIMIT", 500000))
+    return Response({"population": Person.applicants().count(),
+                     "candidate_total": count, "estimate": estimate,
+                     "token_limit": limit,
+                     "requires_confirmation": bool(limit and estimate["total_tokens"] > limit),
+                     "explain": explain})
+
+
+@api_view(["POST"])
+@permission_classes([RequiresTalent])
+def candidate_set_create(request):
+    """Create an immutable scoped snapshot; process only one bounded T2 batch."""
+    from .search_v2 import (compile_projection_query, create_candidate_set,
+                            enforce_cost_guard, estimate_judgement_cost,
+                            process_candidate_set)
+    try:
+        plan = _candidate_plan(request.data.get("plan", request.data))
+        count = compile_projection_query(plan)[0].count()
+        estimate = estimate_judgement_cost(candidates=count)
+        guard = enforce_cost_guard(
+            estimate,
+            token_limit=getattr(settings, "SEARCH_V2_T3_TOKEN_LIMIT", 500000),
+            confirmed=request.data.get("confirmed") is True)
+    except PermissionError as exc:
+        return Response({"detail": str(exc), "estimate": estimate,
+                         "requires_confirmation": True},
+                        status=status.HTTP_409_CONFLICT)
+    except (TypeError, ValueError) as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+    run = create_candidate_set(plan, user=request.user,
+                               scope_token=f"talent-user:{request.user.pk}")
+    run.cost_used = {"estimate": guard, "actual_tokens": 0}
+    run.save(update_fields=["cost_used", "updated_at"])
+    run = process_candidate_set(run.pk, batch_size=500, max_batches=1)
+    return Response(_candidate_run_data(run, include_plan=True),
+                    status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET", "PATCH"])
+@permission_classes([RequiresTalent])
+def candidate_set_detail(request, run_id):
+    """Owner-scoped progress, cancel and bounded resume endpoint."""
+    from .search_v2 import process_candidate_set
+
+    run = get_object_or_404(CandidateSetRun, pk=run_id, user=request.user)
+    if request.method == "PATCH":
+        action = str(request.data.get("action") or "").lower()
+        if action == "cancel":
+            run.cancel_requested = True
+            run.save(update_fields=["cancel_requested", "updated_at"])
+        elif action == "resume":
+            if run.complete:
+                return Response({"detail": "Run đã hoàn tất."},
+                                status=status.HTTP_409_CONFLICT)
+            run.cancel_requested = False
+            run.save(update_fields=["cancel_requested", "updated_at"])
+            run = process_candidate_set(run.pk, batch_size=500, max_batches=1)
+        else:
+            return Response({"detail": "action phải là cancel hoặc resume."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        run.refresh_from_db()
+    return Response(_candidate_run_data(run, include_plan=True))
 
 
 def _search_kwargs(params):

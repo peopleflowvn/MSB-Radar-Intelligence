@@ -598,3 +598,149 @@ Một lượt phải chứng minh được bằng trace máy đọc được:
 8. Chi phí token của lượt và có chạm trần hay không.
 9. Câu trả lời cuối nói đúng coverage và trạng thái degraded.
 10. Người dùng — không phải Radar — quyết định cuối cùng.
+
+---
+
+## 17. Implementation ledger — hiện trạng bàn giao 20/09/2026
+
+> Phần này chỉ ghi nhận kết quả thực thi; **không thay thế hoặc hạ thấp đề bài,
+> acceptance, scale check và release gate ở các mục 1–16**. `IMPLEMENTED` bên
+> dưới có nghĩa là code đã tồn tại và có test local; chỉ được ghi
+> `PRODUCTION ACCEPTED` khi toàn bộ acceptance tương ứng đã có bằng chứng.
+
+### 17.1. Release đã thực hiện
+
+- Commit: `aba4e2bff7318ea27e0ca6a68eaa644e2de6e35d` trên `main`, đã khớp
+  `origin/main`.
+- GitHub Actions: `Deploy MSB Radar Platform to Oracle` run `35490274865`, đúng
+  `headSha` trên; job `validate` và `deploy-production` đều thành công.
+- Bước `Verify exact release and live production` thành công; public health trả
+  HTTP 200 với `{"ok": true, "service": "msb-radar-hub"}`.
+- Search V2 đã được deploy dưới dạng code/schema additive. Cấu hình
+  `SEARCH_PLAN_V2_MODE` mặc định vẫn là `off`; chưa được coi là đã canary hoặc
+  đã thay đường tìm kiếm production hiện hành.
+
+### 17.2. Quy ước trạng thái
+
+| Trạng thái | Nghĩa |
+|---|---|
+| `IMPLEMENTED + LOCAL VERIFIED` | Đã có code/migration/test, chưa đủ acceptance ngoài local |
+| `PARTIAL` | Đã có foundation hoặc một phần đường chạy, còn delta quan trọng |
+| `NOT STARTED` | Chưa có implementation tương ứng trong release này |
+| `EXTERNAL GATE` | Cần dữ liệu, hạ tầng, phê duyệt hoặc thời gian quan sát ngoài local |
+| `PRODUCTION ACCEPTED` | Đã đạt đầy đủ acceptance và release gate của ticket |
+
+### 17.3. Kết quả theo ticket
+
+| Ticket | Hiện trạng | Đã làm gì | Còn thiếu để đóng ticket |
+|---|---|---|---|
+| SEARCH-H1 | `IMPLEMENTED + LOCAL VERIFIED`; production observation còn mở | `ai/router.py` hỗ trợ `MSB_AI_DISABLED_PROVIDERS` toàn cục và theo task; có test provider bị loại khỏi routing | Cấu hình danh sách provider theo billing thật và quan sát production 24 giờ, chứng minh không còn HTTP 402 |
+| SEARCH-H2 | `IMPLEMENTED + LOCAL VERIFIED`; production contract còn mở | `talent/vector_index.py` kiểm tra config/query/stored dimension, ném `VectorDimensionMismatch`, fail closed và ghi `semantic_degraded` | Xác minh trực tiếp dimension cột/index/vector trên PostgreSQL production và ADR lưu trữ cuối cùng |
+| SEARCH-H3 | `IMPLEMENTED + LOCAL VERIFIED` | `talent/answer/retrieve.py` có nhánh `FTS_BOOLEAN_MUST` dùng phép giao cho must; có regression test | Chạy case 12/12 trên dữ liệu thật và `EXPLAIN (ANALYZE, BUFFERS)` chứng minh dùng GIN ở quy mô mục tiêu |
+| SEARCH-H4 | `IMPLEMENTED + LOCAL VERIFIED`; production observation còn mở | Coverage có `candidate_total/judged/unknown/not_read`; compose fallback không gọi phần chưa đọc là không phù hợp; UI hiển thị phạm vi đã đọc | Theo dõi câu trả lời thật, audit silent partial/unsupported claim và chốt tỷ lệ unknown |
+| SEARCH-P0-00 | `PARTIAL` | `ai/baseline.py` bổ sung số projection/dossier, provider/token 24 giờ và CandidateSet coverage | Manifest hai revision, corpus fingerprint đầy đủ, SLO/cost ADR được duyệt và tách benchmark/user traffic |
+| SEARCH-P0-05 | `NOT STARTED / EXTERNAL GATE` | Chỉ có unit/regression fixtures kỹ thuật | Gold ≥60 câu, Person × constraint, evidence span, hard negative, hai người gán nhãn/review, đo agreement |
+| SEARCH-P0-06 | `PARTIAL` | Có command `search_scale_fixture` với xác nhận rõ ràng, dữ liệu seed và benchmark/EXPLAIN trên PostgreSQL | Chạy thật fixture 500k trên staging tương đương production, concurrency/load report và lưu query plans |
+| SEARCH-P0-01 | `PARTIAL / EXTERNAL GATE` | Có provider kill switch và thống kê provider/token | Capacity/billing/quota test thật, fallback drill, circuit behavior và quan sát ≥24 giờ |
+| SEARCH-P0-02 | `PARTIAL` | Dimension contract fail-closed; CandidateSet trace ghi model/configured/stored dimension; migration thêm index PostgreSQL | ADR HNSW/halfvec/filtered ANN, dung lượng 5–10 triệu vector và benchmark production-like |
+| SEARCH-P0-03 | `PARTIAL` | `BaseDossier` giữ section/full text/offset; `evidence_view` báo available/selected sections và chars, không còn cắt mù 700 ký tự | Đo corpus thật theo constraint/section/source và so sánh baseline cũ; xác nhận late-CV recall trên gold |
+| SEARCH-P0-04 | `PARTIAL` | Backend sinh `answer_coverage` cho nhánh thường, cache, count SQL, superlative, reference rỗng và non-people; phân biệt `sql_aggregate`, `deterministic_scan` với `deep_read`; frontend hiện đúng evaluated/deep-read/unknown/not-read/degraded; có unit test | Đưa schema vào OpenAPI/contract chính thức, kiểm tra các nhánh chat/attachment ngoài people pipeline và production acceptance |
+| SEARCH-P1-00 | `PARTIAL` | Có `RadarTurnPlan`, `Constraint`, domain/query type, must/prefer/exclude, range/temporal/geo và bridge từ legacy plan | Planner V2 đa miền thật, schema validation ở API, clarification flow và Boolean AST lồng nhau |
+| SEARCH-P1-01 | `PARTIAL` | Có `SearchProjection`, canonical fields, searchable text, JSON arrays, indexes cơ bản và PostgreSQL GIN migration | Vocabulary/ID canonical quản trị được, field tsvector materialized/setweight, scope/RBAC SQL predicate và production query plans |
+| SEARCH-P1-02 | `PARTIAL` | Compiler đẩy must/exclude/range xuống QuerySet; alias Anh–Việt và địa danh nền; không quét toàn kho trong Python | AND/OR/NOT tree đầy đủ, phrase/field boost, adaptive expansion, prefer scoring và field-aware FTS production path |
+| SEARCH-P1-03 | `PARTIAL` | `CandidateSetRun/Member` bền, lưu toàn bộ ID bằng iterator/bulk batch, provenance, ordinal/keyset cursor và truthful counts; test >60 | Union structured + FTS + ANN trong DB, count từng nhánh, dedupe/provenance đầy đủ, RBAC SQL và snapshot/reconciliation semantics |
+| SEARCH-P1-04 | `PARTIAL` | `BaseDossier` chứa profile, application metadata, toàn bộ Edge payload, CV sections, source offsets, lineage, fingerprint; signals rebuild sau commit | ExtractedFact/current-rejected rules, conflict ledger, mọi application dưới dạng từng record, version switch và reconciliation |
+| SEARCH-P1-05 | `PARTIAL` | EvidenceView chọn section theo constraint, ưu tiên đa dạng và dùng explicit character budget tới 24k; test dữ kiện cuối CV >700 ký tự | Multi-round fetch theo yêu cầu model, semantic selection trong Person, per-constraint completeness và token packing benchmark |
+| SEARCH-P1-06 | `PARTIAL` | Có deterministic `supported/unknown`, group contract và cache chỉ nhận supported/contradicted có evidence ID | Constraint judgement schema được dùng bởi Answer Engine live, deterministic verdict cho mọi field đáng tin cậy, conflict/inference validation |
+| SEARCH-P1-07 | `PARTIAL` | Cache key gắn dossier fingerprint/constraint/scope/model/prompt/schema; có token estimate và confirmation cost guard | Nối cache vào T3 live, cache hit metrics, invalidation/rebuild, quota theo user/task/provider và chi phí tiền thật |
+| SEARCH-P1-08 | `PARTIAL` | Có stable grouping/ranking theo group, confidence và person ID; demographic fields không bị hard-code thành score | Preference scoring từ constraint người dùng, explain từng tiêu chí, aggregate/reduce hoàn chỉnh và gold ranking evaluation |
+| SEARCH-P1-09 | `PARTIAL` | Compose hiện có coverage truth và source presentation; Answer UI có coverage panel | Compose trực tiếp từ verdict/evidence ID V2, source-offset citations và verifier chặn mọi factual claim không có evidence |
+| SEARCH-P1-10 | `PARTIAL` | Signals materialize dossier/projection sau thay đổi Person/Profile/Document/SourceRecord; có resumable rebuild command | Outbox/dead-letter, Fact/Application events đầy đủ, incremental embedding, periodic reconciliation, stale ≤5 phút và benchmark 500k |
+| SEARCH-P1-11 | `PARTIAL` | CandidateSet có state/cursor/heartbeat/cancel flag; processor T2 resume theo batch; command resume; cost preflight; API owner-scoped estimate/create/status/cancel/resume chỉ xử lý một batch mỗi request | Worker queue T3 thật, bounded parallel LLM, retry/jitter/circuit breaker, idempotency sau restart và test 10k unknown candidates |
+| SEARCH-P1-12 | `PARTIAL` | Model có interactive/exhaustive mode; API estimate/create/status/cancel/resume có confirmation khi vượt token limit; UI Answer không che giấu partial coverage | Background transition theo deadline, estimate-confirm/progress/export UI, reconnect và load test 30 users |
+| SEARCH-P1-13 | `NOT STARTED / EXTERNAL GATE` | Chưa thay đổi pipeline RB trong release này | Discovery denominator RB, DNC/RBAC, rebuild dossiers, embeddings, index/reconciliation, benchmark và canary |
+| SEARCH-P2-01..06 | `NOT STARTED` | Chưa kéo vào release này | Thực hiện sau khi correctness/release gates P0/P1 đạt như mục 12 |
+
+### 17.4. Các thành phần code đã thêm hoặc thay đổi
+
+- `product_core/server/talent/search_v2.py`: contract plan/constraint, compiler,
+  projection/dossier builder, EvidenceView, CandidateSet, judgement cache,
+  grouping/ranking, cost guard và resumable T2 processor.
+- `product_core/server/talent/models.py` và migrations `0013`–`0015`:
+  `SearchProjection`, `CandidateSetRun`, `CandidateSetMember`, `BaseDossier`,
+  `ConstraintJudgementCache` và PostgreSQL GIN indexes.
+- `product_core/server/talent/signals.py`: materialize projection/dossier sau
+  thay đổi dữ liệu liên quan.
+- `product_core/server/talent/answer/engine.py`: feature mode
+  `off|shadow|on`, durable shadow CandidateSet và normalized answer coverage.
+- `product_core/server/talent/answer/retrieve.py`: Boolean must FTS.
+- `product_core/server/talent/vector_index.py`: dimension contract fail-closed.
+- `product_core/server/talent/answer/compose.py`: coverage-safe payload/fallback.
+- `product_core/server/ai/router.py`: provider kill switch.
+- `product_core/server/ai/baseline.py`: Search V2/provider/coverage telemetry.
+- Management commands: `rebuild_search_v2`, `process_candidate_set`,
+  `search_scale_fixture`.
+- Talent API: `POST /candidate-sets/estimate/`, `POST /candidate-sets/` và
+  `GET|PATCH /candidate-sets/<run_id>/`; run bị giới hạn theo owner, cost guard
+  chạy trước khi tạo snapshot, `resume` chỉ xử lý một batch để không khóa request.
+- `product_core/web/src/AnswerView.tsx`: coverage UI; không biểu diễn phần chưa
+  đọc là kết quả âm.
+
+### 17.5. Bằng chứng kiểm tra của release
+
+- Backend `ai + talent`: **913/913 tests passed**.
+- Backend tests mục tiêu Search V2/search quality/baseline: **38/38 passed**.
+- Frontend: **141/141 tests passed**.
+- TypeScript typecheck và production build: passed.
+- `makemigrations --check --dry-run`, Django system check và
+  `git diff --check`: passed.
+- Test frontend còn in cảnh báo jsdom `window.scrollTo/navigation` đã tồn tại;
+  command vẫn exit 0 và toàn bộ test đạt. Đây không phải bằng chứng browser E2E.
+
+### 17.6. Việc tiếp theo theo đúng dependency
+
+1. Bật `SEARCH_PLAN_V2_MODE=shadow` trên phạm vi canary và thu diff legacy/V2;
+   chưa bật `on` rộng.
+2. Hoàn thành P0-05 gold set và P0-06 fixture 500k; dùng kết quả để chốt P0-00
+   SLO/cost và P0-02 vector ADR.
+3. Hoàn thiện union structured + field-FTS + ANN và Boolean AST trước khi coi
+   CandidateSet là recall boundary mới.
+4. Nối EvidenceView/cache vào bounded T3 worker, sau đó mới làm exhaustive
+   API/UI và benchmark 10k candidates.
+5. Chỉ mở RB sau discovery/reconciliation/DNC/RBAC; không suy diễn từ 21 chunks.
+6. Thực hiện legal gate cho thuộc tính nhân khẩu học; Radar chỉ phân tích và
+   khuyến nghị có evidence, người dùng giữ quyết định cuối cùng.
+7. Sau mỗi bước: canary, rollback drill, health check, production telemetry và
+   observation window theo release gates mục 14.
+
+### 17.7. Nhật ký increment sau release `aba4e2b` — chưa commit/deploy
+
+**Phạm vi:** tiếp tục P0-04, P1-11 và P1-12; không sửa đề bài/acceptance.
+
+- Chuẩn hóa coverage ở mọi exit path của people pipeline. Exact SQL count báo
+  `evaluated` theo SQL nhưng giữ `judged=0`, vì không được nói AI đã đọc CV;
+  deterministic superlative cũng tách khỏi deep-read.
+- Thêm API estimate/create/status/cancel/resume cho CandidateSet exhaustive.
+  API chỉ cho chủ run xem/thao tác, giới hạn tối đa 50 constraints, chỉ nhận
+  domain Talent và yêu cầu `confirmed=true` khi estimate vượt token limit.
+- T2 qua API chỉ chạy tối đa một batch 500 candidate mỗi request; phần worker
+  nền vẫn là delta của P1-11, không giả vờ đã có durable queue.
+- Sửa lỗi lifecycle: CandidateSet vừa tạo không còn `complete=true` khi vẫn có
+  candidate chưa đi qua cursor. Run chỉ complete ngay khi tập rỗng và compiler
+  không unresolved, hoặc sau khi processor đi hết snapshot.
+- Frontend coverage phân biệt nhãn “Đã tính bằng SQL”, “Đã kiểm tra bằng code”
+  và “Đọc sâu”, tránh trình bày mọi evaluation như một lượt đọc AI.
+
+**Bằng chứng local của increment:**
+
+- Backend Search V2 + search quality: **33/33 passed**.
+- Frontend AnswerView + AiSearch: **22/22 passed**.
+- Regression rộng backend `ai + talent`: **918/918 passed**.
+- Regression rộng frontend: **142/142 passed**; production build passed.
+- TypeScript typecheck, Django system check và migration check: passed.
+- Cảnh báo HTTP 409/404 trong test là case cost guard và owner isolation được
+  kiểm tra có chủ đích.
+
+**Trạng thái bàn giao:** thay đổi của mục 17.7 đang ở worktree, chưa commit,
+chưa push và chưa deploy. Vì vậy mục 17.1 vẫn là release production gần nhất;
+không dùng bằng chứng local ở đây để tuyên bố production accepted.
