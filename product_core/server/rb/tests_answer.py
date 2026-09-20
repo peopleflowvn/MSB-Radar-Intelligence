@@ -1315,3 +1315,35 @@ class StripSensitiveTest(TestCase):
         from .answer.judge import strip_sensitive
         self.assertEqual(strip_sensitive("Đã kết hôn nên cần nhà. Có nhu cầu chi tiêu lớn."),
                          "Đã kết hôn nên cần nhà.")
+
+
+class AbortedEmptyTurnNotPersistedTest(TestCase):
+    """Cùng lỗi đo được ở Talent (xem talent/tests_answer.py) — Growth dùng
+    chung cách chữa: client rớt kết nối trước khi có gì để nói thì không ghi
+    một lượt hội thoại rỗng."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user("rb-persist-user", password="x")
+
+    def test_aborted_va_rong_thi_khong_ghi_hoi_thoai(self):
+        from .answer_views import _persist
+
+        result = engine.AnswerResult(text="", people=[], sources=[],
+                                     trace={"workflow_models": []})
+        _persist(self.user, "thread-1", "turn-1", "", "câu hỏi bất kỳ",
+                 result, aborted=True)
+
+        from ai.models import AssistantMessage
+        self.assertEqual(AssistantMessage.objects.count(), 0)
+
+    def test_khong_aborted_va_rong_van_duoc_ghi(self):
+        from .answer_views import _persist
+
+        result = engine.AnswerResult(text="", people=[], sources=[],
+                                     trace={"workflow_models": []})
+        _persist(self.user, "thread-2", "turn-2", "", "câu hỏi bất kỳ",
+                 result, aborted=False)
+
+        from ai.models import AssistantMessage
+        self.assertEqual(AssistantMessage.objects.filter(role="assistant").count(), 1)

@@ -49,6 +49,11 @@ def _stream_response(iterator):
 def _persist(user, conversation_id, client_turn_id, parent_turn_id, question,
              result, *, aborted=False):
     """Ghi lượt vào hội thoại — câu hỏi tiếp ("so sánh 2 người đầu") mới có chỗ bám."""
+    if aborted and not (result.text or "").strip() and not result.people:
+        # Xem lý do đầy đủ ở `talent/answer_views.py::_persist` — cùng một lỗi
+        # đo được ở Talent, áp cùng cách chữa cho Growth.
+        log.info("rb.ask: lượt bị huỷ giữa chừng, không có nội dung — bỏ, không ghi hội thoại")
+        return
     duration_ms = max(0, int((result.trace or {}).get("ms_total") or 0))
     metadata = {"answer_engine": True, "trace": result.trace,
                 "duration_ms": duration_ms}

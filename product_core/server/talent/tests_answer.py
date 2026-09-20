@@ -3162,3 +3162,48 @@ class AffirmationContextTest(TestCase):
         # Nhưng không có ngữ cảnh hội thoại thì vẫn là smalltalk bình thường
         self.assertTrue(chat_mod._is_smalltalk("ok"))
         self.assertTrue(chat_mod._is_smalltalk("vâng"))
+
+
+class AbortedEmptyTurnNotPersistedTest(TestCase):
+    """Production 19–21/09: 4 lượt client rớt kết nối trước khi có gì để nói bị
+    ghi thành bong bóng chat "(không có nội dung)" — ai mở lại luồng đó sau sẽ
+    thấy như Radar bị lỗi. `_persist` không được lưu một lượt hỏng như vậy."""
+
+    def setUp(self):
+        self.user = User.objects.create_user("persist-user", password="x")
+
+    def test_aborted_va_rong_thi_khong_ghi_hoi_thoai(self):
+        from .answer_views import _persist
+
+        result = engine.AnswerResult(text="", people=[], trace={"workflow_models": []})
+        _persist(self.user, "thread-1", "turn-1", "", "câu hỏi bất kỳ",
+                 result, aborted=True)
+
+        from ai.models import AssistantMessage
+        self.assertEqual(AssistantMessage.objects.count(), 0)
+
+    def test_aborted_nhung_da_co_nguoi_van_duoc_ghi(self):
+        """Huỷ giữa chừng SAU khi đã tìm được người thì vẫn phải lưu — dở dang
+        khác hẳn với rỗng hoàn toàn."""
+        from .answer_views import _persist
+
+        result = engine.AnswerResult(
+            text="Đã tìm được một phần...", people=[{"person_id": 1, "name": "A", "why": ""}],
+            trace={"workflow_models": []})
+        _persist(self.user, "thread-2", "turn-2", "", "câu hỏi bất kỳ",
+                 result, aborted=True)
+
+        from ai.models import AssistantMessage
+        self.assertEqual(AssistantMessage.objects.filter(role="assistant").count(), 1)
+
+    def test_khong_aborted_va_rong_van_duoc_ghi(self):
+        """Rỗng nhưng KHÔNG phải do client rớt (luồng chạy xong mà không có gì
+        để nói) vẫn phải lưu — im lặng bỏ chỗ này là mất lịch sử thật."""
+        from .answer_views import _persist
+
+        result = engine.AnswerResult(text="", people=[], trace={"workflow_models": []})
+        _persist(self.user, "thread-3", "turn-3", "", "câu hỏi bất kỳ",
+                 result, aborted=False)
+
+        from ai.models import AssistantMessage
+        self.assertEqual(AssistantMessage.objects.filter(role="assistant").count(), 1)

@@ -45,6 +45,15 @@ def _stream_response(iterator):
 def _persist(user, conversation_id, client_turn_id, parent_turn_id, question,
              result, *, aborted=False, attachments=None):
     """Ghi lượt vào hội thoại — câu hỏi tiếp mới có ngữ cảnh để bám vào."""
+    if aborted and not (result.text or "").strip() and not result.people:
+        # Client rớt kết nối (đóng tab/tải lại trang) TRƯỚC KHI có gì để nói —
+        # không lưu một lượt hội thoại rỗng. Đo trên production 19–21/09: 4 lượt
+        # đúng kiểu này, luôn `duration_ms=0`, và nếu ai mở lại đúng luồng đó sẽ
+        # thấy một bong bóng chat "(không có nội dung)" — rất dễ bị hiểu nhầm là
+        # Radar bị lỗi khi đang demo. Người dùng gõ lại câu hỏi sẽ tạo
+        # `client_turn_id` mới và có lượt riêng, không phụ thuộc vào bản ghi này.
+        log.info("ask: lượt bị huỷ giữa chừng, không có nội dung — bỏ, không ghi hội thoại")
+        return
     duration_ms = max(0, int((result.trace or {}).get("ms_total") or 0))
     metadata = {"answer_engine": True, "trace": result.trace,
                 "duration_ms": duration_ms}
