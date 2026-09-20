@@ -871,10 +871,10 @@ khi mọi ticket của nó ở L4.
 | H4 unknown ≠ not matched | **L2** | audit câu trả lời thật, chốt ngưỡng unknown |
 | H5 fallback không mang model hub khác | **L2** | đã deploy (run 35497650837); đối chiếu 404 về 0 trong 24 giờ |
 | P0-00 baseline/manifest/ADR | **L3** | manifest hai revision + ADR SLO/cost được duyệt |
-| P0-01 provider capacity | **L2** | H5 + một lần thử lại khi embedding bị 429 đã deploy; mã lý do `embedding_rate_limited` tách riêng để đếm được. Còn: quota/billing thật, fallback drill, quan sát 24h |
-| P0-02 dimension + ADR vector | **L3** | chiều đã pin 1024 và xác minh; còn ADR halfvec/HNSW/filtered ANN + dung lượng ở 500k |
+| P0-01 provider capacity | **L3** | H5 đã deploy và **0 lỗi 404 sau bản vá** (trước đó 254/48h); hạn mức embedding đã đo trên prod (xem 17.10d). Còn: token bucket dùng chung có ưu tiên online, fallback drill, quan sát 24h |
+| P0-02 dimension + ADR vector | **L3** | chiều đã pin 1024 và xác minh. ADR còn thiếu, và nay có thêm một câu bắt buộc phải trả lời: ở hạn mức embedding đo được, embed lại 500k qua GreenNode là không khả thi — chốt tự host hay đường khác |
 | P0-03 đo truncation | **L1** | đo trên corpus thật theo constraint/section |
-| P0-04 coverage contract | **L2** | `AnswerRun.coverage` đã deploy (`ai/0027`); schema OpenAPI cho ba endpoint CandidateSet đã viết; còn: kiểm nhánh chat/attachment và audit lượt thật sau vài ngày |
+| P0-04 coverage contract | **L2** | `AnswerRun.coverage` + schema OpenAPI đã deploy; lỗi treo claim do chính đợt này gây ra đã sửa và deploy (17.10d). Còn: xác nhận có dòng coverage thật sau vài lượt tìm, kiểm nhánh chat/attachment |
 | P0-05 gold set | **L3** | silver 28 case chạy trên prod hai lần, tìm ra 2 lỗi thật (17.10c). Còn: nâng lên gold ≥60 câu, hai người gán nhãn, và gán nhãn 10 case semantic đang bị bỏ qua |
 | P0-06 scale fixture | **L1** | bị chặn bởi đĩa/RAM host — cần quyết (a) hay (b) ở P0-06 |
 | P1-00 typed plan | **L1** | planner V2 thật sinh `where`, clarification flow |
@@ -989,6 +989,9 @@ ticket xem 17.3, trạng thái slice xem hai bảng ở mục 9.
 | `02415df` | P1-02B, P1-03D | Bảng `SearchVocabulary` + lệnh `search_vocabulary`; nhánh dense ANN pre-filter bằng subquery, `hnsw.iterative_scan` khi tập lớn; ablation phân biệt "không áp dụng" với recall 0 | backend 1933; đã deploy |
 | `db97c42` | P1-02C, P1-03C/D, P0-04 | Alias vào cả tsquery (sửa bỏ sót 14/319 mà ablation tìm ra); `VectorBranchUnavailable` có mã lý do; chọn nhánh theo query type; schema OpenAPI cho CandidateSet | backend 1939; deploy `35499630280`; ablation lần 3 cho FTS 1,000 |
 | `762c94c` | P0-01, P1-03D | Một lần thử lại sau 1,2 giây khi embedding bị 429; tách `embedding_rate_limited` khỏi `embedding_failed` | backend 1939; deploy `35500253243` |
+| `fcee1e4` | P0-05 | Ablation tự giãn nhịp (`--pace-seconds`); sửa các câu "chưa deploy" đã cũ trong ledger | backend 1939; deploy `35510159525` |
+| `a871aa4` | P0-04 | `_coverage_of` đọc được dataclass; đọc coverage tách khỏi `try` của `finish` — sửa lỗi treo claim ở 17.10d | backend 1940; deploy `35510876422` |
+| `2e5b106` | P0-05 | Ablation chỉ gọi embedding một lần mỗi case (trước đó hai lần nên tự chạm hạn mức) | backend 1940; deploy `35511413523` |
 | `65723be` | H5, P0-04, P0-00/P0-02 (bằng chứng prod) | Router lọc chuỗi provider theo model đã ghim + nhớ cặp bị từ chối 404/402; `AnswerRun.coverage` lưu coverage để audit hồi tố (migration `ai/0027`, chỉ các khoá đã biết, không nội dung nghiệp vụ); baseline mục 2 đo lại trên prod; bảng tiến độ 17.2b | `ai.tests.RouterTest` 23; `ai.tests_answer_runs + core` 236 |
 | `a0d8e7d` | H5, P0-05, P1-03C | Migration `0016` chuyển sang `atomic = False` và bọc riêng `CREATE EXTENSION` — trước đó thiếu quyền `pg_trgm` sẽ abort transaction, migrate chết, container crash-loop khi khởi động; dataset silver chuyển vào `talent/eval_data` vì image chỉ copy `product_core/server` nên `search_ablation` không thể chạy trên prod | toàn bộ backend **1925/1925**; đã deploy trong run `35497650837` |
 
@@ -1187,6 +1190,45 @@ thứ tư trong vài giây bị giới hạn tốc độ. Commit `762c94c` thêm
 lại sau 1,2 giây và tách mã lý do `embedding_rate_limited` khỏi
 `embedding_failed`, để dashboard capacity của P0-01 đếm được đúng loại. Chờ
 deploy `35500253243` để đo lại.
+
+### 17.10d. Ba phát hiện nữa từ việc chạy thật trên production
+
+**1. Một lỗi do chính đợt này gây ra: claim không bao giờ được đóng.**
+Commit `65723be` đọc coverage bằng `result.get("trace")`, nhưng `result` là
+`AnswerResult` (dataclass) nên `.get` ném `AttributeError` — và vì nó nằm cùng
+`try` với `run_state.finish()`, **mọi lượt hoàn tất từ deploy đầu tiên đều không
+đóng được claim**: `AnswerRun` treo ở `running` rồi báo `timeout` khi người dùng
+mở lại cùng `client_turn_id`. Câu trả lời vẫn được `persist()` trước đó nên không
+mất dữ liệu. Bằng chứng trên prod: đúng 1 `AnswerRun` sau 07:00 và nó ở trạng
+thái `running`; bảng `coverage` rỗng hoàn toàn.
+
+Sửa trong commit `a871aa4`: `_coverage_of` đọc được cả dataclass
+và dict, và việc đọc coverage **tách khỏi** `try` của `finish`. Bài học đáng ghi
+vào chuẩn ticket: *một dòng telemetry không được phép chặn một chuyển trạng thái*.
+Bộ test cũ chỉ gọi `finish()` trực tiếp với dict nên không thể bắt được lỗi này;
+test hồi quy mới dùng `AnswerResult` thật.
+
+**2. Hạn mức endpoint embedding là một giới hạn thật, đã đo.**
+Probe trên prod: 3 lời gọi liên tiếp đều được, lời gọi thứ 6–7 bị `429` **dù đã
+nghỉ 8 giây**; nhưng một phút sau, 4 lời gọi liên tiếp lại được. Tức GreenNode
+`baai/bge-m3` chặn theo tổng số lời gọi trong một cửa sổ, không phải theo khoảng
+cách giữa hai lời gọi, và nhánh query dùng **chung** hạn mức đó với
+`msbradar-embedding-worker`. Hệ quả cho kế hoạch:
+
+- P0-01 phải có **token bucket dùng chung, ưu tiên online** — không phải thêm
+  số lần thử lại. Một lượt hỏi chỉ cần 1 lời gọi nên vẫn ổn; mọi việc chạy lô
+  thì không.
+- P0-02 phải trả lời: đổi model embedding nghĩa là embed lại toàn kho. Ở hạn mức
+  này, 500.000 hồ sơ là **không khả thi** qua GreenNode. Cấu hình đã có sẵn chế
+  độ tự host (`ollama` + `nomic-embed-text`); ADR vector phải chốt đường nào.
+
+**3. `embedding_rate_limited` trong ablation là lỗi của chính công cụ đo.**
+`ablation()` gọi `vector_branch` lại cho từng cấu hình nên mỗi case tốn **hai**
+lời gọi embedding; tới case thứ tư là chạm hạn mức. Giãn nhịp 2 giây rồi 6 giây
+đều không cứu được, vì nguyên nhân là *số* lời gọi chứ không phải khoảng cách.
+Nay mỗi nhánh chạy một lần cho cả lượt rồi dùng lại. Đây là lý do con số vector
+0,71 ở 17.10c **chưa phải số thật của nhánh** — phải đo lại sau deploy
+`35511413523`.
 
 ### 17.11. Việc tiếp theo theo đúng dependency
 
