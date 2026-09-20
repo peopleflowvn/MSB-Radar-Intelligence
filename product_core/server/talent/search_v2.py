@@ -688,6 +688,8 @@ def vector_branch(base_queryset, plan: RadarTurnPlan, *, limit, population=None)
         return None, {"ran": False, "reason": "dimension_mismatch",
                       "error": str(exc)[:200]}
     except vector_index.VectorBranchUnavailable as exc:
+        # `embedding_rate_limited` là tín hiệu capacity cho P0-01, không phải
+        # "kho không có vector". Giữ nguyên mã lý do để dashboard đếm được.
         return None, {"ran": False, "reason": str(exc)[:60]}
     except Exception as exc:                       # noqa: BLE001 - provider/mạng
         return None, {"ran": False, "reason": "error", "error": str(exc)[:200]}

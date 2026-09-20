@@ -109,6 +109,11 @@ class VectorDimensionMismatch(RuntimeError):
     """Query and stored vectors cannot safely participate in the same ANN query."""
 
 
+#: Chờ giữa hai lần gọi embedding khi bị 429. Đủ để vượt cửa sổ giới hạn tốc độ
+#: của GreenNode mà không làm người dùng cảm thấy treo.
+QUERY_EMBED_RETRY_DELAY = 1.2
+
+
 class VectorBranchUnavailable(RuntimeError):
     """Nhánh vector không chạy được, và lý do phải nói ra bằng tên riêng.
 
@@ -408,12 +413,21 @@ def search_scored(query, *, limit=250, person_queryset=None, iterative=False):
     if not has_vectors_for(current_model()):
         raise VectorBranchUnavailable("no_vectors_for_model")
     vector, model = embed(query, task_type="RETRIEVAL_QUERY")
+    if not vector and LAST_EMBED_ERROR == "rate_limited":
+        # Bị giới hạn tốc độ thì đợi một nhịp rồi thử LẠI MỘT LẦN: ablation trên
+        # prod 20/09 mất cả nhánh vector của một lượt chỉ vì lời gọi thứ tư
+        # trong vài giây bị 429. Một lần thử lại rẻ hơn hẳn việc mất nhánh; hai
+        # lần thì bắt đầu ăn vào ngân sách thời gian của lượt hỏi.
+        time.sleep(QUERY_EMBED_RETRY_DELAY)
+        vector, model = embed(query, task_type="RETRIEVAL_QUERY")
     if not vector:
         # Gọi embedding hỏng (hết hạn mức, mạng, provider) KHÁC với "trong phạm
         # vi không ai có vector". Gộp hai thứ vào một `[]` làm báo cáo ablation
         # nói sai: production 20/09 ghi `no_vectors_in_scope` cho một lượt thực
         # ra là lỗi gọi embedding.
-        raise VectorBranchUnavailable("embedding_failed")
+        raise VectorBranchUnavailable(
+            "embedding_rate_limited" if LAST_EMBED_ERROR == "rate_limited"
+            else "embedding_failed")
     configured = _dimensions()
     stored = _stored_dimension(model)
     observed = len(vector)
