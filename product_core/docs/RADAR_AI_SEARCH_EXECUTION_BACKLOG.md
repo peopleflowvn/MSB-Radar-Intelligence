@@ -1506,3 +1506,34 @@ AnswerRun cũ quá deadline còn `running` đã được chuẩn hóa thành `ti
 87% xuống 82%, còn khoảng 8,9 GB. Hai image TalentFlow `main` và `develop` đều
 đang có container sử dụng nên được giữ lại; không xóa volume/database/image đang
 chạy. Đây là đường demo ổn định, chưa biến partial deep-read thành exhaustive.
+
+### 17.13. Nối CandidateSet V2 vào xếp hạng deep-read
+
+Audit `ai_llmcall` sau deploy `6ca01e9` cho thấy hai lượt production cuối đều
+chạy sạch: mỗi lượt có một plan Qwen, hai batch judge GLM và một compose GLM;
+không có failed attempt. Hai failed attempt từng thấy là dữ liệu của lượt cũ
+trước khi đổi route judge, nên không đổi planner theo suy đoán và không tạo thêm
+rủi ro capacity.
+
+CandidateSet V2 nay được nối vào đường Answer Engine như **một nguồn xếp hạng
+RRF**, không phải danh sách ghim cứng:
+
+- thứ tự `CandidateSetMember.ordinal` là một ranked source có trọng số ngang
+  nguồn local;
+- hồ sơ xuất hiện ở nhiều nguồn được tăng hạng theo branch agreement;
+- hồ sơ chỉ có ở đường legacy vẫn được giữ, nên rollout không làm mất recall;
+- CandidateSet `blocked`, `retrieval_degraded`, thiếu member hoặc chưa chạy đủ
+  branch bắt buộc sẽ không được dùng và đường legacy tiếp tục fail-open;
+- trace tách `used_for_recall` và `used_for_ranking` để audit đúng vai trò.
+
+Việc này thay thế hành vi tạm thời chỉ dùng CandidateSet khi có hard filter.
+Nó chưa tuyên bố semantic recall đã đạt chuẩn: gold P0-05 vẫn là gate bắt buộc,
+và deep-read vẫn chỉ đọc pool có trần rồi báo coverage partial trung thực.
+
+**Bằng chứng local:** test mới chứng minh candidate chỉ có ở legacy không bị
+xóa và candidate được cả V2 + legacy đồng thuận được xếp trước; 270/270 test
+liên quan qua. Full `ai + talent` ban đầu lộ một test router còn kỳ vọng judge
+Qwen dù production/default đã chuyển GLM; test được sửa sang tác vụ
+`candidate_extraction` (vẫn có primary Qwen) để tiếp tục kiểm đúng cơ chế hạ
+model. Chạy lại full suite: **978/978 pass**. Trạng thái deploy/probe production
+sẽ được bổ sung ngay sau workflow exact-SHA.

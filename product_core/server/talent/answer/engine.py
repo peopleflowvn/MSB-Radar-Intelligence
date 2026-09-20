@@ -109,11 +109,12 @@ def _collect_workflow_models(trace, default_provider="", default_model=""):
 #: đoạn CV) là nguồn chính; truy hồi local phủ cả 462 ứng viên KHÔNG có file
 #: CV mà V2 không lập chỉ mục; khớp cấu trúc là tín hiệu phụ — nó chỉ biết
 #: "có trường khớp chữ", không biết mức liên quan.
-SOURCE_WEIGHTS = {"v2": 1.0, "local": 1.0, "structured": 0.6}
+SOURCE_WEIGHTS = {"v2": 1.0, "candidate_set": 1.0,
+                  "local": 1.0, "structured": 0.6}
 
 
 def _retrieve_all(active_plan, *, user, envelope, pool, pinned_ids, structured_ids,
-                  queries, pinned_only):
+                  candidate_set_ids, queries, pinned_only):
     """② — mọi nguồn truy hồi, hợp nhất thành MỘT pool có trần `pool`.
 
     Chạy V2 ở luồng phụ song song với truy hồi local (V2 chỉ gọi HTTP; ORM
@@ -145,10 +146,16 @@ def _retrieve_all(active_plan, *, user, envelope, pool, pinned_ids, structured_i
     structured = (retrieve_stage.retrieve(active_plan, pinned_ids=structured_ids,
                                           search_queries=[], pool=len(structured_ids))
                   if structured_ids else [])
+    candidate_set = (retrieve_stage.retrieve(
+        active_plan, pinned_ids=candidate_set_ids, search_queries=[],
+        pool=len(candidate_set_ids)) if candidate_set_ids else [])
     # Giữ đúng thứ tự xếp hạng của khớp cấu trúc (retrieve đặt người ghim theo
     # thứ tự được đưa vào).
     rank = {pid: i for i, pid in enumerate(structured_ids)}
     structured.sort(key=lambda c: rank.get(c.person_id, len(rank)))
+    candidate_rank = {pid: i for i, pid in enumerate(candidate_set_ids)}
+    candidate_set.sort(key=lambda c: candidate_rank.get(c.person_id,
+                                                        len(candidate_rank)))
 
     engine = "product-core"
     sources = []
@@ -166,6 +173,8 @@ def _retrieve_all(active_plan, *, user, envelope, pool, pinned_ids, structured_i
         finally:
             executor.shutdown(wait=False)
     sources.append((local, SOURCE_WEIGHTS["local"]))
+    if candidate_set:
+        sources.append((candidate_set, SOURCE_WEIGHTS["candidate_set"]))
     if structured:
         sources.append((structured, SOURCE_WEIGHTS["structured"]))
     return (retrieve_stage.fuse_candidates(sources, pool=pool, pinned_ids=pinned_ids),
@@ -619,6 +628,7 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
     # judge/compose path remains unchanged.  This gives canary rollback without
     # throwing away the CandidateSet trace needed to explain differences.
     v2_mode = str(getattr(settings, "SEARCH_PLAN_V2_MODE", "off") or "off").lower()
+    candidate_set_ids = []
     if v2_mode in {"shadow", "on"} and referenced_ids is None:
         try:
             from talent.search_v2 import (create_candidate_set, from_legacy_plan,
@@ -640,15 +650,17 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
                 "semantic_available": v2_run.semantic_available,
                 "explain": v2_run.explain,
             }
-            # Chỉ dùng CandidateSet làm nguồn recall khi nó thực sự đã lọc bằng
-            # điều kiện cứng. Plan chỉ có ràng buộc semantic cho ra tập bằng cả
-            # kho, và `[:POOL]` của tập đó chỉ là 60 person_id nhỏ nhất — ghim
-            # chúng vào lượt đọc sâu là lấy chỗ của người khớp thật.
-            usable = bool(v2_run.explain.get("hard_filters_applied")
-                          and v2_run.state != "blocked")
+            # Chỉ dùng một snapshot đã chạy đủ branch và không degraded. Thứ tự
+            # member của semantic-only plan nay đến từ union FTS/vector thật;
+            # đưa nó vào RRF như một nguồn xếp hạng, không ghim cứng lên đầu.
+            completeness = v2_run.explain.get("completeness") or {}
+            usable = bool(v2_ids and v2_run.state != "blocked"
+                          and not v2_run.retrieval_degraded
+                          and completeness.get("branches_complete"))
             trace["search_v2"]["used_for_recall"] = bool(v2_mode == "on" and usable)
+            trace["search_v2"]["used_for_ranking"] = bool(v2_mode == "on" and usable)
             if v2_mode == "on" and usable:
-                structured_pins = list(dict.fromkeys(v2_ids + structured_pins))
+                candidate_set_ids = v2_ids
         except Exception as exc:                  # shadow/canary must fail open
             trace["search_v2"] = {"mode": v2_mode, "degraded": True,
                                   "error": str(exc)[:300]}
@@ -680,6 +692,7 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         candidates, retrieval_engine = _retrieve_all(
             active_plan, user=user, envelope=envelope, pool=pool,
             pinned_ids=pinned_ids, structured_ids=[] if pinned_only else structured_pins,
+            candidate_set_ids=[] if pinned_only else candidate_set_ids,
             queries=queries, pinned_only=pinned_only)
         if active_plan.shape == "count":
             from people.models import Person

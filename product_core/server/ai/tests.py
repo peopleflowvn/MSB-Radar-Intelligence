@@ -429,7 +429,9 @@ class RouterTest(TestCase):
                         "MSB_AI_GREENNODE_MODEL": "qwen/qwen3.6-flash",
                         "MSB_AI_PROVIDER_DEFAULT": "greennode"},
                    transport=transport)
-        result = r.complete(MESSAGES, task="talent_answer_judge", budget_seconds=20)
+        # candidate_extraction still has qwen3.7-plus as its measured primary.
+        # Talent judge intentionally moved to GLM for production demo capacity.
+        result = r.complete(MESSAGES, task="candidate_extraction", budget_seconds=20)
         # Thu model chinh truoc, roi moi ha xuong model ke tiep trong benchmark.
         self.assertEqual(calls[0], "qwen/qwen3.7-plus")
         self.assertEqual(result.model, "qwen/qwen3.6-flash")

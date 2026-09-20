@@ -51,6 +51,30 @@ def _many_candidates(count):
     return rows
 
 
+class CandidateSetRankingBridgeTest(SimpleTestCase):
+    def test_candidate_set_is_a_ranked_source_not_a_hard_pin(self):
+        """CandidateSet V2 may improve rank but must not erase legacy recall."""
+        one = retrieve_stage.Candidate(1, "legacy-only", 1.0, 1, [])
+        two_local = retrieve_stage.Candidate(2, "both", 1.0, 1, [])
+        two_v2 = retrieve_stage.Candidate(2, "both", 1.0, 1, [])
+        three = retrieve_stage.Candidate(3, "v2-only", 1.0, 1, [])
+
+        def fake_retrieve(_plan, *, pinned_ids=(), search_queries=None, **_kwargs):
+            if list(pinned_ids) == [3, 2] and search_queries == []:
+                return [three, two_v2]
+            return [one, two_local]
+
+        with mock.patch("talent.answer.engine.retrieve_stage.retrieve",
+                        side_effect=fake_retrieve):
+            rows, engine_name = engine._retrieve_all(
+                SimpleNamespace(), user=None, envelope=SimpleNamespace(thread=None),
+                pool=3, pinned_ids=[], structured_ids=[], candidate_set_ids=[3, 2],
+                queries=["java"], pinned_only=False)
+
+        self.assertEqual([row.person_id for row in rows], [2, 1, 3])
+        self.assertEqual(engine_name, "product-core")
+
+
 def _reader(seen):
     """`complete_fn` giả đọc trọn lô: ghi lại cỡ mỗi lô đã thực sự gửi đi."""
     def _call(messages, task="", **kwargs):
