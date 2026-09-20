@@ -5,7 +5,7 @@
 một nhánh không thêm Person nào mà chỉ thêm độ trễ và tiền, ablation sẽ nói ra.
 
     python manage.py search_ablation
-    python manage.py search_ablation --dataset evaluation/datasets/search_silver_v1.jsonl
+    python manage.py search_ablation --dataset talent/eval_data/search_silver_v1.jsonl
     python manage.py search_ablation --out docs/benchmark/search_ablation_<ngày>.json
 
 Bộ `search_silver_v1.jsonl` là **silver**, không phải gold: các case
@@ -24,17 +24,26 @@ from django.core.management.base import BaseCommand, CommandError
 from talent.search_v2 import (ABLATION_CONFIGS, RadarTurnPlan, ablation,
                               compile_projection_query)
 
-DEFAULT_DATASET = "evaluation/datasets/search_silver_v1.jsonl"
+DEFAULT_DATASET = "talent/eval_data/search_silver_v1.jsonl"
 
 
 def _dataset_path(value):
+    """Tìm dataset trong image trước, rồi mới tới gốc repo.
+
+    Image của Hub chỉ copy `product_core/server`, nên dataset phải nằm trong đó
+    mới chạy được trên production — đường dẫn gốc repo chỉ còn là tiện lợi khi
+    làm việc trên máy.
+    """
     path = Path(value)
-    if not path.is_absolute():
-        # BASE_DIR là `product_core/server`; dataset nằm ở gốc repo.
-        path = Path(settings.BASE_DIR).parent.parent / value
-    if not path.is_file():
-        raise CommandError(f"Không thấy dataset: {path}")
-    return path
+    if path.is_absolute():
+        if not path.is_file():
+            raise CommandError(f"Không thấy dataset: {path}")
+        return path
+    base = Path(settings.BASE_DIR)
+    for candidate in (base / value, base.parent.parent / value, Path.cwd() / value):
+        if candidate.is_file():
+            return candidate
+    raise CommandError(f"Không thấy dataset {value} trong {base} hoặc gốc repo.")
 
 
 def load_cases(path):

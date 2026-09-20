@@ -887,7 +887,7 @@ khi mọi ticket của nó ở L4.
 | SEARCH-H3 | `IMPLEMENTED + LOCAL VERIFIED` | `talent/answer/retrieve.py` có nhánh `FTS_BOOLEAN_MUST` dùng phép giao cho must; có regression test | Chạy case 12/12 trên dữ liệu thật và `EXPLAIN (ANALYZE, BUFFERS)` chứng minh dùng GIN ở quy mô mục tiêu |
 | SEARCH-H4 | `IMPLEMENTED + LOCAL VERIFIED`; production observation còn mở | Coverage có `candidate_total/judged/unknown/not_read`; compose fallback không gọi phần chưa đọc là không phù hợp; UI hiển thị phạm vi đã đọc | Theo dõi câu trả lời thật, audit silent partial/unsupported claim và chốt tỷ lệ unknown |
 | SEARCH-P0-00 | `PARTIAL` | `ai/baseline.py` bổ sung số projection/dossier, provider/token 24 giờ và CandidateSet coverage | Manifest hai revision, corpus fingerprint đầy đủ, SLO/cost ADR được duyệt và tách benchmark/user traffic |
-| SEARCH-P0-05 | `PARTIAL / EXTERNAL GATE` | Bộ **silver** `evaluation/datasets/search_silver_v1.jsonl` 23 case: 14 case deterministic có truth suy được bằng SQL nên chấm được ngay, 9 case semantic mang `status=needs_review`; lệnh `search_ablation` chấm và **bỏ qua** case chưa gán nhãn, in rõ số bị bỏ qua | Nâng lên gold ≥60 câu: nhãn Person × constraint, evidence span, hard negative, hai người gán nhãn/review, đo agreement, chốt ngưỡng `unknown` |
+| SEARCH-P0-05 | `PARTIAL / EXTERNAL GATE` | Bộ **silver** `product_core/server/talent/eval_data/search_silver_v1.jsonl` 23 case: 14 case deterministic có truth suy được bằng SQL nên chấm được ngay, 9 case semantic mang `status=needs_review`; lệnh `search_ablation` chấm và **bỏ qua** case chưa gán nhãn, in rõ số bị bỏ qua | Nâng lên gold ≥60 câu: nhãn Person × constraint, evidence span, hard negative, hai người gán nhãn/review, đo agreement, chốt ngưỡng `unknown` |
 | SEARCH-P0-06 | `PARTIAL` | Có command `search_scale_fixture` với xác nhận rõ ràng, dữ liệu seed và benchmark/EXPLAIN trên PostgreSQL | Chạy thật fixture 500k trên staging tương đương production, concurrency/load report và lưu query plans |
 | SEARCH-P0-01 | `PARTIAL / EXTERNAL GATE` | Có provider kill switch và thống kê provider/token | Capacity/billing/quota test thật, fallback drill, circuit behavior và quan sát ≥24 giờ |
 | SEARCH-P0-02 | `PARTIAL` | Dimension contract fail-closed; CandidateSet trace ghi model/configured/stored dimension; migration thêm index PostgreSQL | ADR HNSW/halfvec/filtered ANN, dung lượng 5–10 triệu vector và benchmark production-like |
@@ -1026,7 +1026,7 @@ Thêm mới:
   được (`vendor_unsupported`, `no_indexable_token`, `top_n_capped`);
   `union_branches` dedupe theo Person, giữ rank/score/provenance từng nhánh.
 - **Silver set và ablation (P0-05 tạm).**
-  `evaluation/datasets/search_silver_v1.jsonl` 23 case; lệnh
+  `product_core/server/talent/eval_data/search_silver_v1.jsonl` 23 case; lệnh
   `python manage.py search_ablation` chấm recall theo ba cấu hình
   (`structured`, `field_fts`, `structured+field_fts`), đếm unique hit từng nhánh,
   và bỏ qua case semantic chưa gán nhãn kèm cảnh báo "recall semantic chưa được đo".

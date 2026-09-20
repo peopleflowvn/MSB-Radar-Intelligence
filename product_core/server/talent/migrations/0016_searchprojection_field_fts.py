@@ -40,10 +40,17 @@ def create(apps, schema_editor):
                            f"tsvector GENERATED ALWAYS AS ({TSV_EXPRESSION}) STORED")
         cursor.execute("CREATE INDEX IF NOT EXISTS talent_searchprojection_tsv_gin "
                        "ON talent_searchprojection USING GIN (search_tsv)")
+    # Extension nằm ngoài giao dịch của các câu trên: `CREATE EXTENSION` thiếu
+    # quyền sẽ làm abort cả transaction, và nếu migration này atomic thì mọi câu
+    # sau đó cũng lỗi → container crash-loop lúc khởi động. Vì vậy Migration này
+    # đặt `atomic = False` và phần trigram được bọc riêng.
+    with connection.cursor() as cursor:
         try:
             cursor.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
-        except Exception:                          # noqa: BLE001 - thiếu quyền
+        except Exception as exc:                   # noqa: BLE001 - thiếu quyền
+            print(f"0016: bỏ qua chỉ mục trigram, không tạo được pg_trgm: {exc}")
             return
+    with connection.cursor() as cursor:
         for column in TRIGRAM_COLUMNS:
             cursor.execute(
                 f"CREATE INDEX IF NOT EXISTS talent_searchprojection_{column}_trgm "
@@ -62,5 +69,6 @@ def drop(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
     dependencies = [("talent", "0015_searchprojection_postgres_indexes")]
     operations = [migrations.RunPython(create, drop)]
