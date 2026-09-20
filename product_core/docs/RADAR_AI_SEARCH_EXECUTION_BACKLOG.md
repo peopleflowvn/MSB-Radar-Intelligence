@@ -871,7 +871,7 @@ khi mọi ticket của nó ở L4.
 | H4 unknown ≠ not matched | **L2** | audit câu trả lời thật, chốt ngưỡng unknown |
 | H5 fallback không mang model hub khác | **L2** | đã deploy (run 35497650837); đối chiếu 404 về 0 trong 24 giờ |
 | P0-00 baseline/manifest/ADR | **L3** | manifest hai revision + ADR SLO/cost được duyệt |
-| P0-01 provider capacity | **L3** | 0 lỗi 404 sau H5; hạn mức embedding và chat đã đo trên prod; token bucket theo provider đã deploy; nguyên nhân thật là **một khoá GreenNode** (17.10f). Còn: đặt `MSB_AI_RATE_PER_MINUTE_GREENNODE` và hiệu chỉnh, thêm khoá, fallback drill, quan sát 24h |
+| P0-01 provider capacity | **L3** | chuỗi model dự phòng theo tác vụ đã deploy (17.10i); 0 lỗi 404 sau H5; hạn mức embedding và chat đã đo trên prod; token bucket theo provider đã deploy; nguyên nhân thật là **một khoá GreenNode** (17.10f). Còn: đặt `MSB_AI_RATE_PER_MINUTE_GREENNODE` và hiệu chỉnh, thêm khoá, fallback drill, quan sát 24h |
 | P0-02 dimension + ADR vector | **L3** | chiều đã pin 1024 và xác minh. ADR còn thiếu, và nay có thêm một câu bắt buộc phải trả lời: ở hạn mức embedding đo được, embed lại 500k qua GreenNode là không khả thi — chốt tự host hay đường khác |
 | P0-03 đo truncation | **L1** | đo trên corpus thật theo constraint/section |
 | P0-04 coverage contract | **L2** | `AnswerRun.coverage` + schema OpenAPI đã deploy; lỗi treo claim do chính đợt này gây ra đã sửa và deploy (17.10d). Còn: xác nhận có dòng coverage thật sau vài lượt tìm, kiểm nhánh chat/attachment |
@@ -1354,6 +1354,46 @@ nặng nhất. Ba đường: (a) chuyển judge sang `glm-5.2-hackathon` (còn h
 nhưng chậm gấp ~3), (b) giữ qwen và để gáo token xếp hàng (đúng nhưng lượt hỏi
 dài hơn), (c) xin GreenNode nâng hạn mức cho qwen. Chất lượng judge đã được chốt
 bằng benchmark 19/09 nên không tự đổi model mà không có người quyết.
+
+### 17.10i. Shadow đã chạy trên production, và chuỗi model dự phòng
+
+**Shadow sống.** Sau deploy `35516067601`, hub đọc `SEARCH_PLAN_V2_MODE=shadow`
+và một lượt tìm thật đã tạo `CandidateSetRun` đầu tiên trên production:
+
+| Thuộc tính | Giá trị |
+|---|---|
+| `candidate_total` | 505 (trên 611 ứng viên) |
+| nhánh đã chạy | `field_fts` ✔, `vector` ✔, `structured` ✗ (`no_hard_filter` — plan legacy không có filter cứng) |
+| `strategy` | `hybrid` |
+| `retrieval_degraded` | `false` |
+| `judged` | 0 — đúng: còn ràng buộc semantic nên mọi member là `unknown`, shadow không đọc sâu |
+
+Đây là lần đầu CandidateSet hybrid chạy trên dữ liệu thật, và nó **không đổi kết
+quả trả về** cho người dùng.
+
+**Chuỗi model dự phòng (theo yêu cầu người dùng: chỉ đổi khi lỗi).** Trước đây
+hết hạn mức là mất cả chặng đọc sâu, vì chuỗi dự phòng chỉ đổi *provider* chứ
+không đổi *model* — mà hạn mức lại tính theo model. Nay `ai/tasks.py` khai chuỗi
+model theo thứ tự chất lượng lấy từ benchmark 19/09:
+
+| Tác vụ | Chính | Kế tiếp |
+|---|---|---|
+| `talent_answer_judge`, `rb_answer_judge` | `qwen3.7-plus` | `qwen3.6-flash` → `glm-5.2-hackathon` |
+| `talent_answer_plan`, `rb_prospect_search` | `qwen3.7-plus` | `qwen3.6-flash` → `glm-5.2-hackathon` |
+| `talent_answer_compose` | `deepseek-v4-pro` | `glm-5.2-hackathon` → `deepseek-v4-flash` |
+| `cv_ocr`, `talent_embedding` | — | **rỗng**: đổi năng lực là hỏng lặng |
+
+Ba luật: model chính được thử trên mọi provider **trước**; người gọi ghim model
+thì không tự đổi; và model chính lỗi cấu hình (402/404) vẫn nổ ngay như cũ —
+chỉ model **dự phòng** bị từ chối mới thử tiếp cái sau.
+
+**Hai lần deploy hỏng ở tầng Docker, không phải code.** Deploy `35514898531` hỏng
+khi pull `python:3.11-slim` (containerd ingest), `35516067601` hỏng khi khởi động
+`msbradar-intelligence-indexer` ("No such container"). Cả hai lần production vẫn
+khoẻ (health 200) vì container cũ chỉ bị thay sau khi image mới dựng xong. Nguyên
+nhân gần như chắc là **đĩa chật**: 87% đầy, build cache 2,7 GB. Đã dọn build cache
+và image mồ côi (679 MB) và dựng lại indexer bằng tay. Đĩa là một rủi ro vận hành
+thật, cần theo dõi.
 
 ### 17.11. Việc tiếp theo theo đúng dependency
 
