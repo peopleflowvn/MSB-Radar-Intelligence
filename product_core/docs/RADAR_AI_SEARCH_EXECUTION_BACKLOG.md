@@ -1563,3 +1563,74 @@ Kết luận của increment: bridge ranking chạy thật và fail-open đúng,
 vẫn là interactive partial deep-read (16 hồ sơ), chưa đóng gold recall hay
 exhaustive gate. Hai câu hẹp không có nguồn là kết quả “không đủ bằng chứng”,
 không phải provider/retrieval crash.
+
+## 18. Đường găng Demo Readiness — Tuyển dụng và Khách hàng
+
+Mục tiêu ngắn hạn không phải đóng dàn đều toàn bộ backlog mà là tạo hai đường
+demo vàng độc lập, ổn định và có bằng chứng: **Tuyển dụng** và **Khách hàng**.
+Các ticket dưới đây được ưu tiên trước exhaustive/scale/P2, nhưng không hạ các
+contract về quyền, coverage, evidence hoặc fact/inference đã chốt ở trên.
+
+### 18.1. Thứ tự thực hiện bắt buộc
+
+| Ưu tiên | Ticket | Kết quả phải có | Acceptance cho demo |
+|---:|---|---|---|
+| 1 | `DEMO-00` — Domain router | Phân luồng `RECRUITMENT/CUSTOMER/AMBIGUOUS` bằng luật chắc chắn trước, AI chỉ xử lý phần còn mơ hồ; không fallback chéo kho | 10 câu tuyển dụng + 10 câu khách hàng phân đúng; 5 câu mơ hồ hỏi lại ngắn; trace có domain, lý do, confidence |
+| 2 | `DEMO-01` — RB data readiness | Xác định denominator/quyền; Customer projection, dossier, chunk, embedding, structured/FTS/vector branch và reconciliation | Không demo RB khi còn trạng thái 26 chunk/0 vector; số nguồn → projection → dossier → index đối soát được; 5–10 câu RB thật có kết quả và nguồn |
+| 3 | `DEMO-02` — Talent latency | Trả tiến trình ngay, CandidateSet và chuẩn bị dossier song song; deep-read lượt đầu 8–12 hồ sơ ưu tiên, cho phép “đọc thêm”; cache theo fingerprint + constraint ổn định | first progress <1 giây; preliminary <10 giây nếu UI có pha sơ bộ; deep answer mục tiêu 30–45 giây, hard deadline 60 giây; không tăng worker gây burst 429 |
+| 4 | `DEMO-03` — Golden demo pack | Bộ câu thật có expected Person/Customer, hard negative, evidence, coverage và latency | Tối thiểu 10 câu Talent + 10 câu RB + 5 câu mơ hồ + 5 follow-up; review thủ công trước khi quay |
+| 5 | `DEMO-04` — Domain answer contracts | Hai mẫu trả lời riêng cho tuyển dụng và khách hàng, dùng chung evidence/coverage verifier | Không gọi người chưa đọc là không phù hợp; RB tách fact/inference và chỉ khuyến nghị, người dùng quyết định |
+| 6 | `DEMO-05` — RB Answer Engine | Nối RB vào CandidateSet → EvidenceView → judgement → rank → grounded compose, có fail-open/degraded truth | Câu có đáp án trả khách hàng + nguồn; câu thiếu dữ liệu nói thiếu gì; không bịa giao dịch/nhu cầu/sản phẩm |
+| 7 | `DEMO-06` — Readiness gate | Một lệnh chạy toàn bộ demo pack nhiều vòng và xuất báo cáo | 100% domain đúng; 0 provider error; 0 AnswerRun treo; 0 citation sai; coverage đúng; expected entities đạt gate; health/disk/DB connection đạt |
+
+### 18.2. Contract đường Tuyển dụng
+
+Câu trả lời demo tuyển dụng phải:
+
+- chia nhóm “phù hợp cao”, “tiềm năng” và “chưa đủ bằng chứng”;
+- giải thích theo từng constraint và dẫn nguồn CV/application/Edge;
+- hiển thị riêng tổng CandidateSet và số hồ sơ đã đọc sâu;
+- không biến `not_read` thành “không phù hợp”;
+- với câu không có ai đạt đủ điều kiện, trả kết luận rỗng trung thực và có thể
+  đề nghị nới đúng constraint, không đưa hồ sơ gần đúng như kết luận chắc chắn.
+
+### 18.3. Contract đường Khách hàng
+
+Câu trả lời demo khách hàng phải:
+
+- nêu cơ hội/nhu cầu, sản phẩm hoặc hành động gợi ý, tín hiệu và thời điểm;
+- dẫn nguồn dữ liệu được phép dùng và mức chắc chắn;
+- tách rõ `FACT`, `INFERENCE`, `UNKNOWN`;
+- không suy diễn giao dịch, khả năng tài chính hoặc nhu cầu khi không có bằng
+  chứng;
+- Radar chỉ phân tích và khuyến nghị; người dùng là người quyết định cuối cùng.
+
+### 18.4. Golden demo pack
+
+Talent phải phủ: kỹ năng cụ thể; title + skill + ngành; địa điểm/kinh nghiệm;
+semantic transfer (“xây hệ thống giao dịch quy mô lớn”); so sánh/follow-up; và
+case không có người phù hợp. RB phải phủ: nhu cầu/sản phẩm; tín hiệu giao dịch
+hoặc tương tác gần đây; khách cần chăm sóc lại; so sánh cơ hội; giải thích đề
+xuất; và case không đủ dữ liệu.
+
+Mỗi case bắt buộc lưu:
+
+1. câu hỏi và domain kỳ vọng;
+2. Person/Customer phải xuất hiện và hard negative không được xuất hiện;
+3. evidence span/source kỳ vọng;
+4. coverage/completeness kỳ vọng;
+5. latency budget;
+6. câu trả lời an toàn khi không tìm thấy hoặc provider/branch degraded.
+
+### 18.5. Quyết định tối ưu cho clip demo
+
+Nếu chỉ đủ nguồn lực làm ba việc trước khi quay, thứ tự là:
+
+1. làm RB có dữ liệu thật và vector/reconciliation đầy đủ;
+2. giảm latency Talent xuống dưới hard deadline 60 giây mà không tạo burst 429;
+3. dựng và chạy lặp bộ golden demo có expected result.
+
+Không bật exhaustive UI chỉ để clip trông “đủ”: đường interactive vẫn được
+phép đọc sâu một pool có trần, nhưng UI và câu trả lời phải nói đúng mẫu số,
+số đã đọc và số chưa đọc. Gold P0-05, scale P0-06 và exhaustive P1-11/P1-12
+vẫn là gate release dài hạn sau Demo Readiness.
