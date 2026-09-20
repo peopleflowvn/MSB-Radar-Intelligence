@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
+from types import SimpleNamespace
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
@@ -13,7 +14,7 @@ from .models import (CandidateSetMember, ConstraintJudgementCache,
 from .search_v2 import (Constraint, RadarTurnPlan, build_dossier,
                         build_projection, cache_judgement, compile_projection_query,
                         create_candidate_set, deterministic_group, evidence_view,
-                        enforce_cost_guard, estimate_judgement_cost, rank_rows,
+                        enforce_cost_guard, estimate_judgement_cost, from_legacy_plan, rank_rows,
                         process_candidate_set, split_sections)
 from .answer.engine import _set_answer_coverage
 
@@ -56,6 +57,77 @@ class PlanCompilerTest(TestCase):
         self.assertEqual(finished.judged, 75)
         self.assertEqual(finished.not_read, 0)
         self.assertTrue(finished.complete)
+
+    def test_nested_boolean_ast_preserves_and_or_not(self):
+        data_hn = self._person("Data HN", "Data Analyst", location="Hà Nội")
+        data_hcm = self._person("Data HCM", "Data Analyst", location="Hồ Chí Minh")
+        self._person("Blocked", "Data Analyst", location="Đà Nẵng")
+        self._person("Developer", "Python Developer", location="Hà Nội")
+        plan = RadarTurnPlan(where={"op": "and", "children": [
+            {"field": "title", "value": "Data Analyst"},
+            {"op": "or", "children": [
+                {"field": "location", "value": "Hanoi", "kind": "geo"},
+                {"field": "location", "value": "ho chi minh", "kind": "geo"},
+            ]},
+            {"op": "not", "children": [
+                {"field": "location", "value": "da nang", "kind": "geo"},
+            ]},
+        ]})
+        query, explain = compile_projection_query(plan)
+        self.assertEqual(set(query.values_list("person_id", flat=True)),
+                         {data_hn.pk, data_hcm.pk})
+        self.assertEqual(len(explain["applied"]), 4)
+        self.assertTrue(explain["deterministic_complete"])
+        self.assertEqual(RadarTurnPlan.from_dict(plan.as_dict()).as_dict(), plan.as_dict())
+
+    def test_boolean_ast_rejects_invalid_shape_and_fails_closed_on_unknown_field(self):
+        with self.assertRaises(ValueError):
+            RadarTurnPlan(where={"op": "not", "children": [
+                {"field": "title", "value": "A"},
+                {"field": "title", "value": "B"},
+            ]})
+        self._person("Keep out", "Data Analyst")
+        plan = RadarTurnPlan(where={"field": "unindexed", "value": "anything"})
+        query, explain = compile_projection_query(plan)
+        self.assertFalse(query.exists())
+        self.assertFalse(explain["deterministic_complete"])
+        self.assertEqual(len(explain["unresolved"]), 1)
+
+    def test_semantic_hard_and_preference_do_not_filter_membership(self):
+        first = self._person("First", "Data Analyst")
+        second = self._person("Second", "Python Developer")
+        plan = RadarTurnPlan(
+            must=[Constraint("search_text", "chuyển đổi số tương tự",
+                             classification="HARD_SEMANTIC")],
+            prefer=[Constraint("skills", "Python", classification="PREFERENCE")])
+        query, explain = compile_projection_query(plan)
+        self.assertEqual(set(query.values_list("person_id", flat=True)),
+                         {first.pk, second.pk})
+        self.assertEqual(explain["semantic_requirements"],
+                         [plan.must[0].constraint_id])
+        self.assertEqual(explain["preference_signals"],
+                         [plan.prefer[0].constraint_id])
+        self.assertTrue(explain["retrieval_branches_required"])
+        run = create_candidate_set(plan)
+        self.assertTrue(run.retrieval_degraded)
+        self.assertFalse(run.explain["branches"]["field_fts"]["ran"])
+
+    def test_legacy_free_text_is_semantic_not_exact_contains_filter(self):
+        plan = from_legacy_plan(SimpleNamespace(
+            shape="find_people", must_have=["kinh nghiệm tương đương"],
+            should_have=["ưu tiên ngân hàng"], search_queries=["banking transformation"]))
+        self.assertEqual(plan.must[0].classification, "HARD_SEMANTIC")
+        self.assertEqual(plan.prefer[0].classification, "PREFERENCE")
+        query, explain = compile_projection_query(plan)
+        self.assertEqual(query.count(), SearchProjection.objects.count())
+        self.assertTrue(explain["retrieval_branches_required"])
+
+    def test_boolean_where_rejects_semantic_constraint(self):
+        with self.assertRaises(ValueError):
+            RadarTurnPlan(where={
+                "field": "search_text", "value": "lãnh đạo chuyển đổi",
+                "classification": "HARD_SEMANTIC",
+            })
 
 
 class AnswerCoverageContractTest(TestCase):

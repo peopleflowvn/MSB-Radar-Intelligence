@@ -27,6 +27,10 @@ SCHEMA_VERSION = 1
 ALLOWED_DOMAINS = {"TALENT", "CUSTOMER", "BOTH", "GENERAL", "CLARIFY"}
 ALLOWED_KINDS = {"term", "range", "temporal", "geo"}
 ALLOWED_OPS = {"eq", "contains", "gte", "lte", "between", "before", "after"}
+BOOLEAN_OPS = {"and", "or", "not"}
+CONSTRAINT_CLASSES = {"HARD_DETERMINISTIC", "HARD_SEMANTIC", "PREFERENCE"}
+MAX_BOOLEAN_DEPTH = 8
+MAX_BOOLEAN_LEAVES = 50
 
 
 def _hash(value) -> str:
@@ -55,16 +59,22 @@ class Constraint:
     kind: str = "term"
     op: str = "contains"
     provenance: str = "user"
+    classification: str = "HARD_DETERMINISTIC"
     constraint_id: str = ""
 
     def __post_init__(self):
         if self.kind not in ALLOWED_KINDS or self.op not in ALLOWED_OPS:
             raise ValueError(f"Unsupported constraint {self.kind}/{self.op}")
+        classification = str(self.classification or "").upper()
+        if classification not in CONSTRAINT_CLASSES:
+            raise ValueError(f"Unsupported constraint class {self.classification}")
+        object.__setattr__(self, "classification", classification)
         if not self.field or self.value in (None, "", []):
             raise ValueError("Constraint requires field and value")
         if not self.constraint_id:
             object.__setattr__(self, "constraint_id", _hash(
-                [self.field, self.kind, self.op, self.value])[:16])
+                [self.field, self.kind, self.op, self.value,
+                 self.classification])[:16])
 
     def as_dict(self):
         return asdict(self)
@@ -77,6 +87,7 @@ class RadarTurnPlan:
     must: list[Constraint] = field(default_factory=list)
     prefer: list[Constraint] = field(default_factory=list)
     exclude: list[Constraint] = field(default_factory=list)
+    where: dict | None = None
     semantic_concepts: list[str] = field(default_factory=list)
     exhaustive: bool = False
     version: int = PLAN_VERSION
@@ -87,12 +98,15 @@ class RadarTurnPlan:
             raise ValueError(f"Unsupported domain {self.domain}")
         if self.query_type not in {"list", "count", "aggregate", "compare"}:
             raise ValueError(f"Unsupported query type {self.query_type}")
+        if self.where is not None:
+            self.where = normalize_boolean_ast(self.where)
 
     def as_dict(self):
         result = asdict(self)
         result["must"] = [row.as_dict() for row in self.must]
         result["prefer"] = [row.as_dict() for row in self.prefer]
         result["exclude"] = [row.as_dict() for row in self.exclude]
+        result["where"] = self.where
         return result
 
     @classmethod
@@ -104,14 +118,52 @@ class RadarTurnPlan:
         return cls(**raw)
 
 
+def normalize_boolean_ast(raw, *, _depth=0, _counter=None):
+    """Validate/canonicalize nested AND/OR/NOT without evaluating user code."""
+    if _counter is None:
+        _counter = [0]
+    if _depth > MAX_BOOLEAN_DEPTH:
+        raise ValueError(f"Boolean AST exceeds depth {MAX_BOOLEAN_DEPTH}")
+    if not isinstance(raw, dict):
+        raise ValueError("Boolean AST node must be an object")
+    if set(raw) == {"constraint"}:
+        return normalize_boolean_ast(raw["constraint"], _depth=_depth,
+                                     _counter=_counter)
+    if "field" in raw:
+        allowed = {"field", "value", "kind", "op", "provenance",
+                   "classification", "constraint_id"}
+        unknown = set(raw) - allowed
+        if unknown:
+            raise ValueError(f"Unsupported constraint fields: {sorted(unknown)}")
+        _counter[0] += 1
+        if _counter[0] > MAX_BOOLEAN_LEAVES:
+            raise ValueError(f"Boolean AST exceeds {MAX_BOOLEAN_LEAVES} leaves")
+        constraint = Constraint(**raw)
+        if constraint.classification != "HARD_DETERMINISTIC":
+            raise ValueError("Boolean where only accepts HARD_DETERMINISTIC constraints")
+        return {"constraint": constraint.as_dict()}
+    if set(raw) != {"op", "children"}:
+        raise ValueError("Boolean node requires exactly op and children")
+    op = str(raw.get("op") or "").lower()
+    children = raw.get("children")
+    if op not in BOOLEAN_OPS or not isinstance(children, list) or not children:
+        raise ValueError("Boolean op must be and/or/not with non-empty children")
+    if op == "not" and len(children) != 1:
+        raise ValueError("Boolean NOT requires exactly one child")
+    return {"op": op, "children": [normalize_boolean_ast(
+        child, _depth=_depth + 1, _counter=_counter) for child in children]}
+
+
 def from_legacy_plan(plan):
     """Lossless-enough bridge for shadowing the current Talent planner."""
     shape = getattr(plan, "shape", "find_people")
     query_type = {"count": "count", "compare": "compare",
                   "analyze": "aggregate"}.get(shape, "list")
-    must = [Constraint("search_text", value, provenance="legacy.must_have")
+    must = [Constraint("search_text", value, provenance="legacy.must_have",
+                       classification="HARD_SEMANTIC")
             for value in (getattr(plan, "must_have", None) or [])]
-    prefer = [Constraint("search_text", value, provenance="legacy.should_have")
+    prefer = [Constraint("search_text", value, provenance="legacy.should_have",
+                         classification="PREFERENCE")
               for value in (getattr(plan, "should_have", None) or [])]
     return RadarTurnPlan(domain="TALENT", query_type=query_type, must=must,
                          prefer=prefer,
@@ -157,25 +209,68 @@ def _condition(constraint: Constraint):
     return Q(**{f"{field_name}__{lookup}": value})
 
 
+def _boolean_condition(node, applied, unresolved):
+    if "constraint" in node:
+        constraint = Constraint(**node["constraint"])
+        try:
+            result = _condition(constraint)
+            applied.append(constraint.constraint_id)
+            return result
+        except ValueError:
+            unresolved.append(constraint.constraint_id)
+            # An unresolved hard condition must never widen the result set.
+            return Q(pk__in=[])
+    children = [_boolean_condition(child, applied, unresolved)
+                for child in node["children"]]
+    op = node["op"]
+    if op == "not":
+        return ~children[0]
+    result = children[0]
+    for child in children[1:]:
+        result = result & child if op == "and" else result | child
+    return result
+
+
 def compile_projection_query(plan: RadarTurnPlan):
     """Compile hard AST to a lazy indexed QuerySet plus machine-readable explain."""
     query = SearchProjection.objects.filter(version=SCHEMA_VERSION)
-    applied, unresolved = [], []
+    applied, unresolved, semantic, preferences = [], [], [], []
     for item in plan.must:
+        if item.classification == "HARD_SEMANTIC":
+            semantic.append(item.constraint_id)
+            continue
+        if item.classification == "PREFERENCE":
+            preferences.append(item.constraint_id)
+            continue
         try:
             query = query.filter(_condition(item))
             applied.append(item.constraint_id)
         except ValueError:
             unresolved.append(item.constraint_id)
     for item in plan.exclude:
+        if item.classification == "HARD_SEMANTIC":
+            semantic.append(item.constraint_id)
+            continue
+        if item.classification == "PREFERENCE":
+            preferences.append(item.constraint_id)
+            continue
         try:
             query = query.exclude(_condition(item))
             applied.append(item.constraint_id)
         except ValueError:
             unresolved.append(item.constraint_id)
+    if plan.where:
+        query = query.filter(_boolean_condition(plan.where, applied, unresolved))
+    preferences.extend(item.constraint_id for item in plan.prefer)
+    if unresolved:
+        query = query.none()
     return query.order_by("person_id"), {
         "plan_version": plan.version, "projection_version": SCHEMA_VERSION,
         "applied": applied, "unresolved": unresolved,
+        "semantic_requirements": list(dict.fromkeys(semantic)),
+        "preference_signals": list(dict.fromkeys(preferences)),
+        "retrieval_branches_required": bool(semantic or preferences
+                                             or plan.semantic_concepts),
         "deterministic_complete": not unresolved,
     }
 
@@ -337,13 +432,21 @@ def create_candidate_set(plan: RadarTurnPlan, *, user=None, scope_token=""):
     explain["semantic"] = {"model": model, "configured_dimension": configured,
                            "stored_dimension": stored,
                            "available": semantic_available}
+    branch_required = bool(explain.get("retrieval_branches_required"))
+    explain["branches"] = {
+        "structured": {"ran": True, "degraded": False},
+        "field_fts": {"ran": False, "degraded": branch_required,
+                      "reason": "not_implemented" if branch_required else "not_required"},
+        "vector": {"ran": False, "degraded": branch_required,
+                   "reason": "not_implemented" if branch_required else "not_required"},
+    }
     run = CandidateSetRun.objects.create(
         user=user, mode=(CandidateSetRun.MODE_EXHAUSTIVE if plan.exhaustive
                          else CandidateSetRun.MODE_INTERACTIVE),
         plan=plan.as_dict(), scope_token=scope_token, population=population,
         candidate_total=total, not_read=total, pending=total, explain=explain,
         semantic_available=semantic_available,
-        retrieval_degraded=bool(model and not semantic_available),
+        retrieval_degraded=bool((model and not semantic_available) or branch_required),
         complete=(total == 0 and not explain["unresolved"]))
     batch = []
     for ordinal, person_id in enumerate(

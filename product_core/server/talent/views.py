@@ -44,7 +44,7 @@ def _candidate_plan(data, *, exhaustive=True):
 
     if not isinstance(data, dict):
         raise ValueError("plan phải là object.")
-    allowed = {"domain", "query_type", "must", "prefer", "exclude",
+    allowed = {"domain", "query_type", "must", "prefer", "exclude", "where",
                "semantic_concepts", "exhaustive", "version"}
     unknown = set(data) - allowed
     if unknown:
