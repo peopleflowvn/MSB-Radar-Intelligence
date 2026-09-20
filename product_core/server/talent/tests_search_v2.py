@@ -420,7 +420,9 @@ class SilverDatasetTest(TestCase):
                                      location="Hà Nội", years_experience=5)
         build_projection(person.pk)
         out = StringIO()
-        call_command("search_ablation", stdout=out)
+        # pace 0: test không cần giãn nhịp chống 429, và 8 giây ngủ
+        # trong một bộ test là cách làm người ta bỏ chạy test.
+        call_command("search_ablation", pace_seconds=0, stdout=out)
         summary = json.loads(out.getvalue().split("\n{")[0] if False
                              else out.getvalue()[:out.getvalue().rindex("}") + 1])
         self.assertGreater(summary["skipped_needs_review"], 0)

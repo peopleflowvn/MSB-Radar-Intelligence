@@ -871,7 +871,7 @@ khi mọi ticket của nó ở L4.
 | H4 unknown ≠ not matched | **L2** | audit câu trả lời thật, chốt ngưỡng unknown |
 | H5 fallback không mang model hub khác | **L2** | đã deploy (run 35497650837); đối chiếu 404 về 0 trong 24 giờ |
 | P0-00 baseline/manifest/ADR | **L3** | manifest hai revision + ADR SLO/cost được duyệt |
-| P0-01 provider capacity | **L1** | quota/billing thật, fallback drill, quan sát 24h |
+| P0-01 provider capacity | **L2** | H5 + một lần thử lại khi embedding bị 429 đã deploy; mã lý do `embedding_rate_limited` tách riêng để đếm được. Còn: quota/billing thật, fallback drill, quan sát 24h |
 | P0-02 dimension + ADR vector | **L3** | chiều đã pin 1024 và xác minh; còn ADR halfvec/HNSW/filtered ANN + dung lượng ở 500k |
 | P0-03 đo truncation | **L1** | đo trên corpus thật theo constraint/section |
 | P0-04 coverage contract | **L2** | `AnswerRun.coverage` đã deploy (`ai/0027`); schema OpenAPI cho ba endpoint CandidateSet đã viết; còn: kiểm nhánh chat/attachment và audit lượt thật sau vài ngày |
@@ -879,8 +879,8 @@ khi mọi ticket của nó ở L4.
 | P0-06 scale fixture | **L1** | bị chặn bởi đĩa/RAM host — cần quyết (a) hay (b) ở P0-06 |
 | P1-00 typed plan | **L1** | planner V2 thật sinh `where`, clarification flow |
 | P1-01 SearchProjection | **L3** | backfill xong 20/09: **611/611** projection + dossier, mọi dòng có `search_tsv`. Còn: scope/RBAC thành predicate SQL, vocabulary ID hoá |
-| P1-02 query compiler | **L3** | 02B đã deploy và gieo 6 dòng từ điển trên prod; 02C chọn nhánh theo query type đã viết; alias nay vào cả tsquery sau khi ablation phát hiện bỏ sót 14/319. Còn: adaptive expansion có telemetry |
-| P1-03 CandidateSet hybrid | **L3** | 03C và 03D đã deploy và **đo trên prod**: field_fts 0,989 / vector 0,709 / hybrid 0,9966 (xem 17.10c). Còn 03E union một câu SQL, 03B taxonomy/application thành nhánh riêng |
+| P1-02 query compiler | **L3** | 02B đã deploy, gieo 6 dòng từ điển trên prod, `vocabulary_version` xuất hiện trong mọi lượt đo; 02C chọn nhánh theo query type đã deploy; alias vào cả tsquery đưa recall FTS từ 0,989 lên 1,000. Còn: adaptive expansion có telemetry |
+| P1-03 CandidateSet hybrid | **L3** | 03C và 03D đã deploy và **đo trên prod**: field_fts **1,000** / vector 0,709 (bị trần `top_n`) / hybrid **1,000** (xem 17.10c). Còn 03E union một câu SQL, 03B taxonomy/application thành nhánh riêng |
 | P1-04 BaseDossier | **L3** | ExtractedFact/conflict ledger, mọi application thành record |
 | P1-05 EvidenceView | **L1** | multi-round fetch, benchmark token |
 | P1-06 judgement schema | **L1** | Answer Engine live dùng verdict V2 |
@@ -987,7 +987,8 @@ ticket xem 17.3, trạng thái slice xem hai bảng ở mục 9.
 | `b9266d0` | P1-00, P1-02 | Boolean AST lồng trong `where` + validator depth 8 / 50 leaves; `NOT` đúng một child; unresolved fail-closed và không bị `NOT` đảo thành cho qua toàn kho; `classification` strict vào fingerprint; compiler chỉ đẩy hard-deterministic xuống SQL; branch chưa có báo `not_implemented` | `ai+talent` 923 |
 | `8d5d0a1` | P0-05, P1-02C/D, P1-03A/C/E/F/G, P1-06, P1-07 | Mục 17.9 | `ai+talent` 935; `tests_search_v2` 30 |
 | `02415df` | P1-02B, P1-03D | Bảng `SearchVocabulary` + lệnh `search_vocabulary`; nhánh dense ANN pre-filter bằng subquery, `hnsw.iterative_scan` khi tập lớn; ablation phân biệt "không áp dụng" với recall 0 | backend 1933; đã deploy |
-| `db97c42` | P1-02C, P1-03C/D, P0-04 | Alias vào cả tsquery (sửa bỏ sót 14/319 mà ablation tìm ra); `VectorBranchUnavailable` có mã lý do; chọn nhánh theo query type; schema OpenAPI cho CandidateSet | backend 1939 |
+| `db97c42` | P1-02C, P1-03C/D, P0-04 | Alias vào cả tsquery (sửa bỏ sót 14/319 mà ablation tìm ra); `VectorBranchUnavailable` có mã lý do; chọn nhánh theo query type; schema OpenAPI cho CandidateSet | backend 1939; deploy `35499630280`; ablation lần 3 cho FTS 1,000 |
+| `762c94c` | P0-01, P1-03D | Một lần thử lại sau 1,2 giây khi embedding bị 429; tách `embedding_rate_limited` khỏi `embedding_failed` | backend 1939; deploy `35500253243` |
 | `65723be` | H5, P0-04, P0-00/P0-02 (bằng chứng prod) | Router lọc chuỗi provider theo model đã ghim + nhớ cặp bị từ chối 404/402; `AnswerRun.coverage` lưu coverage để audit hồi tố (migration `ai/0027`, chỉ các khoá đã biết, không nội dung nghiệp vụ); baseline mục 2 đo lại trên prod; bảng tiến độ 17.2b | `ai.tests.RouterTest` 23; `ai.tests_answer_runs + core` 236 |
 | `a0d8e7d` | H5, P0-05, P1-03C | Migration `0016` chuyển sang `atomic = False` và bọc riêng `CREATE EXTENSION` — trước đó thiếu quyền `pg_trgm` sẽ abort transaction, migrate chết, container crash-loop khi khởi động; dataset silver chuyển vào `talent/eval_data` vì image chỉ copy `product_core/server` nên `search_ablation` không thể chạy trên prod | toàn bộ backend **1925/1925**; đã push lên `main`, **chưa deploy** |
 
@@ -1166,6 +1167,27 @@ Hai lỗi lộ ra, cả hai đã sửa trong lần deploy tiếp theo:
 Ngoài ra, `top_n_capped` trên case 319 người cho thấy `SEARCH_V2_VECTOR_TOP_N =
 500` là trần thật chứ không phải con số trang trí; ở kho 500k nó phải được chốt
 cùng ADR cost ở P0-00.
+
+**Ablation lần 3, sau khi vá (deploy `35499630280`, commit `db97c42`):**
+
+| Cấu hình | Case | Mean recall | So với lần 2 |
+|---|---:|---:|---|
+| structured | 9 | 1,000 | không đổi |
+| field_fts | 4 | **1,000** | từ 0,989 — bản vá alias vào tsquery ăn thật |
+| vector | 4 | 0,709 | không đổi (trần `top_n` chưa sửa) |
+| structured+field_fts | 13 | **1,000** | từ 0,9966 |
+| full | 13 | **1,000** | từ 0,9966 |
+
+Cả 4 case lexical đạt recall 1,0 và đều ghi `vocabulary_version = 1`, tức kết quả
+khớp nhờ alias và giải thích được nhờ đâu. Case `lex-003` (319 người) trước đó
+bỏ sót 14 người, nay không sót ai.
+
+Lý do của nhánh vector nay cũng nói đúng: `lex-004` báo **`embedding_failed`**
+thay cho `no_vectors_in_scope`, và đó là một phát hiện thật — lời gọi embedding
+thứ tư trong vài giây bị giới hạn tốc độ. Commit `762c94c` thêm **một** lần thử
+lại sau 1,2 giây và tách mã lý do `embedding_rate_limited` khỏi
+`embedding_failed`, để dashboard capacity của P0-01 đếm được đúng loại. Chờ
+deploy `35500253243` để đo lại.
 
 ### 17.11. Việc tiếp theo theo đúng dependency
 

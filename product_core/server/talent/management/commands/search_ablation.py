@@ -22,7 +22,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from talent.search_v2 import (ABLATION_CONFIGS, RadarTurnPlan, ablation,
-                              compile_projection_query)
+                              compile_projection_query, recall_terms)
 
 DEFAULT_DATASET = "talent/eval_data/search_silver_v1.jsonl"
 
@@ -78,7 +78,7 @@ def _config_required(config, branches):
                for state in states)
 
 
-def evaluate_case(case, *, fts_top_n):
+def evaluate_case(case, *, fts_top_n, pace_seconds=0.0):
     """Một case → recall/unique hit từng cấu hình, hoặc lý do bị bỏ qua."""
     plan = RadarTurnPlan.from_dict(case.get("plan") or {})
     truth_kind = case.get("truth")
@@ -100,6 +100,12 @@ def evaluate_case(case, *, fts_top_n):
             return {"id": case.get("id"), "truth_size": len(truth),
                     "fail_closed": not truth and bool(explain.get("unresolved")),
                     "unresolved": explain.get("unresolved", [])}
+    if pace_seconds and recall_terms(plan):
+        # Lệnh này chạy LÔ: bốn lượt gọi embedding trong vài giây là đủ để
+        # GreenNode trả 429, và khi đó số recall của nhánh vector là số của một
+        # lần gọi hỏng, không phải của thuật toán. Giãn nhịp để phép đo đo đúng
+        # thứ nó nói là đang đo.
+        time.sleep(pace_seconds)
     report = ablation(plan, fts_top_n=fts_top_n)
     rows = {}
     for config, data in report["configs"].items():
@@ -129,6 +135,9 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--dataset", default=DEFAULT_DATASET)
         parser.add_argument("--fts-top-n", type=int, default=None)
+        parser.add_argument("--pace-seconds", type=float, default=2.0,
+                            help="Giãn nhịp trước mỗi case cần embedding, để "
+                                 "phép đo không bị giới hạn tốc độ làm sai.")
         parser.add_argument("--out", default="")
 
     def handle(self, *args, **options):
@@ -137,11 +146,14 @@ class Command(BaseCommand):
         fts_top_n = options["fts_top_n"] or int(
             getattr(settings, "SEARCH_V2_FTS_TOP_N", 2000))
         started = time.perf_counter()
-        results = [evaluate_case(case, fts_top_n=fts_top_n) for case in cases]
+        results = [evaluate_case(case, fts_top_n=fts_top_n,
+                                 pace_seconds=options["pace_seconds"])
+                   for case in cases]
         skipped = [row for row in results if row.get("skipped")]
         scored = [row for row in results if not row.get("skipped")
                   and row.get("configs")]
         summary = {"dataset": path.name, "cases": len(cases),
+                   "pace_seconds": options["pace_seconds"],
                    "scored": len(scored), "skipped_needs_review": len(skipped),
                    "fts_top_n": fts_top_n,
                    "ms": round((time.perf_counter() - started) * 1000, 1),
