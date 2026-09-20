@@ -1535,5 +1535,31 @@ xóa và candidate được cả V2 + legacy đồng thuận được xếp trư
 liên quan qua. Full `ai + talent` ban đầu lộ một test router còn kỳ vọng judge
 Qwen dù production/default đã chuyển GLM; test được sửa sang tác vụ
 `candidate_extraction` (vẫn có primary Qwen) để tiếp tục kiểm đúng cơ chế hạ
-model. Chạy lại full suite: **978/978 pass**. Trạng thái deploy/probe production
-sẽ được bổ sung ngay sau workflow exact-SHA.
+model. Chạy lại full suite: **978/978 pass**. Bằng chứng deploy/probe exact-SHA
+được ghi ngay dưới đây.
+
+**Kết quả production:** commit `cb0b942` được push lên `main`. Workflow đầu
+`35525338018` qua validate nhưng lỗi ở bước export Docker layer với
+`CreateDiff ... no such file or directory`; cùng thời điểm host đang build
+TalentFlow `develop`, production cũ vẫn khỏe và chưa đổi SHA. Sau khi job kia
+xong, dọn riêng build cache/dangling image giải phóng khoảng **2,36 GB** (disk
+87% → 82%), retry `35525873616` deploy thành công đúng SHA
+`cb0b9422becb67fc23d1bd088a7434b04edfd17b`; exact-release và public health đều
+qua.
+
+Ba probe production sau deploy tạo **12/12 LLM call thành công, 0 failed**:
+
+1. Câu semantic về backend hệ thống giao dịch/tài chính: CandidateSet 502,
+   `used_for_ranking=true`, không degraded; trả 2 hồ sơ gần đúng và không bịa
+   citation khi không có verdict đủ mạnh.
+2. Câu demo Tech Lead/Senior Backend Java/Golang tài chính: 96,74 giây;
+   CandidateSet 501, đọc 16/501, judge đủ 16, không read failure/incomplete;
+   không có người đạt đủ hard/semantic criteria nên answer không gắn nguồn giả.
+3. Câu rộng “có kinh nghiệm lập trình Java”: 77,20 giây; CandidateSet 500,
+   đọc/judge đủ 16; trả 8 hồ sơ, 10 nguồn, compose cited đủ 10 và citation audit
+   `PASS` (7 người được nhắc đều có nguồn cục bộ hợp lệ).
+
+Kết luận của increment: bridge ranking chạy thật và fail-open đúng, nhưng đây
+vẫn là interactive partial deep-read (16 hồ sơ), chưa đóng gold recall hay
+exhaustive gate. Hai câu hẹp không có nguồn là kết quả “không đủ bằng chứng”,
+không phải provider/retrieval crash.
