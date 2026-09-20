@@ -225,7 +225,10 @@ DEFAULT_ROUTE = {
     # ① và ③ cần nhanh/rẻ; ⑤ là chặng duy nhất người dùng đọc thấy.
     "talent_answer_plan": _QWEN_PLUS,    # flash đặt "Senior Data Analyst" vào bắt buộc
     "talent_answer_judge": _QWEN_PLUS,
-    "talent_answer_compose": _VIET_TOT,  # hạn mức 7000 — đủ chỗ cho phần nghĩ
+    # Production 20/09: deepseek-v4-pro thường chạm timeout ~36 giây, rồi hai
+    # fallback cũng chỉ còn 10–15 giây và cùng hỏng. GLM chậm hơn qwen nhưng ổn
+    # định hơn hạn mức và khi là model đầu tiên có đủ budget để hoàn tất compose.
+    "talent_answer_compose": ("greennode", "z-ai/glm-5.2-hackathon"),
     "talent_corpus_qa": _QWEN,           # hạn mức 900
     "talent_search": _QWEN,
     "talent_embedding": _EMBED,
@@ -275,7 +278,7 @@ FALLBACK_MODELS = {
     "rb_prospect_search": (_QWEN, _GLM),
     # ⑤ viết: glm nhanh gấp đôi deepseek-v4-pro. KHÔNG đưa qwen3.7-plus vào đây —
     # nó từng viết gợi ý theo giới tính (xem DEFAULT_REASON).
-    "talent_answer_compose": (_GLM, _VIET_NHANH),
+    "talent_answer_compose": (_GLM, _VIET_TOT, _VIET_NHANH),
     "candidate_extraction": (_QWEN, _GLM),
 }
 #: Chuỗi mặc định theo năng lực, cho tác vụ chưa khai riêng. `EMBEDDING` và
@@ -331,9 +334,9 @@ DEFAULT_REASON = {
                           "bắt buộc, loại oan người đúng nghề.",
     "talent_answer_judge": "Benchmark 19/09: không nhận nhầm hồ sơ nhiễu (flash có), ổn định giữa "
                            "hai lần chạy; ~45 s/30 CV. deepseek/glm chậm 2–8 phút và timeout.",
-    "talent_answer_compose": "Benchmark 19/09: bài phân tích sâu nhất, 0 lỗi trích dẫn (20–50 s). "
-                             "glm-5.2 là lựa chọn nhanh hơn gấp đôi nếu cần. KHÔNG dùng "
-                             "qwen3.7-plus: từng viết gợi ý theo giới tính.",
+    "talent_answer_compose": "Production 20/09: deepseek-v4-pro thường timeout trước khi trả lời; "
+                             "glm-5.2 hoàn tất ổn định hơn khi được cấp trọn budget compose. "
+                             "DeepSeek vẫn là fallback chất lượng cao.",
     "candidate_extraction": "Benchmark 19/09 (10 CV thật × 2 lần): số năm kinh nghiệm khớp Edge "
                             "10/10 (flash 8/8, bỏ sót 2), nhiều trường hơn, ổn định hơn; ~13 s/CV. "
                             "deepseek-v4-flash hỏng JSON 10/10.",

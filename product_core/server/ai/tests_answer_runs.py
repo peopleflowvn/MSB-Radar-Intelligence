@@ -25,6 +25,7 @@ class AnswerRunClaimTest(TestCase):
         key = run_state.claim(self.user, "stalled", 150)
         AnswerRun.objects.filter(pk=key).update(deadline=timezone.now() - timedelta(seconds=1))
         self.assertEqual(run_state.status(self.user, "stalled"), "timeout")
+        self.assertEqual(AnswerRun.objects.get(pk=key).state, "timeout")
         self.assertIsNone(run_state.claim(self.user, "stalled", 150))
         self.assertIsNotNone(run_state.claim(self.user, "new-turn", 150))
 

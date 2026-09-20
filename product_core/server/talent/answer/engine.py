@@ -694,7 +694,8 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         # người, nội dung dossier và nguồn, nên dùng lại không thể lệch dữ liệu.
         # Với một khoá GreenNode và hạn mức theo khoá, đây là cách rẻ nhất để
         # không mất phần đọc sâu ở những câu tinh chỉnh.
-        cache_scope = judge_cache.scope_token_for(user)
+        cache_scope = (judge_cache.scope_token_for(user)
+                       if getattr(settings, "TALENT_JUDGE_CACHE", False) else "")
         cache_criteria = judge_cache.criteria_signature(active_plan)
         fingerprints = {c.person_id: judge_cache.person_fingerprint(c.person_id, c)
                         for c in candidates}
@@ -704,8 +705,10 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
             if person_id in keys:
                 reusable_judgements.setdefault(keys[person_id], judgement)
         unread = [c for c in candidates if keys[c.person_id] not in reusable_judgements]
-        fresh = judge_stage.judge(active_plan, unread, complete_fn=complete_fn,
-                                  deadline=started + READ_BUDGET_SECONDS)
+        fresh = judge_stage.judge(
+            active_plan, unread, complete_fn=complete_fn,
+            workers=max(1, int(getattr(settings, "TALENT_JUDGE_WORKERS", 1))),
+            deadline=started + READ_BUDGET_SECONDS)
         for row in fresh:
             reusable_judgements[keys[row.person_id]] = row
             judge_cache.store(row, scope_token=cache_scope,

@@ -725,6 +725,16 @@ class JudgeCacheTest(TestCase):
                              scope_token=judge_cache.scope_token_for(other),
                              criteria=crit), {})
 
+    def test_mac_dinh_tat_vi_tieu_chi_do_llm_sinh_khong_on_dinh(self):
+        """Do tren prod: cung mot cau hoi cho ba `must_have` khac nhau, lan ba
+        rong han. Nen cache mac dinh TAT cho tới khi duong live dung plan typed."""
+        from django.conf import settings
+        self.assertFalse(getattr(settings, "TALENT_JUDGE_CACHE", False))
+
+    def test_judge_mac_dinh_chay_tuan_tu_de_khong_tu_gay_429(self):
+        from django.conf import settings
+        self.assertEqual(getattr(settings, "TALENT_JUDGE_WORKERS", None), 1)
+
     def test_khong_co_nguoi_hoi_thi_khong_cache(self):
         from talent.answer import judge_cache
 

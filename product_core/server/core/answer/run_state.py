@@ -47,5 +47,10 @@ def status(user, client_turn_id):
     if row is None:
         return None
     if row.state == "running" and row.deadline <= timezone.now():
+        # Container restart có thể giết worker trước ``finally``. Deadline là
+        # ranh giới bền; compare-and-set này không ghi đè một lượt vừa hoàn tất.
+        AnswerRun.objects.filter(pk=row.pk, state="running",
+                                 deadline__lte=timezone.now()).update(
+                                     state="timeout", updated_at=timezone.now())
         return "timeout"
     return row.state

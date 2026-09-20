@@ -281,6 +281,10 @@ ASSISTANT_KNOWLEDGE_CONTEXT = env.bool("ASSISTANT_KNOWLEDGE_CONTEXT", default=Tr
 ASSISTANT_TOOLS = env.bool("ASSISTANT_TOOLS", default=False)
 # Per-process Talent worker cap. Timed-out provider calls retain their slot until exit.
 ANSWER_RUNNER_MAX_WORKERS = max(1, env.int("ANSWER_RUNNER_MAX_WORKERS", default=8))
+# GreenNode giới hạn các model qwen theo model. Bắn bốn lô judge cùng lúc tự
+# tạo burst 429 rồi đốt hết deadline vào fallback. Mặc định chạy tuần tự cho
+# đường demo/production nhỏ; chỉ tăng khi đã đo được capacity thật.
+TALENT_JUDGE_WORKERS = max(1, env.int("TALENT_JUDGE_WORKERS", default=1))
 # Trần số vòng gọi tool trong một lượt (chống lặp vô hạn / chi phí).
 ASSISTANT_TOOL_MAX_STEPS = env.int("ASSISTANT_TOOL_MAX_STEPS", default=4)
 # Tool tier 3 (sinh nội dung / tra ngoài: draft_outreach, enrich_company_from_web).
@@ -336,6 +340,13 @@ SEARCH_V2_FTS_TOP_N = env.int("SEARCH_V2_FTS_TOP_N", default=2000)
 #: Số hit tối đa của nhánh dense ANN. Nhỏ hơn FTS vì mỗi lượt tốn một lời gọi
 #: embedding và vector chỉ để tăng recall cho diễn đạt tương đương.
 SEARCH_V2_VECTOR_TOP_N = env.int("SEARCH_V2_VECTOR_TOP_N", default=500)
+#: Cache kết luận của chặng đọc sâu. MẶC ĐỊNH TẮT, và đó là một kết luận đo
+#: được chứ không phải sự thận trọng: khoá phải gồm bộ tiêu chí, mà tiêu chí hiện
+#: do LLM sinh dưới dạng văn bản tự do — đo trên production 20/09, cùng một câu
+#: hỏi cho ba `must_have` khác nhau và lần thứ ba rỗng hẳn. Cache như vậy chỉ ghi
+#: chứ không bao giờ đọc được. Bật lại khi đường live dùng plan typed của V2
+#: (SEARCH-P1-00), lúc đó tiêu chí có `constraint_id` canonical và ổn định.
+TALENT_JUDGE_CACHE = env.bool("TALENT_JUDGE_CACHE", default=False)
 TALENT_AI_RERANK_CV_CHARS = env.int("TALENT_AI_RERANK_CV_CHARS", default=1500)
 
 # Số chiều YÊU CẦU cho API embedding cần nêu rõ (Gemini output_dimensionality).

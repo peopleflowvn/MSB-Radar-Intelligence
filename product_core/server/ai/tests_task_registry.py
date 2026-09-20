@@ -199,6 +199,8 @@ class BenchmarkDefaultsTest(TestCase):
             self.assertEqual(tasks_registry.default_route(task), ("greennode", "qwen/qwen3.7-plus"))
             self.assertTrue(tasks_registry.DEFAULT_REASON.get(task))
 
-    def test_viet_cau_tra_loi_giu_deepseek_pro(self):
+    def test_viet_cau_tra_loi_dung_glm_da_do_on_dinh_hon_tren_prod(self):
         self.assertEqual(tasks_registry.default_route("talent_answer_compose"),
-                         ("greennode", "deepseek/deepseek-v4-pro"))
+                         ("greennode", "z-ai/glm-5.2-hackathon"))
+        self.assertIn(("greennode", "deepseek/deepseek-v4-pro"),
+                      tasks_registry.fallback_models("talent_answer_compose"))

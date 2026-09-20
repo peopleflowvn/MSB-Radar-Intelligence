@@ -581,7 +581,7 @@ Mục tiêu của wave: một luồng Talent chạy trọn từ plan → project
 | Slice | Nội dung | Acceptance bắt buộc | Trạng thái 20/09 |
 |---|---|---|---|
 | P1-02A — Constraint classification | Schema/provenance cho `HARD_DETERMINISTIC/HARD_SEMANTIC/PREFERENCE`; fallback không chắc → semantic/clarify | semantic-hard không thành SQL filter; preference không đổi membership | `IMPLEMENTED + LOCAL VERIFIED` |
-| P1-02B — Canonical expansion | Vocabulary versioned cho title/skill/company/location/application; phrase, Anh–Việt, dấu/không dấu, abbreviation; IDF/stopword/query budget | không giant-OR; mỗi expansion có source/version; gold exact/alias đạt gate | `NOT STARTED` — alias vẫn là hằng số trong `search_v2.py` |
+| P1-02B — Canonical expansion | Vocabulary versioned cho title/skill/company/location/application; phrase, Anh–Việt, dấu/không dấu, abbreviation; IDF/stopword/query budget | không giant-OR; mỗi expansion có source/version; gold exact/alias đạt gate | `PARTIAL + PROD VERIFIED` — `SearchVocabulary`, migration 0017–0018 và vocabulary version đã chạy; corpus mới có 6 canonical rows, chưa đủ gold/IDF/query-budget gate |
 | P1-02C — Retrieval strategy planner | Chọn branch/budget theo query type và population sau hard filter; exact-distance vs ANN | count bỏ LLM/vector; exact/range ưu tiên SQL; semantic-transfer không bị exact keyword loại | `PARTIAL` — nhánh lexical đã chạy trong phạm vi filter cứng; chưa chọn budget theo query type |
 | P1-02D — Explain/query guard | AST, branch plan, expansion reason, before/after count, index path, timeout/degraded | mọi query tái dựng được và broad query không quét/rank toàn bảng ngoài budget | `PARTIAL` — có `t0`, `branches`, `snapshot`, `fts_index_used`; thiếu EXPLAIN thật và timeout theo branch |
 
@@ -604,8 +604,8 @@ Không bắt đầu learned weight/reranker trước khi P1-02B/C có ablation t
 |---|---|---|---|---|
 | P1-03A — Branch result contract | Chung schema `person_id/branch/matched_constraints/rank/raw_score/normalized_score/evidence_refs/degraded/reason` | branch có thể bật/tắt độc lập; provenance không mất qua union | P1-02A | `IMPLEMENTED + LOCAL VERIFIED` — `BranchHit` + provenance theo nhánh trong member |
 | P1-03B — Structured/taxonomy/application | SQL branches cho projection, canonical taxonomy và application metadata | exact recall 100%; không Python full scan | P1-01, P1-02B | `PARTIAL` — structured xong; taxonomy/application chưa thành nhánh riêng |
-| P1-03C — Field-aware FTS | weighted tsvector, phrase/Boolean, per-field hits | gold FTS recall; GIN path; broad-term guard | P1-02B | `IMPLEMENTED, CHƯA XÁC MINH POSTGRES` — cột generated `search_tsv` A/B/C/D + GIN, trigram cho 4 cột ngắn; chưa chạy trên PostgreSQL |
-| P1-03D — Filtered vector | exact distance trên tập nhỏ, ANN thích nghi trên tập lớn | dimension fail-closed; recall/latency theo hard-filter population | P0-02, P1-02C | `NOT STARTED` — nhánh luôn báo `not_implemented` |
+| P1-03C — Field-aware FTS | weighted tsvector, phrase/Boolean, per-field hits | gold FTS recall; GIN path; broad-term guard | P1-02B | `IMPLEMENTED + PROD VERIFIED` — generated `search_tsv`, GIN/trigram và branch FTS chạy thật; gold semantic/broad-term gate còn mở |
+| P1-03D — Filtered vector | exact distance trên tập nhỏ, ANN thích nghi trên tập lớn | dimension fail-closed; recall/latency theo hard-filter population | P0-02, P1-02C | `IMPLEMENTED + PROD VERIFIED, RECALL GATE OPEN` — pgvector/HNSW 1024 chiều và `prefilter_exact` chạy thật; top-N 500 đang capped trên 611 applicant |
 | P1-03E — SQL union/dedupe | Union mọi branch theo Person; lưu score/rank/provenance; keyset cursor | >60 trả đủ; unique branch hit không mất; request memory không tăng theo set | A–D | `PARTIAL` — union + dedupe + provenance đã có nhưng hợp nhất trong Python dưới trần snapshot; union một câu SQL chưa làm |
 | P1-03F — Deterministic re-verification | Chạy lại toàn hard-deterministic constraints trên mọi member | FTS/vector hit không tự pass must; false positive có verdict/reason | P1-06 schema | `IMPLEMENTED + LOCAL VERIFIED` — `verify_members` |
 | P1-03G — Completeness/degradation | Các lớp completeness mục 3.7 và branch failure semantics | một branch lỗi không xóa hit branch khác; không silent partial | A–F, P0-04 | `IMPLEMENTED + LOCAL VERIFIED` — bảy lớp trong `explain.completeness` và trong API |
@@ -907,11 +907,11 @@ khi mọi ticket của nó ở L4.
 | SEARCH-P0-01 | `PARTIAL / EXTERNAL GATE` | Có provider kill switch và thống kê provider/token | Capacity/billing/quota test thật, fallback drill, circuit behavior và quan sát ≥24 giờ |
 | SEARCH-P0-02 | `PARTIAL` | Dimension contract fail-closed; CandidateSet trace ghi model/configured/stored dimension; migration thêm index PostgreSQL | ADR HNSW/halfvec/filtered ANN, dung lượng 5–10 triệu vector và benchmark production-like |
 | SEARCH-P0-03 | `PARTIAL` | `BaseDossier` giữ section/full text/offset; `evidence_view` báo available/selected sections và chars, không còn cắt mù 700 ký tự | Đo corpus thật theo constraint/section/source và so sánh baseline cũ; xác nhận late-CV recall trên gold |
-| SEARCH-P0-04 | `PARTIAL` (L1) | Còn thiếu quan trọng: `ai_answerrun` không lưu `answer_coverage`, nên không thể audit hồi tố "câu trả lời nào từng nói sai phạm vi". Như trên, cộng bảy lớp completeness (`deterministic/branches/semantic_recall_measured/verification/deep_read/evidence/answer_grounded`) trong `explain.completeness` và trong payload API | Đưa schema vào OpenAPI/contract chính thức, kiểm tra các nhánh chat/attachment ngoài people pipeline và production acceptance |
+| SEARCH-P0-04 | `PARTIAL` | `ai_answerrun.coverage` đã deploy và một run mới đã lưu coverage; bảy lớp completeness có trong `explain.completeness`/API. 243 run lịch sử chưa có coverage nên không thể audit hồi tố đầy đủ | Đưa schema vào OpenAPI/contract chính thức, bảo đảm mọi exit path mới lưu coverage, kiểm tra chat/attachment và production acceptance |
 | SEARCH-P1-00 | `PARTIAL` | Có `RadarTurnPlan`, `Constraint`, domain/query type, must/prefer/exclude/where, range/temporal/geo, phân lớp `HARD_DETERMINISTIC/HARD_SEMANTIC/PREFERENCE`, Boolean AST lồng `AND/OR/NOT` và bridge từ legacy plan; legacy free-text must/prefer được phân thành semantic/preference | Planner V2 đa miền thật, schema validation từ model output, clarification flow và provenance từ câu người dùng vào từng node |
 | SEARCH-P1-01 | `PARTIAL` | Có `SearchProjection`, canonical fields, searchable text, JSON arrays, indexes cơ bản và PostgreSQL GIN migration | Vocabulary/ID canonical quản trị được, field tsvector materialized/setweight, scope/RBAC SQL predicate và production query plans |
-| SEARCH-P1-02 | `PARTIAL` | Như trên, cộng field-aware FTS: điều kiện văn bản gộp dùng `search_tsv @@ to_tsquery` (annotation nên ghép được với AND/OR/NOT) thay cho `LIKE '%…%'`; `tsquery()` giữ phép giao cho must và loại bỏ mọi toán tử người dùng chèn vào; mảng JSONB fail-closed trên vendor không phải PostgreSQL | Vocabulary quản trị được (P1-02B), prefer scoring, adaptive expansion, budget theo query type, EXPLAIN trên PostgreSQL |
-| SEARCH-P1-03 | `PARTIAL` | Như trên, cộng `BranchHit` chung cho mọi nhánh, nhánh lexical chạy **trong** phạm vi filter cứng, `union_branches` dedupe theo Person giữ rank/score/provenance từng nhánh, trần snapshot `blocked` thay cho cắt im lặng, `INSERT … SELECT` cho đường structured trên PostgreSQL, và `verify_members` chạy lại điều kiện cứng trên từng batch | Nhánh ANN (03D), taxonomy/application thành nhánh riêng (03B), union bằng một câu SQL (03E), RBAC là predicate SQL, snapshot/reconciliation semantics |
+| SEARCH-P1-02 | `PARTIAL + PROD VERIFIED` | Như trên, cộng vocabulary quản trị được và field-aware FTS: `search_tsv @@ to_tsquery`, alias version trong explain, Boolean must và PostgreSQL GIN chạy thật | Mở rộng vocabulary, prefer scoring, adaptive expansion, budget theo query type và EXPLAIN/recall gate |
+| SEARCH-P1-03 | `PARTIAL + PROD SHADOW` | `BranchHit`, structured/FTS/vector, union/dedupe/provenance, snapshot guard và `verify_members`; production có 6 hybrid CandidateSet 500–509 người, không degraded | Taxonomy/application thành nhánh riêng, SQL union (khi mở lại scale gate), RBAC predicate, nối T2/T3/grounded compose; vector top-N 500 còn capped |
 | SEARCH-P1-04 | `PARTIAL` | `BaseDossier` chứa profile, application metadata, toàn bộ Edge payload, CV sections, source offsets, lineage, fingerprint; signals rebuild sau commit | ExtractedFact/current-rejected rules, conflict ledger, mọi application dưới dạng từng record, version switch và reconciliation |
 | SEARCH-P1-05 | `PARTIAL` | EvidenceView chọn section theo constraint, ưu tiên đa dạng và dùng explicit character budget tới 24k; test dữ kiện cuối CV >700 ký tự | Multi-round fetch theo yêu cầu model, semantic selection trong Person, per-constraint completeness và token packing benchmark |
 | SEARCH-P1-06 | `PARTIAL` | Như trên, cộng T2 xác minh thật: `supported` chỉ khi Person khớp predicate cứng và không còn constraint semantic chờ T3; không khớp là `contradicted`; compiler `unresolved` làm mọi member `unknown`; số đếm khi đóng run lấy từ DB | Constraint judgement schema được dùng bởi Answer Engine live, deterministic verdict cho mọi field đáng tin cậy, conflict/inference validation |
@@ -1444,3 +1444,42 @@ Bốn việc ghi trên production của mục 17.10 đã làm xong. Còn lại:
    `DEMOGRAPHIC_CONTEXT`. **Cần pháp chế.**
 8. Sau khi 2B đóng: nối EvidenceView/cache vào T3 worker (P1-11), rồi exhaustive
    UI (P1-12), rồi RB (P1-13).
+
+### 17.12. Audit đường demo production và bản ổn định kế tiếp
+
+Audit read-only qua SSH sau deploy `2b25af5` xác nhận Hub/DB/Intelligence khỏe;
+611/611 applicant có projection, dossier và person embedding; 2.229/2.229 CV
+chunk có vector 1024 chiều; GIN và HNSW tồn tại. Sáu CandidateSet shadow đã chạy
+FTS + vector thật, 500–509 member/run và không degraded. Tuy nhiên toàn bộ 3.029
+member vẫn `unknown/not_read`: shadow mới chứng minh retrieval, chưa nối T2/T3.
+
+Hội thoại demo gần nhất cho thấy nguyên nhân bất ổn không nằm ở DB/index mà ở
+capacity của model:
+
+- một câu hỏi tạo bốn lô judge song song, gây burst 429 ở qwen;
+- Gemini fallback trả 402;
+- compose bắt đầu bằng DeepSeek, timeout khoảng 36 giây; GLM/DeepSeek Flash chỉ
+  còn 10–15 giây nên tiếp tục timeout;
+- có AnswerRun hết deadline còn mang trạng thái bền `running` sau container
+  restart;
+- cache judgement production có 152 row nhưng chưa có hit counter và lần đo lặp
+  lại không đọc được row cũ, nên mặc định phải tắt.
+
+Increment ổn định demo thực hiện các thay đổi sau:
+
+1. `TALENT_JUDGE_WORKERS` mặc định 1; production đặt deep-read pool 16 để vẫn
+   tìm toàn kho nhưng chỉ đọc sâu hai lô xếp hạng cao nhất trong deadline.
+2. Compose chính chuyển sang `z-ai/glm-5.2-hackathon`, DeepSeek là fallback; GLM
+   được nhận trọn budget thay vì chỉ phần thời gian còn thừa.
+3. `TALENT_JUDGE_CACHE` mặc định tắt cho tới khi typed constraint ID ổn định và
+   có cache-hit telemetry.
+4. Khi đọc trạng thái một AnswerRun `running` đã quá deadline, code compare-and-
+   set nó thành `timeout`, không để UI thấy “đang chạy” vô hạn.
+5. Sau deploy mới chuyển `SEARCH_PLAN_V2_MODE=on`; V2 chỉ tham gia membership
+   khi có hard filter thật, các câu semantic vẫn giữ retrieval legacy làm lưới
+   an toàn cho tới khi T2/T3 được nối.
+
+**Bằng chứng local trước deploy:** 135/135 test `ai + answer runs + Search V2`
+passed; Django check và migration check passed. Production probe và trạng thái
+deploy phải được ghi bổ sung sau khi workflow hoàn tất; đoạn này không tự coi
+local test là production acceptance.
