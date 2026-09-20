@@ -435,11 +435,11 @@ provider phục vụ được thì vẫn thử (không im lặng bỏ).
 **Dependency:** không  
 **Hiện có → Delta:** config 768, cột/HNSW 1024 (migration cũ 1536) → xác định chiều thật của cột, vector đã lưu và vector query; nếu nhánh vector đang lỗi/bị bỏ qua thì đánh dấu `semantic_degraded` thay vì im lặng; thêm kiểm tra khi khởi động và fail closed.  
 **Acceptance:** báo cáo chiều thật từng lớp; mismatch làm nhánh vector degraded có cảnh báo, không trả kết quả sai.  
-**Đã xác minh trên prod 20/09:** cột và HNSW là `vector(1024)`, model
-`baai/bge-m3` sinh 1024, `EmbeddingConfig.dimensions` = 768 → fail-closed đang
-chạy đúng như thiết kế, nhưng **hệ quả là nhánh ngữ nghĩa tắt ở mọi lượt**. Phần
-còn lại của ticket không phải code: đặt `dimensions = 1024` (qua `/settings` hoặc
-một lệnh dữ liệu), rồi xác nhận log không còn `semantic_degraded`.  
+**Đã đóng trên prod 20/09:** cột và HNSW là `vector(1024)`, model `baai/bge-m3`
+sinh 1024, nhưng `EmbeddingConfig.dimensions` để 768 nên fail-closed **tắt nhánh
+ngữ nghĩa ở mọi lượt** (log 13:02 và 13:04). Đã pin `dimensions = 1024` lúc 07:43
+UTC; hub đọc `configured=1024 stored=1024` và một lượt truy hồi thật trả về 5 hồ
+sơ. Còn lại: quan sát 24 giờ để chắc log không còn `semantic_degraded`.  
 **Rollout/Rollback:** validate-only log trước, enforce sau.
 
 ### SEARCH-H3 — FTS giữ ngữ nghĩa Boolean cho điều kiện must
@@ -874,13 +874,13 @@ khi mọi ticket của nó ở L4.
 | P0-01 provider capacity | **L1** | quota/billing thật, fallback drill, quan sát 24h |
 | P0-02 dimension + ADR vector | **L3** | chiều đã pin 1024 và xác minh; còn ADR halfvec/HNSW/filtered ANN + dung lượng ở 500k |
 | P0-03 đo truncation | **L1** | đo trên corpus thật theo constraint/section |
-| P0-04 coverage contract | **L2** | `AnswerRun.coverage` đã deploy (`ai/0027`); còn: đưa vào OpenAPI, kiểm nhánh chat/attachment, và audit lượt thật sau vài ngày |
-| P0-05 gold set | **L3** | silver 28 case đã chạy trên prod: structured recall 1.0 trên 9 case chấm được, 10 case semantic bị bỏ qua đúng như thiết kế. Còn: nâng lên gold ≥60 câu, hai người gán nhãn |
+| P0-04 coverage contract | **L2** | `AnswerRun.coverage` đã deploy (`ai/0027`); schema OpenAPI cho ba endpoint CandidateSet đã viết; còn: kiểm nhánh chat/attachment và audit lượt thật sau vài ngày |
+| P0-05 gold set | **L3** | silver 28 case chạy trên prod hai lần, tìm ra 2 lỗi thật (17.10c). Còn: nâng lên gold ≥60 câu, hai người gán nhãn, và gán nhãn 10 case semantic đang bị bỏ qua |
 | P0-06 scale fixture | **L1** | bị chặn bởi đĩa/RAM host — cần quyết (a) hay (b) ở P0-06 |
 | P1-00 typed plan | **L1** | planner V2 thật sinh `where`, clarification flow |
 | P1-01 SearchProjection | **L3** | backfill xong 20/09: **611/611** projection + dossier, mọi dòng có `search_tsv`. Còn: scope/RBAC thành predicate SQL, vocabulary ID hoá |
-| P1-02 query compiler | **L1** | 02B xong ở local (bảng `SearchVocabulary` + lệnh `search_vocabulary`, `explain.vocabulary_version`), chờ deploy; còn 02C budget theo query type và adaptive expansion |
-| P1-03 CandidateSet hybrid | **L1** | 03D nhánh ANN đã viết (pre-filter bằng subquery, `hnsw.iterative_scan` khi tập lớn), chờ deploy để đo; còn 03E union một câu SQL, 03B taxonomy/application |
+| P1-02 query compiler | **L3** | 02B đã deploy và gieo 6 dòng từ điển trên prod; 02C chọn nhánh theo query type đã viết; alias nay vào cả tsquery sau khi ablation phát hiện bỏ sót 14/319. Còn: adaptive expansion có telemetry |
+| P1-03 CandidateSet hybrid | **L3** | 03C và 03D đã deploy và **đo trên prod**: field_fts 0,989 / vector 0,709 / hybrid 0,9966 (xem 17.10c). Còn 03E union một câu SQL, 03B taxonomy/application thành nhánh riêng |
 | P1-04 BaseDossier | **L3** | ExtractedFact/conflict ledger, mọi application thành record |
 | P1-05 EvidenceView | **L1** | multi-round fetch, benchmark token |
 | P1-06 judgement schema | **L1** | Answer Engine live dùng verdict V2 |
@@ -986,6 +986,8 @@ ticket xem 17.3, trạng thái slice xem hai bảng ở mục 9.
 | `4da3e60` | P0-04, P1-11, P1-12 | Coverage ở mọi exit path của people pipeline; API estimate/create/status/cancel/resume cho CandidateSet; T2 qua API chỉ một batch 500/request; sửa `complete=true` khi còn candidate chưa qua cursor; nhãn UI tách "tính bằng SQL" / "kiểm bằng code" / "đọc sâu" | `ai+talent` 918; frontend 142 |
 | `b9266d0` | P1-00, P1-02 | Boolean AST lồng trong `where` + validator depth 8 / 50 leaves; `NOT` đúng một child; unresolved fail-closed và không bị `NOT` đảo thành cho qua toàn kho; `classification` strict vào fingerprint; compiler chỉ đẩy hard-deterministic xuống SQL; branch chưa có báo `not_implemented` | `ai+talent` 923 |
 | `8d5d0a1` | P0-05, P1-02C/D, P1-03A/C/E/F/G, P1-06, P1-07 | Mục 17.9 | `ai+talent` 935; `tests_search_v2` 30 |
+| `02415df` | P1-02B, P1-03D | Bảng `SearchVocabulary` + lệnh `search_vocabulary`; nhánh dense ANN pre-filter bằng subquery, `hnsw.iterative_scan` khi tập lớn; ablation phân biệt "không áp dụng" với recall 0 | backend 1933; đã deploy |
+| `db97c42` | P1-02C, P1-03C/D, P0-04 | Alias vào cả tsquery (sửa bỏ sót 14/319 mà ablation tìm ra); `VectorBranchUnavailable` có mã lý do; chọn nhánh theo query type; schema OpenAPI cho CandidateSet | backend 1939 |
 | `65723be` | H5, P0-04, P0-00/P0-02 (bằng chứng prod) | Router lọc chuỗi provider theo model đã ghim + nhớ cặp bị từ chối 404/402; `AnswerRun.coverage` lưu coverage để audit hồi tố (migration `ai/0027`, chỉ các khoá đã biết, không nội dung nghiệp vụ); baseline mục 2 đo lại trên prod; bảng tiến độ 17.2b | `ai.tests.RouterTest` 23; `ai.tests_answer_runs + core` 236 |
 | `a0d8e7d` | H5, P0-05, P1-03C | Migration `0016` chuyển sang `atomic = False` và bọc riêng `CREATE EXTENSION` — trước đó thiếu quyền `pg_trgm` sẽ abort transaction, migrate chết, container crash-loop khi khởi động; dataset silver chuyển vào `talent/eval_data` vì image chỉ copy `product_core/server` nên `search_ablation` không thể chạy trên prod | toàn bộ backend **1925/1925**; đã push lên `main`, **chưa deploy** |
 
@@ -1130,35 +1132,62 @@ mọi nhánh đều `not_required`/`no_hard_filter` thì recall là `null`, và 
 thêm 4 case `lex-*` có `truth_plan` (truth lấy từ điều kiện cứng, plan dùng thuật
 ngữ semantic) để đo đúng phần đóng góp của FTS. Cần chạy lại sau lần deploy tới.
 
+### 17.10c. Ablation lần 2 và hai lỗi nó tìm ra
+
+Sau khi deploy nhánh vector + từ điển (`02415df`), ablation chạy lại trên 611 hồ
+sơ thật với 28 case silver (10 case semantic vẫn bị bỏ qua vì chưa gán nhãn):
+
+| Cấu hình | Case chấm được | Mean recall | Ghi chú |
+|---|---:|---:|---|
+| structured | 9 | 1,000 | truth chính là tập SQL |
+| field_fts | 4 | 0,989 | 3/4 case đạt 1,0 |
+| vector | 4 | 0,709 | bị `top_n = 500` cắt trên case 319 người |
+| structured+field_fts | 13 | 0,9966 | |
+| full (thêm vector) | 13 | 0,9966 | **vector không thêm recall riêng nào** |
+
+Đây đúng là loại số mà mục 3.7 đòi trước khi tăng trọng số hay thêm nhánh: trên
+bộ case này nhánh vector tốn một lời gọi embedding mỗi lượt mà không kéo thêm ai
+vào tập. Chưa đủ để bỏ nhánh (chỉ 4 case, kho 611 người, và case semantic chưa
+gán nhãn là đúng chỗ vector có giá trị) nhưng đủ để **không** ưu tiên tối ưu nó.
+
+Hai lỗi lộ ra, cả hai đã sửa trong lần deploy tiếp theo:
+
+1. **Alias chỉ đi vào filter SQL, không vào tsquery.** Case `lex-003` ("ha noi")
+   bỏ sót 14/319 người vì hồ sơ của họ ghi "hanoi" hoặc "hn" — trong tsvector đó
+   là token khác hẳn, nên `to_tsquery('ha & noi')` không khớp. Nhánh lexical nay
+   mở rộng theo từ điển và ghi lại `vocabulary_version`.
+2. **Lỗi gọi embedding bị báo thành "không có vector trong phạm vi".** Case
+   `lex-004` ghi `no_vectors_in_scope`, hoá ra là `embed()` trả rỗng. Nay
+   `vector_index` ném `VectorBranchUnavailable` với mã lý do riêng
+   (`vendor_unsupported`, `no_vectors_for_model`, `embedding_failed`), và "đã
+   chạy nhưng không thấy ai" là `ran=true, reason=no_match_in_scope`. Gộp hai
+   thứ đó vào một danh sách rỗng là đúng kiểu lỗi mà backlog này tồn tại để chặn.
+
+Ngoài ra, `top_n_capped` trên case 319 người cho thấy `SEARCH_V2_VECTOR_TOP_N =
+500` là trần thật chứ không phải con số trang trí; ở kho 500k nó phải được chốt
+cùng ADR cost ở P0-00.
+
 ### 17.11. Việc tiếp theo theo đúng dependency
 
-Code của H5, P0-04 (lưu coverage) và migration `talent/0016` đã nằm trên `main`
-tại `a0d8e7d` nhưng **chưa deploy**, nên production vẫn đang chạy `aba4e2b`.
+Bốn việc ghi trên production của mục 17.10 đã làm xong. Còn lại:
 
-Bốn việc đầu cần quyền mà phiên làm việc 20/09 không có (auto-mode chặn
-"Production Deploy" và "Remote Shell Writes"). Lệnh cụ thể, theo đúng thứ tự:
-
-1. **Trả lại nhánh ngữ nghĩa** — sửa `EmbeddingConfig.dimensions` 768 → 1024.
-   Làm qua `/settings` là đủ, không cần chạm máy chủ. Sau đó log
-   `msbradar-hub` phải hết `semantic_degraded`.
-2. **Deploy** để lấy H5 + coverage + migration 0016:
-   `gh workflow run deploy-oracle.yml -f confirm_production_deploy=DEPLOY_PRODUCTION -f fast_deploy=true`
-   (đã chạy đủ bộ test local 1925/1925 nên fast deploy là hợp lệ).
-3. **Phủ lại projection/dossier** từ 61 lên 611:
-   `docker exec msbradar-hub python manage.py rebuild_search_v2 --batch-size 200`
-4. **Tắt provider hết billing**: đặt `MSB_AI_DISABLED_PROVIDERS=gemini` (hoặc chỉ
-   cho task còn 402) rồi khởi động lại hub — đây là phần còn thiếu của H1.
-
-Sau khi bốn việc trên xong thì mới đo được:
-
-5. `docker exec msbradar-hub python manage.py search_ablation` trên dữ liệu thật,
-   và `EXPLAIN (ANALYZE, BUFFERS)` cho nhánh `search_tsv` — đây là bằng chứng
-   nâng P1-03C từ L1 lên L3.
-6. Chốt phương án P0-06 (database riêng cùng host cho fixture 150–200k, hay thuê
-   host staging để chạy đủ 500k).
-7. P1-02B vocabulary quản trị được; alias vẫn là hằng số trong `search_v2.py`.
-8. P1-03D nhánh ANN sau khi P0-02 chốt ADR vector — nhánh cuối để
-   `branches_complete` có thể đúng.
-9. Nâng silver set lên gold: người gán nhãn và người review khác nhau.
-10. Legal gate cho thuộc tính nhân khẩu học trước khi bật `DEMOGRAPHIC_CONTEXT`.
-11. `SEARCH_PLAN_V2_MODE=shadow` trên canary, thu diff legacy/V2, rollback drill.
+1. **Quan sát 24 giờ** (không cần ai làm gì, chỉ chờ): log không còn
+   `semantic_degraded` (H2), và `ai_llmcall` không còn 404 sai cặp provider–model
+   (H5). Đạt thì H2 và H5 lên L4 — hai ticket đầu tiên đóng được.
+2. **Chạy lại ablation** sau lần deploy thứ ba để xác nhận `lex-003` lên 1,0 và
+   nhánh vector báo đúng lý do. Ghi số vào 17.10c.
+3. **Chốt P0-06**: fixture 150–200k trong một database riêng cùng host, hay thuê
+   host staging để chạy đủ 500k. Host hiện tại còn 7,5 GB đĩa nên không thể làm
+   đủ 500k. **Cần người quyết.**
+4. **Gán nhãn 10 case semantic** của bộ silver rồi nâng lên gold ≥60 câu, hai
+   người gán nhãn và review. Đây là đường găng: mọi gate recall semantic phụ
+   thuộc nó. **Cần người làm.**
+5. **P1-03E** union bằng một câu SQL, và **03B** tách taxonomy/application thành
+   nhánh riêng — phần còn lại của Wave 2B.
+6. **Bật `SEARCH_PLAN_V2_MODE=shadow`** trên canary để thu diff legacy/V2 trên
+   lưu lượng thật. Việc này đổi hành vi production (thêm ghi CandidateSet và một
+   lời gọi embedding mỗi lượt) nên **cần người duyệt**, kèm rollback drill.
+7. **Legal gate** cho thuộc tính nhân khẩu học trước khi bật
+   `DEMOGRAPHIC_CONTEXT`. **Cần pháp chế.**
+8. Sau khi 2B đóng: nối EvidenceView/cache vào T3 worker (P1-11), rồi exhaustive
+   UI (P1-12), rồi RB (P1-13).
