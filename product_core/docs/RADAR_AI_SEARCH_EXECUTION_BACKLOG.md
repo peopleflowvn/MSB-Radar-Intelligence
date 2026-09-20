@@ -804,7 +804,7 @@ Một lượt phải chứng minh được bằng trace máy đọc được:
 mục 17.1 vẫn là release production gần nhất; không dùng bằng chứng local ở đây
 để tuyên bố production accepted.
 
-### 17.8. Nhật ký increment Boolean AST sau commit `4da3e60` — chưa commit/deploy
+### 17.8. Nhật ký increment Boolean AST sau commit `4da3e60` — commit `b9266d0`, chưa deploy
 
 **Phạm vi:** tiếp tục P1-00 và P1-02.
 
@@ -827,8 +827,8 @@ mục 17.1 vẫn là release production gần nhất; không dùng bằng chứn
 - Django system check và migration check: passed; không phát sinh migration.
 
 **Còn thiếu:** legacy/model planner chưa sinh `where`; phrase/field-aware FTS,
-prefer scoring và union ANN chưa nối vào compiler. Increment này ở worktree,
-chưa commit, chưa push và chưa deploy.
+prefer scoring và union ANN chưa nối vào compiler. Increment này nằm trong
+commit `b9266d0a55ac95d41164617e4480b21076ec8e56`, chưa deploy.
 
 ### 17.9. Quyết định chiến thuật retrieval — cập nhật đề bài
 
@@ -856,7 +856,7 @@ giữ vì cần cho hard filter, nhưng chưa đủ để đóng P1-02/P1-03. Ty
 class và degraded branch contract đã được bổ sung ở mục 17.10; SQL candidate
 union/provenance thực tế vẫn phải hoàn thành trước khi nối ANN/FTS production.
 
-### 17.10. Điều chỉnh implementation theo chiến thuật hybrid — chờ commit/push
+### 17.10. Điều chỉnh implementation theo chiến thuật hybrid — commit `b9266d0`, chưa deploy
 
 **Phạm vi:** sửa phần P1-00/P1-02/P1-03 đã làm để không dùng Boolean sai vai trò.
 
@@ -885,3 +885,9 @@ migration check passed, không phát sinh migration.
 
 **Chưa làm:** branch result table/provenance chi tiết, SQL union của taxonomy /
 field-FTS / application / ANN / pinned, adaptive scoring và T3 bucket sampler.
+
+**Trạng thái source:** implementation và thay đổi đề bài chiến thuật đã được
+commit tại `b9266d0a55ac95d41164617e4480b21076ec8e56`. Commit exhaustive API trước đó
+là `4da3e60ef5947aa6071d31cebc1b76cf34a871cf`. Hai commit này thuộc source mới
+sau production release `aba4e2b`; chưa được deploy nên không đổi trạng thái
+production ở mục 17.1.
