@@ -1246,6 +1246,28 @@ của nó là **trần ngân sách**, không phải chất lượng. Đây là l
 phải chạy ablation trước khi kết luận về một nhánh: lần đầu chúng tôi gần như đã
 kết luận sai về nhánh vector dựa trên số của một lỗi hạ tầng.
 
+### 17.10e. Quyết định phạm vi 20/09: 500k là tương lai
+
+Người dùng quyết định **hoãn** phần chuẩn bị cho quy mô 500.000 hồ sơ. Mục 1.2
+vẫn giữ nguyên làm nguyên tắc thiết kế (không quét Python toàn kho, không nhét ID
+vào `IN`, lọc đẩy xuống SQL) vì những thứ đó không tốn gì thêm khi viết đúng từ
+đầu. Nhưng các ticket **chỉ tồn tại để chứng minh ở 500k** được chuyển sang
+`DEFERRED`, không tính vào việc "xong kế hoạch":
+
+| Ticket | Phần bị hoãn | Lý do |
+|---|---|---|
+| P0-06 | fixture 500k, load test 30 user | host không đủ đĩa/RAM; kho thật 611 hồ sơ |
+| P0-02 | ADR halfvec, dung lượng ở 500k/1M, kế hoạch embed lại toàn kho | chỉ cần khi kho lớn hoặc đổi model |
+| P1-03E | union bằng một câu SQL | union trong Python dưới trần snapshot đủ cho 611–50.000 |
+| P1-11 | test 10.000 candidate, throughput | chưa có nhu cầu exhaustive thật |
+| P1-12 | load test đồng thời | như trên |
+| P2-06 | replica/partition | như trên |
+
+Phần **vẫn phải làm** của các ticket đó không bị hoãn: dimension contract (đã
+xong), trần snapshot (đã xong), cost guard (đã xong), và mọi acceptance về tính
+trung thực. Khi kho thật vượt ~50.000 hồ sơ thì mở lại bảng này trước khi bật
+exhaustive rộng.
+
 ### 17.11. Việc tiếp theo theo đúng dependency
 
 Bốn việc ghi trên production của mục 17.10 đã làm xong. Còn lại:
