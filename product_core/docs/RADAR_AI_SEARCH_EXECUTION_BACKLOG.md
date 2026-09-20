@@ -866,7 +866,7 @@ khi mọi ticket của nó ở L4.
 | Ticket | Mức | Việc còn lại gần nhất |
 |---|:---:|---|
 | H1 bỏ fallback không dùng được | **L2** | H5 đã chặn phần lớn lãng phí; theo dõi 24h xem 402 còn không rồi mới quyết có cần `MSB_AI_DISABLED_PROVIDERS` hay không |
-| H2 chặn lệch chiều vector | **L4** | đã pin `dimensions = 1024` trên prod 20/09 07:43 UTC; contract trong container đọc `configured=1024 stored=1024`; truy hồi vector thật trả 5 hồ sơ. Còn: quan sát 24 giờ không còn `semantic_degraded` |
+| H2 chặn lệch chiều vector | **L3** | đã pin `dimensions = 1024` trên prod 20/09 07:43 UTC; contract trong container đọc `configured=1024 stored=1024`; truy hồi vector thật trả 5 hồ sơ. Còn **duy nhất**: cửa sổ quan sát 24 giờ chưa chạy hết nên chưa được ghi L4 |
 | H3 FTS giữ phép giao cho must | **L3** | EXPLAIN trên prod: GIN `search_tsv` cho Bitmap Index Scan, khớp 44 hồ sơ với `ke & toan`. Còn: case hồi quy 12/12 trên dữ liệu thật |
 | H4 unknown ≠ not matched | **L2** | audit câu trả lời thật, chốt ngưỡng unknown |
 | H5 fallback không mang model hub khác | **L2** | đã deploy (run 35497650837); đối chiếu 404 về 0 trong 24 giờ |
@@ -990,7 +990,7 @@ ticket xem 17.3, trạng thái slice xem hai bảng ở mục 9.
 | `db97c42` | P1-02C, P1-03C/D, P0-04 | Alias vào cả tsquery (sửa bỏ sót 14/319 mà ablation tìm ra); `VectorBranchUnavailable` có mã lý do; chọn nhánh theo query type; schema OpenAPI cho CandidateSet | backend 1939; deploy `35499630280`; ablation lần 3 cho FTS 1,000 |
 | `762c94c` | P0-01, P1-03D | Một lần thử lại sau 1,2 giây khi embedding bị 429; tách `embedding_rate_limited` khỏi `embedding_failed` | backend 1939; deploy `35500253243` |
 | `65723be` | H5, P0-04, P0-00/P0-02 (bằng chứng prod) | Router lọc chuỗi provider theo model đã ghim + nhớ cặp bị từ chối 404/402; `AnswerRun.coverage` lưu coverage để audit hồi tố (migration `ai/0027`, chỉ các khoá đã biết, không nội dung nghiệp vụ); baseline mục 2 đo lại trên prod; bảng tiến độ 17.2b | `ai.tests.RouterTest` 23; `ai.tests_answer_runs + core` 236 |
-| `a0d8e7d` | H5, P0-05, P1-03C | Migration `0016` chuyển sang `atomic = False` và bọc riêng `CREATE EXTENSION` — trước đó thiếu quyền `pg_trgm` sẽ abort transaction, migrate chết, container crash-loop khi khởi động; dataset silver chuyển vào `talent/eval_data` vì image chỉ copy `product_core/server` nên `search_ablation` không thể chạy trên prod | toàn bộ backend **1925/1925**; đã push lên `main`, **chưa deploy** |
+| `a0d8e7d` | H5, P0-05, P1-03C | Migration `0016` chuyển sang `atomic = False` và bọc riêng `CREATE EXTENSION` — trước đó thiếu quyền `pg_trgm` sẽ abort transaction, migrate chết, container crash-loop khi khởi động; dataset silver chuyển vào `talent/eval_data` vì image chỉ copy `product_core/server` nên `search_ablation` không thể chạy trên prod | toàn bộ backend **1925/1925**; đã deploy trong run `35497650837` |
 
 ### 17.8. Quyết định chiến thuật retrieval đã đưa vào đề bài
 
@@ -1008,7 +1008,7 @@ Mục 3, kiến trúc mục 4 và acceptance P1-00/02/03/06/08 được viết t
   top relevance + decision boundary + diversity + hard-semantic/unknown.
 - Ranking chỉ quyết định thứ tự đọc và trình bày, không phải quyền tồn tại.
 
-### 17.9. Increment `8d5d0a1` — đã commit, chưa push và chưa deploy
+### 17.9. Increment `8d5d0a1` — đã deploy (run `35497650837`)
 
 **Phạm vi:** P1-03C field-aware FTS, P1-03A/E branch contract và union,
 P1-03F/G re-verification và completeness, P1-06 verdict, P1-07 cost guard,
@@ -1054,12 +1054,11 @@ Thêm mới:
 **935/935**; `makemigrations --check`, Django system check và `git diff --check`
 passed.
 
-**Chưa xác minh được ở local (không có PostgreSQL trên máy):** cột generated
-`search_tsv`, index trigram, nhánh lexical, `ts_rank_cd` và đường
-`INSERT … SELECT`. Tất cả là gate của staging: cần chạy migration `0016`,
-`search_ablation` và `EXPLAIN (ANALYZE, BUFFERS)` ở đó trước khi coi P1-03C là
-xong. Trên SQLite các đường này báo `vendor_unsupported` và điều kiện mảng JSONB
-fail-closed thành `unresolved`.
+**Đã xác minh trên production sau đó (xem 17.10b):** cột generated `search_tsv`,
+index trigram, nhánh lexical và `ts_rank_cd` đều chạy đúng; `EXPLAIN` chứng minh
+cả hai chỉ mục dùng được. Trên SQLite các đường này vẫn báo `vendor_unsupported`
+và điều kiện mảng JSONB fail-closed thành `unresolved` — đó là hành vi mong muốn
+cho máy lập trình, không phải thiếu sót.
 
 ### 17.10. Xác minh trên production 20/09/2026
 
