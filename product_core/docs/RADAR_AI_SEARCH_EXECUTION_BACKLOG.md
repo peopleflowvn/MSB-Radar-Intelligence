@@ -871,7 +871,7 @@ khi mọi ticket của nó ở L4.
 | H4 unknown ≠ not matched | **L2** | audit câu trả lời thật, chốt ngưỡng unknown |
 | H5 fallback không mang model hub khác | **L2** | đã deploy (run 35497650837); đối chiếu 404 về 0 trong 24 giờ |
 | P0-00 baseline/manifest/ADR | **L3** | manifest hai revision + ADR SLO/cost được duyệt |
-| P0-01 provider capacity | **L3** | H5 đã deploy và **0 lỗi 404 sau bản vá** (trước đó 254/48h); hạn mức embedding đã đo trên prod (xem 17.10d). Còn: token bucket dùng chung có ưu tiên online, fallback drill, quan sát 24h |
+| P0-01 provider capacity | **L3** | 0 lỗi 404 sau H5; hạn mức embedding và chat đã đo trên prod; token bucket theo provider đã deploy; nguyên nhân thật là **một khoá GreenNode** (17.10f). Còn: đặt `MSB_AI_RATE_PER_MINUTE_GREENNODE` và hiệu chỉnh, thêm khoá, fallback drill, quan sát 24h |
 | P0-02 dimension + ADR vector | **L3** | chiều đã pin 1024 và xác minh. ADR còn thiếu, và nay có thêm một câu bắt buộc phải trả lời: ở hạn mức embedding đo được, embed lại 500k qua GreenNode là không khả thi — chốt tự host hay đường khác |
 | P0-03 đo truncation | **L1** | đo trên corpus thật theo constraint/section |
 | P0-04 coverage contract | **L2** | `AnswerRun.coverage` + schema OpenAPI đã deploy; lỗi treo claim do chính đợt này gây ra đã sửa và deploy (17.10d). Còn: xác nhận có dòng coverage thật sau vài lượt tìm, kiểm nhánh chat/attachment |
@@ -992,6 +992,7 @@ ticket xem 17.3, trạng thái slice xem hai bảng ở mục 9.
 | `fcee1e4` | P0-05 | Ablation tự giãn nhịp (`--pace-seconds`); sửa các câu "chưa deploy" đã cũ trong ledger | backend 1939; deploy `35510159525` |
 | `a871aa4` | P0-04 | `_coverage_of` đọc được dataclass; đọc coverage tách khỏi `try` của `finish` — sửa lỗi treo claim ở 17.10d | backend 1940; deploy `35510876422` |
 | `2e5b106` | P0-05 | Ablation chỉ gọi embedding một lần mỗi case (trước đó hai lần nên tự chạm hạn mức) | backend 1940; deploy `35511413523` |
+| `53cf9b0` | H5, P0-01 | Điều kiện chặn dùng model thật sự sẽ gửi (lỗi trong chính H5); token bucket theo provider tự xếp hàng thay vì nhận 429 | backend 1943; deploy `35514345840` |
 | `65723be` | H5, P0-04, P0-00/P0-02 (bằng chứng prod) | Router lọc chuỗi provider theo model đã ghim + nhớ cặp bị từ chối 404/402; `AnswerRun.coverage` lưu coverage để audit hồi tố (migration `ai/0027`, chỉ các khoá đã biết, không nội dung nghiệp vụ); baseline mục 2 đo lại trên prod; bảng tiến độ 17.2b | `ai.tests.RouterTest` 23; `ai.tests_answer_runs + core` 236 |
 | `a0d8e7d` | H5, P0-05, P1-03C | Migration `0016` chuyển sang `atomic = False` và bọc riêng `CREATE EXTENSION` — trước đó thiếu quyền `pg_trgm` sẽ abort transaction, migrate chết, container crash-loop khi khởi động; dataset silver chuyển vào `talent/eval_data` vì image chỉ copy `product_core/server` nên `search_ablation` không thể chạy trên prod | toàn bộ backend **1925/1925**; đã deploy trong run `35497650837` |
 
@@ -1267,6 +1268,45 @@ Phần **vẫn phải làm** của các ticket đó không bị hoãn: dimension
 xong), trần snapshot (đã xong), cost guard (đã xong), và mọi acceptance về tính
 trung thực. Khi kho thật vượt ~50.000 hồ sơ thì mở lại bảng này trước khi bật
 exhaustive rộng.
+
+### 17.10f. Tôi đã chẩn đoán sai "hết quota" — nguyên nhân thật là một khoá
+
+Người dùng nói quota GreenNode vẫn còn nhiều. Kiểm tra lại: **họ đúng, tôi sai.**
+Bằng chứng trong `ai_llmcall`:
+
+| Phút | Số lời gọi | Thất bại |
+|---|---:|---:|
+| 13:10 | 44 | 42 |
+| 13:11 | 1 | 0 |
+| 12:49 | 44 | 42 |
+| 12:47 | 1 | 0 |
+
+Khi lưu lượng là 1–2 lời gọi/phút thì không lỗi nào. Các phút 42 lỗi đều là lúc
+**tôi chạy `answer_eval`**: judge chia lô 8 hồ sơ và bắn 4 lô song song, mỗi lô
+có retry và đổi provider, thành ~44 lời gọi trong một phút. Không phải hết quota
+— là **hạn mức tốc độ**, và GreenNode production chỉ có **một khoá** (hạn mức
+tính theo khoá, xem `ai/keypool.py`).
+
+Probe 12 lời gọi tuần tự cách nhau 1 giây cũng lộ thêm một lỗi trong H5: hai lời
+gọi đầu qua GreenNode, **mười lời gọi sau đều là Gemini 402** — tức cặp
+(gemini, gemini-3.5-flash) vẫn được gọi lại mãi dù đã bị từ chối. Dòng log "Bỏ
+qua gemini/gemini-3.5-flash trong 900s" mà tôi từng dẫn làm bằng chứng H5 hoạt
+động là log lúc **ghi nhận**, không phải lúc bỏ qua: điều kiện chặn dùng
+`picked_model`, mà với provider dự phòng `_model_for` trả `None`, nên nó không
+bao giờ đúng.
+
+Hai việc đã sửa và deploy (`35514345840`):
+
+1. Điều kiện chặn dùng **model thật sự sẽ được gửi**, kể cả model mặc định của
+   provider.
+2. Token bucket theo provider (`MSB_AI_RATE_PER_MINUTE[_<PROVIDER>]`, 0 = tắt):
+   tự xếp hàng trong ngân sách thời gian còn lại, hết ngân sách thì bỏ qua
+   provider đó thay vì tiêu một lời gọi để nhận 429. Không đặt biến thì hành vi
+   không đổi.
+
+**Việc bạn có thể làm để tăng hẳn năng lực:** thêm khoá GreenNode. Hạn mức tính
+theo khoá nên hai khoá là gấp đôi, và `keypool` đã hỗ trợ sẵn danh sách khoá —
+không cần sửa code.
 
 ### 17.11. Việc tiếp theo theo đúng dependency
 
