@@ -884,7 +884,7 @@ khi mọi ticket của nó ở L4.
 | P1-04 BaseDossier | **L3** | ExtractedFact/conflict ledger, mọi application thành record |
 | P1-05 EvidenceView | **L1** | multi-round fetch, benchmark token |
 | P1-06 judgement schema | **L1** | Answer Engine live dùng verdict V2 |
-| P1-07 cache + cost guard | **L2** | cache kết luận đã đọc nối vào **đường live** (`judge_cache`, khoá là `dossier_key` nên CV/câu hỏi đổi là khoá đổi; còn `UNKNOWN` thì không lưu; phạm vi theo người hỏi). Còn: mở phạm vi dùng chung sau khi rà RBAC, đo cache hit trên prod, chốt lại token limit |
+| P1-07 cache + cost guard | **L2** | bản đầu là cache chỉ ghi (0 lần dùng lại, xem 17.10j) — đã đổi khoá sang người + nội dung + tiêu chí, **chờ đo lại trên prod**; cache kết luận đã đọc nối vào **đường live** (`judge_cache`, khoá là `dossier_key` nên CV/câu hỏi đổi là khoá đổi; còn `UNKNOWN` thì không lưu; phạm vi theo người hỏi). Còn: mở phạm vi dùng chung sau khi rà RBAC, đo cache hit trên prod, chốt lại token limit |
 | P1-08 rank/reduce | **L1** | `preference_score` bằng code đã có (prefer chỉ đổi thứ tự, xếp sau nhóm, có giải thích từng thành phần). Còn: nối vào đường live, gate pháp chế cho nhân khẩu học |
 | P1-09 grounded compose | **L1** | compose từ verdict/evidence ID V2 |
 | P1-10 materializer/backfill | **L1** | outbox/dead-letter, stale ≤ 5 phút, benchmark |
@@ -1394,6 +1394,31 @@ khoẻ (health 200) vì container cũ chỉ bị thay sau khi image mới dựng
 nhân gần như chắc là **đĩa chật**: 87% đầy, build cache 2,7 GB. Đã dọn build cache
 và image mồ côi (679 MB) và dựng lại indexer bằng tay. Đĩa là một rủi ro vận hành
 thật, cần theo dõi.
+
+### 17.10j. Chuỗi model dự phòng chạy thật, và một cache chỉ ghi
+
+**Chuỗi dự phòng có tác dụng** (đo sau deploy `35517505428`, một lượt tìm thật):
+
+| Model | ok | lỗi |
+|---|---:|---:|
+| `qwen/qwen3.7-plus` (chính) | 4 | 9 |
+| `qwen/qwen3.6-flash` (kế tiếp) | 4 | 2 |
+| `z-ai/glm-5.2-hackathon` (cuối) | 2 | 0 |
+
+Trước bản vá, `qwen3.7-plus` bị chặn là **mất cả lô** vì dự phòng duy nhất là
+Gemini 402. Nay 10 lượt gọi thành công nhờ hạ model. Chặng judge vẫn 61% lỗi ở
+lần gọi đầu, nhưng mỗi lô cuối cùng đều có model chạy được.
+
+**Cache judgement bản đầu là một cache chỉ ghi.** Đo trên prod: ba lượt hỏi
+**cùng một câu** tạo ba tập khoá mới hoàn toàn (8, 16, 40 bản), **0 lần được dùng
+lại**. Khoá lấy từ `judge.dossier_key`, trong đó có `information_need`/`extract`
+do LLM sinh và danh sách đoạn CV đã chọn — cả hai đổi mỗi lượt. Nếu chỉ nhìn "bảng
+cache có 64 bản" thì rất dễ tưởng nó đang chạy; chỉ khi đếm số bản **được ghi lại**
+(0) mới thấy sự thật.
+
+Đã đổi khoá thành đúng ba thứ quyết định một kết luận: người + dấu nội dung hồ sơ
+(`BaseDossier.fingerprint`) + bộ tiêu chí đã chuẩn hoá. Bài học ghi vào chuẩn
+ticket: **một cache phải được đo bằng số lần ĐỌC được, không phải số bản đã ghi.**
 
 ### 17.11. Việc tiếp theo theo đúng dependency
 
