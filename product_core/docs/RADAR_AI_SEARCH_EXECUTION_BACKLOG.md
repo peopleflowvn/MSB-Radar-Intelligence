@@ -880,7 +880,7 @@ khi mọi ticket của nó ở L4.
 | P1-00 typed plan | **L1** | planner V2 thật sinh `where`, clarification flow |
 | P1-01 SearchProjection | **L3** | backfill xong 20/09: **611/611** projection + dossier, mọi dòng có `search_tsv`. Còn: scope/RBAC thành predicate SQL, vocabulary ID hoá |
 | P1-02 query compiler | **L3** | 02B đã deploy, gieo 6 dòng từ điển trên prod, `vocabulary_version` xuất hiện trong mọi lượt đo; 02C chọn nhánh theo query type đã deploy; alias vào cả tsquery đưa recall FTS từ 0,989 lên 1,000. Còn: adaptive expansion có telemetry |
-| P1-03 CandidateSet hybrid | **L3** | 03C và 03D đã deploy và **đo trên prod**: field_fts **1,000** / vector 0,709 (bị trần `top_n`) / hybrid **1,000** (xem 17.10c). Còn 03E union một câu SQL, 03B taxonomy/application thành nhánh riêng |
+| P1-03 CandidateSet hybrid | **L3** | 03C và 03D đã deploy và **đo trên prod**: field_fts **1,000** / vector **0,960** / hybrid **1,000** (xem 17.10c–d). Còn 03E union một câu SQL, 03B taxonomy/application thành nhánh riêng |
 | P1-04 BaseDossier | **L3** | ExtractedFact/conflict ledger, mọi application thành record |
 | P1-05 EvidenceView | **L1** | multi-round fetch, benchmark token |
 | P1-06 judgement schema | **L1** | Answer Engine live dùng verdict V2 |
@@ -1226,9 +1226,25 @@ cách giữa hai lời gọi, và nhánh query dùng **chung** hạn mức đó 
 `ablation()` gọi `vector_branch` lại cho từng cấu hình nên mỗi case tốn **hai**
 lời gọi embedding; tới case thứ tư là chạm hạn mức. Giãn nhịp 2 giây rồi 6 giây
 đều không cứu được, vì nguyên nhân là *số* lời gọi chứ không phải khoảng cách.
-Nay mỗi nhánh chạy một lần cho cả lượt rồi dùng lại. Đây là lý do con số vector
-0,71 ở 17.10c **chưa phải số thật của nhánh** — phải đo lại sau deploy
-`35511413523`.
+Nay mỗi nhánh chạy một lần cho cả lượt rồi dùng lại.
+
+**Số thật sau khi sửa (deploy `35511413523`):**
+
+| Cấu hình | Case | Mean recall | Ghi chú |
+|---|---:|---:|---|
+| structured | 9 | 1,000 | |
+| field_fts | 4 | 1,000 | 4/4 hoàn hảo |
+| vector | 4 | **0,960** | 3/4 hoàn hảo; chỉ `lex-003` còn 0,840 vì trần `top_n = 500` trên tập 319 người |
+| structured+field_fts | 13 | 1,000 | |
+| full | 13 | 1,000 | |
+
+Vậy con số 0,709 và 0,71 ở các lần trước **là sai, và sai vì công cụ đo tự chạm
+hạn mức của mình** — nhánh vector thực ra đạt 0,96. Kết luận "vector không thêm
+recall riêng nào" vẫn đúng trên bộ case này (hybrid bằng 1,000 dù có hay không có
+vector), nhưng lý do đã khác: vector gần bằng FTS chứ không yếu, và phần thiếu
+của nó là **trần ngân sách**, không phải chất lượng. Đây là lý do mục 3.7 bắt
+phải chạy ablation trước khi kết luận về một nhánh: lần đầu chúng tôi gần như đã
+kết luận sai về nhánh vector dựa trên số của một lỗi hạ tầng.
 
 ### 17.11. Việc tiếp theo theo đúng dependency
 
