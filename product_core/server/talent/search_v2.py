@@ -963,6 +963,20 @@ def ablation(plan: RadarTurnPlan, *, configs=ABLATION_CONFIGS, fts_top_n=2000,
     queryset, explain = compile_projection_query(plan)
     hard_applied = bool(explain.get("hard_filters_applied"))
     result = {"explain": explain, "configs": {}}
+    # Mỗi nhánh chỉ chạy MỘT lần cho cả lượt ablation rồi dùng lại: bản đầu gọi
+    # lại `vector_branch` cho từng cấu hình nên một case tốn hai lời gọi
+    # embedding, và tới case thứ tư thì endpoint trả 429 — phép đo khi đó đo
+    # chính hạn mức của mình chứ không đo nhánh.
+    cache = {}
+
+    def branch(name):
+        if name not in cache:
+            if name == "field_fts":
+                cache[name] = lexical_branch(queryset, plan, limit=fts_top_n)
+            else:
+                cache[name] = vector_branch(queryset, plan, limit=vector_top_n)
+        return cache[name]
+
     for config in configs:
         started = time.perf_counter()
         ids, state = [], {}
@@ -974,12 +988,12 @@ def ablation(plan: RadarTurnPlan, *, configs=ABLATION_CONFIGS, fts_top_n=2000,
             else:
                 state["structured"] = {"ran": False, "reason": "no_hard_filter"}
         if config in {"field_fts", "structured+field_fts", "full"}:
-            hits, fts_state = lexical_branch(queryset, plan, limit=fts_top_n)
+            hits, fts_state = branch("field_fts")
             state["field_fts"] = fts_state
             if hits:
                 ids = list(dict.fromkeys([*ids, *(hit.person_id for hit in hits)]))[:cap]
         if config in {"vector", "full"}:
-            hits, vector_state = vector_branch(queryset, plan, limit=vector_top_n)
+            hits, vector_state = branch("vector")
             state["vector"] = vector_state
             if hits:
                 ids = list(dict.fromkeys([*ids, *(hit.person_id for hit in hits)]))[:cap]
