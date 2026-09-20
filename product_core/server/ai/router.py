@@ -614,6 +614,25 @@ class Router:
             f"Đã thử {', '.join(attempted)} nhưng đều không stream được. "
             f"Lỗi cuối: {last_error}")
 
+    def _attempts(self, task, order, pinned_model):
+        """Danh sách (provider, model) sẽ thử, theo thứ tự.
+
+        Model chính đi trước trên mọi provider; **sau đó** mới tới các model tốt
+        kế tiếp của cùng tác vụ (`ai/tasks.py::fallback_models`). Đây là "khi lỗi
+        mới đổi": chừng nào model chính còn gọi được thì không đổi gì, còn khi nó
+        bị hạn mức hay bị provider từ chối thì hạ xuống model kế tiếp thay vì bỏ
+        cả lượt đọc.
+
+        Người gọi ghim model thì KHÔNG tự đổi: chỗ đó là lựa chọn có chủ ý.
+        """
+        attempts = [(name, None) for name in order]
+        if pinned_model or not task:
+            return attempts
+        for provider_name, model in tasks_registry.fallback_models(task):
+            if provider_name in order:
+                attempts.append((provider_name, model))
+        return attempts
+
     def _complete_once(self, messages, task="", deadline=None, **kwargs):
         full_order = [n for n in self.provider_order(task)
                       if self.get_provider(n) is not None]
@@ -632,7 +651,8 @@ class Router:
                          pinned_model, ", ".join(servable), ", ".join(skipped))
                 order = servable
 
-        for position, name in enumerate(order):
+        for position, (name, forced_model) in enumerate(
+                self._attempts(task, order, pinned_model)):
             provider = self.get_provider(name)
             if provider is None:
                 continue                      # chưa có khoá; im lặng bỏ qua
@@ -644,7 +664,8 @@ class Router:
             attempted.append(name)
             call_kwargs = dict(kwargs)
             # Model theo tác vụ (nếu người gọi chưa chỉ định rõ).
-            picked_model = call_kwargs.get("model") or self._model_for(name, task)
+            picked_model = (forced_model or call_kwargs.get("model")
+                            or self._model_for(name, task))
             # Model THẬT SỰ được gửi: người gọi ghim, hoặc route theo tác vụ,
             # hoặc model mặc định của provider. Bản đầu chỉ kiểm `picked_model`,
             # nên với provider dự phòng (`_model_for` trả None) điều kiện chặn
@@ -668,7 +689,7 @@ class Router:
                 # lại — VÀ chừa phần cho dự phòng: một provider treo không được
                 # ăn hết ngân sách rồi để provider sau không có giây nào chạy.
                 if remaining is not None:
-                    left = len(order) - position
+                    left = max(1, len(self._attempts(task, order, pinned_model)) - position)
                     per_call = remaining if left <= 1 else remaining * 0.6
                     call_kwargs["timeout"] = min(provider.timeout, per_call)
                 result = provider.complete(messages, **call_kwargs)
@@ -686,9 +707,17 @@ class Router:
                 self._record(name, picked_model or provider.model, task, error=str(exc), started=attempt_started)
                 raise
             except LLMError as exc:
-                self._model_record(name, picked_model or provider.model, error=str(exc))
-                self._record(name, picked_model or provider.model, task, error=str(exc), started=attempt_started)
-                raise
+                self._model_record(name, effective_model, error=str(exc))
+                self._record(name, effective_model, task, error=str(exc),
+                             started=attempt_started)
+                if forced_model is None:
+                    # Model CHÍNH lỗi cấu hình: không được giấu, và cũng không
+                    # được âm thầm nhảy sang chỗ khác — đó là cách hoá đơn đổi
+                    # nhà cung cấp mà không ai biết.
+                    raise
+                # Model dự phòng bị từ chối thì thử cái kế tiếp.
+                last_error = exc
+                continue
 
             self._breaker_record(name, timed_out=False)     # gọi được -> reset
             self._record(name, result.model, task, result=result)

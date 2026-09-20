@@ -414,6 +414,47 @@ class RouterTest(TestCase):
         self.assertEqual(len(calls), 2)
         self.assertIn("rate_limited_locally", str(ctx.exception))
 
+    def test_model_chinh_bi_han_muc_thi_ha_xuong_model_tot_ke_tiep(self):
+        """"Khi loi moi doi": model chinh con goi duoc thi khong doi gi ca."""
+        calls = []
+
+        def transport(url, headers, body, timeout):
+            calls.append(body.get("model"))
+            if body.get("model") == "qwen/qwen3.7-plus":
+                raise LLMUnavailable("greennode: bi gioi han toc do.")
+            return 200, {"choices": [{"message": {"content": "ok"}}],
+                         "usage": {"prompt_tokens": 1, "completion_tokens": 1}}
+
+        r = Router(env={"MSB_AI_GREENNODE_API_KEY": "k",
+                        "MSB_AI_GREENNODE_MODEL": "qwen/qwen3.6-flash",
+                        "MSB_AI_PROVIDER_DEFAULT": "greennode"},
+                   transport=transport)
+        result = r.complete(MESSAGES, task="talent_answer_judge", budget_seconds=20)
+        # Thu model chinh truoc, roi moi ha xuong model ke tiep trong benchmark.
+        self.assertEqual(calls[0], "qwen/qwen3.7-plus")
+        self.assertEqual(result.model, "qwen/qwen3.6-flash")
+
+    def test_nguoi_goi_ghim_model_thi_khong_tu_doi(self):
+        calls = []
+
+        def transport(url, headers, body, timeout):
+            calls.append(body.get("model"))
+            raise LLMUnavailable("greennode: bi gioi han toc do.")
+
+        r = Router(env={"MSB_AI_GREENNODE_API_KEY": "k",
+                        "MSB_AI_GREENNODE_MODEL": "qwen/qwen3.6-flash",
+                        "MSB_AI_PROVIDER_DEFAULT": "greennode"},
+                   transport=transport)
+        with self.assertRaises(LLMUnavailable):
+            r.complete(MESSAGES, task="talent_answer_judge", budget_seconds=4,
+                       model="z-ai/glm-5.2-hackathon")
+        self.assertEqual(set(calls), {"z-ai/glm-5.2-hackathon"})
+
+    def test_tac_vu_thi_giac_khong_bao_gio_bi_ha_sang_model_khong_doc_duoc_anh(self):
+        from . import tasks as registry
+        self.assertEqual(registry.fallback_models("cv_ocr"), ())
+        self.assertEqual(registry.fallback_models("talent_embedding"), ())
+
     def test_han_muc_tinh_theo_tung_model_khong_phai_theo_provider(self):
         """Do tren prod: qwen3.7-plus chan sau 2 loi goi, glm-5.2 thi khong —
         han muc la cua tung model."""

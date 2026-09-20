@@ -258,6 +258,45 @@ DEFAULT_ROUTE = {
     "title_similarity": _QWEN,
 }
 
+_GLM = ("greennode", "z-ai/glm-5.2-hackathon")
+
+#: Model tốt kế tiếp khi model chính KHÔNG DÙNG ĐƯỢC (hạn mức, provider từ chối).
+#: Không phải để chạy song song và không phải để tiết kiệm: chừng nào model chính
+#: còn gọi được thì vẫn dùng nó. Thứ tự lấy từ benchmark 19/09 ở `DEFAULT_REASON`,
+#: cộng một phép đo hạn mức trên production 20/09: `qwen3.7-plus` và
+#: `qwen3.6-flash` bị chặn sau 2 lời gọi liên tiếp, còn `glm-5.2-hackathon` nhận
+#: cả 4 — nên glm đứng cuối mọi chuỗi: chậm hơn nhưng còn hạn mức.
+FALLBACK_MODELS = {
+    # ③ đọc bằng chứng: flash nhận nhầm hồ sơ nhiễu nhưng vẫn hơn không đọc gì.
+    "talent_answer_judge": (_QWEN, _GLM),
+    "rb_answer_judge": (_QWEN, _GLM),
+    # ① hiểu câu hỏi: sai một chút ở kế hoạch còn cứu được ở các chặng sau.
+    "talent_answer_plan": (_QWEN, _GLM),
+    "rb_prospect_search": (_QWEN, _GLM),
+    # ⑤ viết: glm nhanh gấp đôi deepseek-v4-pro. KHÔNG đưa qwen3.7-plus vào đây —
+    # nó từng viết gợi ý theo giới tính (xem DEFAULT_REASON).
+    "talent_answer_compose": (_GLM, _VIET_NHANH),
+    "candidate_extraction": (_QWEN, _GLM),
+}
+#: Chuỗi mặc định theo năng lực, cho tác vụ chưa khai riêng. `EMBEDDING` và
+#: `VISION` cố ý để trống: đổi sang model không có năng lực đó là hỏng lặng.
+CAPABILITY_FALLBACK = {"FAST": (_GLM,), "DEEP": (_GLM, _VIET_NHANH),
+                       "VISION": (), "EMBEDDING": ()}
+
+
+def fallback_models(name):
+    """Các cặp (provider, model) thay thế, theo thứ tự chất lượng giảm dần.
+
+    Không bao giờ chứa model chính, và không bao giờ đổi năng lực: tác vụ cần
+    thị giác hay embedding thì trả rỗng.
+    """
+    primary = default_route(name)
+    chain = FALLBACK_MODELS.get(name)
+    if chain is None:
+        chain = CAPABILITY_FALLBACK.get(capability_for(name), ())
+    return tuple(pair for pair in chain if pair and pair != primary)
+
+
 # Capability is a workload policy, not a requirement for a particular model.
 # Existing measured task overrides remain authoritative; new registered tasks
 # can inherit one of these defaults without business code naming a provider.
