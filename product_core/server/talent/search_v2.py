@@ -627,7 +627,18 @@ def lexical_branch(base_queryset, plan: RadarTurnPlan, *, limit):
         return None, {"ran": False, "reason": "not_required"}
     if not fts_available():
         return None, {"ran": False, "reason": "vendor_unsupported"}
-    parts = [f"({tsquery(term, mode='and')})" for term in terms
+    # Mở rộng theo từ điển: ablation trên prod 20/09 cho thấy truy vấn "ha noi"
+    # bỏ sót 14/319 người vì hồ sơ của họ ghi "hanoi"/"hn" — một token khác hẳn
+    # trong tsvector. Alias phải đi vào tsquery chứ không chỉ vào filter SQL.
+    variants, vocab_version = [], 0
+    for term in terms:
+        folded = canonical(term)
+        expanded, version = expand_term("title", canonical_for("title", folded))
+        geo_expanded, geo_version = expand_term(
+            "location", canonical_for("location", folded))
+        vocab_version = max(vocab_version, version, geo_version)
+        variants.extend([folded, *expanded, *geo_expanded])
+    parts = [f"({tsquery(term, mode='and')})" for term in dict.fromkeys(variants)
              if tsquery(term, mode="and")]
     if not parts:
         return None, {"ran": False, "reason": "no_indexable_token"}
@@ -643,6 +654,7 @@ def lexical_branch(base_queryset, plan: RadarTurnPlan, *, limit):
     capped = len(hits) >= max(1, int(limit))
     return hits, {"ran": True, "hits": len(hits), "top_n": int(limit),
                   "capped": capped, "tsquery": query,
+                  "vocabulary_version": vocab_version,
                   "reason": "top_n_capped" if capped else ""}
 
 
@@ -675,12 +687,15 @@ def vector_branch(base_queryset, plan: RadarTurnPlan, *, limit, population=None)
     except vector_index.VectorDimensionMismatch as exc:
         return None, {"ran": False, "reason": "dimension_mismatch",
                       "error": str(exc)[:200]}
+    except vector_index.VectorBranchUnavailable as exc:
+        return None, {"ran": False, "reason": str(exc)[:60]}
     except Exception as exc:                       # noqa: BLE001 - provider/mạng
         return None, {"ran": False, "reason": "error", "error": str(exc)[:200]}
     if not rows:
-        # Không có vector cho model đang dùng, hoặc chưa ai trong phạm vi được
-        # embed: nhánh coi như KHÔNG chạy, không phải "chạy và không thấy ai".
-        return None, {"ran": False, "reason": "no_vectors_in_scope"}
+        # Nhánh ĐÃ chạy và trong phạm vi không ai đủ gần. Khác hẳn với không
+        # chạy được — chỗ này từng bị gộp làm một.
+        return [], {"ran": True, "hits": 0, "top_n": int(limit), "capped": False,
+                    "model": model, "reason": "no_match_in_scope"}
     hits = [BranchHit("vector", person_id, rank=ordinal,
                       raw_score=round(1.0 - float(distance), 6))
             for ordinal, (person_id, distance) in enumerate(rows, 1)]
@@ -713,6 +728,31 @@ def union_branches(*branch_hits):
         row["provenance"].get("vector", {}).get("rank", 0),
         row["person_id"]))
     return ordered
+
+
+#: Tập đã lọc cứng nhỏ hơn mức này thì bỏ nhánh vector: nhánh đó chỉ thêm recall,
+#: mà structured đã liệt kê đủ, nên nó chỉ còn là một lời gọi embedding trả tiền
+#: để sắp lại thứ tự vài trăm người.
+VECTOR_SKIP_MAX = 200
+
+
+def retrieval_strategy(plan: RadarTurnPlan, *, population, hard_applied):
+    """Chọn nhánh theo loại câu hỏi và độ lớn tập sau filter cứng (P1-02C).
+
+    Không dùng một công thức cho mọi câu: câu đếm không cần vector hay LLM, câu
+    exact đã đủ bằng SQL, còn câu "kinh nghiệm tương đương" thì ngược lại.
+    """
+    if plan.query_type in {"count", "aggregate"}:
+        return {"query_type": plan.query_type, "use_fts": False,
+                "use_vector": False, "reason": "sql_aggregate"}
+    if not recall_terms(plan):
+        return {"query_type": plan.query_type, "use_fts": False,
+                "use_vector": False, "reason": "no_recall_terms"}
+    if hard_applied and population is not None and population <= VECTOR_SKIP_MAX:
+        return {"query_type": plan.query_type, "use_fts": True,
+                "use_vector": False, "reason": "population_small_enough"}
+    return {"query_type": plan.query_type, "use_fts": True, "use_vector": True,
+            "reason": "hybrid"}
 
 
 def branch_state(explain, *, structured=None, fts=None, vector=None):
@@ -829,9 +869,19 @@ def create_candidate_set(plan: RadarTurnPlan, *, user=None, scope_token="",
     from django.conf import settings
     fts_top_n = int(getattr(settings, "SEARCH_V2_FTS_TOP_N", 2000))
     vector_top_n = int(getattr(settings, "SEARCH_V2_VECTOR_TOP_N", 500))
-    lexical_hits, fts_state = lexical_branch(queryset, plan, limit=fts_top_n)
-    vector_hits, vector_state = vector_branch(queryset, plan, limit=vector_top_n,
-                                              population=total)
+    strategy = retrieval_strategy(plan, population=total, hard_applied=hard_applied)
+    explain["strategy"] = strategy
+    if strategy["use_fts"]:
+        lexical_hits, fts_state = lexical_branch(queryset, plan, limit=fts_top_n)
+    else:
+        lexical_hits, fts_state = None, {"ran": False, "required": False,
+                                         "reason": strategy["reason"]}
+    if strategy["use_vector"]:
+        vector_hits, vector_state = vector_branch(queryset, plan, limit=vector_top_n,
+                                                  population=total)
+    else:
+        vector_hits, vector_state = None, {"ran": False, "required": False,
+                                           "reason": strategy["reason"]}
     recall_hits = [hits for hits in (lexical_hits, vector_hits) if hits]
     structured_state = {"ran": True, "required": True, "degraded": False,
                         "hits": total}
@@ -851,13 +901,23 @@ def create_candidate_set(plan: RadarTurnPlan, *, user=None, scope_token="",
         union_rows = union_branches(structured_hits, *recall_hits)
     explain["branches"] = branch_state(explain, structured=structured_state,
                                        fts=fts_state, vector=vector_state)
-    complete_branches = branches_complete(explain)
 
     # Trần snapshot: thà từ chối vật chất hoá còn hơn ghi cả kho vào member table
     # rồi gọi đó là CandidateSet. Trần bị vượt là trạng thái `blocked`, không
     # phải cắt bớt im lặng.
     candidate_total = len(union_rows) if union_rows is not None else total
     enroll = not limit or candidate_total <= limit
+    if hard_applied and enroll and union_rows is None:
+        # Structured đã liệt kê ĐỦ tập thoả điều kiện cứng và tất cả đã vào
+        # snapshot. Không nhánh recall nào có thể thêm ai mà không vi phạm điều
+        # kiện cứng, nên thiếu FTS/vector ở đây không phải mất recall. Ghi rõ lý
+        # do thay vì đánh degraded cho một thứ không thể sót.
+        for name in ("field_fts", "vector"):
+            if not explain["branches"][name].get("ran"):
+                explain["branches"][name].update(
+                    required=False, degraded=False,
+                    reason="structured_enumerates_all")
+    complete_branches = branches_complete(explain)
     explain["snapshot"] = {
         "limit": limit, "enrolled": enroll,
         "source": "union" if union_rows is not None else "structured",

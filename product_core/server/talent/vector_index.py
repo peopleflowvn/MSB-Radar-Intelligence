@@ -109,6 +109,14 @@ class VectorDimensionMismatch(RuntimeError):
     """Query and stored vectors cannot safely participate in the same ANN query."""
 
 
+class VectorBranchUnavailable(RuntimeError):
+    """Nhánh vector không chạy được, và lý do phải nói ra bằng tên riêng.
+
+    `str(exc)` là mã lý do (`vendor_unsupported`, `no_vectors_for_model`,
+    `embedding_failed`) để trace và ablation không phải đoán từ một list rỗng.
+    """
+
+
 def _stored_dimension(model):
     """Observed dimension for the active model, without scanning the index."""
     for queryset in (PersonSearchDocument.objects, CVChunk.objects):
@@ -396,12 +404,16 @@ def search_scored(query, *, limit=250, person_queryset=None, iterative=False):
     không trả về ít hơn `limit` một cách âm thầm.
     """
     if connection.vendor != "postgresql":
-        return []
+        raise VectorBranchUnavailable("vendor_unsupported")
     if not has_vectors_for(current_model()):
-        return []
+        raise VectorBranchUnavailable("no_vectors_for_model")
     vector, model = embed(query, task_type="RETRIEVAL_QUERY")
     if not vector:
-        return []
+        # Gọi embedding hỏng (hết hạn mức, mạng, provider) KHÁC với "trong phạm
+        # vi không ai có vector". Gộp hai thứ vào một `[]` làm báo cáo ablation
+        # nói sai: production 20/09 ghi `no_vectors_in_scope` cho một lượt thực
+        # ra là lỗi gọi embedding.
+        raise VectorBranchUnavailable("embedding_failed")
     configured = _dimensions()
     stored = _stored_dimension(model)
     observed = len(vector)

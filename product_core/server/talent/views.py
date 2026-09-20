@@ -25,7 +25,9 @@ from django.utils.html import escape
 from django.utils import timezone
 from people.models import Document, Interaction, Person, Relationship
 from django.utils.dateparse import parse_datetime
-from rest_framework import status
+from drf_spectacular.utils import (OpenApiExample, extend_schema,
+                                   inline_serializer)
+from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
@@ -36,6 +38,86 @@ from .models import (CandidateSetRun, EmbeddingConfig, Pool, PoolMembership, Tag
                      TalentProfile)
 from .serializers import (PersonDetailSerializer, PoolSerializer, TalentCardSerializer,
                           TalentProfileUpdateSerializer, TagSerializer)
+
+
+#: Hình dạng coverage/completeness của một CandidateSet, đưa thẳng vào OpenAPI.
+#: Client cần biết rằng `candidate_total` KHÁC số hồ sơ AI đã đọc, và rằng có bảy
+#: lớp completeness chứ không phải một cờ `complete` duy nhất — hợp đồng này nằm
+#: trong schema thì không ai đọc nhầm nữa (SEARCH-P0-04).
+CANDIDATE_RUN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "string", "format": "uuid"},
+        "mode": {"type": "string", "enum": ["interactive", "exhaustive"]},
+        "state": {"type": "string",
+                  "enum": ["pending", "running", "done", "cancelled", "blocked"],
+                  "description": "`blocked` = từ chối vật chất hoá (vượt trần snapshot)."},
+        "population": {"type": "integer", "description": "Số Person trong phạm vi quyền."},
+        "candidate_total": {"type": "integer",
+                            "description": "Số Person trong CandidateSet — KHÔNG phải số hồ sơ đã đọc."},
+        "judged": {"type": "integer", "description": "Đã có verdict (code hoặc AI)."},
+        "unknown": {"type": "integer", "description": "Đã xét nhưng chưa kết luận được."},
+        "not_read": {"type": "integer", "description": "Chưa đọc sâu; KHÔNG đồng nghĩa không phù hợp."},
+        "pending": {"type": "integer"},
+        "failed": {"type": "integer"},
+        "complete": {"type": "boolean",
+                     "description": "Chỉ true khi verification xong VÀ mọi nhánh bắt buộc đã chạy."},
+        "retrieval_degraded": {"type": "boolean"},
+        "semantic_available": {"type": "boolean"},
+        "completeness": {
+            "type": "object",
+            "description": "Bảy lớp độc lập; không lớp nào được suy ra từ lớp khác.",
+            "properties": {
+                "deterministic_complete": {"type": "boolean"},
+                "branches_complete": {"type": "boolean"},
+                "semantic_recall_measured": {"type": "boolean"},
+                "verification_complete": {"type": "boolean"},
+                "deep_read_complete": {"type": "boolean"},
+                "evidence_complete": {"type": "boolean"},
+                "answer_grounded": {"type": "boolean"},
+            },
+        },
+        "cost_used": {"type": "object"},
+        "explain": {"type": "object",
+                    "description": "AST đã áp, nhánh nào chạy, trần snapshot, chiến lược, vocabulary_version."},
+        "cursor": {"type": "integer"},
+        "heartbeat_at": {"type": "string", "format": "date-time", "nullable": True},
+    },
+}
+CANDIDATE_ESTIMATE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "population": {"type": "integer"},
+        "candidate_total": {"type": "integer"},
+        "estimate": {"type": "object", "properties": {
+            "candidates": {"type": "integer"},
+            "prompt_tokens": {"type": "integer"},
+            "completion_tokens": {"type": "integer"},
+            "total_tokens": {"type": "integer"}}},
+        "token_limit": {"type": "integer"},
+        "requires_confirmation": {"type": "boolean",
+                                  "description": "true thì phải gửi lại với `confirmed: true`."},
+        "explain": {"type": "object"},
+    },
+}
+
+
+#: Request body của hai endpoint tạo/ước tính. `plan` cố ý là dict tự do vì
+#: schema thật của nó do `RadarTurnPlan` kiểm, và kiểm ở một chỗ thì không lệch
+#: được; phần còn lại thì khai rõ để client không phải đoán.
+CANDIDATE_PLAN_REQUEST = inline_serializer(
+    name="CandidateSetPlanRequest",
+    fields={
+        "plan": serializers.DictField(
+            help_text="RadarTurnPlan V2: domain TALENT, tối đa 50 constraints, "
+                      "`where` là Boolean AST chỉ nhận HARD_DETERMINISTIC."),
+        "confirmed": serializers.BooleanField(
+            required=False,
+            help_text="Bắt buộc true khi ước tính chi phí vượt trần."),
+    })
+CANDIDATE_ACTION_REQUEST = inline_serializer(
+    name="CandidateSetActionRequest",
+    fields={"action": serializers.ChoiceField(choices=["cancel", "resume"])})
 
 
 def _candidate_plan(data, *, exhaustive=True):
@@ -78,6 +160,19 @@ def _candidate_run_data(run, *, include_plan=False):
     return data
 
 
+@extend_schema(
+    methods=["POST"],
+    request=CANDIDATE_PLAN_REQUEST,
+    responses={200: CANDIDATE_ESTIMATE_SCHEMA},
+    description=(
+        "Đếm chính xác T0 và ước tính token cho lượt đọc sâu, **không** tạo gì. "
+        "`requires_confirmation=true` nghĩa là chi phí vượt trần và phải gửi lại "
+        "với `confirmed: true`."
+    ),
+    examples=[OpenApiExample("Plan tối thiểu", value={"plan": {
+        "domain": "TALENT", "query_type": "list",
+        "must": [{"field": "title", "value": "Data Analyst"}]}})],
+)
 @api_view(["POST"])
 @permission_classes([RequiresTalent])
 def candidate_set_estimate(request):
@@ -99,6 +194,16 @@ def candidate_set_estimate(request):
                      "explain": explain})
 
 
+@extend_schema(
+    methods=["POST"],
+    request=CANDIDATE_PLAN_REQUEST,
+    responses={201: CANDIDATE_RUN_SCHEMA, 409: CANDIDATE_ESTIMATE_SCHEMA},
+    description=(
+        "Tạo snapshot CandidateSet và chạy MỘT lô xác minh bằng code. "
+        "HTTP 409 = chi phí vượt trần, gửi lại với `confirmed: true`. "
+        "`candidate_total` là số Person trong tập, không phải số hồ sơ AI đã đọc."
+    ),
+)
 @api_view(["POST"])
 @permission_classes([RequiresTalent])
 def candidate_set_create(request):
@@ -129,6 +234,21 @@ def candidate_set_create(request):
                     status=status.HTTP_201_CREATED)
 
 
+@extend_schema(
+    methods=["GET"],
+    responses={200: CANDIDATE_RUN_SCHEMA},
+    description="Tiến độ và coverage của một run; chỉ chủ run đọc được.",
+)
+@extend_schema(
+    methods=["PATCH"],
+    request=CANDIDATE_ACTION_REQUEST,
+    responses={200: CANDIDATE_RUN_SCHEMA},
+    description=(
+        "`action`: `cancel` xin dừng (idempotent), `resume` chạy tiếp một lô "
+        "xác minh. Không dùng để đổi plan — plan của snapshot là bất biến."
+    ),
+    examples=[OpenApiExample("Chạy tiếp một lô", value={"action": "resume"})],
+)
 @api_view(["GET", "PATCH"])
 @permission_classes([RequiresTalent])
 def candidate_set_detail(request, run_id):

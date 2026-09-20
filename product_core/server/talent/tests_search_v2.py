@@ -18,8 +18,9 @@ from .search_v2 import (EVIDENCE_CHAR_BUDGET, BranchHit, Constraint, RadarTurnPl
                         deterministic_group, enforce_cost_guard,
                         estimate_judgement_cost, evidence_view, from_legacy_plan,
                         lexical_branch, process_candidate_set, rank_rows,
-                        canonical_for, recall_terms, split_sections, tsquery,
-                        union_branches, vector_branch, vocabulary)
+                        canonical_for, recall_terms, retrieval_strategy,
+                        split_sections, tsquery, union_branches, vector_branch,
+                        vocabulary)
 from .answer.engine import _set_answer_coverage
 
 
@@ -183,8 +184,36 @@ class BranchContractTest(TestCase):
         self.assertIsNone(hits)
         # Không có model/vector thì nhánh là "không chạy", không phải "chạy và
         # không thấy ai" — hai điều đó nói khác nhau hoàn toàn về coverage.
-        self.assertIn(state["reason"], {"no_model", "no_vectors_in_scope"})
+        self.assertIn(state["reason"], {"no_model", "no_vectors_for_model",
+                                        "vendor_unsupported"})
         self.assertFalse(state["ran"])
+
+    def test_embedding_failure_is_not_reported_as_empty_scope(self):
+        from talent import vector_index
+
+        plan = RadarTurnPlan(must=[Constraint("search_text", "chuyển đổi số",
+                                              classification="HARD_SEMANTIC")])
+        queryset, _explain = compile_projection_query(plan)
+        with mock.patch.object(vector_index, "current_model", return_value="m1"), \
+             mock.patch.object(vector_index, "search_scored",
+                               side_effect=vector_index.VectorBranchUnavailable(
+                                   "embedding_failed")):
+            hits, state = vector_branch(queryset, plan, limit=10, population=5)
+        self.assertIsNone(hits)
+        self.assertEqual(state["reason"], "embedding_failed")
+
+    def test_branch_that_ran_and_found_nobody_says_so(self):
+        from talent import vector_index
+
+        plan = RadarTurnPlan(must=[Constraint("search_text", "chuyển đổi số",
+                                              classification="HARD_SEMANTIC")])
+        queryset, _explain = compile_projection_query(plan)
+        with mock.patch.object(vector_index, "current_model", return_value="m1"), \
+             mock.patch.object(vector_index, "search_scored", return_value=[]):
+            hits, state = vector_branch(queryset, plan, limit=10, population=5)
+        self.assertEqual(hits, [])
+        self.assertTrue(state["ran"])
+        self.assertEqual(state["reason"], "no_match_in_scope")
 
     def test_vector_branch_surfaces_dimension_mismatch_as_degraded(self):
         from talent import vector_index
@@ -217,6 +246,58 @@ class BranchContractTest(TestCase):
         report = ablation(RadarTurnPlan(must=[Constraint("title", "Data Analyst")]))
         self.assertEqual(report["configs"]["structured"]["ids"], [person.pk])
         self.assertFalse(report["configs"]["field_fts"]["branches"]["field_fts"]["ran"])
+
+
+class RetrievalStrategyTest(TestCase):
+    """P1-02C: không dùng cùng một chuỗi nhánh cho mọi loại câu hỏi."""
+
+    def _person(self, name, title="Data Analyst"):
+        person = Person.objects.create(display_name=name, is_applicant=True)
+        TalentProfile.objects.create(person=person, current_title=title)
+        build_projection(person.pk)
+        return person
+
+    def test_count_question_uses_sql_and_pays_for_no_embedding(self):
+        plan = RadarTurnPlan(query_type="count", must=[
+            Constraint("title", "Data Analyst"),
+            Constraint("search_text", "chuyển đổi số", classification="HARD_SEMANTIC")])
+        strategy = retrieval_strategy(plan, population=5000, hard_applied=True)
+        self.assertFalse(strategy["use_fts"])
+        self.assertFalse(strategy["use_vector"])
+        self.assertEqual(strategy["reason"], "sql_aggregate")
+
+    def test_small_hard_filtered_set_skips_the_paid_vector_branch(self):
+        plan = RadarTurnPlan(must=[
+            Constraint("title", "Data Analyst"),
+            Constraint("search_text", "chuyển đổi số", classification="HARD_SEMANTIC")])
+        strategy = retrieval_strategy(plan, population=40, hard_applied=True)
+        self.assertTrue(strategy["use_fts"])
+        self.assertFalse(strategy["use_vector"])
+
+    def test_semantic_transfer_on_large_population_uses_hybrid(self):
+        plan = RadarTurnPlan(must=[
+            Constraint("search_text", "kinh nghiệm tương đương",
+                       classification="HARD_SEMANTIC")])
+        strategy = retrieval_strategy(plan, population=300000, hard_applied=False)
+        self.assertTrue(strategy["use_fts"])
+        self.assertTrue(strategy["use_vector"])
+        self.assertEqual(strategy["reason"], "hybrid")
+
+    def test_structured_enumerating_everything_is_not_degraded(self):
+        person = self._person("Duy nhất")
+        run = create_candidate_set(RadarTurnPlan(must=[
+            Constraint("title", "Data Analyst"),
+            Constraint("search_text", "chuyển đổi số", classification="HARD_SEMANTIC")]))
+        self.assertEqual(run.candidate_total, 1)
+        self.assertEqual(list(run.members.values_list("person_id", flat=True)),
+                         [person.pk])
+        # Điều kiện cứng đã liệt kê đủ nên thiếu FTS/vector không phải mất recall.
+        self.assertEqual(run.explain["branches"]["vector"]["reason"],
+                         "structured_enumerates_all")
+        self.assertTrue(run.explain["completeness"]["branches_complete"])
+        self.assertFalse(run.retrieval_degraded)
+        # Nhưng ràng buộc semantic vẫn chưa ai đọc, nên chưa hoàn tất.
+        self.assertFalse(run.complete)
 
 
 class VocabularyTest(TestCase):
