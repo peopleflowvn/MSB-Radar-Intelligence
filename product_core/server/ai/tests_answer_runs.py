@@ -44,6 +44,20 @@ class AnswerRunClaimTest(TestCase):
         with mock.patch.object(core_runner, "_INFLIGHT", {}),                 mock.patch.object(core_runner, "_shared_status", return_value=None):
             self.assertEqual(runner.status_of(self.user, "done-turn"), "done")
 
+    def test_coverage_is_persisted_so_partial_answers_can_be_audited(self):
+        """Coverage chỉ nằm trong response thì không rà lại được sau khi đóng tab."""
+        claim_id = run_state.claim(self.user, "turn-coverage", 30)
+        run_state.finish(claim_id, "done", coverage={
+            "method": "deep_read", "candidate_total": 120, "judged": 55,
+            "unknown": 3, "not_read": 65, "complete": False,
+            "retrieval_degraded": True, "cv_text": "không được lưu"})
+        row = AnswerRun.objects.get(pk=claim_id)
+        self.assertEqual(row.coverage["not_read"], 65)
+        self.assertFalse(row.coverage["complete"])
+        self.assertTrue(row.coverage["retrieval_degraded"])
+        # Bảng này không được nhận nội dung nghiệp vụ.
+        self.assertNotIn("cv_text", row.coverage)
+
     def test_claim_uses_same_id_length_as_persisted_messages(self):
         self.assertIsNotNone(run_state.claim(self.user, "x" * 80, 150))
         self.assertIsNone(run_state.claim(self.user, "x" * 64, 150))

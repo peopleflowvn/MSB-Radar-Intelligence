@@ -83,24 +83,50 @@ Hệ quả bắt buộc:
 
 ## 2. Baseline production đã xác minh
 
-Snapshot read-only 20/09/2026; số liệu này là mốc, không phải cấu hình vĩnh viễn. Các lần triển khai phải sinh manifest mới.
+Đo trực tiếp trên PostgreSQL production (Oracle VPS Core, container
+`msbradar-db`) lúc 20/09/2026 14:00 bằng truy vấn read-only. Số liệu cũ của bản
+v2 (1.075 Person) đã lạc hậu vì 462 ứng viên không có CV đã bị xoá ngày 19/09.
 
-| Hạng mục | Hiện trạng |
-|---|---:|
-| Person / TalentProfile | 1.075 / 1.073 |
-| Person có extracted fact | 1.053 |
-| SourceRecord resolved / pending | 1.272 / 11 |
-| Talent document eligible | 673 |
-| Knowledge document active/parsed | 6 |
-| Intelligence index | 679 document / 66.540 chunk |
-| Talent profile embedding | 1.073 / 1.073 |
-| CV chunk embedding | 2.196 / 2.196 |
-| RB evidence chunk/vector | 21 / 0 |
+| Hạng mục | Hiện trạng | Ghi chú |
+|---|---:|---|
+| Person applicant / TalentProfile | 611 / 611 | |
+| Document | 679 | |
+| CV chunk / đã embed | 2.221 / 2.221 | 100% |
+| **SearchProjection / BaseDossier** | **61 / 61** | **chỉ phủ 10% ứng viên — xem 17.11** |
+| CandidateSetRun / Member / JudgementCache | 0 / 0 / 0 | V2 chưa chạy trên prod (`SEARCH_PLAN_V2_MODE` chưa đặt) |
+| RB evidence chunk / vector | 26 / 0 | cột `vector` chưa chốt chiều, chưa có HNSW |
+| PostgreSQL / pgvector | 16.15 / 0.8.6 | 0.8.6 có iterative scan cho filtered ANN |
+| `pg_trgm` | có sẵn, **chưa cài** | migration 0016 sẽ cài (role hiện tại là superuser) |
+| Đĩa / RAM của host | 41 GB đã dùng trên 49 GB; 5,9 GB RAM | **không đủ cho fixture 500k — xem P0-06** |
 
-- Talent HNSW hiện dùng `vector(1024)` nhưng `EmbeddingConfig.dimensions=768` (migration `talent/0006` từng khai báo 1536 — cần xác minh chiều thực tế trong DB ở H2).
-- Intelligence semantic nhiều lần nhận GreenNode HTTP 429.
-- Smoke query: V2 9,79 giây; local full 4,52 giây; toàn lượt 95,85 giây; compose fallback do GreenNode timeout và Gemini HTTP 402.
-- 24 giờ: Talent plan `qwen3.7-plus` 13/13; judge `qwen3.7-plus` 110/110; compose `deepseek-v4-pro` 13/20; AnswerRun 15 done và 2 timeout.
+Chiều vector thật trong DB:
+
+| Cột | Kiểu | HNSW |
+|---|---|---|
+| `talent_cvchunk.embedding` | `vector(1024)` | có, cosine |
+| `talent_personsearchdocument.embedding` | `vector(1024)` | có, cosine |
+| `rb_prospectevidencechunk.embedding` | `vector` (chưa chốt chiều) | không |
+
+- **Lệch chiều đang làm hỏng production:** `EmbeddingConfig.dimensions = 768`
+  nhưng model đang dùng là greennode `baai/bge-m3` sinh vector 1024 và cột/HNSW
+  cũng là 1024. Log `msbradar-hub` ngày 20/09 (13:02, 13:04): *"tắt nhánh vector
+  cho lượt này: semantic_degraded: vector dimension mismatch configured=768
+  query=1024 stored=1024"* — 12 lần trong 48 giờ, tức **mọi lượt tìm kiếm hiện
+  chạy không có nhánh ngữ nghĩa**. Chỉ cần sửa một giá trị (768 → 1024).
+- **Provider 48 giờ** (`ai_llmcall`): 254 lượt thất bại HTTP 404 vì gửi model
+  của hub khác sang Gemini (`deepseek/deepseek-v4-pro` 85, `z-ai/glm-5.2` 85,
+  `deepseek-v4-flash` 84); 46 lượt HTTP 402 (Gemini hết billing); 66 lượt
+  greennode bị giới hạn tốc độ; 77 lượt timeout ở `rb_prospect_search`.
+  `MSB_AI_DISABLED_PROVIDERS` **chưa được đặt trên prod**, nên acceptance của
+  H1 chưa đạt.
+- **Token 48 giờ:** judge `qwen3.7-plus` 1,13 triệu token; `rb_prospect_search`
+  794 nghìn; compose `deepseek-v4-pro` 149 nghìn. Đây là mốc cho trần chi phí ở
+  P0-00.
+- **AnswerRun 48 giờ:** 27 done, 3 timeout.
+- Kế hoạch truy vấn đo thật trên prod: `title_norm LIKE '%…%'` cho **Seq Scan**
+  (61 hàng, không index nào phục vụ được), còn `to_tsvector(...) @@ to_tsquery`
+  dùng đúng `talent_searchprojection_fts_gin` (Bitmap Index Scan). Đây là lý do
+  của migration 0016.
 
 ### 2.1. Baseline mất bằng chứng
 
@@ -388,12 +414,32 @@ Mỗi hotfix nhỏ, có test hồi quy, deploy độc lập. Số liệu trướ
 **Acceptance:** không còn attempt 402 trong 24 giờ; compose fail thì answer mang trạng thái lỗi, không giả vờ complete.  
 **Rollout/Rollback:** config; khôi phục chuỗi cũ bằng config.
 
+### SEARCH-H5 — Fallback không được mang model của hub khác
+
+**Status/Effort/Owner:** `READY / S / Platform`  
+**Dependency:** không  
+**Hiện có → Delta:** `_complete_once` lấy `model=` của người gọi rồi gửi nguyên
+sang MỌI provider trong chuỗi dự phòng. Đo trên prod 48 giờ: 254 lượt gọi HTTP
+404 (`deepseek/*`, `z-ai/*` gửi vào Gemini). Nay chuỗi provider được lọc theo mã
+model đã ghim (`provider_serves_model`), và cặp (provider, model) bị từ chối
+404/402 hai lần thì bị bỏ qua 15 phút thay vì thử lại mỗi lượt.  
+**Acceptance:** 404 do sai cặp provider–model về 0 trong 24 giờ; không lượt nào
+bị mất đường dự phòng khi vẫn còn provider phục vụ được model; chuỗi chỉ còn một
+provider phục vụ được thì vẫn thử (không im lặng bỏ).  
+**Telemetry:** số cặp bị bỏ qua, lý do, `skipped` trong thông báo lỗi.  
+**Rollout/Rollback:** đi cùng deploy thường; rollback là revert commit.
+
 ### SEARCH-H2 — Xác minh và chặn lệch chiều vector
 
 **Status/Effort/Owner:** `READY / S / Data-Index`  
 **Dependency:** không  
 **Hiện có → Delta:** config 768, cột/HNSW 1024 (migration cũ 1536) → xác định chiều thật của cột, vector đã lưu và vector query; nếu nhánh vector đang lỗi/bị bỏ qua thì đánh dấu `semantic_degraded` thay vì im lặng; thêm kiểm tra khi khởi động và fail closed.  
 **Acceptance:** báo cáo chiều thật từng lớp; mismatch làm nhánh vector degraded có cảnh báo, không trả kết quả sai.  
+**Đã xác minh trên prod 20/09:** cột và HNSW là `vector(1024)`, model
+`baai/bge-m3` sinh 1024, `EmbeddingConfig.dimensions` = 768 → fail-closed đang
+chạy đúng như thiết kế, nhưng **hệ quả là nhánh ngữ nghĩa tắt ở mọi lượt**. Phần
+còn lại của ticket không phải code: đặt `dimensions = 1024` (qua `/settings` hoặc
+một lệnh dữ liệu), rồi xác nhận log không còn `semantic_degraded`.  
 **Rollout/Rollback:** validate-only log trước, enforce sau.
 
 ### SEARCH-H3 — FTS giữ ngữ nghĩa Boolean cho điều kiện must
@@ -442,7 +488,14 @@ Mỗi hotfix nhỏ, có test hồi quy, deploy độc lập. Số liệu trướ
 **Dependency:** không  
 **Deliverable:** generator dữ liệu **tổng hợp** 500.000 Person (không có PII thật) với phân bố field/độ dài CV/số chunk mô phỏng theo kho thật; môi trường staging cùng cấu hình DB với production; harness đo P50/P95 cho T0/T1/count và EXPLAIN của từng mẫu query; cài sẵn gold case nhúng vào kho tổng hợp để đo recall ở quy mô lớn.  
 **Acceptance:** tạo lại fixture được bằng seed; harness chạy trong CI hàng đêm hoặc theo yêu cầu; báo cáo dung lượng DB/index/RAM.  
-**Scale check:** chính deliverable.
+**Scale check:** chính deliverable.  
+**Chặn bằng hạ tầng (đo 20/09 trên VPS Core):** host chỉ còn 7,5 GB đĩa trống và
+5,9 GB RAM, lại đang chạy cả TalentFlow. Fixture 500.000 Person **không chạy được
+ở đây**. Hai lựa chọn, phải chốt bằng ADR: (a) fixture 150–200k chỉ gồm
+`SearchProjection` + `TalentProfile` (không CV chunk) trong một **database riêng**
+trên cùng PostgreSQL — đủ để lấy query plan thật, và ghi rõ là ngoại suy;
+(b) thuê host riêng cho staging để chạy đủ 500k. Cho tới khi có (b), mọi phát
+biểu về SLO ở 500k là ngoại suy, không phải đo.
 
 ### SEARCH-P0-01 — Provider capacity và fallback thực sự dùng được
 
@@ -777,15 +830,53 @@ Một lượt phải chứng minh được bằng trace máy đọc được:
   `SEARCH_PLAN_V2_MODE` mặc định vẫn là `off`; chưa được coi là đã canary hoặc
   đã thay đường tìm kiếm production hiện hành.
 
-### 17.2. Quy ước trạng thái
+### 17.2. Thang mức độ hoàn thành
 
-| Trạng thái | Nghĩa |
-|---|---|
-| `IMPLEMENTED + LOCAL VERIFIED` | Đã có code/migration/test, chưa đủ acceptance ngoài local |
-| `PARTIAL` | Đã có foundation hoặc một phần đường chạy, còn delta quan trọng |
-| `NOT STARTED` | Chưa có implementation tương ứng trong release này |
-| `EXTERNAL GATE` | Cần dữ liệu, hạ tầng, phê duyệt hoặc thời gian quan sát ngoài local |
-| `PRODUCTION ACCEPTED` | Đã đạt đầy đủ acceptance và release gate của ticket |
+Một ticket đi qua năm mức. Mức chỉ được nâng khi có bằng chứng, và bằng chứng
+phải ghi ngay trong bảng 17.3 — không nâng mức bằng cảm giác "đã làm xong rồi".
+
+| Mức | Nghĩa | Bằng chứng cần có |
+|---|---|---|
+| **L0** | Chưa làm | — |
+| **L1** | Có code + test local | tên test và số test đạt |
+| **L2** | Đã deploy lên production | commit + run id của workflow |
+| **L3** | Đã xác minh trên dữ liệu thật | truy vấn/log/EXPLAIN trên prod |
+| **L4** | Đạt acceptance của ticket | đủ mọi dòng acceptance + cửa sổ quan sát |
+
+Một ticket ở L1 nghĩa là **chưa ai được nói nó xong**. Wave chỉ được coi là đóng
+khi mọi ticket của nó ở L4.
+
+### 17.2b. Tiến độ tổng quan 20/09/2026
+
+| Ticket | Mức | Việc còn lại gần nhất |
+|---|:---:|---|
+| H1 bỏ fallback không dùng được | **L2** | đặt `MSB_AI_DISABLED_PROVIDERS=gemini` trên prod; prod vẫn còn 46 lượt 402/48h |
+| H2 chặn lệch chiều vector | **L3** | sửa `EmbeddingConfig.dimensions` 768 → 1024; hiện nhánh ngữ nghĩa tắt mọi lượt |
+| H3 FTS giữ phép giao cho must | **L2** | chạy case 12/12 và EXPLAIN trên prod |
+| H4 unknown ≠ not matched | **L2** | audit câu trả lời thật, chốt ngưỡng unknown |
+| H5 fallback không mang model hub khác | **L1** | deploy rồi đối chiếu 404 về 0 trong 24h |
+| P0-00 baseline/manifest/ADR | **L3** | manifest hai revision + ADR SLO/cost được duyệt |
+| P0-01 provider capacity | **L1** | quota/billing thật, fallback drill, quan sát 24h |
+| P0-02 dimension + ADR vector | **L3** | ADR halfvec/HNSW/filtered ANN + dung lượng ở 500k |
+| P0-03 đo truncation | **L1** | đo trên corpus thật theo constraint/section |
+| P0-04 coverage contract | **L1** | ~~lưu coverage vào `ai_answerrun`~~ đã làm (chưa deploy); còn: đưa vào OpenAPI, kiểm nhánh chat/attachment |
+| P0-05 gold set | **L1** | nâng silver 23 case thành gold ≥60 câu, hai người gán nhãn |
+| P0-06 scale fixture | **L1** | bị chặn bởi đĩa/RAM host — cần quyết (a) hay (b) ở P0-06 |
+| P1-00 typed plan | **L1** | planner V2 thật sinh `where`, clarification flow |
+| P1-01 SearchProjection | **L3** | **projection chỉ phủ 61/611 trên prod** — chạy backfill |
+| P1-02 query compiler | **L1** | vocabulary quản trị được (02B), budget theo query type (02C) |
+| P1-03 CandidateSet hybrid | **L1** | nhánh ANN (03D), union một câu SQL (03E) |
+| P1-04 BaseDossier | **L3** | ExtractedFact/conflict ledger, mọi application thành record |
+| P1-05 EvidenceView | **L1** | multi-round fetch, benchmark token |
+| P1-06 judgement schema | **L1** | Answer Engine live dùng verdict V2 |
+| P1-07 cache + cost guard | **L1** | nối cache vào T3, chốt lại token limit |
+| P1-08 rank/reduce | **L1** | preference scoring, gate pháp chế cho nhân khẩu học |
+| P1-09 grounded compose | **L1** | compose từ verdict/evidence ID V2 |
+| P1-10 materializer/backfill | **L1** | outbox/dead-letter, stale ≤ 5 phút, benchmark |
+| P1-11 durable T3 worker | **L1** | worker queue thật, test 10k candidate |
+| P1-12 interactive/exhaustive | **L1** | background transition, export, load test |
+| P1-13 RB | **L0** | discovery denominator; prod đang 26 chunk / 0 vector |
+| P2-01..06 | **L0** | mở sau khi correctness gate đạt |
 
 ### 17.3. Kết quả theo ticket
 
@@ -801,7 +892,7 @@ Một lượt phải chứng minh được bằng trace máy đọc được:
 | SEARCH-P0-01 | `PARTIAL / EXTERNAL GATE` | Có provider kill switch và thống kê provider/token | Capacity/billing/quota test thật, fallback drill, circuit behavior và quan sát ≥24 giờ |
 | SEARCH-P0-02 | `PARTIAL` | Dimension contract fail-closed; CandidateSet trace ghi model/configured/stored dimension; migration thêm index PostgreSQL | ADR HNSW/halfvec/filtered ANN, dung lượng 5–10 triệu vector và benchmark production-like |
 | SEARCH-P0-03 | `PARTIAL` | `BaseDossier` giữ section/full text/offset; `evidence_view` báo available/selected sections và chars, không còn cắt mù 700 ký tự | Đo corpus thật theo constraint/section/source và so sánh baseline cũ; xác nhận late-CV recall trên gold |
-| SEARCH-P0-04 | `PARTIAL` | Như trên, cộng bảy lớp completeness (`deterministic/branches/semantic_recall_measured/verification/deep_read/evidence/answer_grounded`) trong `explain.completeness` và trong payload API | Đưa schema vào OpenAPI/contract chính thức, kiểm tra các nhánh chat/attachment ngoài people pipeline và production acceptance |
+| SEARCH-P0-04 | `PARTIAL` (L1) | Còn thiếu quan trọng: `ai_answerrun` không lưu `answer_coverage`, nên không thể audit hồi tố "câu trả lời nào từng nói sai phạm vi". Như trên, cộng bảy lớp completeness (`deterministic/branches/semantic_recall_measured/verification/deep_read/evidence/answer_grounded`) trong `explain.completeness` và trong payload API | Đưa schema vào OpenAPI/contract chính thức, kiểm tra các nhánh chat/attachment ngoài people pipeline và production acceptance |
 | SEARCH-P1-00 | `PARTIAL` | Có `RadarTurnPlan`, `Constraint`, domain/query type, must/prefer/exclude/where, range/temporal/geo, phân lớp `HARD_DETERMINISTIC/HARD_SEMANTIC/PREFERENCE`, Boolean AST lồng `AND/OR/NOT` và bridge từ legacy plan; legacy free-text must/prefer được phân thành semantic/preference | Planner V2 đa miền thật, schema validation từ model output, clarification flow và provenance từ câu người dùng vào từng node |
 | SEARCH-P1-01 | `PARTIAL` | Có `SearchProjection`, canonical fields, searchable text, JSON arrays, indexes cơ bản và PostgreSQL GIN migration | Vocabulary/ID canonical quản trị được, field tsvector materialized/setweight, scope/RBAC SQL predicate và production query plans |
 | SEARCH-P1-02 | `PARTIAL` | Như trên, cộng field-aware FTS: điều kiện văn bản gộp dùng `search_tsv @@ to_tsquery` (annotation nên ghép được với AND/OR/NOT) thay cho `LIKE '%…%'`; `tsquery()` giữ phép giao cho must và loại bỏ mọi toán tử người dùng chèn vào; mảng JSONB fail-closed trên vendor không phải PostgreSQL | Vocabulary quản trị được (P1-02B), prefer scoring, adaptive expansion, budget theo query type, EXPLAIN trên PostgreSQL |
@@ -880,6 +971,7 @@ ticket xem 17.3, trạng thái slice xem hai bảng ở mục 9.
 | `4da3e60` | P0-04, P1-11, P1-12 | Coverage ở mọi exit path của people pipeline; API estimate/create/status/cancel/resume cho CandidateSet; T2 qua API chỉ một batch 500/request; sửa `complete=true` khi còn candidate chưa qua cursor; nhãn UI tách "tính bằng SQL" / "kiểm bằng code" / "đọc sâu" | `ai+talent` 918; frontend 142 |
 | `b9266d0` | P1-00, P1-02 | Boolean AST lồng trong `where` + validator depth 8 / 50 leaves; `NOT` đúng một child; unresolved fail-closed và không bị `NOT` đảo thành cho qua toàn kho; `classification` strict vào fingerprint; compiler chỉ đẩy hard-deterministic xuống SQL; branch chưa có báo `not_implemented` | `ai+talent` 923 |
 | `8d5d0a1` | P0-05, P1-02C/D, P1-03A/C/E/F/G, P1-06, P1-07 | Mục 17.9 | `ai+talent` 935; `tests_search_v2` 30 |
+| chưa commit | H5, P0-04, P0-00/P0-02 (bằng chứng prod) | Router lọc chuỗi provider theo model đã ghim + nhớ cặp bị từ chối 404/402; `AnswerRun.coverage` lưu coverage để audit hồi tố (migration `ai/0027`, chỉ các khoá đã biết, không nội dung nghiệp vụ); baseline mục 2 đo lại trên prod; bảng tiến độ 17.2b | `ai.tests.RouterTest` 23; `ai.tests_answer_runs + core` 236; toàn bộ backend 1921 |
 
 ### 17.8. Quyết định chiến thuật retrieval đã đưa vào đề bài
 
@@ -950,16 +1042,50 @@ passed.
 xong. Trên SQLite các đường này báo `vendor_unsupported` và điều kiện mảng JSONB
 fail-closed thành `unresolved`.
 
-### 17.10. Việc tiếp theo theo đúng dependency
+### 17.10. Xác minh trên production 20/09/2026
 
-1. Chạy migration `0016` + `search_ablation` + `EXPLAIN` trên staging
-   PostgreSQL; ghi số vào manifest P0-00.
-2. P1-02B vocabulary quản trị được: alias hiện vẫn là hằng số trong
-   `search_v2.py`, Product-Ops chưa sở hữu được.
-3. P1-03D nhánh ANN sau khi P0-02 chốt ADR vector; đây là nhánh cuối để
+Đợt đầu tiên chạy trực tiếp trên VPS Core thay vì chỉ trên máy lập trình. Tất cả
+là **read-only**: `docker ps`, `docker logs`, và `psql` chỉ với `SELECT`/`EXPLAIN`.
+
+Đã kiểm và kết quả:
+
+| Kiểm | Kết quả |
+|---|---|
+| Container và phiên bản | `msbradar-hub`/`msbradar-db` healthy; PostgreSQL 16.15; pgvector 0.8.6 |
+| Chiều vector từng lớp | cột và HNSW 1024; config 768; model `baai/bge-m3` → lệch, xem mục 2 |
+| Log nhánh ngữ nghĩa | `semantic_degraded` 12 lần/48 giờ, tức tắt ở mọi lượt tìm |
+| Phủ projection/dossier | 61/611 ứng viên (10%) — signals chỉ dựng khi có thay đổi, backfill chưa chạy trên prod |
+| Chỉ mục `talent_searchprojection` | 24 chỉ mục; GIN full-text của 0015 chỉ dùng được nếu query viết đúng biểu thức |
+| EXPLAIN LIKE vs tsvector | `LIKE '%…%'` → Seq Scan; `@@ to_tsquery` → Bitmap Index Scan |
+| Provider 48 giờ | 254 lượt 404 sai cặp provider–model; 46 lượt 402; 66 rate limit; 77 timeout |
+| `MSB_AI_DISABLED_PROVIDERS` | chưa đặt → acceptance H1 chưa đạt |
+| Lưu vết coverage | `ai_answerrun` chỉ có `state/deadline/user`; **không lưu `answer_coverage`** nên không audit hồi tố được lượt nào từng trả partial |
+| RB evidence | 26 chunk, 0 vector, cột chưa chốt chiều |
+| Hạ tầng | 41/49 GB đĩa, 5,9 GB RAM, dùng chung với TalentFlow |
+
+Ba việc **ghi** cần thiết nhưng bị chặn trong phiên này (auto-mode chặn ghi trên
+máy chủ từ xa), xếp theo mức tác động:
+
+1. `EmbeddingConfig.dimensions = 1024` — trả lại nhánh ngữ nghĩa cho toàn bộ
+   tìm kiếm. Làm được qua `/settings` mà không cần ai truy cập máy chủ.
+2. `docker exec msbradar-hub python manage.py rebuild_search_v2` — đưa
+   projection/dossier từ 61 lên 611. Lệnh idempotent, không sửa dữ liệu nghiệp vụ.
+3. Đặt `MSB_AI_DISABLED_PROVIDERS=gemini` (hoặc chỉ cho task còn 402) rồi deploy
+   bản mới để lấy H5 + migration 0016.
+
+Fixture 500k **không chạy trên host này** (mục P0-06). Nếu chọn phương án (a),
+lệnh `search_scale_fixture` phải trỏ vào một database riêng: nó tạo Person tổng
+hợp, chạy trên database production sẽ làm bẩn kho ứng viên thật.
+
+### 17.11. Việc tiếp theo theo đúng dependency
+
+1. Ba việc ghi ở 17.10, theo đúng thứ tự đó.
+2. Deploy bản mới (`gh workflow run deploy-oracle.yml`), rồi chạy migration
+   `0016`, `search_ablation` và `EXPLAIN (ANALYZE, BUFFERS)` trên prod.
+3. Chốt phương án P0-06 (database riêng cùng host, hay host staging riêng).
+4. P1-02B vocabulary quản trị được; alias vẫn là hằng số trong `search_v2.py`.
+5. P1-03D nhánh ANN sau khi P0-02 chốt ADR vector — nhánh cuối để
    `branches_complete` có thể đúng.
-4. Nâng silver set lên gold: người gán nhãn và người review khác nhau.
-5. Nối EvidenceView/cache vào T3 worker (P1-11) — chỉ sau khi 03D xong.
-6. Legal gate cho thuộc tính nhân khẩu học trước khi bật `DEMOGRAPHIC_CONTEXT`.
-7. Bật `SEARCH_PLAN_V2_MODE=shadow` trên canary, thu diff legacy/V2, rollback
-   drill, rồi mới tính `on`.
+6. Nâng silver set lên gold: người gán nhãn và người review khác nhau.
+7. Legal gate cho thuộc tính nhân khẩu học trước khi bật `DEMOGRAPHIC_CONTEXT`.
+8. `SEARCH_PLAN_V2_MODE=shadow` trên canary, thu diff legacy/V2, rollback drill.

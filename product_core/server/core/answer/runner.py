@@ -271,7 +271,8 @@ class TurnRunner:
                     log.exception("answer.runner: persist hỏng")
                     state, err = "error", "persist"
                 try:
-                    run_state.finish(claim_id, state)
+                    coverage = ((result or {}).get("trace") or {}).get("answer_coverage")
+                    run_state.finish(claim_id, state, coverage=coverage)
                 except Exception:
                     log.exception("answer.runner: durable completion failed")
                 with _LOCK:

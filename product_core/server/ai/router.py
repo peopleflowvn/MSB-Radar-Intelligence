@@ -34,6 +34,25 @@ log = logging.getLogger(__name__)
 DEFAULT_ORDER = ["greennode", "agentbase", "openai", "gemini", "deepseek"]
 
 
+def provider_serves_model(provider, model):
+    """Provider này có thể phục vụ mã model đó không.
+
+    Chuỗi dự phòng trước đây mang nguyên `model=` của người gọi sang mọi nhà
+    cung cấp, nên Gemini bị hỏi `deepseek/deepseek-v4-pro` và trả HTTP 404 —
+    production 20/09 mất 254 lượt gọi trong 48 giờ đúng vì việc này. Quy tắc tối
+    thiểu, không đoán thêm: `gemini-*` chỉ chạy trên Gemini, và Gemini không
+    chạy model có tiền tố nhà cung cấp khác (`deepseek/`, `qwen/`, `z-ai/`…).
+    """
+    name = str(provider or "").strip().lower()
+    code = str(model or "").strip().lower()
+    if not name or not code:
+        return True
+    is_gemini_model = code.startswith("gemini-") or code.startswith("models/gemini")
+    if name == "gemini":
+        return is_gemini_model
+    return not is_gemini_model
+
+
 def _dedupe(names):
     seen, out = set(), []
     for name in names:
@@ -68,6 +87,13 @@ class NoProviderConfigured(LLMError):
 # bắt mọi lượt gọi sau đó cùng chờ hết giờ vì nó. Reset khi gọi lại thành công.
 _BREAKER_TRIPS = 2          # số lần timeout liên tiếp trước khi ngắt
 _BREAKER_COOLDOWN = 90.0    # giây tạm bỏ qua sau khi ngắt
+#: Lỗi "provider này không có model đó" / "chưa thanh toán" không tự khỏi trong
+#: vài giây như 429. Nhớ theo CẶP (provider, model) rồi bỏ qua, thay vì thử lại
+#: mỗi lượt. Đo trên production 20/09: 254 lượt gọi 404 và 46 lượt 402 trong 48
+#: giờ, tất cả đều là gửi model của provider khác vào chuỗi dự phòng.
+_MODEL_BREAKER_TRIPS = 2
+_MODEL_BREAKER_COOLDOWN = 900.0
+_PERMANENT_ERROR_MARKERS = ("404", "402", "not found", "does not exist")
 
 # Router là singleton THEO TIẾN TRÌNH. Với gunicorn nhiều worker, lưu cấu hình ở
 # `/settings` chỉ gọi `reset_router()` trong đúng worker phục vụ request đó — các
@@ -87,6 +113,7 @@ class Router:
         self.sink = sink
         self._cache = {}
         self._breaker = {}          # name -> {"fails": int, "until": monotonic ts}
+        self._model_breaker = {}    # (name, model) -> {"fails": int, "until": ts}
         self._config_checked_at = 0.0
         self._config_stamp = None
 
@@ -131,6 +158,28 @@ class Router:
     def _breaker_open(self, name):
         state = self._breaker.get(name)
         return bool(state and state.get("until", 0) > time.monotonic())
+
+    def _model_key(self, name, model):
+        return (str(name or "").lower(), str(model or "").lower())
+
+    def _model_blocked(self, name, model):
+        state = self._model_breaker.get(self._model_key(name, model))
+        return bool(state and state.get("until", 0) > time.monotonic())
+
+    def _model_record(self, name, model, *, error=""):
+        """Nhớ cặp (provider, model) vừa bị từ chối vĩnh viễn."""
+        if not model:
+            return
+        text = str(error or "").lower()
+        if not any(marker in text for marker in _PERMANENT_ERROR_MARKERS):
+            return
+        key = self._model_key(name, model)
+        state = self._model_breaker.setdefault(key, {"fails": 0, "until": 0.0})
+        state["fails"] += 1
+        if state["fails"] >= _MODEL_BREAKER_TRIPS:
+            state["until"] = time.monotonic() + _MODEL_BREAKER_COOLDOWN
+            log.warning("Bỏ qua %s/%s trong %.0fs: nhà cung cấp từ chối model này (%s)",
+                        name, model, _MODEL_BREAKER_COOLDOWN, error)
 
     def _breaker_record(self, name, *, timed_out):
         if not timed_out:
@@ -424,6 +473,11 @@ class Router:
         deadline = time.monotonic() + budget
         full_order = self.provider_order(task)
         order = [n for n in full_order if not self._breaker_open(n)] or full_order
+        pinned_model = kwargs.get("model")
+        if pinned_model:
+            servable = [n for n in order if provider_serves_model(n, pinned_model)]
+            if servable:
+                order = servable
         attempted, last_error = [], None
         for name in order:
             provider = self.get_provider(name)
@@ -432,10 +486,14 @@ class Router:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 break
-            attempted.append(name)
             call_kwargs = dict(kwargs)
             call_kwargs["timeout"] = min(provider.timeout, remaining)
             picked_model = call_kwargs.get("model") or self._model_for(name, task)
+            if picked_model and self._model_blocked(name, picked_model):
+                log.info("Bỏ qua %s cho model %s khi stream (đã bị từ chối)",
+                         name, picked_model)
+                continue
+            attempted.append(name)
             if picked_model:
                 call_kwargs["model"] = picked_model
             attempt_started = time.monotonic()
@@ -494,7 +552,18 @@ class Router:
                       if self.get_provider(n) is not None]
         # Bỏ qua provider đang bị ngắt — trừ khi nó là lựa chọn duy nhất.
         order = [n for n in full_order if not self._breaker_open(n)] or full_order
-        attempted, last_error = [], None
+        attempted, skipped, last_error = [], [], None
+        # Người gọi ghim model ⇒ chỉ thử những nhà cung cấp phục vụ được mã đó.
+        # Không nhà nào phục vụ được thì vẫn giữ chuỗi cũ: thà thử và nhận lỗi
+        # thật còn hơn tự ý im lặng không gọi ai.
+        pinned_model = kwargs.get("model")
+        if pinned_model:
+            servable = [n for n in order if provider_serves_model(n, pinned_model)]
+            if servable and len(servable) < len(order):
+                skipped = [f"{n}:{pinned_model}" for n in order if n not in servable]
+                log.info("Model %s chỉ chạy trên %s; bỏ qua %s",
+                         pinned_model, ", ".join(servable), ", ".join(skipped))
+                order = servable
 
         for position, name in enumerate(order):
             provider = self.get_provider(name)
@@ -509,6 +578,9 @@ class Router:
             call_kwargs = dict(kwargs)
             # Model theo tác vụ (nếu người gọi chưa chỉ định rõ).
             picked_model = call_kwargs.get("model") or self._model_for(name, task)
+            if picked_model and self._model_blocked(name, picked_model):
+                skipped.append(f"{name}:{picked_model}(blocked)")
+                continue
             if picked_model:
                 call_kwargs["model"] = picked_model
             attempt_started = time.monotonic()
@@ -525,6 +597,7 @@ class Router:
                 last_error = exc
                 timed_out = "timed out" in str(exc).lower() or "timeout" in str(exc).lower()
                 self._breaker_record(name, timed_out=timed_out)
+                self._model_record(name, picked_model or provider.model, error=str(exc))
                 log.warning("Nhà cung cấp %s tạm thời không dùng được: %s", name, exc)
                 self._record(name, picked_model or provider.model, task, error=str(exc), started=attempt_started)
                 continue
@@ -534,6 +607,7 @@ class Router:
                 self._record(name, picked_model or provider.model, task, error=str(exc), started=attempt_started)
                 raise
             except LLMError as exc:
+                self._model_record(name, picked_model or provider.model, error=str(exc))
                 self._record(name, picked_model or provider.model, task, error=str(exc), started=attempt_started)
                 raise
 
@@ -542,12 +616,19 @@ class Router:
             return result
 
         if not attempted:
+            if skipped:
+                # Nói đúng lý do: có provider, nhưng không provider nào phục vụ
+                # được model đã ghim. Đây là lỗi cấu hình, không phải hết khoá.
+                raise LLMUnavailable(
+                    "Không nhà cung cấp nào phục vụ được model đã ghim: "
+                    + ", ".join(skipped))
             raise NoProviderConfigured(
                 "Chưa cấu hình nhà cung cấp AI nào. Đặt một trong các biến: "
                 + ", ".join(f"MSB_AI_{n.upper()}_API_KEY" for n in DEFAULT_ORDER))
         raise LLMUnavailable(
-            f"Đã thử {', '.join(attempted)} nhưng đều không dùng được. "
-            f"Lỗi cuối: {last_error}")
+            f"Đã thử {', '.join(attempted)} nhưng đều không dùng được"
+            + (f" (bỏ qua {', '.join(skipped)})" if skipped else "")
+            + f". Lỗi cuối: {last_error}")
 
     def _record(self, provider, model, task, result=None, error="", started=None):
         try:

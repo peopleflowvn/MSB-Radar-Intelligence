@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from . import tasks as tasks_registry
-from .models import LLMCall, TaskModelRoute
+from .models import LLMCall, ProviderConfig, TaskModelRoute
 from .providers import (Completion, LLMAuthError, LLMError, LLMUnavailable,
                         OpenAICompatibleProvider, PROVIDER_DEFAULTS, build_provider)
 from .router import DEFAULT_ORDER, NoProviderConfigured, Router
@@ -321,6 +321,59 @@ class RouterTest(TestCase):
                    transport=fake_transport(record=calls))
         r.complete(MESSAGES, task="talent_search", model="deepseek/deepseek-v4-pro")
         self.assertEqual(calls[0]["body"]["model"], "deepseek/deepseek-v4-pro")
+
+    def test_du_phong_khong_mang_model_cua_hub_khac(self):
+        """Production 20/09: 254 lượt gọi 404 trong 48 giờ vì gửi
+        `deepseek/deepseek-v4-pro` sang Gemini trong chuỗi dự phòng."""
+        self._khong_route_db("talent_answer_judge")
+        ProviderConfig.objects.all().delete()   # để thứ tự env có hiệu lực
+        calls = []
+        r = Router(env={"MSB_AI_GREENNODE_API_KEY": "k",
+                        "MSB_AI_GREENNODE_MODEL": "qwen/qwen3.6-flash",
+                        "MSB_AI_GEMINI_API_KEY": "k",
+                        "MSB_AI_PROVIDER_DEFAULT": "greennode",
+                        "MSB_AI_PROVIDER_FALLBACK": "gemini"},
+                   transport=fake_transport(status=LLMUnavailable("greennode bận"),
+                                            record=calls))
+        with self.assertRaises(LLMUnavailable) as ctx:
+            r.complete(MESSAGES, task="talent_answer_judge", budget_seconds=3,
+                       model="deepseek/deepseek-v4-pro")
+        # GreenNode (đầu chuỗi) được thử; Gemini bị bỏ qua chứ không tiêu một
+        # lượt gọi để nhận 404.
+        self.assertEqual([call["url"].split("//")[1].split("/")[0] for call in calls],
+                         ["maas-llm-aiplatform-hcm.api.vngcloud.vn"])
+        self.assertIn("gemini:deepseek/deepseek-v4-pro", str(ctx.exception))
+
+    def test_model_gemini_khong_bi_gui_sang_hub_khac(self):
+        self._khong_route_db("talent_answer_judge")
+        ProviderConfig.objects.all().delete()
+        calls = []
+        r = Router(env={"MSB_AI_GEMINI_API_KEY": "k",
+                        "MSB_AI_GREENNODE_API_KEY": "k",
+                        "MSB_AI_GREENNODE_MODEL": "qwen/qwen3.6-flash",
+                        "MSB_AI_PROVIDER_DEFAULT": "gemini",
+                        "MSB_AI_PROVIDER_FALLBACK": "greennode"},
+                   transport=fake_transport(status=LLMUnavailable("gemini bận"),
+                                            record=calls))
+        with self.assertRaises(LLMUnavailable):
+            r.complete(MESSAGES, task="talent_answer_judge", budget_seconds=3,
+                       model="gemini-3.5-flash")
+        # Model của Gemini không được đem sang MaaS của GreenNode.
+        self.assertTrue(all("googleapis.com" in call["url"] for call in calls), calls)
+
+    def test_provider_tu_choi_model_thi_khong_thu_lai_mai(self):
+        """HTTP 404/402 không tự khỏi như 429, nên nhớ theo cặp provider+model."""
+        r = Router(env={"MSB_AI_GEMINI_API_KEY": "k",
+                        "MSB_AI_PROVIDER_DEFAULT": "gemini"},
+                   transport=fake_transport(
+                       status=LLMUnavailable("gemini: yêu cầu bị từ chối (HTTP 404)."),
+                       record=[]))
+        for _ in range(2):
+            with self.assertRaises(LLMUnavailable):
+                r.complete(MESSAGES, task="talent_answer_judge",
+                           model="gemini-3.5-flash", budget_seconds=2)
+        self.assertTrue(r._model_blocked("gemini", "gemini-3.5-flash"))
+        self.assertFalse(r._model_blocked("gemini", "gemini-3.5-pro"))
 
     def test_doi_provider_mac_dinh_KHONG_lam_mat_greennode(self):
         """Đặt default=gemini không được âm thầm loại GreenNode khỏi chuỗi.

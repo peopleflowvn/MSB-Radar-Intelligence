@@ -29,9 +29,16 @@ def claim(user, client_turn_id, seconds):
     return row.pk if created else None
 
 
-def finish(claim_id, state):
-    AnswerRun.objects.filter(pk=claim_id, state="running").update(
-        state=state, updated_at=timezone.now())
+def finish(claim_id, state, coverage=None):
+    """Đóng claim. `coverage` được lưu để rà lại được phạm vi đã trả lời."""
+    fields = {"state": state, "updated_at": timezone.now()}
+    if isinstance(coverage, dict) and coverage:
+        # Chỉ các khoá đã biết: bảng này không được nhận nội dung nghiệp vụ.
+        allowed = ("method", "candidate_total", "evaluated", "judged", "unknown",
+                   "not_read", "complete", "retrieval_degraded")
+        fields["coverage"] = {key: coverage[key] for key in allowed
+                             if key in coverage}
+    AnswerRun.objects.filter(pk=claim_id, state="running").update(**fields)
 
 
 def status(user, client_turn_id):

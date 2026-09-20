@@ -355,6 +355,11 @@ class AnswerRun(models.Model):
     client_turn_id = models.CharField(max_length=64)
     state = models.CharField(max_length=12, default="running")
     deadline = models.DateTimeField()
+    #: Bản coverage của lượt (`method/candidate_total/judged/unknown/not_read/
+    #: complete/retrieval_degraded`) — KHÔNG có nội dung CV hay liên hệ. Trước
+    #: đây coverage chỉ tồn tại trong response, nên không cách nào rà lại "lượt
+    #: nào từng nói sai phạm vi" sau khi người dùng đóng tab.
+    coverage = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
