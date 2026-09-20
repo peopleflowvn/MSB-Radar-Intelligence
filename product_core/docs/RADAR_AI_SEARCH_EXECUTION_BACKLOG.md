@@ -885,7 +885,7 @@ khi mọi ticket của nó ở L4.
 | P1-05 EvidenceView | **L1** | multi-round fetch, benchmark token |
 | P1-06 judgement schema | **L1** | Answer Engine live dùng verdict V2 |
 | P1-07 cache + cost guard | **L2** | cache kết luận đã đọc nối vào **đường live** (`judge_cache`, khoá là `dossier_key` nên CV/câu hỏi đổi là khoá đổi; còn `UNKNOWN` thì không lưu; phạm vi theo người hỏi). Còn: mở phạm vi dùng chung sau khi rà RBAC, đo cache hit trên prod, chốt lại token limit |
-| P1-08 rank/reduce | **L1** | preference scoring, gate pháp chế cho nhân khẩu học |
+| P1-08 rank/reduce | **L1** | `preference_score` bằng code đã có (prefer chỉ đổi thứ tự, xếp sau nhóm, có giải thích từng thành phần). Còn: nối vào đường live, gate pháp chế cho nhân khẩu học |
 | P1-09 grounded compose | **L1** | compose từ verdict/evidence ID V2 |
 | P1-10 materializer/backfill | **L1** | outbox/dead-letter, stale ≤ 5 phút, benchmark |
 | P1-11 durable T3 worker | **L1** | worker queue thật, test 10k candidate |
@@ -1324,6 +1324,36 @@ Thứ tự tiếp theo: shadow chạy vài lượt thật → đối chiếu dif
 CandidateSet V2 → nếu không mất hồ sơ nào thì đổi sang `on`. Ở `on`, V2 chỉ
 **thêm** recall vào pipeline hiện có và lỗi thì fail-open, nên đường cũ vẫn là
 lưới an toàn.
+
+### 17.10h. Hạn mức GreenNode tính theo MODEL, không theo khoá
+
+Người dùng cấp thêm hai khoá GreenNode. Khoá **không** nằm trong `.env` mà trong
+`ai_providerconfig.api_key_encrypted` (mã hoá bằng `SECRET_KEY`), nên đã thêm vào
+đúng chỗ đó — pool hiện có 3 khoá (`vn-_l-…`, `vn-aIp…`, `vn-KYj…`).
+
+Đo ngay sau khi thêm, 4 lời gọi liên tiếp mỗi model:
+
+| Model | Kết quả |
+|---|---|
+| `qwen/qwen3.7-plus` | ok, ok, **429**, **429** |
+| `qwen/qwen3.6-flash` | ok, ok, **429**, **429** |
+| `z-ai/glm-5.2-hackathon` | ok, ok, ok, ok (chậm hơn: ~12 giây/lượt) |
+
+Ba khoá **không** làm tăng thông lượng của hai model qwen, nhưng `glm-5.2-hackathon`
+thì không bị chặn. Kết luận: **hạn mức là của từng model**, không phải của khoá
+hay của nhà cung cấp. Vì vậy gáo token đã đổi sang cặp `(provider, model)` —
+gáo theo provider vừa chặn oan model còn dư, vừa không chặn đủ model đã hết.
+
+Bằng chứng bản vá H5 chạy đúng trên production: trong probe 12 lời gọi, sau hai
+lần Gemini trả 402 thì **các lời gọi sau không còn gọi Gemini nữa** ("bỏ qua
+gemini…"), chỉ còn thử GreenNode. Trước bản vá thì mười lời gọi liên tiếp đều
+nướng vào Gemini.
+
+**Quyết định cần người:** judge đang chạy `qwen/qwen3.7-plus` — model bị chặn
+nặng nhất. Ba đường: (a) chuyển judge sang `glm-5.2-hackathon` (còn hạn mức
+nhưng chậm gấp ~3), (b) giữ qwen và để gáo token xếp hàng (đúng nhưng lượt hỏi
+dài hơn), (c) xin GreenNode nâng hạn mức cho qwen. Chất lượng judge đã được chốt
+bằng benchmark 19/09 nên không tự đổi model mà không có người quyết.
 
 ### 17.11. Việc tiếp theo theo đúng dependency
 
