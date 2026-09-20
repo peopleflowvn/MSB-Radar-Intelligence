@@ -563,6 +563,46 @@ class BaseDossier(models.Model):
     built_at = models.DateTimeField(auto_now=True, db_index=True)
 
 
+class SearchVocabulary(models.Model):
+    """Từ điển canonical + alias cho query compiler (SEARCH-P1-02B).
+
+    Trước đây alias là hằng số trong `search_v2.py`: nghiệp vụ muốn thêm một cách
+    gọi chức danh phải chờ một lần deploy, nên thực tế là không ai thêm. Bảng này
+    để Product-Ops sở hữu nội dung, có `version` và `updated_by` để giải thích
+    được vì sao một truy vấn khớp — `explain` của mỗi lượt ghi lại version đã dùng.
+
+    Bảng KHÔNG chứa dữ liệu ứng viên: chỉ từ vựng.
+    """
+
+    KIND_TITLE = "title"
+    KIND_SKILL = "skill"
+    KIND_COMPANY = "company"
+    KIND_EDUCATION = "education"
+    KIND_LOCATION = "location"
+    KIND_PRODUCT = "product"
+    KINDS = (KIND_TITLE, KIND_SKILL, KIND_COMPANY, KIND_EDUCATION,
+             KIND_LOCATION, KIND_PRODUCT)
+
+    kind = models.CharField(max_length=20, db_index=True)
+    #: Dạng chuẩn đã bỏ dấu, hạ chữ thường (`search_v2.canonical`).
+    canonical = models.CharField(max_length=240)
+    #: Các cách gọi khác, cũng đã chuẩn hoá. Trùng `canonical` là vô hại.
+    aliases = models.JSONField(default=list, blank=True)
+    enabled = models.BooleanField(default=True, db_index=True)
+    version = models.PositiveIntegerField(default=1)
+    note = models.CharField(max_length=200, blank=True, default="")
+    updated_by = models.CharField(max_length=120, blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["kind", "canonical"],
+                                                name="uq_search_vocab_kind_canonical")]
+        indexes = [models.Index(fields=["kind", "enabled"])]
+
+    def __str__(self):
+        return f"{self.kind}:{self.canonical}"
+
+
 class ConstraintJudgementCache(models.Model):
     """Only complete, scope-bound evidence judgements are reusable."""
 

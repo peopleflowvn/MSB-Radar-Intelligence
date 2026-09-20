@@ -333,6 +333,9 @@ SEARCH_V2_SNAPSHOT_MAX_MEMBERS = env.int("SEARCH_V2_SNAPSHOT_MAX_MEMBERS",
 #: Số hit tối đa của nhánh field-aware FTS. Recall của nhánh này bị giới hạn bởi
 #: chính con số đó và phải được ghi lại, không được phát biểu là "đã tìm toàn bộ".
 SEARCH_V2_FTS_TOP_N = env.int("SEARCH_V2_FTS_TOP_N", default=2000)
+#: Số hit tối đa của nhánh dense ANN. Nhỏ hơn FTS vì mỗi lượt tốn một lời gọi
+#: embedding và vector chỉ để tăng recall cho diễn đạt tương đương.
+SEARCH_V2_VECTOR_TOP_N = env.int("SEARCH_V2_VECTOR_TOP_N", default=500)
 TALENT_AI_RERANK_CV_CHARS = env.int("TALENT_AI_RERANK_CV_CHARS", default=1500)
 
 # Số chiều YÊU CẦU cho API embedding cần nêu rõ (Gemini output_dimensionality).

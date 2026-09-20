@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 from types import SimpleNamespace
+from unittest import mock
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
@@ -10,14 +11,15 @@ from accounts import roles
 from people.models import Document, Person
 
 from .models import (CandidateSetMember, ConstraintJudgementCache,
-                     SearchProjection, TalentProfile)
+                     SearchProjection, SearchVocabulary, TalentProfile)
 from .search_v2 import (EVIDENCE_CHAR_BUDGET, BranchHit, Constraint, RadarTurnPlan,
                         ablation, build_dossier, build_projection, cache_judgement,
                         compile_projection_query, create_candidate_set,
                         deterministic_group, enforce_cost_guard,
                         estimate_judgement_cost, evidence_view, from_legacy_plan,
                         lexical_branch, process_candidate_set, rank_rows,
-                        recall_terms, split_sections, tsquery, union_branches)
+                        canonical_for, recall_terms, split_sections, tsquery,
+                        union_branches, vector_branch, vocabulary)
 from .answer.engine import _set_answer_coverage
 
 
@@ -173,6 +175,41 @@ class BranchContractTest(TestCase):
         self.assertEqual(state["reason"], "vendor_unsupported")
         self.assertFalse(state["ran"])
 
+    def test_vector_branch_reports_why_it_did_not_run(self):
+        plan = RadarTurnPlan(must=[Constraint("search_text", "chuyển đổi số",
+                                              classification="HARD_SEMANTIC")])
+        queryset, _explain = compile_projection_query(plan)
+        hits, state = vector_branch(queryset, plan, limit=10, population=0)
+        self.assertIsNone(hits)
+        # Không có model/vector thì nhánh là "không chạy", không phải "chạy và
+        # không thấy ai" — hai điều đó nói khác nhau hoàn toàn về coverage.
+        self.assertIn(state["reason"], {"no_model", "no_vectors_in_scope"})
+        self.assertFalse(state["ran"])
+
+    def test_vector_branch_surfaces_dimension_mismatch_as_degraded(self):
+        from talent import vector_index
+
+        plan = RadarTurnPlan(must=[Constraint("search_text", "chuyển đổi số",
+                                              classification="HARD_SEMANTIC")])
+        queryset, _explain = compile_projection_query(plan)
+        with mock.patch.object(vector_index, "current_model", return_value="m1"), \
+             mock.patch.object(vector_index, "search_scored",
+                               side_effect=vector_index.VectorDimensionMismatch("768 vs 1024")):
+            hits, state = vector_branch(queryset, plan, limit=10, population=5)
+        self.assertIsNone(hits)
+        self.assertEqual(state["reason"], "dimension_mismatch")
+
+    def test_vector_hits_join_union_without_passing_must(self):
+        person = Person.objects.create(display_name="Vector", is_applicant=True)
+        TalentProfile.objects.create(person=person, current_title="Kế toán")
+        build_projection(person.pk)
+        rows = union_branches([BranchHit("vector", person.pk, rank=1, raw_score=.87)])
+        self.assertEqual(rows[0]["provenance"]["vector"]["rank"], 1)
+        run = create_candidate_set(RadarTurnPlan(
+            must=[Constraint("title", "Data Analyst")]))
+        # Người chỉ vào từ nhánh vector không được coi là đã thoả `must`.
+        self.assertEqual(run.candidate_total, 0)
+
     def test_ablation_scores_each_config_separately(self):
         person = Person.objects.create(display_name="Ablation", is_applicant=True)
         TalentProfile.objects.create(person=person, current_title="Data Analyst")
@@ -180,6 +217,97 @@ class BranchContractTest(TestCase):
         report = ablation(RadarTurnPlan(must=[Constraint("title", "Data Analyst")]))
         self.assertEqual(report["configs"]["structured"]["ids"], [person.pk])
         self.assertFalse(report["configs"]["field_fts"]["branches"]["field_fts"]["ran"])
+
+
+class VocabularyTest(TestCase):
+    """P1-02B: alias là nội dung nghiệp vụ, sửa được mà không cần deploy."""
+
+    def _person(self, name, title, location="Hà Nội"):
+        person = Person.objects.create(display_name=name, is_applicant=True,
+                                       location=location)
+        TalentProfile.objects.create(person=person, current_title=title,
+                                     location=location)
+        build_projection(person.pk)
+        return person
+
+    def test_seed_is_used_when_table_is_empty_and_version_is_zero(self):
+        SearchVocabulary.objects.all().delete()
+        table, version = vocabulary("location")
+        self.assertIn("ha noi", table)
+        self.assertEqual(version, 0)
+        self.assertEqual(canonical_for("location", "hanoi"), "ha noi")
+
+    def test_new_alias_from_table_changes_matching_without_deploy(self):
+        person = self._person("Chuyên viên", "chuyen vien du lieu")
+        plan = RadarTurnPlan(must=[Constraint("title", "Data Analyst")])
+        self.assertEqual(compile_projection_query(plan)[0].count(), 0)
+        SearchVocabulary.objects.update_or_create(
+            kind="title", canonical="data analyst",
+            defaults={"aliases": ["data analyst", "chuyen vien du lieu"],
+                      "version": 7, "updated_by": "test"})
+        query, explain = compile_projection_query(plan)
+        self.assertEqual(list(query.values_list("person_id", flat=True)), [person.pk])
+        # Khớp nhờ alias thì phải nói được là alias bản nào.
+        self.assertEqual(explain["vocabulary_version"], 7)
+
+    def test_disabled_row_stops_matching(self):
+        self._person("Chuyên viên", "chuyen vien du lieu")
+        SearchVocabulary.objects.update_or_create(
+            kind="title", canonical="data analyst",
+            defaults={"aliases": ["data analyst", "chuyen vien du lieu"],
+                      "enabled": False, "version": 8, "updated_by": "test"})
+        plan = RadarTurnPlan(must=[Constraint("title", "Data Analyst")])
+        self.assertEqual(compile_projection_query(plan)[0].count(), 0)
+
+    def test_import_export_round_trip_and_version_bump(self):
+        from io import StringIO
+        import json as json_module
+        import tempfile
+        from pathlib import Path
+
+        from django.core.management import call_command
+
+        SearchVocabulary.objects.all().delete()
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "vocab.json"
+            path.write_text(json_module.dumps(
+                {"title": {"Data Analyst": ["Chuyên viên dữ liệu"]}}),
+                encoding="utf-8")
+            call_command("search_vocabulary", "import", file=str(path), by="ops",
+                         stdout=StringIO())
+            row = SearchVocabulary.objects.get(kind="title", canonical="data analyst")
+            self.assertEqual(row.version, 1)
+            self.assertIn("chuyen vien du lieu", row.aliases)
+            self.assertEqual(row.updated_by, "ops")
+
+            path.write_text(json_module.dumps(
+                {"title": {"Data Analyst": ["Chuyên viên dữ liệu", "DA"]}}),
+                encoding="utf-8")
+            call_command("search_vocabulary", "import", file=str(path), by="ops",
+                         stdout=StringIO())
+            row.refresh_from_db()
+            self.assertEqual(row.version, 2)   # sửa nội dung thì version tăng
+
+            out = StringIO()
+            call_command("search_vocabulary", "export", stdout=out)
+            self.assertIn("chuyen vien du lieu", out.getvalue())
+
+    def test_import_rejects_unknown_kind(self):
+        from io import StringIO
+        import json as json_module
+        import tempfile
+        from pathlib import Path
+
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "vocab.json"
+            path.write_text(json_module.dumps({"mau toc": {"x": ["y"]}}),
+                            encoding="utf-8")
+            with self.assertRaises(CommandError):
+                call_command("search_vocabulary", "import", file=str(path),
+                             stdout=StringIO())
 
 
 class SilverDatasetTest(TestCase):

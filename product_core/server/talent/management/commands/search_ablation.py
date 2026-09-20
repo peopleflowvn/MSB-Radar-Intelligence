@@ -59,6 +59,25 @@ def load_cases(path):
     return cases
 
 
+def _config_required(config, branches):
+    """Cấu hình này có nhánh nào thật sự được yêu cầu chạy không.
+
+    Nếu mọi nhánh của cấu hình đều `not_required` thì recall của nó là **không
+    áp dụng**, không phải 0. Báo 0 sẽ đọc thành "nhánh này chẳng tìm được ai",
+    trong khi thực tế nó chưa hề được hỏi.
+    """
+    states = [branches.get(name) or {} for name in config.split("+")]
+    states = [state for state in states if state]
+    if not states:
+        return True
+    # `not_required`: plan không cần nhánh này. `no_hard_filter`: plan không có
+    # điều kiện cứng nào để nhánh structured làm việc. Cả hai đều là "không áp
+    # dụng", khác hẳn với "đã chạy và không tìm được ai".
+    idle = {"not_required", "no_hard_filter"}
+    return any(state.get("ran") or state.get("reason") not in idle
+               for state in states)
+
+
 def evaluate_case(case, *, fts_top_n):
     """Một case → recall/unique hit từng cấu hình, hoặc lý do bị bỏ qua."""
     plan = RadarTurnPlan.from_dict(case.get("plan") or {})
@@ -68,6 +87,12 @@ def evaluate_case(case, *, fts_top_n):
         if labels.get("status") != "labelled" or not labels.get("person_ids"):
             return {"id": case.get("id"), "skipped": "needs_review"}
         truth = set(labels.get("person_ids") or [])
+    elif case.get("truth_plan"):
+        # Truth lấy từ một plan khác (thường là điều kiện cứng tương đương), để
+        # đo được nhánh lexical/vector có tìm lại đúng tập đó hay không.
+        truth_queryset, _explain = compile_projection_query(
+            RadarTurnPlan.from_dict(case["truth_plan"]))
+        truth = set(truth_queryset.values_list("person_id", flat=True))
     else:
         queryset, explain = compile_projection_query(plan)
         truth = set(queryset.values_list("person_id", flat=True))
@@ -79,10 +104,13 @@ def evaluate_case(case, *, fts_top_n):
     rows = {}
     for config, data in report["configs"].items():
         found = set(data["ids"])
+        applicable = _config_required(config, data["branches"])
         rows[config] = {
             "count": data["count"], "ms": data["ms"],
-            "recall": (round(len(found & truth) / len(truth), 4) if truth else None),
-            "missed": sorted(truth - found)[:20],
+            "recall": (round(len(found & truth) / len(truth), 4)
+                       if truth and applicable else None),
+            "applicable": applicable,
+            "missed": sorted(truth - found)[:20] if applicable else [],
             "extra": len(found - truth),
             "branches": data["branches"],
         }

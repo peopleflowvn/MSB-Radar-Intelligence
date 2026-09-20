@@ -48,14 +48,97 @@ def canonical(value) -> str:
     return normalize_name(str(value or "")).strip()
 
 
-GEO_ALIASES = {"hanoi": "ha noi", "hn": "ha noi", "hochiminh": "ho chi minh",
-               "hcm": "ho chi minh", "saigon": "ho chi minh", "sg": "ho chi minh"}
-TERM_ALIASES = {
-    "data analyst": ("data analyst", "chuyen vien phan tich du lieu", "phan tich du lieu"),
-    "relationship manager": ("relationship manager", "quan he khach hang", "rm"),
-    "accountant": ("accountant", "ke toan"),
-    "college": ("college", "cao dang"),
+#: Hạt giống cho `SearchVocabulary`, dạng `kind → {canonical: (alias, …)}`.
+#: Giữ trong code CHỈ để hệ thống mới dựng lên là chạy được và để test không cần
+#: seed; nguồn sự thật khi bảng đã có dữ liệu là `SearchVocabulary`
+#: (SEARCH-P1-02B). Thêm alias mới thì sửa bảng, không sửa file này.
+SEED_VOCABULARY = {
+    "location": {
+        "ha noi": ("ha noi", "hanoi", "hn"),
+        "ho chi minh": ("ho chi minh", "hochiminh", "hcm", "saigon", "sg",
+                        "tp hcm", "sai gon"),
+    },
+    "title": {
+        "data analyst": ("data analyst", "chuyen vien phan tich du lieu",
+                         "phan tich du lieu"),
+        "relationship manager": ("relationship manager", "quan he khach hang", "rm"),
+        "accountant": ("accountant", "ke toan"),
+    },
+    "education": {"college": ("college", "cao dang")},
 }
+#: Giữ tên cũ cho code/test đang import.
+GEO_ALIASES = {alias: canon for canon, aliases in SEED_VOCABULARY["location"].items()
+               for alias in aliases}
+TERM_ALIASES = {**SEED_VOCABULARY["title"], **SEED_VOCABULARY["education"]}
+#: Field của constraint → `kind` trong từ điển.
+VOCAB_KIND = {"title": "title", "skill": "skill", "skills": "skill",
+              "company": "company", "education": "education",
+              "location": "location", "industry": "product",
+              "industries": "product", "application_position": "title"}
+_VOCAB_CACHE = {"stamp": None, "data": {}, "version": 0}
+
+
+def _vocab_stamp():
+    """Dấu để biết từ điển đã đổi, không phải đọc lại cả bảng mỗi truy vấn."""
+    try:
+        from django.db.models import Max
+
+        from .models import SearchVocabulary
+        row = SearchVocabulary.objects.aggregate(
+            m=Max("updated_at"), v=Max("version"), n=Count("pk"))
+        return (row["m"].isoformat() if row["m"] else "", row["v"] or 0,
+                row["n"] or 0)
+    except Exception:                              # noqa: BLE001 - chưa migrate
+        return None
+
+
+def vocabulary(kind=None):
+    """`{canonical: (alias, …)}` theo `kind`, lấy từ DB, fallback về hạt giống.
+
+    Trả cả `version` để `explain` nói được truy vấn đã dùng từ điển bản nào — một
+    kết quả khớp nhờ alias mà không giải thích được là một kết quả không kiểm được.
+    """
+    stamp = _vocab_stamp()
+    if stamp is None:
+        return ((SEED_VOCABULARY.get(kind, {}) if kind else SEED_VOCABULARY), 0)
+    if stamp != _VOCAB_CACHE["stamp"]:
+        from .models import SearchVocabulary
+        data, version = {}, 0
+        for row in SearchVocabulary.objects.filter(enabled=True).values(
+                "kind", "canonical", "aliases", "version"):
+            aliases = tuple(dict.fromkeys(
+                [row["canonical"], *[canonical(x) for x in (row["aliases"] or [])]]))
+            data.setdefault(row["kind"], {})[row["canonical"]] = aliases
+            version = max(version, int(row["version"] or 0))
+        _VOCAB_CACHE.update(stamp=stamp, data=data, version=version)
+    data = _VOCAB_CACHE["data"]
+    if not data:
+        # Bảng trống (hệ thống mới) → hạt giống, và version 0 để thấy rõ là chưa
+        # ai quản trị từ điển.
+        return ((SEED_VOCABULARY.get(kind, {}) if kind else SEED_VOCABULARY), 0)
+    return (data.get(kind, {}) if kind else data), _VOCAB_CACHE["version"]
+
+
+def canonical_for(kind, value):
+    """Dạng chuẩn của một giá trị theo từ điển ("hanoi" và "hn" → "ha noi")."""
+    table, _version = vocabulary(kind)
+    for candidate in (value, value.replace(" ", "")):
+        if candidate in table:
+            return candidate
+        for canon, aliases in table.items():
+            if candidate == canon or candidate in aliases:
+                return canon
+    return value
+
+
+def expand_term(field, value):
+    """Các dạng cần tìm cho một giá trị: chính nó cộng alias trong từ điển."""
+    kind = VOCAB_KIND.get(field)
+    table, version = vocabulary(kind) if kind else ({}, 0)
+    aliases = table.get(value)
+    if aliases:
+        return tuple(dict.fromkeys([value, *aliases])), version
+    return (value,), version
 
 
 @dataclass(frozen=True)
@@ -232,8 +315,14 @@ def _condition(constraint: Constraint, ctx=None):
     if constraint.kind in {"term", "geo"}:
         value = canonical(value)
         if constraint.kind == "geo":
-            value = GEO_ALIASES.get(value.replace(" ", ""), GEO_ALIASES.get(value, value))
-        aliases = TERM_ALIASES.get(value, (value,))
+            # Địa danh: quy về dạng chuẩn TRƯỚC khi mở rộng ("hanoi" → "ha noi"),
+            # nếu không thì "hanoi" và "Hà Nội" là hai truy vấn khác nhau.
+            value = canonical_for("location", value)
+        field_kind = "location" if constraint.kind == "geo" else constraint.field
+        aliases, vocab_version = expand_term(field_kind, value)
+        if ctx is not None:
+            ctx["vocabulary_version"] = max(ctx.get("vocabulary_version", 0),
+                                            vocab_version)
         # Văn bản gộp dùng chỉ mục GIN trên `search_tsv`; `LIKE '%…%'` trên cột
         # này là quét toàn bảng.
         if field_name == "searchable_text" and ctx is not None and fts_available():
@@ -294,7 +383,7 @@ def compile_projection_query(plan: RadarTurnPlan):
     """Compile hard AST to a lazy indexed QuerySet plus machine-readable explain."""
     query = SearchProjection.objects.filter(version=SCHEMA_VERSION)
     applied, unresolved, semantic, preferences = [], [], [], []
-    ctx = {"annotations": {}, "tsqueries": []}
+    ctx = {"annotations": {}, "tsqueries": [], "vocabulary_version": 0}
     keeps, drops = [], []
     for item in plan.must:
         if item.classification == "HARD_SEMANTIC":
@@ -337,6 +426,7 @@ def compile_projection_query(plan: RadarTurnPlan):
     semantic = list(dict.fromkeys(semantic))
     return query.order_by("person_id"), {
         "fts_index_used": bool(ctx["tsqueries"]),
+        "vocabulary_version": ctx.get("vocabulary_version", 0),
         "plan_version": plan.version, "projection_version": SCHEMA_VERSION,
         "applied": applied, "unresolved": unresolved,
         "hard_filters_applied": len(applied),
@@ -556,6 +646,51 @@ def lexical_branch(base_queryset, plan: RadarTurnPlan, *, limit):
                   "reason": "top_n_capped" if capped else ""}
 
 
+#: Trên tập đã lọc cứng nhỏ hơn ngưỡng này, khoảng cách được tính chính xác
+#: trong phạm vi đó. Lớn hơn thì bật `hnsw.iterative_scan` để ANN có filter không
+#: âm thầm trả ít hơn `top_n`.
+VECTOR_PREFILTER_MAX = 20000
+
+
+def vector_branch(base_queryset, plan: RadarTurnPlan, *, limit, population=None):
+    """Nhánh dense ANN trong phạm vi filter cứng (SEARCH-P1-03D).
+
+    Nhánh này chỉ thêm recall cho phần diễn đạt tương đương; nó không bao giờ tự
+    cho một Person pass điều kiện `must` — T2 vẫn xác minh lại toàn bộ.
+    """
+    terms = recall_terms(plan)
+    if not terms:
+        return None, {"ran": False, "reason": "not_required"}
+    from talent import vector_index
+
+    model = vector_index.current_model()
+    if not model:
+        return None, {"ran": False, "reason": "no_model"}
+    total = population if population is not None else base_queryset.count()
+    iterative = total > VECTOR_PREFILTER_MAX
+    try:
+        rows = vector_index.search_scored(" ".join(terms), limit=max(1, int(limit)),
+                                          person_queryset=base_queryset,
+                                          iterative=iterative)
+    except vector_index.VectorDimensionMismatch as exc:
+        return None, {"ran": False, "reason": "dimension_mismatch",
+                      "error": str(exc)[:200]}
+    except Exception as exc:                       # noqa: BLE001 - provider/mạng
+        return None, {"ran": False, "reason": "error", "error": str(exc)[:200]}
+    if not rows:
+        # Không có vector cho model đang dùng, hoặc chưa ai trong phạm vi được
+        # embed: nhánh coi như KHÔNG chạy, không phải "chạy và không thấy ai".
+        return None, {"ran": False, "reason": "no_vectors_in_scope"}
+    hits = [BranchHit("vector", person_id, rank=ordinal,
+                      raw_score=round(1.0 - float(distance), 6))
+            for ordinal, (person_id, distance) in enumerate(rows, 1)]
+    capped = len(hits) >= max(1, int(limit))
+    return hits, {"ran": True, "hits": len(hits), "top_n": int(limit),
+                  "capped": capped, "model": model,
+                  "mode": "ann_iterative" if iterative else "prefilter_exact",
+                  "reason": "top_n_capped" if capped else ""}
+
+
 def union_branches(*branch_hits):
     """Union theo Person, giữ rank/score/provenance từng nhánh.
 
@@ -575,6 +710,7 @@ def union_branches(*branch_hits):
     ordered = sorted(merged.values(), key=lambda row: (
         0 if "structured" in row["provenance"] else 1,
         row["provenance"].get("field_fts", {}).get("rank", 0),
+        row["provenance"].get("vector", {}).get("rank", 0),
         row["person_id"]))
     return ordered
 
@@ -586,8 +722,8 @@ def branch_state(explain, *, structured=None, fts=None, vector=None):
         "structured": structured or {"ran": True, "required": True, "degraded": False},
         "field_fts": {"required": branch_required, "ran": False,
                       "reason": "not_implemented", **(fts or {})},
-        "vector": vector or {"required": branch_required, "ran": False,
-                             "reason": "not_implemented"},
+        "vector": {"required": branch_required, "ran": False,
+                   "reason": "not_implemented", **(vector or {})},
     }
 
 
@@ -632,7 +768,8 @@ def _enroll_union(run, rows):
             run=run, person_id=row["person_id"], ordinal=ordinal,
             provenance=row["provenance"],
             structured_score=row["scores"].get("structured"),
-            lexical_score=row["scores"].get("field_fts")))
+            lexical_score=row["scores"].get("field_fts"),
+            semantic_score=row["scores"].get("vector")))
         if len(batch) == 2000:
             CandidateSetMember.objects.bulk_create(batch, batch_size=2000)
             batch = []
@@ -691,25 +828,29 @@ def create_candidate_set(plan: RadarTurnPlan, *, user=None, scope_token="",
     # semantic, không bao giờ kéo vào người vi phạm điều kiện cứng.
     from django.conf import settings
     fts_top_n = int(getattr(settings, "SEARCH_V2_FTS_TOP_N", 2000))
+    vector_top_n = int(getattr(settings, "SEARCH_V2_VECTOR_TOP_N", 500))
     lexical_hits, fts_state = lexical_branch(queryset, plan, limit=fts_top_n)
+    vector_hits, vector_state = vector_branch(queryset, plan, limit=vector_top_n,
+                                              population=total)
+    recall_hits = [hits for hits in (lexical_hits, vector_hits) if hits]
     structured_state = {"ran": True, "required": True, "degraded": False,
                         "hits": total}
     union_rows = None
-    if lexical_hits is not None and not hard_applied:
+    if recall_hits and not hard_applied:
         # Không có filter cứng thì T0 bằng cả dân số; tập đó không phải
-        # CandidateSet. Thành viên lấy từ nhánh lexical, và recall bị giới hạn
+        # CandidateSet. Thành viên lấy từ các nhánh recall, và recall bị giới hạn
         # bởi `top_n` — điều này được ghi lại, không được phát biểu là "đã tìm
         # toàn bộ".
         structured_state = {"ran": False, "required": False, "degraded": False,
                             "reason": "no_hard_filter", "hits": 0}
-        union_rows = union_branches(lexical_hits)
-    elif lexical_hits is not None and total <= limit:
+        union_rows = union_branches(*recall_hits)
+    elif recall_hits and total <= limit:
         structured_hits = [BranchHit("structured", person_id) for person_id in
                            queryset.values_list("person_id", flat=True)
                            .iterator(chunk_size=2000)]
-        union_rows = union_branches(structured_hits, lexical_hits)
+        union_rows = union_branches(structured_hits, *recall_hits)
     explain["branches"] = branch_state(explain, structured=structured_state,
-                                       fts=fts_state)
+                                       fts=fts_state, vector=vector_state)
     complete_branches = branches_complete(explain)
 
     # Trần snapshot: thà từ chối vật chất hoá còn hơn ghi cả kho vào member table
@@ -744,11 +885,12 @@ def create_candidate_set(plan: RadarTurnPlan, *, user=None, scope_token="",
     return run
 
 
-ABLATION_CONFIGS = ("structured", "field_fts", "structured+field_fts")
+ABLATION_CONFIGS = ("structured", "field_fts", "vector",
+                    "structured+field_fts", "full")
 
 
 def ablation(plan: RadarTurnPlan, *, configs=ABLATION_CONFIGS, fts_top_n=2000,
-             cap=SNAPSHOT_MAX_MEMBERS):
+             vector_top_n=500, cap=SNAPSHOT_MAX_MEMBERS):
     """Chạy từng cấu hình nhánh riêng để đo đóng góp thật (mục 3.7 backlog).
 
     Không có số này thì mọi việc tăng trọng số hay thêm nhánh chỉ là phỏng đoán:
@@ -762,16 +904,21 @@ def ablation(plan: RadarTurnPlan, *, configs=ABLATION_CONFIGS, fts_top_n=2000,
     for config in configs:
         started = time.perf_counter()
         ids, state = [], {}
-        if config in {"structured", "structured+field_fts"}:
+        if config in {"structured", "structured+field_fts", "full"}:
             if hard_applied:
                 ids = list(queryset.values_list("person_id", flat=True)
                            .iterator(chunk_size=2000))[:cap]
                 state["structured"] = {"ran": True, "hits": len(ids)}
             else:
                 state["structured"] = {"ran": False, "reason": "no_hard_filter"}
-        if config in {"field_fts", "structured+field_fts"}:
+        if config in {"field_fts", "structured+field_fts", "full"}:
             hits, fts_state = lexical_branch(queryset, plan, limit=fts_top_n)
             state["field_fts"] = fts_state
+            if hits:
+                ids = list(dict.fromkeys([*ids, *(hit.person_id for hit in hits)]))[:cap]
+        if config in {"vector", "full"}:
+            hits, vector_state = vector_branch(queryset, plan, limit=vector_top_n)
+            state["vector"] = vector_state
             if hits:
                 ids = list(dict.fromkeys([*ids, *(hit.person_id for hit in hits)]))[:cap]
         result["configs"][config] = {

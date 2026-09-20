@@ -381,6 +381,60 @@ def has_vectors_for(model):
             .exclude(embedding__isnull=True).exists())
 
 
+def search_scored(query, *, limit=250, person_queryset=None, iterative=False):
+    """`[(person_id, distance)]` gần nhất, có thể giới hạn phạm vi bằng SUBQUERY.
+
+    `person_queryset` là một queryset có cột `person_id` (ví dụ `SearchProjection`
+    đã lọc cứng). Nó được nhúng thành subquery SQL, **không** kéo danh sách ID về
+    Python: ở kho 500k thì `IN (…)` với hàng chục nghìn phần tử vừa chậm vừa vỡ.
+
+    Lọc TRƯỚC (pre-filter) chứ không phải ANN toàn kho rồi lọc sau: post-filter
+    làm mất recall khi điều kiện cứng chỉ chọn vài trăm người — top-K của toàn
+    kho có thể không chứa ai trong số đó.
+
+    `iterative=True` bật `hnsw.iterative_scan` (pgvector ≥ 0.8) để ANN có filter
+    không trả về ít hơn `limit` một cách âm thầm.
+    """
+    if connection.vendor != "postgresql":
+        return []
+    if not has_vectors_for(current_model()):
+        return []
+    vector, model = embed(query, task_type="RETRIEVAL_QUERY")
+    if not vector:
+        return []
+    configured = _dimensions()
+    stored = _stored_dimension(model)
+    observed = len(vector)
+    if stored is None or observed != stored or observed != configured:
+        raise VectorDimensionMismatch(
+            "semantic_degraded: vector dimension mismatch "
+            f"configured={configured} query={observed} stored={stored} model={model}")
+    from pgvector.django import CosineDistance
+
+    scope = None
+    if person_queryset is not None:
+        scope = person_queryset.values("person_id")
+    if iterative:
+        with connection.cursor() as cursor:
+            try:
+                cursor.execute("SET LOCAL hnsw.iterative_scan = 'relaxed_order'")
+            except Exception:                      # noqa: BLE001 - pgvector cũ
+                pass
+    best = {}
+    for model_class in (PersonSearchDocument, CVChunk):
+        rows = (model_class.objects.exclude(embedding__isnull=True)
+                .filter(embedding_model=model, **VISIBLE))
+        if scope is not None:
+            rows = rows.filter(person_id__in=scope)
+        rows = (rows.annotate(distance=CosineDistance("embedding", vector))
+                .order_by("distance").values_list("person_id", "distance")[:limit])
+        for person_id, distance in rows:
+            current = best.get(person_id)
+            if current is None or distance < current:
+                best[person_id] = distance
+    return sorted(best.items(), key=lambda row: (row[1], row[0]))[:limit]
+
+
 def search(query, *, limit=250):
     """Return person ids from person + CV vectors, preserving best rank per person."""
     if connection.vendor != "postgresql":

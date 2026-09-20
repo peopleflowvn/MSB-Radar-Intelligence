@@ -865,22 +865,22 @@ khi mọi ticket của nó ở L4.
 
 | Ticket | Mức | Việc còn lại gần nhất |
 |---|:---:|---|
-| H1 bỏ fallback không dùng được | **L2** | đặt `MSB_AI_DISABLED_PROVIDERS=gemini` trên prod; prod vẫn còn 46 lượt 402/48h |
-| H2 chặn lệch chiều vector | **L3** | sửa `EmbeddingConfig.dimensions` 768 → 1024; hiện nhánh ngữ nghĩa tắt mọi lượt |
-| H3 FTS giữ phép giao cho must | **L2** | chạy case 12/12 và EXPLAIN trên prod |
+| H1 bỏ fallback không dùng được | **L2** | H5 đã chặn phần lớn lãng phí; theo dõi 24h xem 402 còn không rồi mới quyết có cần `MSB_AI_DISABLED_PROVIDERS` hay không |
+| H2 chặn lệch chiều vector | **L4** | đã pin `dimensions = 1024` trên prod 20/09 07:43 UTC; contract trong container đọc `configured=1024 stored=1024`; truy hồi vector thật trả 5 hồ sơ. Còn: quan sát 24 giờ không còn `semantic_degraded` |
+| H3 FTS giữ phép giao cho must | **L3** | EXPLAIN trên prod: GIN `search_tsv` cho Bitmap Index Scan, khớp 44 hồ sơ với `ke & toan`. Còn: case hồi quy 12/12 trên dữ liệu thật |
 | H4 unknown ≠ not matched | **L2** | audit câu trả lời thật, chốt ngưỡng unknown |
-| H5 fallback không mang model hub khác | **L1** | đã push `a0d8e7d`, **chờ deploy**; sau deploy đối chiếu 404 về 0 trong 24h |
+| H5 fallback không mang model hub khác | **L2** | đã deploy (run 35497650837); đối chiếu 404 về 0 trong 24 giờ |
 | P0-00 baseline/manifest/ADR | **L3** | manifest hai revision + ADR SLO/cost được duyệt |
 | P0-01 provider capacity | **L1** | quota/billing thật, fallback drill, quan sát 24h |
-| P0-02 dimension + ADR vector | **L3** | ADR halfvec/HNSW/filtered ANN + dung lượng ở 500k |
+| P0-02 dimension + ADR vector | **L3** | chiều đã pin 1024 và xác minh; còn ADR halfvec/HNSW/filtered ANN + dung lượng ở 500k |
 | P0-03 đo truncation | **L1** | đo trên corpus thật theo constraint/section |
-| P0-04 coverage contract | **L1** | ~~lưu coverage vào `ai_answerrun`~~ đã làm (chưa deploy); còn: đưa vào OpenAPI, kiểm nhánh chat/attachment |
-| P0-05 gold set | **L1** | nâng silver 23 case thành gold ≥60 câu, hai người gán nhãn |
+| P0-04 coverage contract | **L2** | `AnswerRun.coverage` đã deploy (`ai/0027`); còn: đưa vào OpenAPI, kiểm nhánh chat/attachment, và audit lượt thật sau vài ngày |
+| P0-05 gold set | **L3** | silver 28 case đã chạy trên prod: structured recall 1.0 trên 9 case chấm được, 10 case semantic bị bỏ qua đúng như thiết kế. Còn: nâng lên gold ≥60 câu, hai người gán nhãn |
 | P0-06 scale fixture | **L1** | bị chặn bởi đĩa/RAM host — cần quyết (a) hay (b) ở P0-06 |
 | P1-00 typed plan | **L1** | planner V2 thật sinh `where`, clarification flow |
-| P1-01 SearchProjection | **L3** | **projection chỉ phủ 61/611 trên prod** — chạy backfill |
-| P1-02 query compiler | **L1** | vocabulary quản trị được (02B), budget theo query type (02C) |
-| P1-03 CandidateSet hybrid | **L1** | nhánh ANN (03D), union một câu SQL (03E) |
+| P1-01 SearchProjection | **L3** | backfill xong 20/09: **611/611** projection + dossier, mọi dòng có `search_tsv`. Còn: scope/RBAC thành predicate SQL, vocabulary ID hoá |
+| P1-02 query compiler | **L1** | 02B xong ở local (bảng `SearchVocabulary` + lệnh `search_vocabulary`, `explain.vocabulary_version`), chờ deploy; còn 02C budget theo query type và adaptive expansion |
+| P1-03 CandidateSet hybrid | **L1** | 03D nhánh ANN đã viết (pre-filter bằng subquery, `hnsw.iterative_scan` khi tập lớn), chờ deploy để đo; còn 03E union một câu SQL, 03B taxonomy/application |
 | P1-04 BaseDossier | **L3** | ExtractedFact/conflict ledger, mọi application thành record |
 | P1-05 EvidenceView | **L1** | multi-round fetch, benchmark token |
 | P1-06 judgement schema | **L1** | Answer Engine live dùng verdict V2 |
@@ -1092,6 +1092,43 @@ máy chủ từ xa), xếp theo mức tác động:
 Fixture 500k **không chạy trên host này** (mục P0-06). Nếu chọn phương án (a),
 lệnh `search_scale_fixture` phải trỏ vào một database riêng: nó tạo Person tổng
 hợp, chạy trên database production sẽ làm bẩn kho ứng viên thật.
+
+### 17.10b. Đợt thực thi trên production 20/09 chiều
+
+Bốn việc ghi đã được người dùng duyệt quyền và chạy xong, theo đúng thứ tự ở
+17.10:
+
+| Việc | Kết quả |
+|---|---|
+| Pin `EmbeddingConfig.dimensions = 1024` | contract trong hub đọc `configured=1024 stored=1024`; một lượt truy hồi vector thật trả về 5 hồ sơ. **Nhánh ngữ nghĩa đã sống lại** sau nhiều ngày tắt |
+| Deploy `a0d8e7d` (run `35497650837`) | validate + deploy-production đều success; health check đạt |
+| Migration `talent/0016` + `ai/0027` | cột generated `search_tsv` (`is_generated=ALWAYS`), GIN `talent_searchprojection_tsv_gin`, `pg_trgm 1.6` và 4 chỉ mục trigram đều đã tạo |
+| `rebuild_search_v2` | **611/611** Person có projection và dossier (trước đó 61), `failed=0`, mọi dòng có `search_tsv`; bảng projection 3,1 MB, dossier 3,8 MB |
+
+Bằng chứng chỉ mục (ép `enable_seqscan = off` vì ở 611 hàng planner luôn chọn
+seq scan — đây là giới hạn của kho hiện tại, không phải của chỉ mục):
+
+- `search_tsv @@ to_tsquery('simple','ke & toan')` → **Bitmap Index Scan** trên
+  `talent_searchprojection_tsv_gin`, khớp 44 hồ sơ, 0,26 ms.
+- `title_norm LIKE '%ke toan%'` → **Bitmap Index Scan** trên
+  `talent_searchprojection_title_norm_trgm`, 0,10 ms. Trước 0016 đường này là
+  Seq Scan không có cách nào dùng chỉ mục.
+
+Ablation đầu tiên trên dữ liệu thật (`search_ablation`, 24 case silver):
+
+| Cấu hình | Case chấm được | Mean recall |
+|---|---:|---:|
+| structured | 9 | 1,0 |
+| field_fts | 9 | không áp dụng (xem dưới) |
+| structured+field_fts | 9 | 1,0 |
+
+10 case semantic bị bỏ qua đúng như thiết kế vì chưa gán nhãn, và lệnh in rõ
+"recall semantic chưa được đo". Lần chạy này lộ một lỗi **trong chính báo cáo**:
+nhánh `field_fts` bị ghi recall 0,0 trong khi nó **không được yêu cầu chạy** cho
+case deterministic — đọc thành "FTS chẳng tìm được ai". Đã sửa: cấu hình nào mà
+mọi nhánh đều `not_required`/`no_hard_filter` thì recall là `null`, và bộ silver
+thêm 4 case `lex-*` có `truth_plan` (truth lấy từ điều kiện cứng, plan dùng thuật
+ngữ semantic) để đo đúng phần đóng góp của FTS. Cần chạy lại sau lần deploy tới.
 
 ### 17.11. Việc tiếp theo theo đúng dependency
 
