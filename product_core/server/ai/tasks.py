@@ -224,7 +224,10 @@ _EMBED = ("gemini", "models/gemini-embedding-2")
 DEFAULT_ROUTE = {
     # ① và ③ cần nhanh/rẻ; ⑤ là chặng duy nhất người dùng đọc thấy.
     "talent_answer_plan": _QWEN_PLUS,    # flash đặt "Senior Data Analyst" vào bắt buộc
-    "talent_answer_judge": _QWEN_PLUS,
+    # qwen3.7-plus chính xác nhất trong benchmark nhưng production chỉ cho vài
+    # lượt/model/phút; plan + hai batch judge đã tự chạm trần. GLM đọc chậm hơn
+    # nhưng còn capacity và với pool 16 vẫn nằm trong deadline demo.
+    "talent_answer_judge": ("greennode", "z-ai/glm-5.2-hackathon"),
     # Production 20/09: deepseek-v4-pro thường chạm timeout ~36 giây, rồi hai
     # fallback cũng chỉ còn 10–15 giây và cùng hỏng. GLM chậm hơn qwen nhưng ổn
     # định hơn hạn mức và khi là model đầu tiên có đủ budget để hoàn tất compose.
@@ -271,7 +274,7 @@ _GLM = ("greennode", "z-ai/glm-5.2-hackathon")
 #: cả 4 — nên glm đứng cuối mọi chuỗi: chậm hơn nhưng còn hạn mức.
 FALLBACK_MODELS = {
     # ③ đọc bằng chứng: flash nhận nhầm hồ sơ nhiễu nhưng vẫn hơn không đọc gì.
-    "talent_answer_judge": (_QWEN, _GLM),
+    "talent_answer_judge": (_GLM, _QWEN_PLUS, _QWEN),
     "rb_answer_judge": (_QWEN, _GLM),
     # ① hiểu câu hỏi: sai một chút ở kế hoạch còn cứu được ở các chặng sau.
     "talent_answer_plan": (_QWEN, _GLM),
@@ -332,8 +335,9 @@ def capability_for(name):
 DEFAULT_REASON = {
     "talent_answer_plan": "Benchmark 19/09: flash hay đặt cấp bậc (\"Senior\") vào điều kiện "
                           "bắt buộc, loại oan người đúng nghề.",
-    "talent_answer_judge": "Benchmark 19/09: không nhận nhầm hồ sơ nhiễu (flash có), ổn định giữa "
-                           "hai lần chạy; ~45 s/30 CV. deepseek/glm chậm 2–8 phút và timeout.",
+    "talent_answer_judge": "Benchmark 19/09 ưu tiên qwen3.7-plus về chất lượng, nhưng production "
+                           "20/09 giới hạn model sau plan + một batch. GLM còn capacity và hoàn "
+                           "tất pool demo 16 trong deadline; qwen3.7-plus giữ làm fallback.",
     "talent_answer_compose": "Production 20/09: deepseek-v4-pro thường timeout trước khi trả lời; "
                              "glm-5.2 hoàn tất ổn định hơn khi được cấp trọn budget compose. "
                              "DeepSeek vẫn là fallback chất lượng cao.",

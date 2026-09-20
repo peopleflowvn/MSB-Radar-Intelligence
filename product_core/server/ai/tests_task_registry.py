@@ -194,7 +194,7 @@ class BenchmarkDefaultsTest(TestCase):
     `DEFAULT_REASON` và chạy lại benchmark, không sửa lẻ một con số."""
 
     def test_doc_cv_va_hieu_cau_hoi_dung_qwen_plus(self):
-        for task in ("talent_answer_plan", "talent_answer_judge", "rb_prospect_search",
+        for task in ("talent_answer_plan", "rb_prospect_search",
                      "rb_answer_judge", "candidate_extraction"):
             self.assertEqual(tasks_registry.default_route(task), ("greennode", "qwen/qwen3.7-plus"))
             self.assertTrue(tasks_registry.DEFAULT_REASON.get(task))
@@ -204,3 +204,9 @@ class BenchmarkDefaultsTest(TestCase):
                          ("greennode", "z-ai/glm-5.2-hackathon"))
         self.assertIn(("greennode", "deepseek/deepseek-v4-pro"),
                       tasks_registry.fallback_models("talent_answer_compose"))
+
+    def test_judge_dung_glm_vi_qwen_khong_du_capacity_demo(self):
+        self.assertEqual(tasks_registry.default_route("talent_answer_judge"),
+                         ("greennode", "z-ai/glm-5.2-hackathon"))
+        self.assertIn(("greennode", "qwen/qwen3.7-plus"),
+                      tasks_registry.fallback_models("talent_answer_judge"))

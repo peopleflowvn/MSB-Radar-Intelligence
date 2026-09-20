@@ -1469,8 +1469,9 @@ Increment ổn định demo thực hiện các thay đổi sau:
 
 1. `TALENT_JUDGE_WORKERS` mặc định 1; production đặt deep-read pool 16 để vẫn
    tìm toàn kho nhưng chỉ đọc sâu hai lô xếp hạng cao nhất trong deadline.
-2. Compose chính chuyển sang `z-ai/glm-5.2-hackathon`, DeepSeek là fallback; GLM
-   được nhận trọn budget thay vì chỉ phần thời gian còn thừa.
+2. Judge và compose chính chuyển sang `z-ai/glm-5.2-hackathon`: qwen chính xác
+   nhưng plan + judge tự chạm rate limit; DeepSeek compose timeout. Qwen/DeepSeek
+   vẫn là fallback, còn GLM được nhận trọn budget thay vì phần thời gian còn thừa.
 3. `TALENT_JUDGE_CACHE` mặc định tắt cho tới khi typed constraint ID ổn định và
    có cache-hit telemetry.
 4. Khi đọc trạng thái một AnswerRun `running` đã quá deadline, code compare-and-
