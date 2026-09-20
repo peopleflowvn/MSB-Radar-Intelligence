@@ -1043,10 +1043,51 @@ def deterministic_group(judgements, *, read=True):
     return "HIGH" if confidence >= .8 else "MEDIUM" if confidence >= .55 else "NEAR"
 
 
+def preference_score(member_scores, plan: RadarTurnPlan, *, matched=()):
+    """Điểm `prefer` bằng CODE, trong [0, 1], kèm giải thích từng thành phần.
+
+    Ba luật của mục 3.2 và P1-08:
+
+    * `prefer` **chỉ** đổi thứ tự. Nó không đưa ai vào và không loại ai ra —
+      membership do `HARD_DETERMINISTIC` và các nhánh recall quyết.
+    * Không có `prefer` nào thì điểm là 0 cho mọi người, nên thứ tự không đổi.
+    * Mỗi thành phần được ghi lại: một người xếp trên phải nói được là nhờ đâu.
+    """
+    wanted = [item for item in (plan.prefer or [])]
+    if not wanted:
+        return 0.0, []
+    matched_ids = {str(x) for x in matched}
+    parts, total = [], 0.0
+    share = 1.0 / len(wanted)
+    for item in wanted:
+        hit = item.constraint_id in matched_ids
+        if hit:
+            total += share
+        parts.append({"constraint_id": item.constraint_id, "field": item.field,
+                      "value": str(item.value)[:80], "matched": hit,
+                      "weight": round(share, 4)})
+    # Điểm lexical/semantic của các nhánh recall là tín hiệu phụ, trần 10% để nó
+    # không bao giờ lấn được một `prefer` thật sự khớp.
+    signal = max([float(member_scores.get(name) or 0.0)
+                  for name in ("field_fts", "vector")] or [0.0])
+    if signal:
+        bonus = min(0.1, max(0.0, signal) * 0.1)
+        total += bonus
+        parts.append({"constraint_id": "", "field": "retrieval_signal",
+                      "value": "", "matched": True, "weight": round(bonus, 4)})
+    return round(min(1.0, total), 4), parts
+
+
 def rank_rows(rows):
-    """Stable deterministic order; demographics are intentionally not score inputs."""
+    """Thứ tự tất định: nhóm trước, rồi `prefer`, rồi confidence, rồi person_id.
+
+    `prefer` xếp SAU nhóm có chủ đích: một người "gần đúng" không được vượt lên
+    trên một người đã thoả mọi điều kiện bắt buộc chỉ vì hợp mấy tiêu chí ưu
+    tiên. Giới tính, tuổi, hôn nhân cố ý KHÔNG phải đầu vào của điểm.
+    """
     return sorted(rows, key=lambda row: (
         GROUP_ORDER.get(row.get("group", "UNKNOWN"), 99),
+        -float(row.get("preference_score", 0) or 0),
         -float(row.get("confidence", 0)), int(row.get("person_id", 0))))
 
 

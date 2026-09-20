@@ -414,6 +414,18 @@ class RouterTest(TestCase):
         self.assertEqual(len(calls), 2)
         self.assertIn("rate_limited_locally", str(ctx.exception))
 
+    def test_han_muc_tinh_theo_tung_model_khong_phai_theo_provider(self):
+        """Do tren prod: qwen3.7-plus chan sau 2 loi goi, glm-5.2 thi khong —
+        han muc la cua tung model."""
+        r = Router(env={"MSB_AI_GEMINI_API_KEY": "k",
+                        "MSB_AI_PROVIDER_DEFAULT": "gemini",
+                        "MSB_AI_RATE_PER_MINUTE_GEMINI": "1"},
+                   transport=fake_transport())
+        self.assertTrue(r._rate_allow("gemini", 5, "model-a"))
+        # Model A da het luot, nhung model B van con gao rieng cua no.
+        self.assertFalse(r._rate_allow("gemini", 1, "model-a"))
+        self.assertTrue(r._rate_allow("gemini", 5, "model-b"))
+
     def test_khong_dat_han_muc_thi_khong_doi_hanh_vi(self):
         calls = []
         r = Router(env={"MSB_AI_GEMINI_API_KEY": "k",

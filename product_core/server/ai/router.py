@@ -206,14 +206,22 @@ class Router:
                     return 0
         return 0
 
-    def _rate_allow(self, name, remaining):
-        """Tự xếp hàng theo hạn mức của provider, trong ngân sách còn lại."""
+    def _rate_allow(self, name, remaining, model=""):
+        """Tự xếp hàng theo hạn mức, trong ngân sách còn lại.
+
+        Gáo tính theo CẶP (provider, model): đo trên production 20/09,
+        `qwen/qwen3.7-plus` và `qwen/qwen3.6-flash` đều chỉ nhận 2 lời gọi liên
+        tiếp rồi trả 429, còn `z-ai/glm-5.2-hackathon` nhận cả 4 — tức hạn mức
+        là của từng model, không phải của nhà cung cấp hay của khoá. Gáo theo
+        provider sẽ vừa chặn oan model còn dư vừa không chặn đủ model đã hết.
+        """
         limit = self._rate_limit_for(name)
         if not limit:
             return True
-        bucket = self._buckets.get(name)
+        key = f"{name}:{str(model or '').lower()}"
+        bucket = self._buckets.get(key)
         if bucket is None or bucket.limit != limit:
-            bucket = self._buckets[name] = _RateBucket(limit)
+            bucket = self._buckets[key] = _RateBucket(limit)
         # Chừa 1 giây cho chính lời gọi; `remaining=None` nghĩa là không có deadline.
         budget = 30.0 if remaining is None else max(0.0, remaining - 1.0)
         return bucket.take(budget)
@@ -647,7 +655,7 @@ class Router:
                 skipped.append(f"{name}:{effective_model}(blocked)")
                 log.info("Bỏ qua %s/%s: đã bị từ chối gần đây", name, effective_model)
                 continue
-            if not self._rate_allow(name, remaining):
+            if not self._rate_allow(name, remaining, effective_model):
                 # Hết hạn mức tốc độ của provider này trong ngân sách còn lại:
                 # bỏ qua còn hơn tiêu một lời gọi để nhận 429.
                 skipped.append(f"{name}(rate_limited_locally)")

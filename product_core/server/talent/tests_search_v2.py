@@ -13,6 +13,7 @@ from people.models import Document, Person
 from .models import (CandidateSetMember, ConstraintJudgementCache,
                      SearchProjection, SearchVocabulary, TalentProfile)
 from .search_v2 import (EVIDENCE_CHAR_BUDGET, BranchHit, Constraint, RadarTurnPlan,
+                        preference_score,
                         ablation, build_dossier, build_projection, cache_judgement,
                         compile_projection_query, create_candidate_set,
                         deterministic_group, enforce_cost_guard,
@@ -688,3 +689,58 @@ class JudgeCacheTest(TestCase):
         self.assertEqual(judge_cache.scope_token_for(None), "")
         self.assertFalse(judge_cache.store("khoa-4", self._judgement(["SUPPORTED"]),
                                            scope_token=""))
+
+
+class PreferenceRankTest(TestCase):
+    """P1-08: `prefer` chỉ đổi thứ tự, và phải giải thích được."""
+
+    def _plan(self):
+        return RadarTurnPlan(
+            must=[Constraint("title", "Data Analyst")],
+            prefer=[Constraint("skills", "Python", classification="PREFERENCE"),
+                    Constraint("location", "Hà Nội", kind="geo",
+                               classification="PREFERENCE")])
+
+    def test_khong_co_prefer_thi_diem_bang_0_va_thu_tu_khong_doi(self):
+        plan = RadarTurnPlan(must=[Constraint("title", "Data Analyst")])
+        score, parts = preference_score({}, plan)
+        self.assertEqual(score, 0.0)
+        self.assertEqual(parts, [])
+
+    def test_moi_prefer_khop_gop_mot_phan_va_duoc_ghi_lai(self):
+        plan = self._plan()
+        score, parts = preference_score({}, plan,
+                                        matched=[plan.prefer[0].constraint_id])
+        self.assertEqual(score, 0.5)
+        self.assertEqual([p["matched"] for p in parts], [True, False])
+        self.assertEqual(parts[0]["field"], "skills")
+
+    def test_tin_hieu_truy_hoi_khong_bao_gio_lan_duoc_mot_prefer_that(self):
+        plan = self._plan()
+        chi_tin_hieu, _ = preference_score({"vector": 1.0, "field_fts": 1.0}, plan)
+        mot_prefer, _ = preference_score({}, plan,
+                                         matched=[plan.prefer[0].constraint_id])
+        self.assertLess(chi_tin_hieu, mot_prefer)
+        self.assertLessEqual(chi_tin_hieu, 0.1)
+
+    def test_prefer_khong_dua_ai_len_tren_nhom_tot_hon(self):
+        rows = [
+            {"person_id": 1, "group": "HIGH", "confidence": .6, "preference_score": 0},
+            {"person_id": 2, "group": "NEAR", "confidence": .9, "preference_score": 1.0},
+        ]
+        self.assertEqual([r["person_id"] for r in rank_rows(rows)], [1, 2])
+
+    def test_trong_cung_nhom_thi_prefer_quyet_thu_tu(self):
+        rows = [
+            {"person_id": 1, "group": "HIGH", "confidence": .9, "preference_score": 0.0},
+            {"person_id": 2, "group": "HIGH", "confidence": .9, "preference_score": 0.5},
+        ]
+        self.assertEqual([r["person_id"] for r in rank_rows(rows)], [2, 1])
+
+    def test_gioi_tinh_tuoi_khong_phai_dau_vao_cua_diem(self):
+        plan = self._plan()
+        a, _ = preference_score({}, plan, matched=[plan.prefer[0].constraint_id])
+        # Thêm thuộc tính nhân khẩu học vào đầu vào không được đổi điểm.
+        b, _ = preference_score({"gender": 1.0, "age": 1.0}, plan,
+                                matched=[plan.prefer[0].constraint_id])
+        self.assertEqual(a, b)
