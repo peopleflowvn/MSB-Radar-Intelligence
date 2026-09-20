@@ -879,7 +879,7 @@ ticket xem 17.3, trạng thái slice xem hai bảng ở mục 9.
 |---|---|---|---|
 | `4da3e60` | P0-04, P1-11, P1-12 | Coverage ở mọi exit path của people pipeline; API estimate/create/status/cancel/resume cho CandidateSet; T2 qua API chỉ một batch 500/request; sửa `complete=true` khi còn candidate chưa qua cursor; nhãn UI tách "tính bằng SQL" / "kiểm bằng code" / "đọc sâu" | `ai+talent` 918; frontend 142 |
 | `b9266d0` | P1-00, P1-02 | Boolean AST lồng trong `where` + validator depth 8 / 50 leaves; `NOT` đúng một child; unresolved fail-closed và không bị `NOT` đảo thành cho qua toàn kho; `classification` strict vào fingerprint; compiler chỉ đẩy hard-deterministic xuống SQL; branch chưa có báo `not_implemented` | `ai+talent` 923 |
-| chưa commit | P0-05, P1-02C, P1-03A/C/E/F/G, P1-06, P1-07 | Mục 17.9 | `ai+talent` 935; `tests_search_v2` 30 |
+| `8d5d0a1` | P0-05, P1-02C/D, P1-03A/C/E/F/G, P1-06, P1-07 | Mục 17.9 | `ai+talent` 935; `tests_search_v2` 30 |
 
 ### 17.8. Quyết định chiến thuật retrieval đã đưa vào đề bài
 
@@ -897,7 +897,7 @@ Mục 3, kiến trúc mục 4 và acceptance P1-00/02/03/06/08 được viết t
   top relevance + decision boundary + diversity + hard-semantic/unknown.
 - Ranking chỉ quyết định thứ tự đọc và trình bày, không phải quyền tồn tại.
 
-### 17.9. Increment hiện tại — chưa commit
+### 17.9. Increment `8d5d0a1` — đã commit, chưa push và chưa deploy
 
 **Phạm vi:** P1-03C field-aware FTS, P1-03A/E branch contract và union,
 P1-03F/G re-verification và completeness, P1-06 verdict, P1-07 cost guard,
