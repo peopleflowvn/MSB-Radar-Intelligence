@@ -884,7 +884,7 @@ khi mọi ticket của nó ở L4.
 | P1-04 BaseDossier | **L3** | ExtractedFact/conflict ledger, mọi application thành record |
 | P1-05 EvidenceView | **L1** | multi-round fetch, benchmark token |
 | P1-06 judgement schema | **L1** | Answer Engine live dùng verdict V2 |
-| P1-07 cache + cost guard | **L1** | nối cache vào T3, chốt lại token limit |
+| P1-07 cache + cost guard | **L2** | cache kết luận đã đọc nối vào **đường live** (`judge_cache`, khoá là `dossier_key` nên CV/câu hỏi đổi là khoá đổi; còn `UNKNOWN` thì không lưu; phạm vi theo người hỏi). Còn: mở phạm vi dùng chung sau khi rà RBAC, đo cache hit trên prod, chốt lại token limit |
 | P1-08 rank/reduce | **L1** | preference scoring, gate pháp chế cho nhân khẩu học |
 | P1-09 grounded compose | **L1** | compose từ verdict/evidence ID V2 |
 | P1-10 materializer/backfill | **L1** | outbox/dead-letter, stale ≤ 5 phút, benchmark |
@@ -993,6 +993,7 @@ ticket xem 17.3, trạng thái slice xem hai bảng ở mục 9.
 | `a871aa4` | P0-04 | `_coverage_of` đọc được dataclass; đọc coverage tách khỏi `try` của `finish` — sửa lỗi treo claim ở 17.10d | backend 1940; deploy `35510876422` |
 | `2e5b106` | P0-05 | Ablation chỉ gọi embedding một lần mỗi case (trước đó hai lần nên tự chạm hạn mức) | backend 1940; deploy `35511413523` |
 | `53cf9b0` | H5, P0-01 | Điều kiện chặn dùng model thật sự sẽ gửi (lỗi trong chính H5); token bucket theo provider tự xếp hàng thay vì nhận 429 | backend 1943; deploy `35514345840` |
+| `8a739b7` | P1-07 | `judge_cache`: nhớ kết luận đã đọc giữa các lượt, khoá gói cả nội dung dossier; `stats.judge_cache_hits` | backend 1947; deploy `35514898531` |
 | `65723be` | H5, P0-04, P0-00/P0-02 (bằng chứng prod) | Router lọc chuỗi provider theo model đã ghim + nhớ cặp bị từ chối 404/402; `AnswerRun.coverage` lưu coverage để audit hồi tố (migration `ai/0027`, chỉ các khoá đã biết, không nội dung nghiệp vụ); baseline mục 2 đo lại trên prod; bảng tiến độ 17.2b | `ai.tests.RouterTest` 23; `ai.tests_answer_runs + core` 236 |
 | `a0d8e7d` | H5, P0-05, P1-03C | Migration `0016` chuyển sang `atomic = False` và bọc riêng `CREATE EXTENSION` — trước đó thiếu quyền `pg_trgm` sẽ abort transaction, migrate chết, container crash-loop khi khởi động; dataset silver chuyển vào `talent/eval_data` vì image chỉ copy `product_core/server` nên `search_ablation` không thể chạy trên prod | toàn bộ backend **1925/1925**; đã deploy trong run `35497650837` |
 
@@ -1307,6 +1308,22 @@ Hai việc đã sửa và deploy (`35514345840`):
 **Việc bạn có thể làm để tăng hẳn năng lực:** thêm khoá GreenNode. Hạn mức tính
 theo khoá nên hai khoá là gấp đôi, và `keypool` đã hỗ trợ sẵn danh sách khoá —
 không cần sửa code.
+
+### 17.10g. Bật Search V2 trên production, từng bước
+
+Người dùng yêu cầu bật dần để kiểm tra trên prod. Cấu hình đặt trong
+`~/msbradar/.env` (đã backup `.env.bak-20260920`), có hiệu lực sau khi container
+được dựng lại:
+
+| Biến | Giá trị | Vì sao |
+|---|---|---|
+| `SEARCH_PLAN_V2_MODE` | `shadow` | tạo CandidateSet bền + trace để so sánh, **không đổi** kết quả trả về |
+| `MSB_AI_RATE_PER_MINUTE_GREENNODE` | `8` | một khoá, hạn mức theo khoá; tự xếp hàng thay vì bắn 4 lô rồi nhận 429. Con số này là **điểm khởi đầu cần hiệu chỉnh**: còn 429 thì giảm, sạch thì tăng |
+
+Thứ tự tiếp theo: shadow chạy vài lượt thật → đối chiếu diff giữa đường cũ và
+CandidateSet V2 → nếu không mất hồ sơ nào thì đổi sang `on`. Ở `on`, V2 chỉ
+**thêm** recall vào pipeline hiện có và lỗi thì fail-open, nên đường cũ vẫn là
+lưới an toàn.
 
 ### 17.11. Việc tiếp theo theo đúng dependency
 
