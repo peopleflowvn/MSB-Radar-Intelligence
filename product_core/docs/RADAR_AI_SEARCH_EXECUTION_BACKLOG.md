@@ -1484,3 +1484,25 @@ Increment ổn định demo thực hiện các thay đổi sau:
 passed; Django check và migration check passed. Production probe và trạng thái
 deploy phải được ghi bổ sung sau khi workflow hoàn tất; đoạn này không tự coi
 local test là production acceptance.
+
+**Kết quả triển khai:** commit ổn định nền `7252f0b` deploy thành công ở workflow
+`35521490322`. Điều chỉnh capacity judge `6ca01e9` gặp một lần lỗi containerd
+`CreateDiff ... no such file or directory` ở workflow `35522884085`; production
+cũ vẫn khỏe. Sau khi prune an toàn build cache/dangling layers, retry workflow
+`35523358207` thành công, gồm exact-SHA health verification.
+
+**Cấu hình production sau deploy:** `SEARCH_PLAN_V2_MODE=on`, deep-read pool 16,
+judge worker 1, AnswerRunner worker 2, judgement cache tắt. Migration 0028/0029
+đặt cả Talent judge và compose vào `z-ai/glm-5.2-hackathon`; qwen/DeepSeek giữ
+vai trò fallback.
+
+**Probe production cuối bằng đúng câu demo Tech Lead/Senior Backend Java/Golang
+tài chính:** hoàn tất 99,08 giây; retrieval 16, judged 16, unread 0,
+`read_failed=false`, `read_incomplete=false`; compose GLM không fallback;
+coverage nói đúng `candidate_total=500`, `judged=16`, `not_read=484`. Hai
+AnswerRun cũ quá deadline còn `running` đã được chuẩn hóa thành `timeout`.
+
+**VPS:** build cache + dangling layers giải phóng khoảng 2,81 GB; root disk từ
+87% xuống 82%, còn khoảng 8,9 GB. Hai image TalentFlow `main` và `develop` đều
+đang có container sử dụng nên được giữ lại; không xóa volume/database/image đang
+chạy. Đây là đường demo ổn định, chưa biến partial deep-read thành exhaustive.
