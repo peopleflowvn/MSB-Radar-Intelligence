@@ -114,6 +114,17 @@ def _sweep(now):
         _INFLIGHT.pop(k, None)
 
 
+def _coverage_of(result):
+    """`answer_coverage` trong trace, dù `result` là dataclass hay dict."""
+    trace = getattr(result, "trace", None)
+    if trace is None and isinstance(result, dict):
+        trace = result.get("trace")
+    if not isinstance(trace, dict):
+        return None
+    coverage = trace.get("answer_coverage")
+    return coverage if isinstance(coverage, dict) else None
+
+
 class TurnRunner:
     """Chạy lượt của MỘT domain.
 
@@ -270,8 +281,17 @@ class TurnRunner:
                 except Exception:                  # noqa: BLE001
                     log.exception("answer.runner: persist hỏng")
                     state, err = "error", "persist"
+                # Trích coverage TÁCH KHỎI việc đóng claim: `result` là
+                # `AnswerResult` (dataclass) chứ không phải dict, và bản đầu tiên
+                # của chỗ này gọi `.get()` nên ném AttributeError — nằm cùng
+                # `try` với `finish()` nên claim không bao giờ được đóng. Một
+                # dòng telemetry không được phép chặn một chuyển trạng thái.
+                coverage = None
                 try:
-                    coverage = ((result or {}).get("trace") or {}).get("answer_coverage")
+                    coverage = _coverage_of(result)
+                except Exception:                  # noqa: BLE001
+                    log.exception("answer.runner: đọc coverage hỏng")
+                try:
                     run_state.finish(claim_id, state, coverage=coverage)
                 except Exception:
                     log.exception("answer.runner: durable completion failed")

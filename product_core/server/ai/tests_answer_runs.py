@@ -58,6 +58,24 @@ class AnswerRunClaimTest(TestCase):
         # Bảng này không được nhận nội dung nghiệp vụ.
         self.assertNotIn("cv_text", row.coverage)
 
+    def test_coverage_is_read_from_a_dataclass_result_not_only_a_dict(self):
+        """`AnswerResult` la dataclass: ban dau code goi `.get()` nen nem loi va
+        keo theo ca `finish()` khong chay — claim treo o trang thai running."""
+        from core.answer.runner import _coverage_of
+        from talent.answer.engine import AnswerResult
+
+        coverage = {"method": "deep_read", "candidate_total": 9, "judged": 4,
+                    "not_read": 5, "complete": False}
+        result = AnswerResult(text="x", trace={"answer_coverage": coverage})
+        self.assertEqual(_coverage_of(result), coverage)
+        self.assertEqual(_coverage_of({"trace": {"answer_coverage": coverage}}),
+                         coverage)
+        # Khong co trace, trace sai kieu, hay khong co coverage: tra None chu
+        # khong duoc nem — mot dong telemetry khong duoc chan chuyen trang thai.
+        self.assertIsNone(_coverage_of(AnswerResult(text="x")))
+        self.assertIsNone(_coverage_of({"trace": "khong phai dict"}))
+        self.assertIsNone(_coverage_of(None))
+
     def test_claim_uses_same_id_length_as_persisted_messages(self):
         self.assertIsNotNone(run_state.claim(self.user, "x" * 80, 150))
         self.assertIsNone(run_state.claim(self.user, "x" * 64, 150))
