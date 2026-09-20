@@ -1634,3 +1634,97 @@ Không bật exhaustive UI chỉ để clip trông “đủ”: đường intera
 phép đọc sâu một pool có trần, nhưng UI và câu trả lời phải nói đúng mẫu số,
 số đã đọc và số chưa đọc. Gold P0-05, scale P0-06 và exhaustive P1-11/P1-12
 vẫn là gate release dài hạn sau Demo Readiness.
+
+### 18.6. Đánh giá mục 18 và phát hiện từ chat thật production (21/09)
+
+Đọc toàn bộ 66 message thật (26 lượt Talent, 7 lượt Growth) trên production
+19–21/09 qua `AssistantMessage`, cộng đo trực tiếp trên container đang chạy.
+Không đoán — mọi số dưới đây lấy từ dữ liệu/lệnh thật, có script tái tạo được.
+
+**Phê bình DEMO-00 (domain router):** không cần làm. UI đã có "Perspective
+Switch" tường minh (`SearchWorkspace.tsx`, `role="tablist"`) và hai endpoint
+tách biệt `/api/v1/talent/ask/` vs `/api/v1/rb/ask/` — người dùng chọn góc nhìn
+TRƯỚC khi gõ, không có khoảng xám "AMBIGUOUS" nào cần AI phân loại trong sản
+phẩm thật. Một bộ phân loại mới thêm nguy cơ (một tầng LLM nữa có thể lỗi/chậm)
+mà không giải quyết vấn đề thật nào. Đề xuất: bỏ DEMO-00 khỏi đường găng, chỉ
+giữ một việc rẻ — xác nhận Perspective Switch nhớ đúng lựa chọn qua reload.
+
+**DEMO-01/DEMO-05 (RB rebuild) không phải blocker như giả định:** mục 18 viết
+"Không demo RB khi còn trạng thái 26 chunk/0 vector". Đúng là `ProspectEvidenceChunk`
+vẫn 26/0 (chưa đổi từ 20/09), NHƯNG đó là một pipeline THỬ NGHIỆM khác — đường
+`rb_prospect_search` đang thực sự trả lời production KHÔNG đi qua bảng đó, mà
+đọc `rb_profile`/`rb_opportunities`/structured signals. Kiểm một câu thật
+("Tìm quản lý, giám đốc... thẻ tín dụng hạn mức cao"): `citation_audit.status =
+PASS`, 15/15 người được nhắc có nguồn cục bộ hợp lệ, `invalid_source_numbers=[]`,
+47 giây. RB **đã đủ để demo ngay bây giờ** theo đúng contract mục 18.3 (có
+nguồn, có mức chắc chắn, không bịa). Việc còn lại là dựng golden case (DEMO-03),
+không phải xây lại RB.
+
+**Bốn lượt Talent thật bị huỷ giữa chừng, để lại bong bóng "(không có nội
+dung)":** `aborted=true, duration_ms=0` — client rớt kết nối (đóng tab/tải lại)
+trước khi pipeline sinh được gì, gần như chắc chắn vì đợi câu hỏi mẫu (xem dưới)
+quá lâu mà không có tín hiệu tiến triển rõ. Đã sửa (`62a6489`, đã deploy): bỏ
+ghi khi `aborted` và hoàn toàn rỗng, để không ai mở lại đúng luồng đó và tưởng
+Radar lỗi giữa một buổi demo. 5 test hồi quy, backend 1969/1969.
+
+**Sự cố "msb có những sản phẩm gì" → "Tôi chưa tra được câu này" đã tự hết:**
+đúng lúc đó (20/09 04:35 UTC) `assistant_intent/web/conversation` cùng dồn vào
+`qwen3.6-flash` và bị 429, Gemini dự phòng thì 402 — tức đúng lỗ hổng hạn mức
+theo model mà backlog này đã sửa cùng ngày (mục 17.10f–j). Kiểm lại NGAY BÂY
+GIỜ trên production: câu hỏi giống hệt trả lời đúng, có nguồn, 14,9 giây. Không
+cần sửa gì thêm.
+
+**Bug 19/09 "60 hồ sơ đọc sâu → suy ra cả kho" đã được xác nhận sửa:** golden
+case cũ ghi "'Hà Nội: 5 ứng viên' trong khi thật ~500 hồ sơ có địa điểm". Chạy
+lại y nguyên câu hỏi trên production: trả lời dựng từ SQL trên toàn bộ 611 hồ
+sơ ("308 Hà Nội, 58 TP HCM... 580/611 có nơi ở") — đúng và nhất quán, dù mất
+105 giây (không đi qua fast-path SQL sẵn có, nhưng vẫn đúng số).
+
+**Câu hỏi demo chủ lực đang chọn SAI, không phải hệ thống lỗi:** golden case đã
+ghi từ 19/09 rằng "Tìm Senior Data Analyst ở Hà Nội biết SQL và Python, trên 3
+năm kinh nghiệm" **không có ai trong kho đạt đủ cả ba điều kiện** — 6 lượt hỏi
+thật trong hai ngày đều đúng khi trả lời "chưa có ứng viên nào đáp ứng". Hệ
+thống trung thực, nhưng một demo trực tiếp mà câu hỏi mở màn liên tục ra "không
+tìm thấy ai" thì không thuyết phục. Cùng bộ tiêu chí nhưng bỏ "Senior"/"Hà Nội"
+("ai biết SQL và Python?") có **10 người thật, trích dẫn CV nguyên văn** (đã
+kiểm sống: "Bùi Tiến Mạnh — CV ghi rõ 'Python, SQL/MySQL' trong Tech Stack…").
+Đề xuất cho DEMO-03: dùng câu rộng làm câu mở màn có kết quả, giữ câu hẹp làm
+một khoảnh khắc CÓ CHỦ Ý sau đó để chứng minh đúng contract 18.2 — "không có ai
+đạt đủ điều kiện, trả kết luận rỗng trung thực" — biến giới hạn thành điểm bán.
+
+**Độ trễ là rủi ro lớn nhất còn lại cho một buổi demo trực tiếp, và đã đo thật:**
+
+| Câu hỏi | Thời gian đo | Ghi chú |
+|---|---:|---|
+| Tech Lead/Backend Java-Golang tài chính | 85,2s | judge 2 lô tuần tự ≈ 61,5s |
+| ai biết SQL và Python? | 127,5s | trả 10 người có trích dẫn |
+| Thống kê theo khu vực | 105,1s | đúng số nhưng lẽ ra phải là SQL tức thời |
+
+`HARD_DEADLINE=150s` — câu 127,5s chỉ còn ~22s dư trước khi bị coi là quá giờ.
+Đã thử hai hướng và có bằng chứng RÕ để không đi tiếp:
+
+- `TALENT_JUDGE_WORKERS=2` (chạy 2 lô song song để giảm còn ~1 lô thời gian):
+  **chậm hơn** (95,7s) và **chỉ đọc được 8/16** — GreenNode/GLM không chịu được
+  2 lô nặng chạy cùng lúc như đã tưởng từ phép đo lượt nhỏ hôm 20/09.
+- `TALENT_DEEP_READ_POOL=8`: không có tác dụng vì `MIN_POOL=16` là sàn cứng
+  trong code (`max(16, min(200, …))`), cần sửa code mới hạ được — đúng như mục
+  18.1 DEMO-02 đã lường trước ("cho phép đọc thêm" thay vì chỉ cắt pool).
+
+Kết luận: **không chỉnh cấu hình concurrency/pool thêm trước demo** — hai lần
+thử đều xấu đi. Khuyến nghị còn lại, theo đúng độ phức tạp thấp mà mục 18 yêu
+cầu: (1) chấp nhận 80–130 giây nhưng đảm bảo UI luôn hiện tiến triển từng giai
+đoạn liên tục (không có khoảng lặng nào >10s không có tín hiệu) để người xem
+không tưởng đứng máy; (2) tập dượt với đúng câu hỏi đã đo thời gian, không thử
+câu mới chưa đo ngay trên sân khấu; (3) DEMO-02 "8–12 hồ sơ + đọc thêm" vẫn là
+hướng đúng cho SAU demo, không phải việc làm gấp trước giờ lên hình.
+
+**Việc còn lại theo đúng ưu tiên "demo trước, phức tạp để sau":**
+
+1. Dựng DEMO-03 (golden pack) từ chính các câu đã đo ở trên — đã có 3 câu
+   Talent thật (2 có kết quả + 1 rỗng trung thực) và 1 câu RB thật, chỉ cần
+   thêm 5–7 câu nữa và ghi lại theo khuôn mục 18.4.
+2. Diễn tập DEMO-06 (chạy cả gói nhiều vòng) bằng `answer_eval --cases` với bộ
+   câu đã chốt, xác nhận latency/coverage ổn định qua ít nhất 2–3 lần lặp.
+3. Bỏ DEMO-00 khỏi đường găng (lý do ở trên); dồn thời gian đó cho DEMO-03/06.
+4. Theo dõi đĩa VPS (83%, còn ~8,3 GB) trước ngày quay — không chạy thêm việc
+   nặng đĩa (fixture, build song song) sát giờ demo.
