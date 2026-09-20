@@ -636,3 +636,55 @@ class CandidateSetApiTest(TestCase):
         self.client.force_login(self.other)
         self.assertEqual(self.client.get(
             f"/api/v1/talent/candidate-sets/{run_id}/").status_code, 404)
+
+
+class JudgeCacheTest(TestCase):
+    """P1-07 vào đường live: kết luận đã đọc phải dùng lại được ở lượt sau."""
+
+    def setUp(self):
+        self.user = User.objects.create_user("cache-user", password="x")
+        self.person = Person.objects.create(display_name="Đã đọc", is_applicant=True)
+        TalentProfile.objects.create(person=self.person, current_title="Data Analyst")
+
+    def _judgement(self, statuses):
+        from talent.answer.judge import Judgement
+        return Judgement(person_id=self.person.pk, name="Đã đọc", relevant=True,
+                         confidence=0.9, why="vì có SQL",
+                         criteria=[{"text": "SQL", "status": s} for s in statuses],
+                         model="qwen/qwen3.7-plus")
+
+    def test_ket_luan_dut_khoat_duoc_nho_va_dung_lai(self):
+        from talent.answer import judge_cache
+
+        scope = judge_cache.scope_token_for(self.user)
+        self.assertTrue(judge_cache.store("khoa-1", self._judgement(["SUPPORTED"]),
+                                          scope_token=scope))
+        got = judge_cache.load(["khoa-1"], scope_token=scope)
+        self.assertIn("khoa-1", got)
+        self.assertEqual(got["khoa-1"].person_id, self.person.pk)
+        self.assertEqual(got["khoa-1"].why, "vì có SQL")
+
+    def test_con_unknown_thi_khong_nho(self):
+        from talent.answer import judge_cache
+
+        scope = judge_cache.scope_token_for(self.user)
+        self.assertFalse(judge_cache.store(
+            "khoa-2", self._judgement(["SUPPORTED", "UNKNOWN"]), scope_token=scope))
+        self.assertEqual(judge_cache.load(["khoa-2"], scope_token=scope), {})
+
+    def test_pham_vi_khac_nhau_thi_khong_dung_chung(self):
+        from talent.answer import judge_cache
+
+        other = User.objects.create_user("cache-other", password="x")
+        judge_cache.store("khoa-3", self._judgement(["SUPPORTED"]),
+                          scope_token=judge_cache.scope_token_for(self.user))
+        self.assertEqual(
+            judge_cache.load(["khoa-3"],
+                             scope_token=judge_cache.scope_token_for(other)), {})
+
+    def test_khong_co_nguoi_hoi_thi_khong_cache(self):
+        from talent.answer import judge_cache
+
+        self.assertEqual(judge_cache.scope_token_for(None), "")
+        self.assertFalse(judge_cache.store("khoa-4", self._judgement(["SUPPORTED"]),
+                                           scope_token=""))

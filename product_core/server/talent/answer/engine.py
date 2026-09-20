@@ -30,6 +30,7 @@ from . import chat as chat_stage
 from . import compose as compose_stage
 from . import corpus as corpus_stage
 from . import judge as judge_stage
+from . import judge_cache
 from . import plan as plan_stage
 from . import resolve as resolve_stage
 from . import structured_match
@@ -689,11 +690,21 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         yield _step(f"Tìm thấy {len(candidates)} hồ sơ liên quan", "done")
         yield _step("Đọc hồ sơ")
         keys = {c.person_id: judge_stage.dossier_key(active_plan, c) for c in candidates}
+        # Kết luận đã đọc ở LƯỢT TRƯỚC cũng dùng lại được: khoá đã gói câu hỏi,
+        # người, nội dung dossier và nguồn, nên dùng lại không thể lệch dữ liệu.
+        # Với một khoá GreenNode và hạn mức theo khoá, đây là cách rẻ nhất để
+        # không mất phần đọc sâu ở những câu tinh chỉnh.
+        cache_scope = judge_cache.scope_token_for(user)
+        cached = judge_cache.load(list(keys.values()), scope_token=cache_scope)
+        for key, judgement in cached.items():
+            reusable_judgements.setdefault(key, judgement)
         unread = [c for c in candidates if keys[c.person_id] not in reusable_judgements]
         fresh = judge_stage.judge(active_plan, unread, complete_fn=complete_fn,
                                   deadline=started + READ_BUDGET_SECONDS)
         for row in fresh:
             reusable_judgements[keys[row.person_id]] = row
+            judge_cache.store(keys.get(row.person_id), row, scope_token=cache_scope,
+                              person_id=row.person_id)
         judgements = judge_stage.JudgeReport(
             [reusable_judgements[keys[c.person_id]] for c in candidates
              if keys[c.person_id] in reusable_judgements],
@@ -711,6 +722,7 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         stats["not_read"] = stats["unread"]
         stats["judge_sent"] = len(unread)
         stats["judge_reused"] = len(candidates) - len(unread)
+        stats["judge_cache_hits"] = len(cached)
         stats["deep_read_selection"] = (
             "identified_people" if pinned_only else "top_hybrid_retrieval_from_full_store")
         stats["deep_read_pool_limit"] = retrieve_stage.pool_for(active_plan)
