@@ -630,6 +630,7 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
                 "person_id", flat=True)[:retrieve_stage.POOL])
             trace["search_v2"] = {
                 "mode": v2_mode, "run_id": str(v2_run.pk),
+                "state": v2_run.state,
                 "population": v2_run.population,
                 "candidate_total": v2_run.candidate_total,
                 "judged": v2_run.judged, "unknown": v2_run.unknown,
@@ -638,7 +639,14 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
                 "semantic_available": v2_run.semantic_available,
                 "explain": v2_run.explain,
             }
-            if v2_mode == "on":
+            # Chỉ dùng CandidateSet làm nguồn recall khi nó thực sự đã lọc bằng
+            # điều kiện cứng. Plan chỉ có ràng buộc semantic cho ra tập bằng cả
+            # kho, và `[:POOL]` của tập đó chỉ là 60 person_id nhỏ nhất — ghim
+            # chúng vào lượt đọc sâu là lấy chỗ của người khớp thật.
+            usable = bool(v2_run.explain.get("hard_filters_applied")
+                          and v2_run.state != "blocked")
+            trace["search_v2"]["used_for_recall"] = bool(v2_mode == "on" and usable)
+            if v2_mode == "on" and usable:
                 structured_pins = list(dict.fromkeys(v2_ids + structured_pins))
         except Exception as exc:                  # shadow/canary must fail open
             trace["search_v2"] = {"mode": v2_mode, "degraded": True,

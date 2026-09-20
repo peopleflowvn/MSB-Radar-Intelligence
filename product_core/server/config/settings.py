@@ -325,6 +325,14 @@ TALENT_SCORE_FLOOR = env.float("TALENT_SCORE_FLOOR", default=0.15)
 TALENT_AI_RERANK_POOL = env.int("TALENT_AI_RERANK_POOL", default=60)
 SEARCH_PLAN_V2_MODE = env("SEARCH_PLAN_V2_MODE", default="off")  # off | shadow | on
 SEARCH_V2_T3_TOKEN_LIMIT = env.int("SEARCH_V2_T3_TOKEN_LIMIT", default=500000)
+#: Trần member của một snapshot CandidateSet. Vượt trần thì run ở trạng thái
+#: `blocked` — thà từ chối còn hơn ghi cả kho vào bảng member rồi gọi là
+#: CandidateSet. Trần này phải được chốt lại cùng ADR cost ở SEARCH-P0-00.
+SEARCH_V2_SNAPSHOT_MAX_MEMBERS = env.int("SEARCH_V2_SNAPSHOT_MAX_MEMBERS",
+                                         default=50000)
+#: Số hit tối đa của nhánh field-aware FTS. Recall của nhánh này bị giới hạn bởi
+#: chính con số đó và phải được ghi lại, không được phát biểu là "đã tìm toàn bộ".
+SEARCH_V2_FTS_TOP_N = env.int("SEARCH_V2_FTS_TOP_N", default=2000)
 TALENT_AI_RERANK_CV_CHARS = env.int("TALENT_AI_RERANK_CV_CHARS", default=1500)
 
 # Số chiều YÊU CẦU cho API embedding cần nêu rõ (Gemini output_dimensionality).

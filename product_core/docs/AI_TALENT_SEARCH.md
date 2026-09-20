@@ -1,5 +1,7 @@
 # AI Talent Search
 
+> **Phạm vi search/retrieval/evidence/answer:** nguồn thực thi chi tiết là `RADAR_AI_SEARCH_EXECUTION_BACKLOG.md` (ticket `SEARCH-*`). Khi hai tài liệu nói khác nhau về retrieval, evidence, completeness hay coverage, backlog đó thắng; tài liệu này giữ phần ngoài phạm vi ấy.
+
 **Phase:** 7 — hoàn thành
 **Master Plan:** mục 19.3, 22, 23, 42
 **Vị trí:** `server/talent/{hiring_need,scoring,ai_search}.py`

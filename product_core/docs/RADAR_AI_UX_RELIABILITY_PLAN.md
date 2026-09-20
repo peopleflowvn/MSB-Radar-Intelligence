@@ -1,5 +1,7 @@
 # Kế hoạch cải tiến trải nghiệm Radar AI
 
+> **Phạm vi search/retrieval/evidence/answer:** nguồn thực thi chi tiết là `RADAR_AI_SEARCH_EXECUTION_BACKLOG.md` (ticket `SEARCH-*`). Khi hai tài liệu nói khác nhau về retrieval, evidence, completeness hay coverage, backlog đó thắng; tài liệu này giữ phần ngoài phạm vi ấy.
+
 **Ngày lập:** 2026-09-09  
 **Phạm vi:** Talent Radar, luồng hỏi đáp và tìm kiếm ứng viên bằng AI  
 **Mục tiêu:** Radar tiếp tục xử lý khi người dùng chuyển tab hoặc rời màn hình, thể hiện trạng thái chờ rõ ràng, nhớ đúng người và file đang được nói tới, và phục hồi được một lượt đang chạy mà không tạo câu trả lời trùng.

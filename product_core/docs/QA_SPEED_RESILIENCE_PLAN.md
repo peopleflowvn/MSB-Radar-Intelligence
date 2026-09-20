@@ -1,5 +1,7 @@
 # Kế hoạch: nhanh hơn, hiện bước, không rớt khi chuyển tab
 
+> **Phạm vi search/retrieval/evidence/answer:** nguồn thực thi chi tiết là `RADAR_AI_SEARCH_EXECUTION_BACKLOG.md` (ticket `SEARCH-*`). Khi hai tài liệu nói khác nhau về retrieval, evidence, completeness hay coverage, backlog đó thắng; tài liệu này giữ phần ngoài phạm vi ấy.
+
 Ngày 05/09/2026. Ba yêu cầu độc lập, làm được song song.
 
 ---

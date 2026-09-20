@@ -68,6 +68,7 @@ def _candidate_run_data(run, *, include_plan=False):
         "complete": run.complete, "cancel_requested": run.cancel_requested,
         "retrieval_degraded": run.retrieval_degraded,
         "semantic_available": run.semantic_available,
+        "completeness": (run.explain or {}).get("completeness", {}),
         "cost_used": run.cost_used, "explain": run.explain,
         "cursor": run.cursor, "heartbeat_at": run.heartbeat_at,
         "created_at": run.created_at, "updated_at": run.updated_at,

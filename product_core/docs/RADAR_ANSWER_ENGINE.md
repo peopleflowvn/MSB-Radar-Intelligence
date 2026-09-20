@@ -1,5 +1,7 @@
 # Radar Answer Engine — đập đi xây lại tầng sinh phản hồi
 
+> **Phạm vi search/retrieval/evidence/answer:** nguồn thực thi chi tiết là `RADAR_AI_SEARCH_EXECUTION_BACKLOG.md` (ticket `SEARCH-*`). Khi hai tài liệu nói khác nhau về retrieval, evidence, completeness hay coverage, backlog đó thắng; tài liệu này giữ phần ngoài phạm vi ấy.
+
 **Trạng thái:** kế hoạch, chưa code
 **Ngày:** 03/09/2026
 **Phạm vi:** toàn bộ đường đi từ *câu hỏi của người dùng* → *câu trả lời*. KHÔNG đụng

@@ -1,5 +1,7 @@
 # Radar AI Agent — Product & Engineering Backlog
 
+> **Phạm vi search/retrieval/evidence/answer:** nguồn thực thi chi tiết là `RADAR_AI_SEARCH_EXECUTION_BACKLOG.md` (ticket `SEARCH-*`). Khi hai tài liệu nói khác nhau về retrieval, evidence, completeness hay coverage, backlog đó thắng; tài liệu này giữ phần ngoài phạm vi ấy.
+
 **Cập nhật:** 05/09/2026  
 **Trạng thái:** Backlog v2 — epic map + delivery backlog, được đối chiếu với code và tài liệu hiện có  
 **Phạm vi:** tìm ứng viên, tìm khách hàng, trợ lý tổng quát, tìm kiếm web và năng lực agent dùng chung

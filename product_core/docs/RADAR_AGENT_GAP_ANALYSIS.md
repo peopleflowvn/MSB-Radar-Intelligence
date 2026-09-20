@@ -1,5 +1,7 @@
 # Radar với tư cách một AI agent — đánh giá và kế hoạch vòng tiếp theo
 
+> **Phạm vi search/retrieval/evidence/answer:** nguồn thực thi chi tiết là `RADAR_AI_SEARCH_EXECUTION_BACKLOG.md` (ticket `SEARCH-*`). Khi hai tài liệu nói khác nhau về retrieval, evidence, completeness hay coverage, backlog đó thắng; tài liệu này giữ phần ngoài phạm vi ấy.
+
 *Ngày 03/09/2026. Viết sau khi Answer Engine lên production và đạt 30/30 trên bộ
 `answer_eval`. Mọi con số dưới đây đo trên kho thật (786 hồ sơ, 1375 đoạn CV),
 không phải ước lượng.*

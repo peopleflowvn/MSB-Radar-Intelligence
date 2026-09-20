@@ -1,5 +1,7 @@
 # Radar AI Agent — Hiện trạng hệ thống tìm kiếm ứng viên (Answer Engine)
 
+> **Phạm vi search/retrieval/evidence/answer:** nguồn thực thi chi tiết là `RADAR_AI_SEARCH_EXECUTION_BACKLOG.md` (ticket `SEARCH-*`). Khi hai tài liệu nói khác nhau về retrieval, evidence, completeness hay coverage, backlog đó thắng; tài liệu này giữ phần ngoài phạm vi ấy.
+
 **Trạng thái:** Tài liệu HIỆN TRẠNG — mô tả đúng những gì code đang chạy trên production, không phải
 kế hoạch dự định. Nơi nào còn là dự định thì ghi rõ "CHƯA LÀM"/"ĐỀ XUẤT", không lẫn vào phần mô tả
 thực tế.

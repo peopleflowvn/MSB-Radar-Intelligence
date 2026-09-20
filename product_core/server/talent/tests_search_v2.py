@@ -11,11 +11,13 @@ from people.models import Document, Person
 
 from .models import (CandidateSetMember, ConstraintJudgementCache,
                      SearchProjection, TalentProfile)
-from .search_v2 import (Constraint, RadarTurnPlan, build_dossier,
-                        build_projection, cache_judgement, compile_projection_query,
-                        create_candidate_set, deterministic_group, evidence_view,
-                        enforce_cost_guard, estimate_judgement_cost, from_legacy_plan, rank_rows,
-                        process_candidate_set, split_sections)
+from .search_v2 import (EVIDENCE_CHAR_BUDGET, BranchHit, Constraint, RadarTurnPlan,
+                        ablation, build_dossier, build_projection, cache_judgement,
+                        compile_projection_query, create_candidate_set,
+                        deterministic_group, enforce_cost_guard,
+                        estimate_judgement_cost, evidence_view, from_legacy_plan,
+                        lexical_branch, process_candidate_set, rank_rows,
+                        recall_terms, split_sections, tsquery, union_branches)
 from .answer.engine import _set_answer_coverage
 
 
@@ -128,6 +130,154 @@ class PlanCompilerTest(TestCase):
                 "field": "search_text", "value": "lãnh đạo chuyển đổi",
                 "classification": "HARD_SEMANTIC",
             })
+
+
+class BranchContractTest(TestCase):
+    """P1-03A/C/E: hợp đồng nhánh, tsquery và union giữ provenance."""
+
+    def test_tsquery_keeps_intersection_for_must_and_union_for_recall(self):
+        self.assertEqual(tsquery("Data Analyst"), "data & analyst")
+        self.assertEqual(tsquery("Data Analyst", mode="or"), "data | analyst")
+
+    def test_tsquery_strips_operator_injection(self):
+        self.assertEqual(tsquery("python & !java | (x)"), "python & java")
+        self.assertEqual(tsquery("  "), "")
+
+    def test_recall_terms_take_semantic_and_preference_only(self):
+        plan = RadarTurnPlan(
+            must=[Constraint("title", "Data Analyst"),
+                  Constraint("search_text", "chuyển đổi số",
+                             classification="HARD_SEMANTIC")],
+            prefer=[Constraint("search_text", "ngân hàng",
+                               classification="PREFERENCE")],
+            semantic_concepts=["banking transformation"])
+        self.assertEqual(recall_terms(plan),
+                         ["chuyển đổi số", "ngân hàng", "banking transformation"])
+
+    def test_union_keeps_every_branch_hit_with_provenance(self):
+        rows = union_branches(
+            [BranchHit("structured", 7), BranchHit("structured", 9)],
+            [BranchHit("field_fts", 9, rank=1, raw_score=.9),
+             BranchHit("field_fts", 11, rank=2, raw_score=.4)])
+        self.assertEqual([row["person_id"] for row in rows], [7, 9, 11])
+        self.assertEqual(set(rows[1]["provenance"]), {"structured", "field_fts"})
+        self.assertEqual(rows[2]["provenance"]["field_fts"]["rank"], 2)
+
+    def test_lexical_branch_reports_why_it_did_not_run(self):
+        plan = RadarTurnPlan(must=[Constraint("search_text", "chuyển đổi số",
+                                              classification="HARD_SEMANTIC")])
+        queryset, _explain = compile_projection_query(plan)
+        hits, state = lexical_branch(queryset, plan, limit=10)
+        self.assertIsNone(hits)
+        # Trên SQLite nhánh này không dùng được; im lặng coi như đã tìm đủ mới là lỗi.
+        self.assertEqual(state["reason"], "vendor_unsupported")
+        self.assertFalse(state["ran"])
+
+    def test_ablation_scores_each_config_separately(self):
+        person = Person.objects.create(display_name="Ablation", is_applicant=True)
+        TalentProfile.objects.create(person=person, current_title="Data Analyst")
+        build_projection(person.pk)
+        report = ablation(RadarTurnPlan(must=[Constraint("title", "Data Analyst")]))
+        self.assertEqual(report["configs"]["structured"]["ids"], [person.pk])
+        self.assertFalse(report["configs"]["field_fts"]["branches"]["field_fts"]["ran"])
+
+
+class SilverDatasetTest(TestCase):
+    """Bộ silver phải chạy được và không được tự nhận là gold."""
+
+    def _dataset(self):
+        from talent.management.commands.search_ablation import (DEFAULT_DATASET,
+                                                                _dataset_path,
+                                                                load_cases)
+        return load_cases(_dataset_path(DEFAULT_DATASET))
+
+    def test_every_case_compiles_and_semantic_cases_await_labels(self):
+        cases = self._dataset()
+        self.assertGreaterEqual(len(cases), 20)
+        for case in cases:
+            plan = RadarTurnPlan.from_dict(case["plan"])
+            compile_projection_query(plan)
+            if case["truth"] == "labels":
+                self.assertEqual(case["labels"]["status"], "needs_review")
+
+    def test_ablation_command_skips_unlabelled_semantic_cases(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        person = Person.objects.create(display_name="Silver", is_applicant=True,
+                                       location="Hà Nội")
+        TalentProfile.objects.create(person=person, current_title="Data Analyst",
+                                     location="Hà Nội", years_experience=5)
+        build_projection(person.pk)
+        out = StringIO()
+        call_command("search_ablation", stdout=out)
+        summary = json.loads(out.getvalue().split("\n{")[0] if False
+                             else out.getvalue()[:out.getvalue().rindex("}") + 1])
+        self.assertGreater(summary["skipped_needs_review"], 0)
+        # Không có PostgreSQL thì nhánh lexical không đóng góp gì, và báo cáo
+        # phải nói ra điều đó chứ không mượn điểm của nhánh structured.
+        self.assertEqual(summary["per_config"]["structured"]["mean_recall"], 1.0)
+        self.assertEqual(summary["per_config"]["field_fts"]["mean_recall"], 0.0)
+
+
+class VerificationTruthTest(TestCase):
+    """T2 chỉ được nói "đã xác minh" khi thật sự đối chiếu dữ liệu."""
+
+    def _person(self, name, title, years=4):
+        person = Person.objects.create(display_name=name, is_applicant=True)
+        TalentProfile.objects.create(person=person, current_title=title,
+                                     years_experience=years)
+        build_projection(person.pk)
+        return person
+
+    def test_semantic_plan_leaves_members_unknown_not_supported(self):
+        self._person("A", "Data Analyst")
+        self._person("B", "Python Developer")
+        run = create_candidate_set(RadarTurnPlan(must=[
+            Constraint("search_text", "đã dẫn dắt chuyển đổi số",
+                       classification="HARD_SEMANTIC")]))
+        finished = process_candidate_set(run.pk)
+        self.assertEqual(finished.judged, 0)
+        self.assertEqual(finished.unknown, 2)
+        self.assertFalse(finished.complete)
+        self.assertFalse(finished.explain["completeness"]["branches_complete"])
+        self.assertFalse(finished.explain["completeness"]["verification_complete"])
+
+    def test_member_no_longer_matching_is_contradicted_after_reverification(self):
+        keep = self._person("Khớp", "Data Analyst")
+        drift = self._person("Đổi việc", "Data Analyst")
+        run = create_candidate_set(RadarTurnPlan(
+            must=[Constraint("title", "Data Analyst")]))
+        profile = drift.talent_profile
+        profile.current_title = "Kế toán"
+        profile.save(update_fields=["current_title"])
+        build_projection(drift.pk)
+        finished = process_candidate_set(run.pk)
+        statuses = dict(finished.members.values_list("person_id",
+                                                     "deterministic_status"))
+        self.assertEqual(statuses[keep.pk], "supported")
+        self.assertEqual(statuses[drift.pk], "contradicted")
+        self.assertEqual(finished.judged, 2)
+        self.assertEqual(finished.unknown, 0)
+
+    @override_settings(SEARCH_V2_SNAPSHOT_MAX_MEMBERS=3)
+    def test_snapshot_cap_blocks_instead_of_silently_truncating(self):
+        for index in range(5):
+            self._person(f"Đông {index}", "Data Analyst")
+        run = create_candidate_set(RadarTurnPlan(
+            must=[Constraint("title", "Data Analyst")]))
+        self.assertEqual(run.candidate_total, 5)
+        self.assertEqual(run.state, "blocked")
+        self.assertTrue(run.retrieval_degraded)
+        self.assertEqual(run.explain["snapshot"]["reason"], "snapshot_cap_exceeded")
+        self.assertFalse(CandidateSetMember.objects.filter(run=run).exists())
+        self.assertFalse(process_candidate_set(run.pk).complete)
+
+    def test_cost_estimate_uses_the_real_evidence_budget(self):
+        estimate = estimate_judgement_cost(candidates=100)
+        self.assertEqual(estimate["prompt_tokens"],
+                         100 * EVIDENCE_CHAR_BUDGET // 4)
 
 
 class AnswerCoverageContractTest(TestCase):
