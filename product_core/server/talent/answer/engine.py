@@ -695,15 +695,22 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         # Với một khoá GreenNode và hạn mức theo khoá, đây là cách rẻ nhất để
         # không mất phần đọc sâu ở những câu tinh chỉnh.
         cache_scope = judge_cache.scope_token_for(user)
-        cached = judge_cache.load(list(keys.values()), scope_token=cache_scope)
-        for key, judgement in cached.items():
-            reusable_judgements.setdefault(key, judgement)
+        cache_criteria = judge_cache.criteria_signature(active_plan)
+        fingerprints = {c.person_id: judge_cache.person_fingerprint(c.person_id, c)
+                        for c in candidates}
+        cached = judge_cache.load(fingerprints, scope_token=cache_scope,
+                                  criteria=cache_criteria)
+        for person_id, judgement in cached.items():
+            if person_id in keys:
+                reusable_judgements.setdefault(keys[person_id], judgement)
         unread = [c for c in candidates if keys[c.person_id] not in reusable_judgements]
         fresh = judge_stage.judge(active_plan, unread, complete_fn=complete_fn,
                                   deadline=started + READ_BUDGET_SECONDS)
         for row in fresh:
             reusable_judgements[keys[row.person_id]] = row
-            judge_cache.store(keys.get(row.person_id), row, scope_token=cache_scope,
+            judge_cache.store(row, scope_token=cache_scope,
+                              criteria=cache_criteria,
+                              fingerprint=fingerprints.get(row.person_id, ""),
                               person_id=row.person_id)
         judgements = judge_stage.JudgeReport(
             [reusable_judgements[keys[c.person_id]] for c in candidates

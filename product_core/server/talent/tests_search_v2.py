@@ -654,41 +654,84 @@ class JudgeCacheTest(TestCase):
                          criteria=[{"text": "SQL", "status": s} for s in statuses],
                          model="qwen/qwen3.7-plus")
 
+    def _plan(self, must=("SQL",), should=()):
+        return SimpleNamespace(must_have=list(must), should_have=list(should))
+
     def test_ket_luan_dut_khoat_duoc_nho_va_dung_lai(self):
         from talent.answer import judge_cache
 
         scope = judge_cache.scope_token_for(self.user)
-        self.assertTrue(judge_cache.store("khoa-1", self._judgement(["SUPPORTED"]),
-                                          scope_token=scope))
-        got = judge_cache.load(["khoa-1"], scope_token=scope)
-        self.assertIn("khoa-1", got)
-        self.assertEqual(got["khoa-1"].person_id, self.person.pk)
-        self.assertEqual(got["khoa-1"].why, "vì có SQL")
+        crit = judge_cache.criteria_signature(self._plan())
+        self.assertTrue(judge_cache.store(self._judgement(["SUPPORTED"]),
+                                          scope_token=scope, criteria=crit,
+                                          fingerprint="fp-1"))
+        got = judge_cache.load({self.person.pk: "fp-1"}, scope_token=scope,
+                               criteria=crit)
+        self.assertIn(self.person.pk, got)
+        self.assertEqual(got[self.person.pk].why, "vì có SQL")
+
+    def test_cung_bo_tieu_chi_dien_dat_khac_van_gap_nhau(self):
+        """Đo trên prod: khoá theo câu chữ kế hoạch thì ba lượt cùng một câu tạo
+        ba tập khoá mới — cache chỉ ghi mà không bao giờ đọc được."""
+        from talent.answer import judge_cache
+
+        a = judge_cache.criteria_signature(self._plan(must=["SQL", "Python"]))
+        b = judge_cache.criteria_signature(self._plan(must=["python", "sql"]))
+        self.assertEqual(a, b)
+        self.assertTrue(a)
+
+    def test_ho_so_doi_thi_khong_dung_lai_ket_luan_cu(self):
+        from talent.answer import judge_cache
+
+        scope = judge_cache.scope_token_for(self.user)
+        crit = judge_cache.criteria_signature(self._plan())
+        judge_cache.store(self._judgement(["SUPPORTED"]), scope_token=scope,
+                          criteria=crit, fingerprint="fp-cu")
+        self.assertEqual(judge_cache.load({self.person.pk: "fp-moi"},
+                                          scope_token=scope, criteria=crit), {})
+
+    def test_tieu_chi_khac_thi_khong_dung_lai(self):
+        from talent.answer import judge_cache
+
+        scope = judge_cache.scope_token_for(self.user)
+        judge_cache.store(self._judgement(["SUPPORTED"]), scope_token=scope,
+                          criteria=judge_cache.criteria_signature(self._plan()),
+                          fingerprint="fp-1")
+        khac = judge_cache.criteria_signature(self._plan(must=["Java"]))
+        self.assertEqual(judge_cache.load({self.person.pk: "fp-1"},
+                                          scope_token=scope, criteria=khac), {})
 
     def test_con_unknown_thi_khong_nho(self):
         from talent.answer import judge_cache
 
         scope = judge_cache.scope_token_for(self.user)
+        crit = judge_cache.criteria_signature(self._plan())
         self.assertFalse(judge_cache.store(
-            "khoa-2", self._judgement(["SUPPORTED", "UNKNOWN"]), scope_token=scope))
-        self.assertEqual(judge_cache.load(["khoa-2"], scope_token=scope), {})
+            self._judgement(["SUPPORTED", "UNKNOWN"]), scope_token=scope,
+            criteria=crit, fingerprint="fp-1"))
+        self.assertEqual(judge_cache.load({self.person.pk: "fp-1"},
+                                          scope_token=scope, criteria=crit), {})
 
     def test_pham_vi_khac_nhau_thi_khong_dung_chung(self):
         from talent.answer import judge_cache
 
         other = User.objects.create_user("cache-other", password="x")
-        judge_cache.store("khoa-3", self._judgement(["SUPPORTED"]),
-                          scope_token=judge_cache.scope_token_for(self.user))
+        crit = judge_cache.criteria_signature(self._plan())
+        judge_cache.store(self._judgement(["SUPPORTED"]),
+                          scope_token=judge_cache.scope_token_for(self.user),
+                          criteria=crit, fingerprint="fp-1")
         self.assertEqual(
-            judge_cache.load(["khoa-3"],
-                             scope_token=judge_cache.scope_token_for(other)), {})
+            judge_cache.load({self.person.pk: "fp-1"},
+                             scope_token=judge_cache.scope_token_for(other),
+                             criteria=crit), {})
 
     def test_khong_co_nguoi_hoi_thi_khong_cache(self):
         from talent.answer import judge_cache
 
         self.assertEqual(judge_cache.scope_token_for(None), "")
-        self.assertFalse(judge_cache.store("khoa-4", self._judgement(["SUPPORTED"]),
-                                           scope_token=""))
+        self.assertFalse(judge_cache.store(
+            self._judgement(["SUPPORTED"]), scope_token="", criteria="sql",
+            fingerprint="fp-1"))
 
 
 class PreferenceRankTest(TestCase):
@@ -740,7 +783,6 @@ class PreferenceRankTest(TestCase):
     def test_gioi_tinh_tuoi_khong_phai_dau_vao_cua_diem(self):
         plan = self._plan()
         a, _ = preference_score({}, plan, matched=[plan.prefer[0].constraint_id])
-        # Thêm thuộc tính nhân khẩu học vào đầu vào không được đổi điểm.
         b, _ = preference_score({"gender": 1.0, "age": 1.0}, plan,
                                 matched=[plan.prefer[0].constraint_id])
         self.assertEqual(a, b)
