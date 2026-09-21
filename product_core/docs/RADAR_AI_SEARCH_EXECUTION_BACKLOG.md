@@ -1810,3 +1810,13 @@ công khai bị ngắt SSL thoáng qua (container đã healthy); chạy lại th
 - Đo lại JD GDV sau deploy: 103 s, `incomplete=False`, 4/4 lô GLM thành công (không cần dự phòng).
   Đánh đổi: bộ lọc cấp bậc chặt hơn nên danh sách chính ngắn hơn (1 người) và nhiều "gần đúng" hơn.
 
+**JD đính kèm bị rẽ sang hội thoại + tra web (21/09 18:27, sửa ở `4a58e06` và commit sau):**
+JD `MRRB` chứa câu "cơ cấu danh mục tín dụng … theo …" khớp bộ dò thống kê (`_DISTRIBUTION`)
+chạy trên TOÀN BỘ tin nhắn kể cả nội dung JD ⇒ ① `find_people` bị đổi thành `analyze`, rồi ở
+engine bị bẻ sang `general` ⇒ nhánh hội thoại + "Tra trên internet", không tìm hồ sơ nào. Sửa:
+(1) `plan.user_words()` — các bộ dò từ khoá chỉ nhìn lời người dùng, bỏ khối "TÀI LIỆU ĐÍNH KÈM";
+(2) `general` mà có `must_have` hoặc "tài liệu đính kèm + tìm người phù hợp" ⇒ `find_people`;
+(3) engine không bẻ sang `general` khi đó là yêu cầu tìm người theo tài liệu. Đo lại trên prod:
+các bước "Tìm trong kho → Đã đọc sâu 32 hồ sơ", `shape=find_people`, `incomplete=False`, 118 s,
+kết quả trung thực "không ai thoả đầy đủ" kèm 5 người gần đúng (kho demo chưa có nhiều hồ sơ rủi ro tín dụng).
+
