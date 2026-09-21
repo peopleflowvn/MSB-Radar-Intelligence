@@ -1795,3 +1795,18 @@ trong 149 s — cả ba `incomplete=False`. Đánh đổi: câu khó có thể c
 thay vì cắt ở 100 s; trần tuyệt đối 210 s. Lần deploy đầu tự rollback vì `curl` health
 công khai bị ngắt SSL thoáng qua (container đã healthy); chạy lại thì qua.
 
+**Chất lượng đọc hồ sơ theo bối cảnh + chuỗi dự phòng judge (21/09, `c` các commit sau `49b007f`):**
+- Đọc chat thật hôm nay (JD Giao dịch viên, 2 lượt): người đã lên Phó phòng/Kiểm soát viên
+  nhưng từng làm GDV vẫn lọt danh sách chính vì `must_have` là "ứng tuyển *hoặc có kinh nghiệm* GDV"
+  và ③ không có khái niệm cấp bậc hiện tại. Sửa: ③ trả thêm `cap_do` (dung|cao_hon|thap_hon|chua_ro);
+  ④ chuyển `cao_hon` xuống "gần đúng" kèm lý do (`stats.over_level`); ① ghi cấp bậc vị trí vào
+  `information_need`. `JUDGE_SCHEMA_VERSION` 3 để bỏ cache cũ. Đo lại: người Phó phòng nay ở
+  "gần đúng: cấp bậc hiện tại cao hơn vị trí cần tuyển".
+- Judge luôn rơi về Gemini: GLM timeout ~60 s / 429, rồi qwen cũng hết hạn mức. Chuỗi mới:
+  GLM → qwen3.7-plus → **deepseek-v4-flash** → qwen3.6-flash → Gemini. Đo prod: deepseek-flash 8/8 hồ
+  sơ/42 s (ngang GLM); deepseek-v4-pro 0/8 sau 70 s nên không dùng. Ngân sách mỗi lô 70→100 s và
+  router bỏ qua lượt dự phòng giữa chuỗi khi chỉ còn <30 s (`min_attempt_seconds`): trước đó deepseek
+  chỉ được 9 s, qwen 3 s — chắc chắn timeout — rồi Gemini (4 s) mới chạy.
+- Đo lại JD GDV sau deploy: 103 s, `incomplete=False`, 4/4 lô GLM thành công (không cần dự phòng).
+  Đánh đổi: bộ lọc cấp bậc chặt hơn nên danh sách chính ngắn hơn (1 người) và nhiều "gần đúng" hơn.
+
