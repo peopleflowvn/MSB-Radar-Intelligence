@@ -1,6 +1,6 @@
 import { createContext, Dispatch, ReactNode, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, AssistantConversation, ProspectAnswerPerson, SearchFilters } from "./api";
+import { AnswerPerson, api, AssistantConversation, ProspectAnswerPerson, SearchFilters } from "./api";
 import { AnswerTurn } from "./AnswerView";
 
 // SearchStateProvider được mount NGOÀI <App/> (xem main.tsx) nên không bị
@@ -198,6 +198,82 @@ interface AiChatState {
   setActiveTurn: (turn: ActiveTalentTurn | null) => void;
 }
 
+export function extractAnswerPeople(metadata: Record<string, unknown> | undefined): AnswerPerson[] {
+  if (!metadata) return [];
+  if (Array.isArray(metadata.people) && metadata.people.length > 0) {
+    return (metadata.people as any[]).map((it) => ({
+      person_id: Number(it.person_id ?? it.id),
+      name: String(it.name || ""),
+      why: String(it.why || ""),
+      attributes: (it.attributes as Record<string, string | number>) || {},
+      citations: Array.isArray(it.citations) ? it.citations : [],
+      judgement_status: it.judgement_status,
+      gap: it.gap,
+      profile: it.profile,
+    }));
+  }
+  const snap = (metadata.result_snapshot as Record<string, unknown>) || {};
+  const items = (Array.isArray(snap.items) ? snap.items : null)
+    || (Array.isArray(snap.people) ? snap.people : null)
+    || [];
+  return items.map((it: any) => ({
+    person_id: Number(it.person_id ?? it.id),
+    name: String(it.name || ""),
+    why: String(it.why || ""),
+    attributes: (it.attributes as Record<string, string | number>) || {},
+    citations: Array.isArray(it.citations) ? it.citations : [],
+    judgement_status: it.judgement_status,
+    gap: it.gap,
+    profile: it.profile,
+  }));
+}
+
+export function extractProspectAnswerPeople(metadata: Record<string, unknown> | undefined): ProspectAnswerPerson[] {
+  if (!metadata) return [];
+  if (Array.isArray(metadata.people) && metadata.people.length > 0) {
+    return (metadata.people as any[]).map((it) => ({
+      person_id: Number(it.person_id ?? it.id),
+      name: String(it.name || ""),
+      location: String(it.location || ""),
+      occupation: String(it.occupation || ""),
+      has_open_opportunity: Boolean(it.has_open_opportunity),
+      reasons: Array.isArray(it.reasons) ? it.reasons : (it.why ? [String(it.why)] : []),
+      why: String(it.why || ""),
+      product: String(it.product || ""),
+      priority_score: Number(it.priority_score ?? it.score ?? 0),
+      scores: it.scores || {},
+      need_kind: String(it.need_kind || "nhu_cau"),
+      freshest_days: it.freshest_days != null ? Number(it.freshest_days) : null,
+      action: String(it.action || "reach_out"),
+      action_label: String(it.action_label || "Tiếp cận"),
+      sources: Array.isArray(it.sources) ? it.sources : [],
+      url: String(it.url || ""),
+    }));
+  }
+  const snap = (metadata.result_snapshot as Record<string, unknown>) || {};
+  const items = (Array.isArray(snap.items) ? snap.items : null)
+    || (Array.isArray(snap.people) ? snap.people : null)
+    || [];
+  return items.map((it: any) => ({
+    person_id: Number(it.person_id ?? it.id),
+    name: String(it.name || ""),
+    location: String(it.location || ""),
+    occupation: String(it.occupation || ""),
+    has_open_opportunity: Boolean(it.has_open_opportunity),
+    reasons: Array.isArray(it.reasons) ? it.reasons : (it.why ? [String(it.why)] : []),
+    why: String(it.why || ""),
+    product: String(it.product || ""),
+    priority_score: Number(it.priority_score ?? it.score ?? 0),
+    scores: it.scores || {},
+    need_kind: String(it.need_kind || "nhu_cau"),
+    freshest_days: it.freshest_days != null ? Number(it.freshest_days) : null,
+    action: String(it.action || "reach_out"),
+    action_label: String(it.action_label || "Tiếp cận"),
+    sources: Array.isArray(it.sources) ? it.sources : [],
+    url: String(it.url || ""),
+  }));
+}
+
 const AiChatContext = createContext<AiChatState | null>(null);
 
 function AiChatProvider({ children }: { children: ReactNode }) {
@@ -235,6 +311,7 @@ function AiChatProvider({ children }: { children: ReactNode }) {
     setThreadId(resetThreadId("talent"));
     if (username) refreshConversations().catch(() => undefined);
   }, [username, refreshConversations, setActiveTurn]);
+
   const selectConversation = async (id: string) => {
     try {
       const row = await api.conversation(id, "talent");
@@ -248,10 +325,12 @@ function AiChatProvider({ children }: { children: ReactNode }) {
         answer: (m.role === "assistant" || m.metadata?.answer_engine) ? {
           text: m.content,
           sources: (m.metadata?.cv_citations as AnswerTurn["sources"]) ?? [],
-          people: (m.metadata?.people as any) ?? [],
+          people: extractAnswerPeople(m.metadata),
           reasoning: (m.metadata?.reasoning_trace as string) || (m.metadata?.thinking_trace as string) || undefined,
           provider: m.provider,
           model: m.model,
+          trace: (m.metadata?.trace as Record<string, unknown>) ?? undefined,
+          durationMs: (m.metadata?.duration_ms as number) ?? undefined,
         } : undefined,
       })));
     } catch {
@@ -363,12 +442,13 @@ function ProspectChatProvider({ children }: { children: ReactNode }) {
         // thoại cũ vẫn hiện đúng, không chỉ còn trơ mỗi đoạn văn.
         answer: (m.role === "assistant" || m.metadata?.answer_engine) ? {
           text: m.content,
-          sources: [],
-          people: (m.metadata?.people as ProspectAnswerPerson[]) ?? [],
+          sources: (m.metadata?.cv_citations as AnswerTurn["sources"]) ?? [],
+          people: extractProspectAnswerPeople(m.metadata),
           reasoning: (m.metadata?.reasoning_trace as string) || (m.metadata?.thinking_trace as string) || undefined,
           provider: m.provider,
           model: m.model,
-          trace: m.metadata?.plan ? { plan: m.metadata.plan } : undefined,
+          trace: (m.metadata?.trace as Record<string, unknown>) ?? (m.metadata?.plan ? { plan: m.metadata.plan } : undefined),
+          durationMs: (m.metadata?.duration_ms as number) ?? undefined,
         } : undefined,
       })));
     } catch {

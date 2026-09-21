@@ -15717,6 +15717,75 @@ button.chip.active {
   font-weight: 600;
 }
 
+.talent-card-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+
+.talent-card-hunt-action {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.talent-card-hunt-select {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--surface-raised, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border);
+  color: var(--accent);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+  max-width: 170px;
+}
+
+.talent-card-hunt-select:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft, rgba(5, 150, 105, 0.12));
+}
+
+.talent-card-hunt-select.is-added {
+  color: #10b981;
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.talent-smart-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.talent-bulk-hunt-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.talent-bulk-hunt-select {
+  padding: 3px 10px;
+  font-size: 11.5px;
+  background: var(--surface);
+  border-color: var(--accent);
+  max-width: 240px;
+}
+
+.talent-smart-bulk-status {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
 
 .ai-model-tag {
   display: inline-flex;

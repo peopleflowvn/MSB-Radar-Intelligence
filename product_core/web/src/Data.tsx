@@ -650,6 +650,7 @@ function SourceRecordsExplorer({
               <th style={{ minWidth: '130px' }}>Điện thoại</th>
               <th style={{ width: '130px' }}>Nguồn dữ liệu</th>
               <th style={{ minWidth: '160px' }}>Edge thu thập</th>
+              <th style={{ minWidth: '150px' }}>Đồng bộ lúc</th>
             </tr>
           </thead>
           <tbody>
@@ -710,11 +711,23 @@ function SourceRecordsExplorer({
                     ) : null}
                   </div>
                 </td>
+                <td style={{ fontSize: '12.5px', whiteSpace: 'nowrap' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>
+                      {row.last_seen_at ? new Date(row.last_seen_at).toLocaleString('vi-VN') : '—'}
+                    </span>
+                    {row.first_seen_at && row.revision > 1 ? (
+                      <span style={{ color: 'var(--muted)', fontSize: '11px' }}>
+                        Lần đầu: {new Date(row.first_seen_at).toLocaleString('vi-VN')}
+                      </span>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: 'var(--muted)' }}>
+                <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: 'var(--muted)' }}>
                   Không có bản ghi nào khớp.
                 </td>
               </tr>

@@ -53,3 +53,59 @@ describe("trạng thái bộ lọc Talent", () => {
     expect(screen.getByTestId("history")).toHaveTextContent("1");
   });
 });
+
+describe("phục hồi thẻ ứng viên từ snapshot DB", () => {
+  it("trích xuất đúng danh sách people từ metadata.result_snapshot.items khi tải lại luồng chat", async () => {
+    const { extractAnswerPeople } = await import("./searchPersistence");
+    const metadata = {
+      answer_engine: true,
+      result_snapshot: {
+        kind: "answer",
+        count: 2,
+        items: [
+          { id: 892, name: "Hà My Cao", why: "Chuyên viên chính Quan hệ khách hàng" },
+          { id: 1011, name: "Nguyễn Thị Thanh Thư", why: "Chuyên viên cao cấp" },
+        ],
+      },
+      cv_citations: [
+        { n: 1, person_id: 892, document_id: 539, name: "Hà My Cao", snippet: "VPBank" },
+      ],
+    };
+
+    const people = extractAnswerPeople(metadata);
+    expect(people).toHaveLength(2);
+    expect(people[0]).toMatchObject({
+      person_id: 892,
+      name: "Hà My Cao",
+      why: "Chuyên viên chính Quan hệ khách hàng",
+    });
+    expect(people[1]).toMatchObject({
+      person_id: 1011,
+      name: "Nguyễn Thị Thanh Thư",
+    });
+  });
+
+  it("trích xuất đúng danh sách prospect từ metadata.result_snapshot.items cho RB", async () => {
+    const { extractProspectAnswerPeople } = await import("./searchPersistence");
+    const metadata = {
+      answer_engine: true,
+      result_snapshot: {
+        kind: "answer",
+        count: 1,
+        items: [
+          { id: 456, name: "Công ty ABC", why: "Có nhu cầu vay vốn", priority_score: 85 },
+        ],
+      },
+    };
+
+    const prospects = extractProspectAnswerPeople(metadata);
+    expect(prospects).toHaveLength(1);
+    expect(prospects[0]).toMatchObject({
+      person_id: 456,
+      name: "Công ty ABC",
+      why: "Có nhu cầu vay vốn",
+      priority_score: 85,
+    });
+  });
+});
+

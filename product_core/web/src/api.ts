@@ -82,6 +82,7 @@ export interface SourceRecordRow {
   position: string;
   status: string;
   revision: number;
+  first_seen_at: string;
   last_seen_at: string;
 }
 

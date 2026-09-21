@@ -1,6 +1,7 @@
 import { ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AnswerPerson, AnswerSource, api } from "./api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AnswerPerson, AnswerSource, api, HuntRequestRow } from "./api";
 import { inferFollowUpQuestions } from "./followUpInference";
 import FormattedMarkdown, { LinkablePerson } from "./FormattedMarkdown";
 import SourcePreview, { SourceRef } from "./SourcePreview";
@@ -167,20 +168,27 @@ function TalentPersonCard({
   sources,
   personLinkFrom,
   nearMiss,
+  openHunts = [],
+  onAddToHunt,
+  isAddingToHunt,
+  addedHuntName,
 }: {
   person: AnswerPerson;
   sources: AnswerSource[];
   personLinkFrom: string;
   nearMiss: boolean;
+  openHunts?: HuntRequestRow[];
+  onAddToHunt?: (personId: number, huntId: number) => void;
+  isAddingToHunt?: boolean;
+  addedHuntName?: string;
 }) {
   const info = extractPersonInfo(person, sources);
   const gap = (person.gap || "").trim();
   const note = nearMiss ? (gap || info.highlight) : info.highlight;
   return (
-    <Link
-      to={`/person/${person.person_id}?from=${personLinkFrom}`}
+    <div
       className={`talent-compact-card${nearMiss ? " is-near-miss" : ""}`}
-      title={`Mở hồ sơ 360° của ${person.name}`}
+      title={`Hồ sơ của ${person.name}`}
     >
       <div className="talent-card-header">
         <div className="talent-card-avatar">
@@ -188,7 +196,13 @@ function TalentPersonCard({
         </div>
         <div className="talent-card-title-wrap">
           <div className="talent-card-name-row">
-            <span className="talent-card-name">{person.name}</span>
+            <Link
+              to={`/person/${person.person_id}?from=${personLinkFrom}`}
+              className="talent-card-name"
+              title={`Mở hồ sơ 360° của ${person.name}`}
+            >
+              {person.name}
+            </Link>
             {info.citationNums.length > 0 && (
               <span className="talent-card-citations" title="Trích dẫn bằng chứng trong CV">
                 {info.citationNums.map((c) => `[${c}]`).join(" ")}
@@ -228,11 +242,46 @@ function TalentPersonCard({
             {`${key}: ${value}`}
           </span>
         ))}
-        <span className="talent-attr-pill profile-link-pill">
-          Xem 360° →
-        </span>
       </div>
-    </Link>
+
+      <div className="talent-card-footer-row">
+        <Link
+          to={`/person/${person.person_id}?from=${personLinkFrom}`}
+          className="talent-attr-pill profile-link-pill"
+          title={`Xem chi tiết hồ sơ 360° của ${person.name}`}
+        >
+          Xem 360° →
+        </Link>
+
+        {openHunts.length > 0 && onAddToHunt && (
+          <div className="talent-card-hunt-action" onClick={(e) => e.stopPropagation()}>
+            <select
+              className={`talent-card-hunt-select${addedHuntName ? " is-added" : ""}`}
+              disabled={isAddingToHunt}
+              value=""
+              onChange={(e) => {
+                const hid = Number(e.target.value);
+                if (hid) onAddToHunt(person.person_id, hid);
+              }}
+              title="Thêm ứng viên vào đợt tuyển dụng hoặc nhiệm vụ săn"
+            >
+              <option value="" disabled>
+                {isAddingToHunt
+                  ? "⏳ Đang thêm…"
+                  : addedHuntName
+                  ? `✓ Đã vào: ${addedHuntName}`
+                  : "🎯 + Đợt tuyển…"}
+              </option>
+              {openHunts.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.title}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -242,12 +291,24 @@ function TalentCardGroup({
   sources,
   personLinkFrom,
   nearMiss,
+  openHunts = [],
+  onAddToHunt,
+  addingPersonId,
+  addedHuntNames,
+  onBulkAddToHunt,
+  bulkStatus,
 }: {
   title: string;
   people: AnswerPerson[];
   sources: AnswerSource[];
   personLinkFrom: string;
   nearMiss: boolean;
+  openHunts?: HuntRequestRow[];
+  onAddToHunt?: (personId: number, huntId: number) => void;
+  addingPersonId?: number | null;
+  addedHuntNames?: Record<number, string>;
+  onBulkAddToHunt?: (huntId: number, targetPeople: AnswerPerson[]) => void;
+  bulkStatus?: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (people.length === 0) return null;
@@ -262,15 +323,43 @@ function TalentCardGroup({
         <span className="talent-smart-title">
           <span>{title}</span> <span className="talent-smart-count">({people.length})</span>
         </span>
-        {hasMore && (
-          <button
-            type="button"
-            className="talent-header-expand-link"
-            onClick={() => setExpanded((prev) => !prev)}
-          >
-            {expanded ? "Thu gọn ▴" : `Xem tất cả ${people.length} hồ sơ ▾`}
-          </button>
-        )}
+
+        <div className="talent-smart-header-right">
+          {!nearMiss && openHunts.length > 0 && onBulkAddToHunt && people.length > 1 && (
+            <div className="talent-bulk-hunt-wrap" onClick={(e) => e.stopPropagation()}>
+              {bulkStatus ? (
+                <span className="talent-smart-bulk-status">{bulkStatus}</span>
+              ) : (
+                <select
+                  className="talent-card-hunt-select talent-bulk-hunt-select"
+                  value=""
+                  onChange={(e) => {
+                    const hid = Number(e.target.value);
+                    if (hid) onBulkAddToHunt(hid, people);
+                  }}
+                  title={`Thêm tất cả ${people.length} ứng viên vào đợt tuyển / nhiệm vụ săn`}
+                >
+                  <option value="" disabled>🎯 Thêm cả {people.length} vào đợt tuyển…</option>
+                  {openHunts.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {hasMore && (
+            <button
+              type="button"
+              className="talent-header-expand-link"
+              onClick={() => setExpanded((prev) => !prev)}
+            >
+              {expanded ? "Thu gọn ▴" : `Xem tất cả ${people.length} hồ sơ ▾`}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="talent-smart-grid">
@@ -281,6 +370,10 @@ function TalentCardGroup({
             sources={sources}
             personLinkFrom={personLinkFrom}
             nearMiss={nearMiss}
+            openHunts={openHunts}
+            onAddToHunt={onAddToHunt}
+            isAddingToHunt={addingPersonId === person.person_id}
+            addedHuntName={addedHuntNames?.[person.person_id]}
           />
         ))}
       </div>
@@ -314,6 +407,55 @@ function TalentSmartCards({
   sources?: AnswerSource[];
 }) {
   if (!people || people.length === 0) return null;
+  const qc = useQueryClient();
+  const huntsQuery = useQuery({
+    queryKey: ["hunts", "open-for-cards"],
+    queryFn: () => api.hunts({ open: true, limit: 100 }).catch(() => ({ count: 0, limit: 100, offset: 0, results: [] })),
+    staleTime: 60_000,
+  });
+  const openHunts = huntsQuery.data?.results ?? [];
+
+  const [addingPersonId, setAddingPersonId] = useState<number | null>(null);
+  const [addedHuntNames, setAddedHuntNames] = useState<Record<number, string>>({});
+  const [bulkStatus, setBulkStatus] = useState<string | null>(null);
+
+  const handleAddToHunt = async (personId: number, huntId: number) => {
+    const hunt = openHunts.find((h) => h.id === huntId);
+    setAddingPersonId(personId);
+    try {
+      await api.huntUpdate(huntId, { person_ids_add: [personId] });
+      setAddedHuntNames((prev) => ({ ...prev, [personId]: hunt?.title || "Đợt tuyển" }));
+      qc.invalidateQueries({ queryKey: ["hunts"] });
+      qc.invalidateQueries({ queryKey: ["hunt-tasks"] });
+    } catch (e) {
+      console.error("Lỗi khi thêm vào đợt tuyển:", e);
+    } finally {
+      setAddingPersonId(null);
+    }
+  };
+
+  const handleBulkAddToHunt = async (huntId: number, targetPeople: AnswerPerson[]) => {
+    const hunt = openHunts.find((h) => h.id === huntId);
+    const ids = targetPeople.map((p) => p.person_id);
+    setBulkStatus(`Đang thêm ${ids.length} ứng viên…`);
+    try {
+      await api.huntUpdate(huntId, { person_ids_add: ids });
+      const huntTitle = hunt?.title || "đợt tuyển";
+      setBulkStatus(`✓ Đã thêm ${ids.length} ứng viên vào ${huntTitle}`);
+      setAddedHuntNames((prev) => {
+        const next = { ...prev };
+        ids.forEach((id) => { next[id] = huntTitle; });
+        return next;
+      });
+      qc.invalidateQueries({ queryKey: ["hunts"] });
+      qc.invalidateQueries({ queryKey: ["hunt-tasks"] });
+      setTimeout(() => setBulkStatus(null), 4000);
+    } catch (e) {
+      setBulkStatus("Lỗi khi thêm vào đợt tuyển");
+      setTimeout(() => setBulkStatus(null), 3000);
+    }
+  };
+
   const matched = people.filter((p) => p.judgement_status !== "SUGGESTION");
   const near = people.filter((p) => p.judgement_status === "SUGGESTION");
   return (
@@ -324,6 +466,12 @@ function TalentSmartCards({
         sources={sources}
         personLinkFrom={personLinkFrom}
         nearMiss={false}
+        openHunts={openHunts}
+        onAddToHunt={handleAddToHunt}
+        addingPersonId={addingPersonId}
+        addedHuntNames={addedHuntNames}
+        onBulkAddToHunt={handleBulkAddToHunt}
+        bulkStatus={bulkStatus}
       />
       <TalentCardGroup
         title="Gần phù hợp — chưa đạt đủ tiêu chí"
@@ -331,6 +479,10 @@ function TalentSmartCards({
         sources={sources}
         personLinkFrom={personLinkFrom}
         nearMiss
+        openHunts={openHunts}
+        onAddToHunt={handleAddToHunt}
+        addingPersonId={addingPersonId}
+        addedHuntNames={addedHuntNames}
       />
     </>
   );
