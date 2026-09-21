@@ -107,8 +107,18 @@ def _sort_direction(sort_by, key, information_need=""):
 def aggregate(query_plan, judgements):
     """Trả `(chosen, near_misses, stats)` — danh sách đã chốt để ⑤ diễn đạt."""
     kept, near = [], []
+    over_level = 0
     for judgement in judgements:
-        if judgement.relevant and judgement.confidence >= CONFIDENCE_FLOOR:
+        if (judgement.relevant and judgement.confidence >= CONFIDENCE_FLOOR
+                and query_plan.shape != "count"
+                and getattr(judgement, "level_fit", "") == "cao_hon"):
+            # Từng làm đúng việc nhưng nay đã ở cấp cao hơn vị trí cần tuyển:
+            # không đưa vào danh sách chính, vẫn giữ ở "gần đúng" kèm lý do.
+            over_level += 1
+            judgement.gap = ("Đã ở cấp cao hơn vị trí cần tuyển"
+                             + (f": {judgement.gap}" if judgement.gap else "."))
+            near.append(judgement)
+        elif judgement.relevant and judgement.confidence >= CONFIDENCE_FLOOR:
             kept.append(judgement)
         elif judgement.relevant or judgement.confidence >= NEAR_FLOOR:
             # thoả nhưng thiếu trích dẫn đủ tin (bị hạ độ tin) vẫn là gần đúng
@@ -150,6 +160,7 @@ def aggregate(query_plan, judgements):
         "sorted_by": sorted_by,
         "missing_sort_value": dropped_no_value,
         "cited": sum(1 for j in chosen if j.evidence),
+        "over_level": over_level,
     }
     return chosen, near[:NEAR_MISS], stats
 

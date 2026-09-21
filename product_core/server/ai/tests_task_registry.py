@@ -228,3 +228,11 @@ class AttemptOrderTest(TestCase):
         r = Router(env={"MSB_AI_GREENNODE_API_KEY": "k"})
         self.assertEqual(r._attempts("talent_answer_judge", ["greennode"], "x"),
                          [("greennode", None)])
+
+
+class JudgeFallbackChainTest(TestCase):
+    def test_judge_co_deepseek_flash_khong_co_pro_va_glm_la_chinh(self):
+        chain = tasks_registry.fallback_models("talent_answer_judge")
+        self.assertIn(("greennode", "deepseek/deepseek-v4-flash"), chain)
+        self.assertNotIn(("greennode", "deepseek/deepseek-v4-pro"), chain)
+        self.assertNotIn(("greennode", "z-ai/glm-5.2-hackathon"), chain)

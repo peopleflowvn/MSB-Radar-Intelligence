@@ -281,7 +281,10 @@ _GLM = ("greennode", "z-ai/glm-5.2-hackathon")
 #: cả 4 — nên glm đứng cuối mọi chuỗi: chậm hơn nhưng còn hạn mức.
 FALLBACK_MODELS = {
     # ③ đọc bằng chứng: flash nhận nhầm hồ sơ nhiễu nhưng vẫn hơn không đọc gì.
-    "talent_answer_judge": (_GLM, _QWEN_PLUS, _QWEN),
+    # deepseek-v4-flash đo trên prod 21/09: lô 8 hồ sơ JSON hợp lệ 8/8 trong 42 s
+    # (ngang GLM) và có hạn mức RIÊNG — nên đứng trước Gemini khi GLM/qwen hết
+    # hạn mức. deepseek-v4-pro KHÔNG vào đây: cùng lô đó 70 s vẫn 0/8.
+    "talent_answer_judge": (_GLM, _QWEN_PLUS, _VIET_NHANH, _QWEN),
     "rb_answer_judge": (_QWEN, _GLM),
     # ① hiểu câu hỏi: sai một chút ở kế hoạch còn cứu được ở các chặng sau.
     "talent_answer_plan": (_QWEN, _GLM),

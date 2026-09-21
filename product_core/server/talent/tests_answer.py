@@ -291,6 +291,16 @@ class JudgeTest(TestCase):
         self.assertEqual(result.evidence[0]["ordinal"], 3)
         self.assertEqual(result.extracted["năm sinh"], "1997")
 
+    def test_cap_do_duoc_doc_va_gia_tri_la_bi_bo(self):
+        row = {"id": 1, "thoa": True, "do_tin": 0.9, "vi_sao": "từng làm GDV",
+               "trich_dan": [{"doan": 1, "nguyen_van": "Tốt nghiệp Cao đẳng Kinh tế Đối ngoại"}]}
+        [high] = self._judge({"ket_qua": [dict(row, cap_do="cao_hon")]})
+        [weird] = self._judge({"ket_qua": [dict(row, cap_do="ngang ngửa")]})
+        [absent] = self._judge({"ket_qua": [row]})
+        self.assertEqual(high.level_fit, "cao_hon")
+        self.assertEqual(weird.level_fit, "")
+        self.assertEqual(absent.level_fit, "")
+
     def test_trich_dan_bia_thi_lui_ve_dan_chinh_doan_model_chi(self):
         """Câu chữ bịa KHÔNG được lưu, nhưng đoạn model chỉ là nguồn có thật.
 
@@ -500,6 +510,27 @@ def _j(name, confidence=0.9, relevant=True, **extracted):
 
 
 class AggregateTest(TestCase):
+    def test_nguoi_da_len_cap_cao_hon_xuong_gan_dung_khong_vao_danh_sach_chinh(self):
+        """Tìm giao dịch viên: Phó phòng từng làm GDV không phải kết quả chính."""
+        query_plan = plan_stage.QueryPlan(limit=5)
+        gdv, boss = _j("Giao dịch viên"), _j("Phó phòng")
+        gdv.level_fit, boss.level_fit = "dung", "cao_hon"
+        boss.gap = "Phó phòng giao dịch hiện tại"
+        chosen, near, stats = aggregate_stage.aggregate(query_plan, [gdv, boss])
+        self.assertEqual([j.name for j in chosen], ["Giao dịch viên"])
+        self.assertEqual([j.name for j in near], ["Phó phòng"])
+        self.assertIn("cấp cao hơn", near[0].gap)
+        self.assertIn("Phó phòng giao dịch hiện tại", near[0].gap)
+        self.assertEqual(stats["over_level"], 1)
+
+    def test_cap_do_chua_ro_hoac_thieu_thi_giu_nguyen(self):
+        query_plan = plan_stage.QueryPlan(limit=5)
+        a, b = _j("A"), _j("B")
+        a.level_fit = "chua_ro"
+        chosen, near, stats = aggregate_stage.aggregate(query_plan, [a, b])
+        self.assertEqual(len(chosen), 2)
+        self.assertEqual(stats["over_level"], 0)
+
     def test_it_tuoi_nhat_xep_theo_nam_sinh_giam_dan(self):
         query_plan = plan_stage.QueryPlan(
             limit=3, sort_by={"key": "năm sinh", "dir": "desc"})

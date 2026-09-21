@@ -137,7 +137,10 @@ Chỉ trả JSON, các khoá viết THEO ĐÚNG THỨ TỰ dưới đây:
     + "should_have" / "must_have": bám sát tiêu chí của đề xuất (ví dụ: "ở Hà Nội", "ưu tiên Giang Lê", "ưu tiên Tạ Nguyễn Phương Minh").
     + "search_queries": tạo các truy vấn tìm kiếm phù hợp với đề xuất đó.
 - "information_need": viết lại câu hỏi thành MỘT câu độc lập, đã ghép ngữ cảnh
-  hội thoại, đủ nghĩa khi đọc riêng.
+  hội thoại, đủ nghĩa khi đọc riêng. Khi nhu cầu là MỘT VỊ TRÍ CỤ THỂ (nhất là
+  từ JD/tài liệu đính kèm), ghi rõ CẤP BẬC của vị trí đó (nhân viên/thực thi,
+  chuyên viên, senior, quản lý...) để bước đọc hồ sơ so cấp hiện tại của ứng
+  viên với vị trí — không đề xuất người đã lên cấp cao hơn chỉ vì từng làm nghề đó.
 - "must_have": mảng câu chữ — điều kiện BẮT BUỘC, không thoả thì loại. Rất ít.
   Chỉ đưa vào khi người hỏi nói rõ là bắt buộc hoặc là bản chất vai trò cốt lõi.
   QUY TẮC CỐT LÕI (TRÁNH LOẠI SẠCH HỒ SƠ VỀ 0):

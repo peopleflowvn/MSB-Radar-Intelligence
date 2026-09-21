@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 
 #: Phiên bản schema/prompt của chặng đọc. Đổi prompt hay đổi hình dạng kết luận
 #: thì tăng số này, nếu không cache cũ sẽ trả kết luận theo luật đã bỏ.
-JUDGE_SCHEMA_VERSION = 2
+JUDGE_SCHEMA_VERSION = 3
 
 
 def scope_token_for(user):

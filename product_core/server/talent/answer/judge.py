@@ -85,6 +85,16 @@ có kinh nghiệm hay đang giữ chức danh đó nếu không có bằng chứ
                 kinh nghiệm, đúng kỹ năng mà khác chức danh…)
      0.00–0.30  gần như không liên quan (khác nghề, không kỹ năng nào khớp)
    Một hồ sơ chắc chắn KHÔNG liên quan thì do_tin THẤP, không phải cao.
+5. BỐI CẢNH & CẤP BẬC ("cap_do"): so vị trí/cấp HIỆN TẠI hoặc GẦN NHẤT của ứng
+   viên với cấp của vị trí trong nhu cầu — không chỉ hỏi "họ từng làm việc đó
+   chưa". Từng làm đúng việc nhưng nay đã LÊN CẤP CAO HƠN RÕ RỆT (Trưởng/Phó
+   phòng, Giám đốc, Kiểm soát viên, Quản lý, Lead...) khi nhu cầu là vị trí thực
+   thi/cấp thấp hơn (ví dụ tìm Giao dịch viên) thì KHÔNG phải người phù hợp cho
+   vị trí đó: cap_do="cao_hon", ghi chức danh hiện tại/gần nhất vào "con_thieu".
+   Giá trị: "dung" (cấp hiện tại/gần nhất khớp cấp cần tuyển, hoặc đang ứng tuyển
+   đúng vị trí đó), "cao_hon" (đã ở cấp cao hơn nhu cầu), "thap_hon" (chưa tới
+   cấp cần tuyển), "chua_ro" (không đủ dữ kiện về cấp/thời điểm). Nhu cầu chính
+   nó đòi cấp cao (Senior, Lead, Trưởng phòng...) thì người ở cấp đó là "dung".
 
 Chỉ trả JSON:
 {"ket_qua": [{
@@ -96,6 +106,7 @@ Chỉ trả JSON:
     ở điểm nào với từng điều kiện, hoặc vì sao loại. Không viết chung chung kiểu
     'có kinh nghiệm về X' mà không nói rõ kinh nghiệm đó là gì>",
   "trich_dan": [{"doan": <số thứ tự đoạn>, "nguyen_van": "<copy đúng chữ>"}],
+  "cap_do": "dung"|"cao_hon"|"thap_hon"|"chua_ro",
   "boc_duoc": {"<tên thuộc tính>": <giá trị hoặc null>},
   "con_thieu": "<điều chưa rõ, để trống nếu không>"
 }]}
@@ -114,6 +125,7 @@ class Judgement:
     evidence: list = field(default_factory=list)   # [{document_id, ordinal, quote}]
     extracted: dict = field(default_factory=dict)
     gap: str = ""
+    level_fit: str = ""        # dung | cao_hon | thap_hon | chua_ro (③ mục 5)
     attribute_status: dict = field(default_factory=dict)
     criteria: list = field(default_factory=list)
     provider: str = ""
@@ -124,6 +136,7 @@ class Judgement:
                 "relevant": self.relevant, "confidence": self.confidence,
                 "why": self.why, "evidence": self.evidence,
                 "extracted": self.extracted, "gap": self.gap,
+                "level_fit": self.level_fit,
                 "attribute_status": self.attribute_status, "criteria": self.criteria,
                 "provider": self.provider, "model": self.model}
 
@@ -265,6 +278,14 @@ def _passage_at(number, candidate):
     return None
 
 
+_LEVEL_FITS = {"dung", "cao_hon", "thap_hon", "chua_ro"}
+
+
+def _level_fit(value):
+    text = str(value or "").strip().lower()
+    return text if text in _LEVEL_FITS else ""
+
+
 def _parse_batch(text, batch, query_plan):
     payload = extract_json(text)
     rows = []
@@ -356,6 +377,7 @@ def _parse_batch(text, batch, query_plan):
             why=" ".join(str(row.get("vi_sao") or "").split())[:800],
             evidence=evidence, extracted=extracted,
             gap=" ".join(str(row.get("con_thieu") or "").split())[:200],
+            level_fit=_level_fit(row.get("cap_do")),
             attribute_status=statuses, criteria=criteria))
     return out
 
@@ -505,7 +527,7 @@ def _read_batch(query_plan, batch, caller):
             [{"role": "system", "content": COUNT_SYSTEM if query_plan.shape == "count" else SYSTEM},
              {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
             task=TASK, temperature=0.1, max_tokens=MAX_TOKENS,
-            reasoning_effort="none", budget_seconds=70,
+            reasoning_effort="none", budget_seconds=100,
             response_format={"type": "json_object"})
     except Exception as exc:                        # noqa: BLE001
         log.warning("answer.judge: lô %s hồ sơ lỗi: %s", len(batch), exc)
