@@ -196,15 +196,37 @@ def edge_sync(request):
 
     edge.touch()
 
-    # Chỉ xác nhận phần Hub đã thực sự hoàn tất trong request này: kiểm tra và
-    # lưu bền vững SourceRecord. Phân giải Person/Talent có thể tốn hàng chục
-    # giây trên một lô thật và đã có worker nền đảm nhiệm; chạy inline ở đây làm
-    # Edge timeout rồi gửi lại những bản ghi Hub thực tế đã nhận.
+    # Chỉ phân giải đúng các bản ghi nguồn của request này. Bản cũ gọi
+    # resolve_pending(limit=500), nên một lô 50 bản ghi có thể phải xử lý thêm
+    # hàng trăm bản tồn trước khi được trả lời và làm Edge timeout ở giây 30.
+    # Tài liệu trong cùng lô vẫn cần Person ngay để đi qua pha metadata/file.
+    _resolve_received(edge, records)
 
     for record in documents:
         results.append(_ingest_document(edge, record))
 
     return Response({"ok": True, "results": results})
+
+
+def _resolve_received(edge, records):
+    """Phân giải các SourceRecord thuộc đúng lô vừa nhận, không quét backlog."""
+    keys = [row["entity_key"] for row in records
+            if row["entity_type"] != ENTITY_DOCUMENT]
+    if not keys:
+        return
+    from people.ingest import resolve_record
+
+    pending = SourceRecord.objects.filter(
+        edge=edge,
+        entity_type=ENTITY_SOURCE_RECORD,
+        entity_key__in=keys,
+        status=SourceRecord.STATUS_PENDING,
+    )
+    for record in pending:
+        try:
+            resolve_record(record)
+        except Exception:                       # noqa: BLE001
+            log.exception("Phân giải SourceRecord %s của lô đồng bộ thất bại", record.pk)
 
 
 @api_view(["POST"])

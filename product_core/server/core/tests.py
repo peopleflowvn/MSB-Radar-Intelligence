@@ -259,26 +259,35 @@ class SyncTest(TestCase):
         row.refresh_from_db()
         self.assertEqual(row.status, SourceRecord.STATUS_PENDING)
 
-    def test_ban_ghi_duoc_worker_phan_giai_sau_khi_hub_xac_nhan(self):
+    def test_ban_ghi_duoc_phan_giai_thanh_person_ngay_khi_nhan(self):
         from people.models import Person
-        from people.ingest import resolve_pending
 
         self._push([_record("1")])
         row = SourceRecord.objects.get()
-        self.assertEqual(row.status, SourceRecord.STATUS_PENDING)
-        resolve_pending()
-        row.refresh_from_db()
         self.assertEqual(row.status, SourceRecord.STATUS_RESOLVED)
         self.assertIsNotNone(row.person)
         self.assertEqual(Person.objects.count(), 1)
 
-    def test_noi_dung_sua_duoc_phan_giai_lai_chu_khong_de_cu(self):
-        from people.ingest import resolve_pending
+    def test_dong_bo_chi_phan_giai_ban_ghi_cua_lo_hien_tai(self):
+        """Backlog cũ không được kéo dài request nhận một lô mới."""
+        old = SourceRecord.objects.create(
+            edge=self.edge,
+            entity_type="source_record",
+            entity_key="topcv|ta@msb.com.vn|old",
+            payload={"fullname": "Thiếu định danh"},
+            content_hash="old-hash",
+        )
 
+        response = self._push([_record("new")])
+
+        self.assertEqual(response.status_code, 200)
+        old.refresh_from_db()
+        self.assertIsNone(old.resolve_attempted_at)
+        self.assertEqual(old.status, SourceRecord.STATUS_PENDING)
+
+    def test_noi_dung_sua_duoc_phan_giai_lai_chu_khong_de_cu(self):
         self._push([_record("1")])
-        resolve_pending()
         self._push([_record("1", phone="0912345678")])
-        resolve_pending()
         row = SourceRecord.objects.get()
         self.assertEqual(row.revision, 2)
         self.assertEqual(row.status, SourceRecord.STATUS_RESOLVED)
