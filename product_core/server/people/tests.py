@@ -51,9 +51,9 @@ class OLienHeNhieuGiaTriTest(TestCase):
         """Bộ trích PDF trả cùng một địa chỉ hai lần, một bản thiếu ký tự cuối.
         Quan sát thật trên hồ sơ 'Nguyễn Ngọc Bích'."""
         self.assertEqual(
-            dedupe_emails(["bichnguyen16042004@gmail.com",
-                           "bichnguyen16042004@gmail.co"]),
-            ["bichnguyen16042004@gmail.com"])
+            dedupe_emails(["lethib16042004@gmail.com",
+                           "lethib16042004@gmail.co"]),
+            ["lethib16042004@gmail.com"])
 
     def test_hai_email_khac_nhau_mot_ky_tu_KHONG_bi_gop(self):
         """`an1@` và `an2@` chỉ khác một ký tự mà là hai người thật — gộp theo
@@ -63,15 +63,15 @@ class OLienHeNhieuGiaTriTest(TestCase):
             len(dedupe_emails(["huyenane.147@gmail.com", "huyenanhle.147@gmail.com"])), 2)
 
     def test_khop_ten_nhan_ra_email_cua_chinh_ung_vien(self):
-        self.assertTrue(email_matches_name("nguyenhaiyen105@gmail.com", "Nguyễn Hải Yến"))
-        self.assertFalse(email_matches_name("thuy.pt@seabank.com.vn", "Nguyễn Hải Yến"))
+        self.assertTrue(email_matches_name("nguyenvanan105@gmail.com", "Nguyễn Văn An"))
+        self.assertFalse(email_matches_name("nguoi.tham.chieu@seabank.com.vn", "Nguyễn Văn An"))
 
     def test_chon_dung_email_ung_vien_giua_email_nguoi_tham_chieu(self):
         """Ca thật: CV kèm email hai banker ngân hàng khác làm người tham chiếu."""
         email, guessed = choose_primary_email(
-            ["nguyenhaiyen105@gmail.com", "thuy.pt@seabank.com.vn",
-             "phuongntm39@vpbank.com.vn"], "Nguyễn Hải Yến")
-        self.assertEqual(email, "nguyenhaiyen105@gmail.com")
+            ["nguyenvanan105@gmail.com", "nguoi.tham.chieu@seabank.com.vn",
+             "tham.chieu.2@vpbank.com.vn"], "Nguyễn Văn An")
+        self.assertEqual(email, "nguyenvanan105@gmail.com")
         self.assertFalse(guessed)
 
     def test_mot_email_ca_nhan_giua_email_cong_ty_van_la_tin_hieu_chac(self):
@@ -91,8 +91,8 @@ class OLienHeNhieuGiaTriTest(TestCase):
 
     def test_o_gop_nhieu_gia_tri_van_rut_duoc_dinh_danh(self):
         ids = resolution.extract_identities(payload(
-            email="nguyenhaiyen105@gmail.com, thuy.pt@seabank.com.vn",
-            phone="0972748510, 0986672829", fullname="Nguyễn Hải Yến"))
+            email="nguyenvanan105@gmail.com, nguoi.tham.chieu@seabank.com.vn",
+            phone="0912345678, 0987654321", fullname="Nguyễn Văn An"))
         kinds = [kind for kind, _, _ in ids]
         self.assertIn(Identity.KIND_EMAIL, kinds)
         self.assertIn(Identity.KIND_PHONE, kinds)
@@ -102,19 +102,19 @@ class OLienHeNhieuGiaTriTest(TestCase):
         viên cùng ghi một người tham chiếu sẽ dính vào chung một Person."""
         ids = resolution.extract_identities(payload(
             email="a@gmail.com, b@seabank.com.vn, c@vpbank.com.vn",
-            phone="0972748510, 0986672829, 0986939680"))
+            phone="0912345678, 0987654321, 0986939680"))
         kinds = [kind for kind, _, _ in ids]
         self.assertEqual(kinds.count(Identity.KIND_EMAIL), 1)
         self.assertEqual(kinds.count(Identity.KIND_PHONE), 1)
 
     def test_hai_ung_vien_chung_mot_nguoi_tham_chieu_KHONG_bi_gop(self):
         first = resolution.resolve(payload(
-            cv_id="1", fullname="Nguyễn Hải Yến",
-            email="nguyenhaiyen105@gmail.com, thuy.pt@seabank.com.vn",
-            phone="0972748510"))
+            cv_id="1", fullname="Nguyễn Văn An",
+            email="nguyenvanan105@gmail.com, nguoi.tham.chieu@seabank.com.vn",
+            phone="0912345678"))
         second = resolution.resolve(payload(
             cv_id="2", fullname="Nguyễn Hữu Thành",
-            email="nht28392@gmail.com, thuy.pt@seabank.com.vn",
+            email="nguyenvanc28392@gmail.com, nguoi.tham.chieu@seabank.com.vn",
             phone="0947445205"))
         self.assertEqual(first.outcome, resolution.CREATED)
         self.assertEqual(second.outcome, resolution.CREATED)
@@ -122,17 +122,17 @@ class OLienHeNhieuGiaTriTest(TestCase):
 
     def test_lien_he_du_di_sang_tang_bang_chung_khong_tu_gan(self):
         pool = resolution.contact_pool(payload(
-            fullname="Nguyễn Hải Yến",
-            email="nguyenhaiyen105@gmail.com, thuy.pt@seabank.com.vn",
-            phone="0972748510, 0986672829"))
-        self.assertEqual(pool["primary_email"], "nguyenhaiyen105@gmail.com")
-        self.assertEqual(pool["extra_emails"], ["thuy.pt@seabank.com.vn"])
-        self.assertEqual(pool["extra_phones"], ["+84986672829"])
+            fullname="Nguyễn Văn An",
+            email="nguyenvanan105@gmail.com, nguoi.tham.chieu@seabank.com.vn",
+            phone="0912345678, 0987654321"))
+        self.assertEqual(pool["primary_email"], "nguyenvanan105@gmail.com")
+        self.assertEqual(pool["extra_emails"], ["nguoi.tham.chieu@seabank.com.vn"])
+        self.assertEqual(pool["extra_phones"], ["+84987654321"])
 
     def test_cv_emails_cua_edge_moi_duoc_doc_ca_dang_list_lan_chuoi_json(self):
         for value in (["b@seabank.com.vn"], '["b@seabank.com.vn"]'):
             pool = resolution.contact_pool(payload(
-                fullname="Nguyễn Hải Yến", email="nguyenhaiyen105@gmail.com",
+                fullname="Nguyễn Văn An", email="nguyenvanan105@gmail.com",
                 cv_emails=value))
             self.assertEqual(pool["extra_emails"], ["b@seabank.com.vn"],
                              f"lỗi với {value!r}")

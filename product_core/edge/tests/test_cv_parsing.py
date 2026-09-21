@@ -376,31 +376,31 @@ class CvParsingTests(unittest.TestCase):
                 db.close()
 
     def test_email_nguoi_tham_chieu_khong_bi_gan_cho_ung_vien(self):
-        """CV hay kèm liên hệ NGƯỜI THAM CHIẾU. Hồ sơ thật 'Nguyễn Hải Yến' có
+        """CV hay kèm liên hệ NGƯỜI THAM CHIẾU. Hồ sơ thật 'Nguyễn Văn An' có
         thêm email hai banker SeABank/VPBank. Ô `email` (Hub dùng làm định danh
         Person) phải là của chính ứng viên, không phải của người tham chiếu."""
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(os.path.join(tmp, "ref.db"), log=lambda *_: None).open()
             try:
                 db.upsert({"source": "topcv", "account": "a", "cv_id": "yen",
-                           "fullname": "Nguyễn Hải Yến", "email": "", "phone": "",
+                           "fullname": "Nguyễn Văn An", "email": "", "phone": "",
                            "filename": "yen.pdf", "dl_status": DONE})
                 db.enqueue_document("topcv", "a", "yen", "yen.pdf")
                 db.finish_document(db.claim_document(), {
                     "status": "done", "quality": 1,
                     "text": "NGUOI THAM CHIEU: Thuy PT - SeABank",
                     "fields": {"urls": [],
-                               "emails": ["nguyenhaiyen105@gmail.com",
-                                          "thuy.pt@seabank.com.vn",
-                                          "phuongntm39@vpbank.com.vn"],
-                               "phones": ["0972748510", "0986672829"]},
+                               "emails": ["nguyenvanan105@gmail.com",
+                                          "nguoi.tham.chieu@seabank.com.vn",
+                                          "tham.chieu.2@vpbank.com.vn"],
+                               "phones": ["0912345678", "0987654321"]},
                 })
                 row = db.get_candidate("topcv", "yen", "a")
-                self.assertEqual(row["email"], "nguyenhaiyen105@gmail.com")
-                self.assertEqual(row["phone"], "0972748510")
+                self.assertEqual(row["email"], "nguyenvanan105@gmail.com")
+                self.assertEqual(row["phone"], "0912345678")
                 # Không mất gì: cả ba vẫn nằm ở cột riêng cho Hub phân xử.
                 self.assertEqual(len(json.loads(row["cv_emails"])), 3)
-                self.assertIn("thuy.pt@seabank.com.vn", json.loads(row["cv_emails"]))
+                self.assertIn("nguoi.tham.chieu@seabank.com.vn", json.loads(row["cv_emails"]))
             finally:
                 db.close()
 
@@ -413,14 +413,14 @@ class CvParsingTests(unittest.TestCase):
             db = Database(path, log=lambda *_: None).open()
             try:
                 db.upsert({"source": "topcv", "account": "a", "cv_id": "old",
-                           "fullname": "Nguyễn Hải Yến", "dl_status": DONE})
+                           "fullname": "Nguyễn Văn An", "dl_status": DONE})
             finally:
                 db.close()
             # Dựng lại đúng trạng thái bản cũ: ô gộp + chưa có 2 cột mới.
             raw = sqlite3.connect(path)
             raw.execute("UPDATE candidates SET email=?, phone=?",
-                        ("nguyenhaiyen105@gmail.com, thuy.pt@seabank.com.vn",
-                         "0972748510, 0986672829"))
+                        ("nguyenvanan105@gmail.com, nguoi.tham.chieu@seabank.com.vn",
+                         "0912345678, 0987654321"))
             raw.execute("ALTER TABLE candidates DROP COLUMN cv_emails")
             raw.execute("ALTER TABLE candidates DROP COLUMN cv_phones")
             raw.commit()
@@ -429,10 +429,10 @@ class CvParsingTests(unittest.TestCase):
             db = Database(path, log=lambda *_: None).open()
             try:
                 row = db.get_candidate("topcv", "old", "a")
-                self.assertEqual(row["email"], "nguyenhaiyen105@gmail.com")
-                self.assertEqual(row["phone"], "0972748510")
+                self.assertEqual(row["email"], "nguyenvanan105@gmail.com")
+                self.assertEqual(row["phone"], "0912345678")
                 self.assertEqual(json.loads(row["cv_emails"]),
-                                 ["nguyenhaiyen105@gmail.com", "thuy.pt@seabank.com.vn"])
+                                 ["nguyenvanan105@gmail.com", "nguoi.tham.chieu@seabank.com.vn"])
             finally:
                 db.close()
 
@@ -447,12 +447,12 @@ class CvParsingTests(unittest.TestCase):
             db = Database(path, log=lambda *_: None).open()
             try:
                 db.upsert({"source": "topcv", "account": "a", "cv_id": "x",
-                           "fullname": "Nguyễn Hải Yến", "dl_status": DONE})
+                           "fullname": "Nguyễn Văn An", "dl_status": DONE})
             finally:
                 db.close()
             raw = sqlite3.connect(path)   # cột mới CÒN NGUYÊN, chỉ dữ liệu bị gộp
             raw.execute("UPDATE candidates SET email=?, phone=?, cv_emails=NULL",
-                        ("a@gmail.com, b@seabank.com.vn", "0972748510, 0986672829"))
+                        ("a@gmail.com, b@seabank.com.vn", "0912345678, 0987654321"))
             raw.commit()
             raw.close()
 

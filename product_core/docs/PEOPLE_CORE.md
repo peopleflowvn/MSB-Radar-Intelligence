@@ -91,8 +91,8 @@ Edge từng nối mọi email/SĐT bóc được từ CV vào một ô: `"a@x.co
 Đo trên 283 hồ sơ thật: **28 mất email, 32 mất SĐT, 5 hồ sơ mất cả hai** → `resolve()`
 trả `SKIPPED`, không tạo Person nào.
 
-Và thứ bị vứt chính là mỏ vàng: `thuy.pt@seabank.com.vn`, `phuongntm39@vpbank.com.vn`,
-`hadtv@mbv.com.vn` — **người tham chiếu là banker ngân hàng đối thủ**.
+Và thứ bị vứt chính là mỏ vàng: `nguoi.tham.chieu@seabank.com.vn`, `tham.chieu.2@vpbank.com.vn`,
+`tham.chieu.3@mbv.com.vn` — **người tham chiếu là banker ngân hàng đối thủ**.
 
 Nay có `split_contacts` / `split_emails` / `dedupe_emails` / `choose_primary_email` /
 `choose_primary_phone`. Ba quyết định quan trọng:
@@ -108,7 +108,7 @@ Nay có `split_contacts` / `split_emails` / `dedupe_emails` / `choose_primary_em
    nhân → vị trí đầu**. Chỉ khi cả ba đều không phân định được mới bật `needs_review`.
 
 `dedupe_emails` **chỉ gộp khi một chuỗi là tiền tố của chuỗi kia** — ca thật là bộ
-trích PDF trả `bichnguyen16042004@gmail.co` cạnh `…@gmail.com`. Cố ý **không** gộp
+trích PDF trả `lethib16042004@gmail.co` cạnh `…@gmail.com`. Cố ý **không** gộp
 theo khoảng cách sửa: `an1@gmail.com` và `an2@gmail.com` chỉ khác một ký tự mà là hai
 người thật.
 

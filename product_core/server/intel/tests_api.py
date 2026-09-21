@@ -98,8 +98,8 @@ class IntelApiTest(APITestCase):
         """Người tham chiếu bóc từ CV giờ có API — trước chỉ xem được ở Django admin."""
         from people.models import ContactMention, PersonLink
         ContactMention.objects.create(
-            subject=self.person, full_name="Thuỳ PT", company="SeABank",
-            email="thuy.pt@seabank.com.vn", phone="", email_raw="thuy.pt@seabank.com.vn",
+            subject=self.person, full_name="Trần B", company="SeABank",
+            email="nguoi.tham.chieu@seabank.com.vn", phone="", email_raw="nguoi.tham.chieu@seabank.com.vn",
             kind=ContactMention.KIND_REFERENCE, confidence=0.9,
             evidence="NGƯỜI THAM CHIẾU", extractor="radar_contacts",
             fingerprint="fp-api-1")

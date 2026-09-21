@@ -21,7 +21,7 @@ class JobokoProviderTests(unittest.TestCase):
           <div class="item-content"><div class="item-title">
             <a class="fz-15 text-view-cv" href="{HREF1}">NGUYỄN THỊ KHEN</a>
           </div>
-          <div class="item-info">Online gần đây khennguyen88@gmail.com 0973264860 Đã mở quyền</div>
+          <div class="item-info">Online gần đây nguyenvanb88@gmail.com 0901234567 Đã mở quyền</div>
           </div>
         </div>
         <div class="item"><div class="item-title">
@@ -34,8 +34,8 @@ class JobokoProviderTests(unittest.TestCase):
         first = items[0]
         self.assertEqual(first["fullname"], "NGUYỄN THỊ KHEN")
         self.assertEqual(first["source"], "joboko")
-        self.assertEqual(first["email"], "khennguyen88@gmail.com")
-        self.assertEqual(first["phone"], "0973264860")
+        self.assertEqual(first["email"], "nguyenvanb88@gmail.com")
+        self.assertEqual(first["phone"], "0901234567")
         self.assertEqual(first["apply_source"], "Joboko")
         self.assertEqual(first["cv_url"], HREF1)
         self.assertEqual(items[1]["cv_url"], "https://em-vn.joboko.com" + HREF2)

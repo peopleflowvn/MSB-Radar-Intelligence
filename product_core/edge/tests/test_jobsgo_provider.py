@@ -23,7 +23,7 @@ class JobsGoProviderTests(unittest.TestCase):
         <a class="text-grey text-bold" href="/job/detail/25006841978">Chuyên Viên Pháp Chế</a>
         <div class="candidate-item" style="padding:10px">
           <a class="candidate-name-link" href="{HREF1}">Nguyễn Thị Khen</a>
-          <span>1982 khennguyen88@gmail.com 0973264860</span>
+          <span>1982 nguyenvanb88@gmail.com 0901234567</span>
           <a class="files-link" href="{HREF1}&scroll=cv">1 file</a>
         </div>
         """
@@ -32,8 +32,8 @@ class JobsGoProviderTests(unittest.TestCase):
         first = items[0]
         self.assertEqual(first["source"], "jobsgo")
         self.assertEqual(first["fullname"], "Nguyễn Thị Khen")
-        self.assertEqual(first["email"], "khennguyen88@gmail.com")
-        self.assertEqual(first["phone"], "0973264860")
+        self.assertEqual(first["email"], "nguyenvanb88@gmail.com")
+        self.assertEqual(first["phone"], "0901234567")
         self.assertEqual(first["position"], "Chuyên Viên Pháp Chế")
         self.assertEqual(first["campaign_id"], "25006841978")
         self.assertEqual(first["apply_source"], "JobsGO")

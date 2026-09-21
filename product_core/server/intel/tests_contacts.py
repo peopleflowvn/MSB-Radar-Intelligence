@@ -28,10 +28,10 @@ def _adapter(payload):
 
 CV = """
 NGUYỄN HẢI YẾN
-Email: nguyenhaiyen105@gmail.com — Điện thoại: 0972748510
+Email: nguyenvanan105@gmail.com — Điện thoại: 0912345678
 
 NGƯỜI THAM CHIẾU
-Chị Thuỳ PT — Trưởng phòng KHCN, SeABank — thuy.pt@seabank.com.vn — 0986672829
+Chị Trần B — Trưởng phòng KHCN, SeABank — nguoi.tham.chieu@seabank.com.vn — 0987654321
 """
 
 
@@ -48,15 +48,15 @@ class CoGoiAITest(TestCase):
 
 class BocLienHeTest(TestCase):
     def test_tach_dung_lien_he_ung_vien_va_nguoi_tham_chieu(self):
-        got, usage = contacts.extract_contacts(CV, "Nguyễn Hải Yến", _adapter({
-            "candidate": {"emails": ["nguyenhaiyen105@gmail.com"],
-                          "phones": ["0972748510"]},
-            "references": [{"full_name": "Thuỳ PT", "title": "Trưởng phòng KHCN",
-                            "company": "SeABank", "email": "thuy.pt@seabank.com.vn",
-                            "phone": "0986672829", "kind": "reference",
-                            "evidence": "NGƯỜI THAM CHIẾU: Chị Thuỳ PT",
+        got, usage = contacts.extract_contacts(CV, "Nguyễn Văn An", _adapter({
+            "candidate": {"emails": ["nguyenvanan105@gmail.com"],
+                          "phones": ["0912345678"]},
+            "references": [{"full_name": "Trần B", "title": "Trưởng phòng KHCN",
+                            "company": "SeABank", "email": "nguoi.tham.chieu@seabank.com.vn",
+                            "phone": "0987654321", "kind": "reference",
+                            "evidence": "NGƯỜI THAM CHIẾU: Chị Trần B",
                             "confidence": 0.9}]}))
-        self.assertEqual(got["candidate"]["emails"], ["nguyenhaiyen105@gmail.com"])
+        self.assertEqual(got["candidate"]["emails"], ["nguyenvanan105@gmail.com"])
         self.assertEqual(len(got["references"]), 1)
         self.assertEqual(got["references"][0]["company"], "SeABank")
         self.assertEqual(got["references"][0]["kind"], ContactMention.KIND_REFERENCE)
@@ -64,7 +64,7 @@ class BocLienHeTest(TestCase):
 
     def test_email_model_BIA_RA_bi_loai(self):
         """Chốt chặn quan trọng nhất: chỉ nhận giá trị có NGUYÊN VĂN trong CV."""
-        got, _ = contacts.extract_contacts(CV, "Nguyễn Hải Yến", _adapter({
+        got, _ = contacts.extract_contacts(CV, "Nguyễn Văn An", _adapter({
             "candidate": {"emails": ["khongcotrongcv@gmail.com"], "phones": []},
             "references": [{"full_name": "Ma", "email": "bia@dat.ra",
                             "phone": "0900000000", "evidence": "x"}]}))
@@ -72,12 +72,12 @@ class BocLienHeTest(TestCase):
         self.assertEqual(got["references"], [])
 
     def test_so_dien_thoai_viet_cach_khac_van_duoc_nhan(self):
-        """CV viết '0972 748 510' hay '(+84) 972.748.510' đều là cùng một số."""
+        """CV viết '0912 345 678' hay '(+84) 912.345.678' đều là cùng một số."""
         got, _ = contacts.extract_contacts(
-            "Lien he: 0972 748 510\nNGUOI THAM CHIEU: A - a@x.com",
-            "", _adapter({"candidate": {"phones": ["0972748510"], "emails": []},
+            "Lien he: 0912 345 678\nNGUOI THAM CHIEU: A - a@x.com",
+            "", _adapter({"candidate": {"phones": ["0912345678"], "emails": []},
                           "references": []}))
-        self.assertEqual(got["candidate"]["phones"], ["0972748510"])
+        self.assertEqual(got["candidate"]["phones"], ["0912345678"])
 
     def test_nguoi_duoc_nhac_ma_khong_co_cach_lien_he_thi_bo(self):
         got, _ = contacts.extract_contacts(CV, "", _adapter({
@@ -99,18 +99,18 @@ class BocLienHeTest(TestCase):
 class GhiVaThangHangTest(TestCase):
     def setUp(self):
         self.candidate = Person.objects.create(
-            display_name="Nguyễn Hải Yến", primary_email="nguyenhaiyen105@gmail.com")
+            display_name="Nguyễn Văn An", primary_email="nguyenvanan105@gmail.com")
         self.extracted = {"references": [{
-            "full_name": "Thuỳ PT", "title": "Trưởng phòng KHCN", "company": "SeABank",
-            "relationship": "quản lý cũ", "email_raw": "thuy.pt@seabank.com.vn",
-            "phone_raw": "0986672829", "kind": ContactMention.KIND_REFERENCE,
-            "evidence": "NGƯỜI THAM CHIẾU: Chị Thuỳ PT", "confidence": 0.9}]}
+            "full_name": "Trần B", "title": "Trưởng phòng KHCN", "company": "SeABank",
+            "relationship": "quản lý cũ", "email_raw": "nguoi.tham.chieu@seabank.com.vn",
+            "phone_raw": "0987654321", "kind": ContactMention.KIND_REFERENCE,
+            "evidence": "NGƯỜI THAM CHIẾU: Chị Trần B", "confidence": 0.9}]}
 
     def test_ghi_ContactMention_khong_tao_person_ngay(self):
         saved = contacts.record_mentions(self.candidate, None, self.extracted)
         self.assertEqual(len(saved), 1)
-        self.assertEqual(saved[0].email, "thuy.pt@seabank.com.vn")
-        self.assertEqual(saved[0].phone, "+84986672829")
+        self.assertEqual(saved[0].email, "nguoi.tham.chieu@seabank.com.vn")
+        self.assertEqual(saved[0].phone, "+84987654321")
         self.assertEqual(saved[0].status, ContactMention.STATUS_PROPOSED)
         self.assertIsNone(saved[0].linked_person)
         self.assertEqual(Person.objects.count(), 1)   # chưa tạo người thứ hai
@@ -149,7 +149,7 @@ class GhiVaThangHangTest(TestCase):
 
         result = resolution.resolve({
             "source": "topcv", "cv_id": "9", "fullname": "Phạm Thị Thuỳ",
-            "email": "thuy.pt@seabank.com.vn", "phone": "0986672829"})
+            "email": "nguoi.tham.chieu@seabank.com.vn", "phone": "0987654321"})
         self.assertEqual(result.outcome, resolution.MATCHED)
         self.assertEqual(result.person.pk, ref.pk)
         result.person.refresh_from_db()
@@ -162,7 +162,7 @@ class GhiVaThangHangTest(TestCase):
     def test_khong_tao_quan_he_tu_tro_ve_chinh_minh(self):
         """CV ghi lại chính email của ứng viên trong mục tham chiếu."""
         mention = contacts.record_mentions(self.candidate, None, {"references": [{
-            "full_name": "Nguyễn Hải Yến", "email_raw": "nguyenhaiyen105@gmail.com",
+            "full_name": "Nguyễn Văn An", "email_raw": "nguyenvanan105@gmail.com",
             "phone_raw": "", "kind": ContactMention.KIND_REFERENCE,
             "evidence": "x", "confidence": 0.5}]})[0]
         # Person của ứng viên chưa có Identity nên resolve() tạo người mới;
@@ -200,7 +200,7 @@ class GhiVaThangHangTest(TestCase):
 
     def test_lien_he_cua_chinh_ung_vien_khong_sinh_quan_he(self):
         mention = contacts.record_mentions(self.candidate, None, {"references": [{
-            "full_name": "", "email_raw": "nguyenhaiyen105@gmail.com", "phone_raw": "",
+            "full_name": "", "email_raw": "nguyenvanan105@gmail.com", "phone_raw": "",
             "kind": ContactMention.KIND_SELF, "evidence": "x", "confidence": 0.9}]})[0]
         self.assertIsNone(contacts.promote(mention))
         self.assertEqual(PersonLink.objects.count(), 0)
@@ -214,23 +214,23 @@ class VotLienHeTuOGopTest(TestCase):
     def setUp(self):
         from core.models import Edge, SourceRecord
         self.person = Person.objects.create(
-            display_name="Nguyễn Hải Yến", primary_email="nguyenhaiyen105@gmail.com")
+            display_name="Nguyễn Văn An", primary_email="nguyenvanan105@gmail.com")
         edge = Edge.objects.create(label="M", edge_id="e1")
         self.record = SourceRecord.objects.create(
             edge=edge, entity_type="source_record", entity_key="topcv|a|1",
             content_hash="h1", person=self.person,
-            payload={"source": "topcv", "fullname": "Nguyễn Hải Yến",
-                     "email": "nguyenhaiyen105@gmail.com", "phone": "0972748510",
-                     "cv_emails": ["nguyenhaiyen105@gmail.com", "thuy.pt@seabank.com.vn"],
-                     "cv_phones": ["0972748510", "0986672829"]})
+            payload={"source": "topcv", "fullname": "Nguyễn Văn An",
+                     "email": "nguyenvanan105@gmail.com", "phone": "0912345678",
+                     "cv_emails": ["nguyenvanan105@gmail.com", "nguoi.tham.chieu@seabank.com.vn"],
+                     "cv_phones": ["0912345678", "0987654321"]})
 
     def test_ghi_phan_du_diem_tin_thap_khong_tu_thang_hang(self):
         saved = contacts.record_blob_contacts(self.person, [self.record])
         vals = {(m.email, m.phone) for m in saved}
-        self.assertIn(("thuy.pt@seabank.com.vn", ""), vals)
-        self.assertIn(("", "+84986672829"), vals)
+        self.assertIn(("nguoi.tham.chieu@seabank.com.vn", ""), vals)
+        self.assertIn(("", "+84987654321"), vals)
         # liên hệ của chính ứng viên KHÔNG bị ghi
-        self.assertNotIn(("nguyenhaiyen105@gmail.com", ""), vals)
+        self.assertNotIn(("nguyenvanan105@gmail.com", ""), vals)
         for m in saved:
             self.assertLess(m.confidence, contacts.AUTO_PROMOTE_GATE)
             self.assertEqual(m.extractor, contacts.EXTRACTOR_BLOB)
@@ -239,12 +239,12 @@ class VotLienHeTuOGopTest(TestCase):
 
     def test_khong_de_len_ban_ghi_duong_AI_text_da_co(self):
         contacts.record_mentions(self.person, None, {"references": [{
-            "full_name": "Thuỳ PT", "title": "Trưởng phòng", "company": "SeABank",
-            "email_raw": "thuy.pt@seabank.com.vn", "phone_raw": "",
+            "full_name": "Trần B", "title": "Trưởng phòng", "company": "SeABank",
+            "email_raw": "nguoi.tham.chieu@seabank.com.vn", "phone_raw": "",
             "kind": ContactMention.KIND_REFERENCE, "evidence": "NGƯỜI THAM CHIẾU",
             "confidence": 0.9}]})
         contacts.record_blob_contacts(self.person, [self.record])
-        row = ContactMention.objects.get(email="thuy.pt@seabank.com.vn")
+        row = ContactMention.objects.get(email="nguoi.tham.chieu@seabank.com.vn")
         self.assertEqual(row.extractor, contacts.EXTRACTOR)   # bản AI được giữ
         self.assertEqual(row.company, "SeABank")
 

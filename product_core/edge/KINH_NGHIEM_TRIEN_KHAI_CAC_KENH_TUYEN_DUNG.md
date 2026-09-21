@@ -1211,9 +1211,9 @@ cả nút download, preview, print và export — không dừng ở việc đọ
 
 ## 39. Bài học chung: regex trích trường từ text đã nối bằng dấu cách phải tách theo cấu trúc, không gộp lớp ký tự
 
-Khi viết `_parse_items` cho JobsGO, số điện thoại trích được có lúc thừa một chữ số ở cuối (`09732648601`
-thay vì `0973264860` đúng). Nguyên nhân: `BeautifulSoup.get_text(" ", strip=True)` nối text của nhiều
-node con bằng ĐÚNG MỘT dấu cách, dòng ứng viên có cấu trúc kiểu `"...0973264860 1 file"` (số điện thoại
+Khi viết `_parse_items` cho JobsGO, số điện thoại trích được có lúc thừa một chữ số ở cuối (`09012345671`
+thay vì `0901234567` đúng). Nguyên nhân: `BeautifulSoup.get_text(" ", strip=True)` nối text của nhiều
+node con bằng ĐÚNG MỘT dấu cách, dòng ứng viên có cấu trúc kiểu `"...0901234567 1 file"` (số điện thoại
 rồi tới nhãn bắt đầu bằng chữ số ngay sau, cách nhau một dấu cách). Regex cũ dùng MỘT lớp ký tự gộp
 chung số và dấu cách kiểu `[\d .()-]{8,14}` — phần định lượng ăn luôn qua dấu cách sang chữ số đầu của từ
 tiếp theo, kết quả số điện thoại bị nối thêm số không liên quan mà không có gì báo lỗi.

@@ -492,7 +492,7 @@ file đó rằng nó đã mồ côi — tránh người đọc sau này tưởng
 
 ## 7. Đã xác minh trên production (bằng chứng cụ thể, không phải "chạy được ở local")
 
-Phương pháp kiểm: SSH vào VPS (`ubuntu@161.118.203.171`), `docker exec -i msbradar-hub python
+Phương pháp kiểm: SSH vào VPS (`ubuntu@<VPS_HOST>`), `docker exec -i msbradar-hub python
 manage.py shell`, dùng `django.test.Client(SERVER_NAME="radar.tunghr.io.vn")` +
 `force_login(User.objects.get(pk=1))` để gọi THẲNG `/api/v1/talent/ask/` — đường HTTP thật (middleware,
 permission, URL routing thật), dữ liệu thật, không cần mật khẩu. Đây là cách kiểm khuyến nghị cho mọi
@@ -614,7 +614,7 @@ rỗng toàn bộ mà test cục bộ không bắt được vì fixture vô tìn
 
 ```bash
 # 1. SSH vào VPS
-ssh -i ~/.ssh/id_oracle_core.key ubuntu@161.118.203.171
+ssh -i ~/.ssh/<ssh-key> ubuntu@<VPS_HOST>
 
 # 2. Chạy Django shell BÊN TRONG container hub (dữ liệu thật, code thật đang chạy)
 docker exec -i msbradar-hub python manage.py shell

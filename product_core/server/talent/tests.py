@@ -592,7 +592,7 @@ class ApiTest(TestCase):
         """`PersonLink` từng được tạo mà không hiện ở đâu. Person 360 nay có mục
         `person_links` — người hồ sơ này nhắc tới, và người nhắc tới hồ sơ này."""
         from people.models import PersonLink
-        ref = Person.objects.create(display_name="Chị Thuỳ PT",
+        ref = Person.objects.create(display_name="Chị Trần B",
                                     origin=Person.ORIGIN_CV_REFERENCE, is_applicant=False)
         PersonLink.objects.create(subject=self.person, related=ref,
                                   kind=PersonLink.KIND_REFERENCE, confidence=0.9,
@@ -600,7 +600,7 @@ class ApiTest(TestCase):
         body = self.client.get(reverse("talent-person", args=[self.person.pk])).json()
         out = body["person_links"]["outgoing"]
         self.assertEqual(len(out), 1)
-        self.assertEqual(out[0]["person"]["display_name"], "Chị Thuỳ PT")
+        self.assertEqual(out[0]["person"]["display_name"], "Chị Trần B")
         self.assertEqual(out[0]["kind"], PersonLink.KIND_REFERENCE)
         self.assertFalse(out[0]["person"]["is_applicant"])
         # phía người tham chiếu thấy chiều ngược lại

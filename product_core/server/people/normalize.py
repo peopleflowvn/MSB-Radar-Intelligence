@@ -92,7 +92,7 @@ def dedupe_emails(values):
     """Khử trùng lặp email, gộp cả bản BỊ CẮT CỤT vào bản đầy đủ.
 
     Bộ trích text PDF hay trả cùng một địa chỉ hai lần, một trong đó thiếu vài
-    ký tự cuối — quan sát thật: `bichnguyen16042004@gmail.co` nằm cạnh
+    ký tự cuối — quan sát thật: `lethib16042004@gmail.co` nằm cạnh
     `...@gmail.com`, `nguyenduong1212.job@gmail.c` cạnh `...@gmail.com`. Giữ cả
     hai sẽ đẻ ra một "người" thứ hai không tồn tại.
 
@@ -200,8 +200,8 @@ def email_matches_name(email, fullname):
     """Phần trước @ của email có mang tên người này không.
 
     Tín hiệu MẠNH NHẤT để tách email của ứng viên khỏi email người tham chiếu
-    nằm cùng một ô: `nguyenhaiyen105@gmail.com` với 'Nguyễn Hải Yến' là của
-    chính ứng viên, `thuy.pt@seabank.com.vn` cùng ô thì không.
+    nằm cùng một ô: `nguyenvanan105@gmail.com` với 'Nguyễn Văn An' là của
+    chính ứng viên, `nguoi.tham.chieu@seabank.com.vn` cùng ô thì không.
 
     Chỉ dùng để CHẤM ĐIỂM chọn giá trị nào trong nhiều giá trị đã có sẵn —
     không bao giờ dùng làm định danh (xem `normalize_name`).
