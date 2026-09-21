@@ -45,7 +45,7 @@ BUDGET_SECONDS = 15.0
 #: Cùng lý do và cùng con số với `talent/answer/engine.py`: `core/answer/runner.py`
 #: cắt cả lượt ở 150 giây, mà số lô của ③ đi theo số khách ② trả về nên tự phình
 #: theo kho. Chốt 90 giây để còn dư cho ⑤ viết bài.
-READ_BUDGET_SECONDS = 90.0
+READ_BUDGET_SECONDS = 130.0
 STREAM_MAX_TOKENS = 2500
 
 #: Số lượt tự sửa tối đa ở ⑤ khi bài viết không qua kiểm chứng tất định.

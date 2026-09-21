@@ -45,7 +45,7 @@ log = logging.getLogger(__name__)
 
 #: Hạn chót của response; Python không ép dừng được một luồng đang kẹt ở I/O
 #: của nhà cung cấp.
-HARD_DEADLINE = 150.0
+HARD_DEADLINE = 210.0
 #: Bao lâu giữ một mục đã xong/đã lỗi trong sổ trước khi dọn.
 KEEP_DONE = 120.0
 

@@ -48,14 +48,15 @@ BUDGET_SECONDS = 15.0
 #: `core/answer/runner.py` cắt cả lượt ở 150 giây. Số lô của ③ đi theo số ứng
 #: viên ② trả về, nên kho lớn hoặc xếp hạng kém là ③ tự phình: 89 hồ sơ thành 12
 #: lô, 4 luồng là 3 đợt, mỗi đợt tới 70 giây — vượt trần và người dùng mất trắng
-#: câu trả lời dù gần hết hồ sơ đã đọc xong. Chốt ở 90 giây để còn dư cho ⑤ viết
-#: bài (một lượt gọi model nữa) trong 150 giây đó.
-READ_BUDGET_SECONDS = 80.0
+#: câu trả lời dù gần hết hồ sơ đã đọc xong. Chốt ở 130 giây (nới từ 80 ngày
+#: 21/09 để có chỗ cho các đợt đọc lại lô lỗi khi GLM treo) — còn 65+ giây cho ⑤
+#: viết bài trong trần 210 giây.
+READ_BUDGET_SECONDS = 130.0
 
 #: Trần CẢ LƯỢT do engine tự giữ, dưới `core/answer/runner.py::HARD_DEADLINE`
 #: (150 s). Vượt trần runner là người dùng nhận câu trả lời RỖNG — production
 #: 18–20/09: 4/31 lượt. ⑤ và vòng tự sửa chỉ được dùng phần thời gian còn lại.
-TURN_BUDGET_SECONDS = 135.0
+TURN_BUDGET_SECONDS = 195.0
 #: Dưới mức này không gọi model viết nữa — dựng câu trả lời bằng CODE từ những
 #: gì ③④ đã chốt (vẫn có danh sách + trích dẫn), thay vì chờ tới khi bị cắt.
 MIN_COMPOSE_SECONDS = 25.0

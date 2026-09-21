@@ -426,6 +426,49 @@ class JudgeTest(TestCase):
         self.assertTrue(report.skipped > 0)
         self.assertTrue(report.broken)
 
+    def test_lo_loi_duoc_doc_lai_khi_con_thoi_gian(self):
+        """Nhà cung cấp treo tạm thời: đợt 1 hỏng cả lô lẫn hai nửa, đợt 2 đọc được."""
+        calls = []
+
+        def caller(messages, task="", **kwargs):
+            payload = json.loads(messages[-1]["content"])
+            calls.append(len(payload["ho_so"]))
+            if len(calls) <= 3:               # lô 8 + hai nửa 4 đều hỏng
+                raise RuntimeError("timeout")
+            return _reader([])(messages, task=task, **kwargs)
+
+        report = judge_stage.judge(self.query_plan, _many_candidates(8),
+                                   complete_fn=caller, workers=1,
+                                   deadline=time.monotonic() + 100)
+        self.assertEqual(len(report), 8)
+        self.assertFalse(report.incomplete)
+        self.assertEqual(calls, [8, 4, 4, 8])
+
+    def test_khong_han_gio_thi_khong_doc_lai_lo_loi(self):
+        calls = []
+
+        def caller(messages, task="", **kwargs):
+            calls.append(1)
+            raise RuntimeError("timeout")
+
+        report = judge_stage.judge(self.query_plan, _many_candidates(8),
+                                   complete_fn=caller, workers=1)
+        self.assertEqual(len(calls), 3)       # lô + 2 nửa, không có đợt 2
+        self.assertTrue(report.broken)
+
+    def test_doc_lai_toi_da_so_dot_da_dinh(self):
+        calls = []
+
+        def caller(messages, task="", **kwargs):
+            calls.append(1)
+            raise RuntimeError("timeout")
+
+        report = judge_stage.judge(self.query_plan, _many_candidates(8),
+                                   complete_fn=caller, workers=1,
+                                   deadline=time.monotonic() + 100)
+        self.assertEqual(len(calls), 3 * (1 + judge_stage.RETRY_ROUNDS))
+        self.assertTrue(report.broken)
+
     def test_lo_hong_thi_chia_doi_thu_lai(self):
         calls = []
 

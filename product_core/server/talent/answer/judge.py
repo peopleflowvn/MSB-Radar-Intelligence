@@ -38,6 +38,13 @@ TASK = "talent_answer_judge"
 #: model vượt trần token và trả JSON cụt — parse ra rỗng, và ⑤ đi báo "kho không
 #: có ai" trong khi ② đã tìm được 40 người.
 BATCH = 8
+
+#: Số đợt đọc LẠI cho các lô lỗi/bỏ dở (chỉ khi có hạn chót còn đủ thời gian).
+RETRY_ROUNDS = 2
+#: Còn dưới ngần này giây thì không mở thêm đợt đọc lại.
+MIN_RETRY_SECONDS = 20.0
+#: Đợt đọc lại chạy ít luồng hơn: lô hỏng thường vì nhà cung cấp đang quá tải.
+RETRY_WORKERS = 2
 #: Đủ rộng cho một lô 8 hồ sơ kèm trích dẫn nguyên văn. Nới từ 4000 lên khi
 #: "vi_sao" đổi từ 1 câu ngắn thành 2-4 câu có chi tiết — 8 hồ sơ x lý do dài
 #: hơn dễ vượt trần cũ và bị cắt JSON giữa chừng (§ `_read_batch`).
@@ -557,8 +564,55 @@ def judge(query_plan, candidates, *, complete_fn=None, batch_size=BATCH,
     caller = complete_fn or complete
     batches = [candidates[i:i + batch_size]
                for i in range(0, len(candidates), batch_size)]
-    skipped = 0
+    total_batches = len(batches)
 
+    results, seen = [], set()
+    failed = skipped = 0
+    pending, round_workers = batches, workers
+    for round_no in range(1 + RETRY_ROUNDS):
+        outcomes, skipped = _run_round(query_plan, pending, caller,
+                                       round_workers, deadline)
+        failed = 0
+        for rows, ok in outcomes:
+            for row in rows:
+                if round_no == 0 or row.person_id not in seen:
+                    seen.add(row.person_id)
+                    results.append(row)
+            if not ok:
+                failed += 1
+        missing = [c for c in candidates if c.person_id not in seen]
+        if not missing:
+            failed = skipped = 0        # đã có đủ; lô "hỏng" chỉ là hỏng một phần
+            break
+        # Chỉ đọc lại khi CÓ hạn chót và còn đủ thời gian cho một lô: lô hỏng
+        # thường vì nhà cung cấp treo/hết hạn mức tạm thời, đọc lại sau đó hay
+        # qua được. Không hạn chót thì giữ hành vi cũ (một lượt), để không nhân
+        # số lời gọi ngoài ý muốn.
+        if (round_no >= RETRY_ROUNDS or deadline is None
+                or deadline - time.monotonic() < MIN_RETRY_SECONDS):
+            break
+        log.info("answer.judge: đọc lại %d hồ sơ của các lô lỗi/bỏ dở (đợt %d)",
+                 len(missing), round_no + 2)
+        pending = [missing[i:i + batch_size]
+                   for i in range(0, len(missing), batch_size)]
+        round_workers = min(workers, RETRY_WORKERS)
+
+    if skipped:
+        log.info("answer.judge: bỏ %d lô vì hết ngân sách thời gian", skipped)
+
+    provider, model = "", ""
+    for r in results:
+        if getattr(r, "model", ""):
+            model = r.model
+            provider = getattr(r, "provider", "")
+            break
+    return JudgeReport(results, batches=total_batches, failed=failed,
+                       skipped=skipped, provider=provider, model=model)
+
+
+def _run_round(query_plan, batches, caller, workers, deadline):
+    """Chạy một đợt các lô. Trả (outcomes, số lô bỏ dở vì hết giờ)."""
+    skipped = 0
     if len(batches) == 1 or workers <= 1:
         outcomes = []
         for batch in batches:
@@ -583,22 +637,4 @@ def judge(query_plan, candidates, *, complete_fn=None, batch_size=BATCH,
         finally:
             # `wait=False`: không chặn lối ra để chờ đúng những lô vừa bỏ.
             pool.shutdown(wait=False, cancel_futures=True)
-
-    if skipped:
-        log.info("answer.judge: bỏ %d/%d lô vì hết ngân sách thời gian",
-                 skipped, len(batches))
-
-    results, failed = [], 0
-    provider, model = "", ""
-    for rows, ok in outcomes:
-        results.extend(rows)
-        if not ok:
-            failed += 1
-        if not model:
-            for r in rows:
-                if getattr(r, "model", ""):
-                    model = r.model
-                    provider = getattr(r, "provider", "")
-                    break
-    return JudgeReport(results, batches=len(batches), failed=failed,
-                       skipped=skipped, provider=provider, model=model)
+    return outcomes, skipped
