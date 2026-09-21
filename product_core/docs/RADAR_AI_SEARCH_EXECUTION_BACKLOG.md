@@ -1728,3 +1728,41 @@ hướng đúng cho SAU demo, không phải việc làm gấp trước giờ lê
 3. Bỏ DEMO-00 khỏi đường găng (lý do ở trên); dồn thời gian đó cho DEMO-03/06.
 4. Theo dõi đĩa VPS (83%, còn ~8,3 GB) trước ngày quay — không chạy thêm việc
    nặng đĩa (fixture, build song song) sát giờ demo.
+
+### 18.7. Đọc hết kết quả khớp điều kiện (21/09, commit `a57a33e`, `597d727`)
+
+**Quyết định của chủ dự án:** dữ liệu demo ít nên tập khớp điều kiện nhỏ; cứ đọc hết
+những người tìm được để thể hiện hệ thống không bỏ sót ai. Mục này **thay thế**
+kết luận "không chỉnh concurrency/pool" ở cuối 18.6 (phép đo `workers=2` hôm đó
+nhiễu; đo sạch hơn bên dưới cho kết quả ngược lại).
+
+**Đã làm**
+- `retrieve.py`: người khớp *đủ mọi điều kiện bắt buộc* (giao các danh sách AND-FTS
+  theo từng `must_have`) được gắn `exact=True`, đứng đầu hàng đọc và **không bị cắt
+  bởi pool**, trần `TALENT_READ_ALL_MAX` (mặc định 32, tối đa 96). `engine.py` báo
+  `stats.exact_matches_read`.
+- `TALENT_JUDGE_WORKERS` mặc định 4 (đo: 4 lô song song đọc 32 hồ sơ trong 31,2 s;
+  6 lô chạm hạn mức ~8 lời gọi/phút của GLM).
+- `ai/router.py::_attempts`: model dự phòng của **cùng nhà cung cấp** được thử
+  ngay sau model chính, trước khi sang nhà cung cấp khác. Nguyên nhân: GLM timeout →
+  Gemini 402 → hết ngân sách trước khi tới qwen, làm rơi lô judge.
+
+**Đo trên prod sau khi bật `POOL=32`, `WORKERS=4` (trước bản sửa router)**
+
+| Câu hỏi | Thời gian | Đọc | Kết quả |
+|---|---|---|---|
+| ai biết SQL và Python? | 64 s (trước 128 s) | 32, gồm 18 người khớp đủ | `incomplete=False` |
+| Tech Lead / Senior Backend Java–Golang tài chính | 97 s | 24 | `incomplete=True` (GLM timeout) |
+| Chuyên viên QHKH doanh nghiệp >5 năm | 101 s | 16 | `incomplete=True` |
+
+Bản sửa router (`597d727`) đã deploy nhưng **chưa đo lại** vì SSH tới VPS bị reset sau
+deploy; cần chạy lại `verify_readall.py` để xác nhận hai câu còn lại.
+
+**Bài học vận hành:** file env thật của prod là
+`/home/ubuntu/msb-radar-platform/runtime/product.env`; `~/msbradar/.env` chỉ là
+symlink do deploy tạo. Không `sed -i` vào symlink. Deploy chỉ tạo `product.env` khi
+chưa có, nên sửa trực tiếp file này thì bền. Đổi env xong phải recreate container hub.
+
+**Giới hạn còn lại (nói thật khi trình bày):** chỉ đảm bảo đọc hết người khớp *nguyên
+văn AND* tới 32 người; câu hỏi thuần ngữ nghĩa vẫn đọc theo pool xếp hạng. Chế độ đọc
+toàn bộ (P1-11/12) và "đọc thêm" chưa xây.
