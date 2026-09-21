@@ -701,7 +701,17 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
                 pk__in=[c.person_id for c in candidates]).values_list("pk", flat=True))
             candidates = [c for c in candidates if c.person_id in eligible]
         retrieved_ms = int((time.monotonic() - mark) * 1000)
-        yield _step(f"Tìm thấy {len(candidates)} hồ sơ liên quan", "done")
+        # Số ĐỌC SÂU (đã cắt theo pool) khác số đã xếp hạng và khác số khớp đủ từ
+        # khoá — gọi tất cả là "hồ sơ liên quan" là nói quá: vector luôn trả top-N
+        # dù không hồ sơ nào thật sự khớp.
+        exact_n = sum(1 for c in candidates if getattr(c, "exact", False))
+        ranked_n = int((trace.get("search_v2") or {}).get("candidate_total") or 0)
+        found_label = f"Chọn {len(candidates)} hồ sơ để đọc sâu"
+        if exact_n:
+            found_label += f" ({exact_n} khớp đủ điều kiện bắt buộc)"
+        if ranked_n > len(candidates):
+            found_label += f", từ {ranked_n} hồ sơ đã xếp hạng"
+        yield _step(found_label, "done")
         yield _step("Đọc hồ sơ")
         keys = {c.person_id: judge_stage.dossier_key(active_plan, c) for c in candidates}
         # Kết luận đã đọc ở LƯỢT TRƯỚC cũng dùng lại được: khoá đã gói câu hỏi,
