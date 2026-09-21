@@ -121,6 +121,21 @@ class PlanTest(TestCase):
         self.assertIn(plan_stage.plan(self.JD_QUESTION, complete_fn=caller).shape,
                       ("find_people", "analyze"))  # không được là "general"
 
+    def test_cau_chu_thong_ke_trong_jd_khong_bien_yeu_cau_tim_nguoi_thanh_analyze(self):
+        """Prod 21/09: JD có 'cơ cấu danh mục tín dụng ... theo ...' khớp bộ dò thống kê."""
+        question = (self.JD_QUESTION
+                    + "\nPhân tích cơ cấu danh mục tín dụng theo ngành và theo khu vực.")
+        caller = replies({plan_stage.TASK: json.dumps({
+            "shape": "find_people", "suy_luan": "tìm người cho JD", "do_tin_cay": 0.95,
+            "must_have": ["quản trị rủi ro tín dụng"], "search_queries": ["rủi ro tín dụng"]},
+            ensure_ascii=False)})
+        self.assertEqual(plan_stage.plan(question, complete_fn=caller).shape, "find_people")
+
+    def test_user_words_bo_khoi_dinh_kem(self):
+        self.assertEqual(plan_stage.user_words(self.JD_QUESTION),
+                         "Phân tích tài liệu đính kèm để tìm người phù hợp")
+        self.assertEqual(plan_stage.user_words("tìm Java"), "tìm Java")
+
     def test_tom_tat_tai_lieu_khong_bi_ep_thanh_tim_nguoi(self):
         caller = replies({plan_stage.TASK: json.dumps({
             "shape": "general", "suy_luan": "chỉ tóm tắt", "do_tin_cay": 0.95, "search_queries": []})})

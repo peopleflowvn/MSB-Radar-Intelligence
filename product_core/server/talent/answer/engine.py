@@ -883,8 +883,9 @@ def answer(question, *, envelope=None, user=None, history=None, complete_fn=None
         # chạy ②→⑤ trên kho CV rồi báo "không có dữ liệu". Xem `chat.py::_do_web`.
         # Nhưng nếu lượt trước vừa trả về người (has_recent_candidates), câu này
         # nhiều khả năng là follow-up ("ai trong số đó…") chứ không lạc đề.
-        if internal_knowledge or not (plan_stage.mentions_store(question)
-                                       or plan_stage.has_recent_candidates(envelope)):
+        if (internal_knowledge or not (plan_stage.mentions_store(question)
+                                        or plan_stage.has_recent_candidates(envelope))
+                ) and not plan_stage.asks_people_for_attachment(question):
             from dataclasses import replace
             query_plan = replace(query_plan, shape="general")
     if query_plan.wants_clarification:
@@ -1318,8 +1319,9 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
         # Xem giải thích ở `answer()` — câu không nhắc CV/hồ sơ/kho mà vẫn ra
         # "analyze" là ① nhầm "MSB" (ngân hàng) với kho CV. Trừ khi lượt trước
         # vừa trả người (follow-up thật).
-        if internal_knowledge or not (plan_stage.mentions_store(question)
-                                       or plan_stage.has_recent_candidates(envelope)):
+        if (internal_knowledge or not (plan_stage.mentions_store(question)
+                                        or plan_stage.has_recent_candidates(envelope))
+                ) and not plan_stage.asks_people_for_attachment(question):
             from dataclasses import replace
             query_plan = replace(query_plan, shape="general")
 

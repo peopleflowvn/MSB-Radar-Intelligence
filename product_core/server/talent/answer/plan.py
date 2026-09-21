@@ -277,7 +277,19 @@ _STORE_WORDS = ("cv", "hồ sơ", "ho so", "ứng viên", "ung vien", "kho ",
                 "trong kho", "dữ liệu", "du lieu", "hồ sơ nào", "ho so nao")
 
 
-def _asks_people_for_attachment(question):
+def user_words(question):
+    """Phần người dùng TỰ GÕ — bỏ khối tài liệu đính kèm.
+
+    Các bộ dò từ khoá (thống kê/phân bố…, đếm, phân tích hồ sơ) chỉ được nhìn lời
+    người dùng. Production 21/09: JD có câu "cơ cấu danh mục tín dụng … theo …"
+    khớp bộ dò "thống kê theo" nên yêu cầu tìm người bị xếp thành `analyze` rồi
+    bị bẻ sang nhánh hội thoại — Radar không tìm ai.
+    """
+    head, sep, _tail = str(question or "").partition("TÀI LIỆU ĐÍNH KÈM:")
+    return head.strip() if sep and head.strip() else str(question or "")
+
+
+def asks_people_for_attachment(question):
     """Có tài liệu đính kèm (JD) kèm lời nhờ tìm người/ứng viên phù hợp không."""
     text = normalize_name(question)
     return ("tai lieu dinh kem" in text
@@ -473,7 +485,7 @@ def plan(question, *, envelope=None, complete_fn=None) -> QueryPlan:
     # "Lấy/mở hồ sơ X và phân tích" là yêu cầu ĐỌC hồ sơ, không phải action
     # qua tool. Model đôi khi xếp nó thành action khiến nhánh tool đã biết tên
     # ở preamble nhưng cuối cùng lại hỏi "làm gì với ai".
-    normalized = normalize_name(question)
+    normalized = normalize_name(user_words(question))
     # Đếm theo tên là phép thống kê xác định trên chỉ mục toàn kho. Không để
     # model phân loại nhầm thành tìm kiếm hồ sơ rồi chỉ đọc top-N.
     if re.fullmatch(
@@ -559,7 +571,7 @@ def plan(question, *, envelope=None, complete_fn=None) -> QueryPlan:
     # trả `shape="general"` kèm must_have; Radar đi nhánh hội thoại, không tìm
     # gì rồi bảo người dùng gõ lại. JD/tài liệu đính kèm đi kèm lời nhờ tìm
     # người luôn là yêu cầu tìm người.
-    if shape == "general" and (must_have or _asks_people_for_attachment(question)):
+    if shape == "general" and (must_have or asks_people_for_attachment(question)):
         log.info("answer.plan: 'general' nhưng có tiêu chí tìm người/JD đính kèm "
                  "→ find_people: %r", question[:80])
         shape = "find_people"
