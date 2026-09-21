@@ -15,7 +15,11 @@ thời sập sẽ làm mất dữ liệu chưa đồng bộ. Do đó:
 """
 import json
 
-DEFAULT_TIMEOUT = 30
+# Lô metadata có thể phải đi qua proxy/VPN doanh nghiệp và Hub còn phải ghi bền
+# vững từng bản ghi. 30 giây quá sát: production đã ghi nhận Hub lưu được việc
+# nhưng Edge hết thời gian chờ trước khi nhận phản hồi, rồi gửi lại cả lô. Upload
+# file vẫn có ngưỡng riêng ở dưới.
+DEFAULT_TIMEOUT = 90
 #: Upload file CV nặng hơn hẳn và hay nghẽn qua proxy công ty bị bóp băng thông;
 #: cho nó cửa sổ rộng hơn để không bị hủy oan rồi thử lại vô ích.
 DEFAULT_UPLOAD_TIMEOUT = 120

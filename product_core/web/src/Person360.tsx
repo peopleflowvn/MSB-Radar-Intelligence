@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, ApiError, DocumentRow, DocumentStats, IndexHealth, PersonAskTurn, PersonDetail } from './api'
 import ContactUnlock from './ContactUnlock'
 import FormattedMarkdown from './FormattedMarkdown'
+import { HuntAssignModal } from './HuntAssignModal'
 import PersonFactsSection from './PersonFacts'
 import { useCustomTheme } from './CustomThemeContext'
 
@@ -222,15 +223,6 @@ function CvViewerSection({
 
   return (
     <div className="cv-management-workspace">
-      {shouldMask && (
-        <div className="cv-mask-alert-banner">
-          <span className="cv-mask-icon">🔒</span>
-          <div>
-            <strong>Chế độ bảo mật liên hệ CV đang bật:</strong> Email và Số điện thoại trong nội dung văn bản CV được che tự động. Hãy mở khoá thông tin liên hệ ở đầu trang hồ sơ nếu cần xem chi tiết đầy đủ.
-          </div>
-        </div>
-      )}
-
       <div className={`cv-version-summary ${stats.unparsed_count ? 'warn' : ''}`}>
         <strong>Kho CV có {stats.submission_count} lượt nộp · {stats.file_version_count} file gốc</strong>
         <span>{stats.distinct_text_count} nội dung khác nhau</span>
@@ -1280,6 +1272,11 @@ export default function Person360() {
   const [unlockedContacts, setUnlockedContacts] = useState<{ email: string; phone: string } | null>(null)
   const isUnlocked = Boolean(unlockedContacts)
 
+  // Đưa ứng viên vào đợt tuyển / nhiệm vụ săn
+  const [huntModalOpen, setHuntModalOpen] = useState(false)
+  const [isAddingHunt, setIsAddingHunt] = useState(false)
+  const [addedHuntName, setAddedHuntName] = useState<string | null>(null)
+
   const { maskSensitiveData } = useCustomTheme()
   const queryClient = useQueryClient()
   const session = useQuery({ queryKey: ['me'], queryFn: api.me, retry: false })
@@ -1289,6 +1286,15 @@ export default function Person360() {
   const canViewCV = roles.has('recruiter') || roles.has('hiring_manager') || roles.has('manager') || roles.has('admin')
   const isRmOnly = roles.has('rb_sales') && !canManageTalent
   const isAdmin = roles.has('admin')
+
+  // Đợt tuyển đang mở để đưa vào
+  const huntsQuery = useQuery({
+    queryKey: ['hunts', 'open-for-person'],
+    queryFn: () => api.hunts({ open: true, limit: 100 }).catch(() => ({ count: 0, limit: 100, offset: 0, results: [] })),
+    staleTime: 60_000,
+  })
+  const openHunts = huntsQuery.data?.results ?? []
+
   // Ngữ cảnh mở hồ sơ, gắn qua `?from=`. Phân hệ Tìm kiếm (/search) dùng dạng
   // `search-<tab>-<góc nhìn>`; các giá trị cũ (`talent-ai`, `talent-filter`) vẫn
   // được nhận và trỏ về đúng tab tương ứng của /search.
@@ -1320,6 +1326,30 @@ export default function Person360() {
   const [relTab, setRelTab] = useState<RelationshipTab>(initialRelTab)
   const hasBoth = canManageTalent && canManageRB
   const shouldMask = maskSensitiveData || !isUnlocked
+
+  const handleAssignHunt = async (opts: { huntId?: number; newTitle?: string }) => {
+    setIsAddingHunt(true)
+    try {
+      if (opts.huntId) {
+        const hunt = openHunts.find((h) => h.id === opts.huntId)
+        const huntTitle = hunt?.title || 'đợt tuyển'
+        await api.huntUpdate(opts.huntId, { person_ids_add: [personId] })
+        setAddedHuntName(huntTitle)
+      } else if (opts.newTitle) {
+        const title = opts.newTitle.trim()
+        const created = await api.createShortlist({
+          title,
+          person_ids: [personId],
+        })
+        const finalTitle = created?.title || title
+        setAddedHuntName(finalTitle)
+      }
+      queryClient.invalidateQueries({ queryKey: ['person', personId] })
+      queryClient.invalidateQueries({ queryKey: ['hunts'] })
+    } finally {
+      setIsAddingHunt(false)
+    }
+  }
 
   useEffect(() => {
     if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
@@ -1388,33 +1418,9 @@ export default function Person360() {
 
   return (
     <div className="person-360-container">
-      {/* Executive Hero Card tích hợp Utility Bar */}
+      {/* Executive Hero Card */}
       <div className="person-hero-card">
-        {/* Top Utility Bar: Nút quay lại & Suy lại hồ sơ siêu gọn */}
-        <div className="person-top-utility">
-          <div className="person-utility-left">
-            <Link to={returnPath} className="person-back-compact" title={`Quay lại ${returnLabel}`}>
-              ← Quay lại {returnLabel}
-            </Link>
-          </div>
-
-          <div className="person-utility-right">
-            {canManageTalent && (
-              <button
-                type="button"
-                className="person-rederive-compact"
-                onClick={() => rederive.mutate()}
-                disabled={rederive.isPending}
-                title="Tự động hợp nhất lại dữ liệu từ tất cả các nguồn và phiên bản CV"
-              >
-                <span className={`rederive-icon ${rederive.isPending ? 'spin' : ''}`}>🔄</span>
-                <span>{rederive.isPending ? 'Đang suy lại…' : 'Suy lại hồ sơ'}</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Thông tin Ứng viên & Thẻ liên hệ */}
+        {/* Thông tin Ứng viên & Thẻ liên hệ & Thao tác Đợt tuyển */}
         <div className="person-hero-main-row">
           <div className="person-hero-left">
             <div className="person-avatar-large">
@@ -1452,124 +1458,108 @@ export default function Person360() {
           </div>
 
           <div className="person-hero-right">
-            {/* Mở khoá thông tin liên hệ bảo mật */}
-            <ContactUnlock
-              personId={data.id}
-              maskedEmail={data.primary_email}
-              maskedPhone={data.primary_phone}
-              onUnlocked={(res) => setUnlockedContacts(res)}
-            />
+            {/* Thông báo bảo mật liên hệ CV nếu đang bật che */}
+            {shouldMask && (
+              <div className="contact-mask-notice">
+                <span className="notice-lock-icon">🔒</span>
+                <div className="notice-text">
+                  <strong>Bảo mật liên hệ CV:</strong> Email và SĐT trong CV đang được che tự động. Mở khoá để xem chi tiết.
+                </div>
+              </div>
+            )}
+
+            {/* Thao tác Mở khoá liên hệ & Đợt tuyển / Săn */}
+            <div className="person-hero-actions-col">
+              <ContactUnlock
+                personId={data.id}
+                maskedEmail={data.primary_email}
+                maskedPhone={data.primary_phone}
+                onUnlocked={(res) => setUnlockedContacts(res)}
+              />
+
+              {canManageTalent && (
+                <button
+                  type="button"
+                  className={`person-hunt-btn${addedHuntName ? ' is-added' : ''}`}
+                  disabled={isAddingHunt}
+                  onClick={() => setHuntModalOpen(true)}
+                  title={
+                    addedHuntName
+                      ? `Đã vào đợt tuyển: ${addedHuntName} (bấm để đổi đợt tuyển)`
+                      : 'Đưa ứng viên này vào đợt tuyển dụng hoặc nhiệm vụ săn'
+                  }
+                >
+                  {isAddingHunt ? (
+                    <>⏳ Đang thêm…</>
+                  ) : addedHuntName ? (
+                    <>✓ {addedHuntName}</>
+                  ) : (
+                    <>🎯 + Đợt tuyển / Săn</>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Sticky Quick-Nav Dock (Ghim ngay sát dưới Hero Card khi cuộn xuống) */}
+      {/* Sticky Quick-Nav Dock (Ghim nút quay lại + các Tabs ngay sát dưới Hero Card khi cuộn xuống) */}
       <nav className="person-sticky-nav" aria-label="Thanh điều hướng hồ sơ">
-        <div className="person-nav-pills">
-          <button
-            type="button"
-            className={`person-nav-pill-btn ${activeNav === 'tong-quan' ? 'active' : ''}`}
-            onClick={() => scrollToAnchor('sec-overview', 'tong-quan')}
-          >
-            <span>👤 Tổng quan</span>
-          </button>
-          {canViewCV ? (
+        <div className="person-sticky-nav-inner">
+          <Link to={returnPath} className="person-sticky-back" title={`Quay lại ${returnLabel}`}>
+            ← Quay lại {returnLabel}
+          </Link>
+
+          <div className="person-nav-pills">
             <button
               type="button"
-              className={`person-nav-pill-btn ${activeNav === 'cv' ? 'active' : ''}`}
-              onClick={() => scrollToAnchor('sec-cv', 'cv')}
+              className={`person-nav-pill-btn ${activeNav === 'tong-quan' ? 'active' : ''}`}
+              onClick={() => scrollToAnchor('sec-overview', 'tong-quan')}
             >
-              <span>📄 Kho CV ({data.documents.length} file · {data.document_stats.submission_count} lượt)</span>
+              <span>👤 Tổng quan</span>
             </button>
-          ) : (
+            {canViewCV ? (
+              <button
+                type="button"
+                className={`person-nav-pill-btn ${activeNav === 'cv' ? 'active' : ''}`}
+                onClick={() => scrollToAnchor('sec-cv', 'cv')}
+              >
+                <span>📄 Kho CV ({data.documents.length} file · {data.document_stats.submission_count} lượt)</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="person-nav-pill-btn"
+                disabled
+                title="RM/Sales không có quyền xem tệp CV ứng viên"
+              >
+                <span>🔒 Kho CV (Chỉ dành cho TA)</span>
+              </button>
+            )}
             <button
               type="button"
-              className="person-nav-pill-btn"
-              disabled
-              title="RM/Sales không có quyền xem tệp CV ứng viên"
+              className={`person-nav-pill-btn ${activeNav === 'dot-tuyen' ? 'active' : ''}`}
+              onClick={() => scrollToAnchor('sec-opportunities', 'dot-tuyen')}
             >
-              <span>🔒 Kho CV (Chỉ dành cho TA)</span>
+              <span>🎯 Đợt tuyển &amp; Cơ hội</span>
             </button>
-          )}
-          <button
-            type="button"
-            className={`person-nav-pill-btn ${activeNav === 'dot-tuyen' ? 'active' : ''}`}
-            onClick={() => scrollToAnchor('sec-opportunities', 'dot-tuyen')}
-          >
-            <span>🎯 Đợt tuyển &amp; Cơ hội</span>
-          </button>
-          <button
-            type="button"
-            className={`person-nav-pill-btn ${activeNav === 'lich-su' ? 'active' : ''}`}
-            onClick={() => scrollToAnchor('sec-history', 'lich-su')}
-          >
-            <span>⏳ Lịch sử &amp; Nguồn ({data.sources.length})</span>
-          </button>
-          <button
-            type="button"
-            className={`person-nav-pill-btn ${activeNav === 'ai' ? 'active' : ''}`}
-            onClick={() => scrollToAnchor('sec-ai', 'ai')}
-          >
-            <span>💬 Hỏi &amp; đáp AI</span>
-          </button>
+            <button
+              type="button"
+              className={`person-nav-pill-btn ${activeNav === 'lich-su' ? 'active' : ''}`}
+              onClick={() => scrollToAnchor('sec-history', 'lich-su')}
+            >
+              <span>⏳ Lịch sử &amp; Nguồn ({data.sources.length})</span>
+            </button>
+            <button
+              type="button"
+              className={`person-nav-pill-btn ${activeNav === 'ai' ? 'active' : ''}`}
+              onClick={() => scrollToAnchor('sec-ai', 'ai')}
+            >
+              <span>💬 Hỏi &amp; đáp AI</span>
+            </button>
+          </div>
         </div>
       </nav>
-
-      {/* Micro Metric Chips Strip (Thu gọn & Đặt ngay dưới các Tabs) */}
-      <div className="person-micro-stats" aria-label="Chỉ số tổng hợp">
-        <button
-          type="button"
-          className="micro-stat-chip"
-          onClick={() => scrollToAnchor('sec-history', 'lich-su')}
-          title="Xem chi tiết nguồn hồ sơ & lượt nộp"
-        >
-          <span className="m-icon">📦</span>
-          <span className="m-val">{data.sources.length}</span>
-          <span className="m-lbl">Nguồn nộp</span>
-        </button>
-        <button
-          type="button"
-          className="micro-stat-chip"
-          onClick={() => scrollToAnchor('sec-history', 'lich-su')}
-          title="Xem chi tiết các kênh định danh (Email, SĐT...)"
-        >
-          <span className="m-icon">🔑</span>
-          <span className="m-val">{data.identities.length}</span>
-          <span className="m-lbl">Kênh định danh</span>
-        </button>
-        <button
-          type="button"
-          className="micro-stat-chip"
-          onClick={() => scrollToAnchor('sec-history', 'lich-su')}
-          title="Xem lịch sử sự kiện tương tác"
-        >
-          <span className="m-icon">⏳</span>
-          <span className="m-val">{data.timeline.length}</span>
-          <span className="m-lbl">Tương tác</span>
-        </button>
-        {canViewCV && (
-          <button
-            type="button"
-            className="micro-stat-chip"
-            onClick={() => scrollToAnchor('sec-cv', 'cv')}
-            title="Xem kho CV & văn bản trích xuất"
-          >
-            <span className="m-icon">📄</span>
-            <span className="m-val">{data.document_stats.submission_count} lượt</span>
-            <span className="m-lbl">({data.documents.length} CV)</span>
-          </button>
-        )}
-        <button
-          type="button"
-          className="micro-stat-chip"
-          onClick={() => scrollToAnchor('sec-opportunities', 'dot-tuyen')}
-          title="Xem tín hiệu AI"
-        >
-          <span className="m-icon">⚡</span>
-          <span className="m-val">{data.signals.length}</span>
-          <span className="m-lbl">Tín hiệu AI</span>
-        </button>
-      </div>
 
       {/* 2-Column One-Page Cockpit Grid */}
       <div className="person-cockpit-grid">
@@ -1780,6 +1770,18 @@ export default function Person360() {
           Tự động hợp nhất dữ liệu từ tất cả các nguồn và phiên bản CV (giữ nguyên các trường đã xác nhận thủ công).
         </span>
       </div>
+
+      {/* Modal Đưa ứng viên vào Đợt tuyển / Nhiệm vụ săn */}
+      {huntModalOpen && (
+        <HuntAssignModal
+          isOpen={huntModalOpen}
+          title={`Đưa ${data.display_name || 'ứng viên'} vào Đợt tuyển / Săn`}
+          people={[{ person_id: data.id, name: data.display_name || `Ứng viên #${data.id}` }]}
+          openHunts={openHunts}
+          onClose={() => setHuntModalOpen(false)}
+          onAssign={handleAssignHunt}
+        />
+      )}
     </div>
   )
 }

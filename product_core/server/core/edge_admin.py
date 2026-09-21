@@ -24,6 +24,7 @@ from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from django.utils import timezone
 
 from accounts.permissions import RequiresAdmin, RequiresEdgeOps
 
@@ -109,7 +110,7 @@ class IssueKeySerializer(serializers.Serializer):
 @permission_classes([RequiresEdgeOps])
 def edge_collection(request):
     if request.method == "GET":
-        edges = Edge.objects.all().prefetch_related("api_keys")
+        edges = Edge.objects.filter(retired_at__isnull=True).prefetch_related("api_keys")
         return Response({"results": EdgeSerializer(edges, many=True).data})
 
     if not RequiresAdmin().has_permission(request, None):
@@ -137,13 +138,11 @@ def edge_collection(request):
 @extend_schema(
     methods=["DELETE"],
     request=None,
-    responses={200: None, 409: None},
+    responses={200: None},
     description=(
-        "Xoá hẳn một Edge **chưa từng nạp dữ liệu** (không có bản ghi nguồn). "
-        "Edge đã có bản ghi bị từ chối với `409` — dữ liệu thô là bất biến (xem "
-        "`SourceRecord`), không được phép xoá kéo theo. Muốn dừng một Edge đang "
-        "hoạt động, hãy dùng `PATCH is_active=false` hoặc thu hồi khoá ở "
-        "`POST /keys/<id>/revoke/`."
+        "Gỡ một kết nối Edge khỏi danh sách quản trị. Edge chưa có dữ liệu được xoá "
+        "hẳn; Edge đã nạp dữ liệu được lưu trữ (retire), vô hiệu hoá và thu hồi mọi "
+        "khoá để giữ nguyên dữ liệu nguồn bất biến."
     ),
 )
 @api_view(["PATCH", "DELETE"])
@@ -153,13 +152,14 @@ def edge_detail(request, edge_id):
 
     if request.method == "DELETE":
         if edge.source_records.exists():
-            return Response(
-                {"detail": "Không thể xoá Edge đã có dữ liệu nạp — dữ liệu thô là bất biến."
-                 " Hãy tắt Edge hoặc thu hồi khoá để dừng thu thập."},
-                status=status.HTTP_409_CONFLICT,
-            )
+            now = timezone.now()
+            edge.is_active = False
+            edge.retired_at = now
+            edge.save(update_fields=["is_active", "retired_at", "updated_at"])
+            edge.api_keys.filter(revoked_at__isnull=True).update(revoked_at=now)
+            return Response({"deleted": True, "archived": True})
         edge.delete()
-        return Response({"deleted": True})
+        return Response({"deleted": True, "archived": False})
 
     fields = {}
     if "label" in request.data:

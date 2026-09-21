@@ -195,7 +195,11 @@ def edge_sync(request):
             results.append(_ingest(edge, record))
 
     edge.touch()
-    _resolve_quietly()
+
+    # Chỉ xác nhận phần Hub đã thực sự hoàn tất trong request này: kiểm tra và
+    # lưu bền vững SourceRecord. Phân giải Person/Talent có thể tốn hàng chục
+    # giây trên một lô thật và đã có worker nền đảm nhiệm; chạy inline ở đây làm
+    # Edge timeout rồi gửi lại những bản ghi Hub thực tế đã nhận.
 
     for record in documents:
         results.append(_ingest_document(edge, record))
@@ -229,23 +233,6 @@ def edge_data_report(request):
     edge.last_seen_at = edge.data_reported_at
     edge.save(update_fields=["data_report", "data_reported_at", "last_seen_at", "updated_at"])
     return Response({"ok": True, "reported_at": edge.data_reported_at})
-
-
-def _resolve_quietly():
-    """Phân giải các bản ghi vừa nhận thành Person.
-
-    Chạy SAU khi đã lưu, và mọi lỗi đều bị nuốt: Edge đã hoàn thành phần việc
-    của nó khi dữ liệu nằm an toàn trong bàn nhận. Để lỗi phân giải làm hỏng
-    phản hồi sẽ khiến Edge gửi lại những bản ghi vốn đã lưu thành công.
-
-    Bản ghi chưa phân giải được vẫn ở 'pending', nên resolve_pending() chạy lại
-    lúc nào cũng được — kể cả sau khi quy tắc phân giải thay đổi.
-    """
-    try:
-        from people.ingest import resolve_pending
-        resolve_pending(limit=settings.EDGE_SYNC_MAX_BATCH)
-    except Exception:                            # noqa: BLE001 — xem docstring
-        log.exception("Phân giải Person thất bại sau khi nhận đồng bộ")
 
 
 def _ingest_document(edge, record):

@@ -191,9 +191,9 @@ describe("Kết nối Edge", () => {
     expect(del).not.toHaveBeenCalled();
   });
 
-  it("Edge đã nạp dữ liệu thì nút xoá bị khoá — bắt buộc dùng Tắt thay vì xoá", () => {
+  it("Edge đã nạp dữ liệu vẫn cho gỡ kết nối an toàn", () => {
     renderPage([edgeRow({ record_count: 3 })], true);
-    expect(screen.getByText("🗑️ Xóa Edge")).toBeDisabled();
+    expect(screen.getByText("🗑️ Xóa Edge")).toBeEnabled();
   });
 
   it("Edge chưa nạp dữ liệu thì được phép xoá", () => {

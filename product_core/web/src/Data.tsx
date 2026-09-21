@@ -172,7 +172,10 @@ export function EdgeConnections({ canManage }: { canManage: boolean }) {
   }
 
   function handleRemoveEdge(edge: EdgeAdminRow) {
-    if (!window.confirm(`Xoá hẳn Edge "${edge.label}"? Thao tác này không thể hoàn tác.`)) return
+    const detail = edge.record_count > 0
+      ? `Edge đã nạp ${edge.record_count.toLocaleString('vi-VN')} bản ghi. Kết nối và toàn bộ khoá sẽ bị thu hồi; dữ liệu đã nạp vẫn được giữ nguyên.`
+      : 'Edge chưa nạp dữ liệu và sẽ được xoá hẳn.'
+    if (!window.confirm(`Xoá kết nối Edge "${edge.label}"?\n\n${detail}`)) return
     setEdgeError(null)
     remove.mutate(edge)
   }
@@ -333,15 +336,10 @@ export function EdgeConnections({ canManage }: { canManage: boolean }) {
                     background: 'rgba(220, 38, 38, 0.08)',
                     color: '#dc2626',
                     border: '1px solid rgba(220, 38, 38, 0.35)',
-                    opacity: edge.record_count > 0 ? 0.6 : 1,
-                    cursor: edge.record_count > 0 ? 'not-allowed' : 'pointer',
+                    cursor: 'pointer',
                   }}
-                  disabled={remove.isPending || edge.record_count > 0}
-                  title={
-                    edge.record_count > 0
-                      ? `Edge này đã nạp ${edge.record_count.toLocaleString('vi-VN')} bản ghi — dữ liệu thô là bất biến nên không thể xoá. Hãy dùng nút "Tắt" để dừng Edge, hoặc thu hồi khoá.`
-                      : 'Xoá hẳn Edge này khỏi Hub'
-                  }
+                  disabled={remove.isPending}
+                  title="Gỡ kết nối Edge; dữ liệu đã nạp vẫn được giữ nguyên"
                   onClick={() => handleRemoveEdge(edge)}
                 >
                   🗑️ Xóa Edge

@@ -125,16 +125,25 @@ class EdgeDeleteTest(TestCase):
         self.assertEqual(response.json()["deleted"], True)
         self.assertFalse(Edge.objects.filter(pk=self.edge.pk).exists())
 
-    def test_khong_xoa_duoc_Edge_da_co_du_lieu(self):
-        """Dữ liệu thô là bất biến — xoá Edge không được phép kéo theo mất bản ghi nguồn."""
+    def test_xoa_Edge_da_co_du_lieu_thi_go_ket_noi_va_giu_ban_ghi(self):
+        """Gỡ kết nối nhưng không cascade dữ liệu nguồn bất biến."""
+        key, _raw = EdgeApiKey.issue(self.edge)
         SourceRecord.objects.create(
             edge=self.edge, entity_type="candidate", entity_key="cv-1", content_hash="h1",
         )
         response = self.client.delete(
             reverse("edge-admin-edge-detail", args=[self.edge.pk]))
-        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["archived"])
         self.assertTrue(Edge.objects.filter(pk=self.edge.pk).exists())
         self.assertEqual(SourceRecord.objects.filter(edge=self.edge).count(), 1)
+        self.edge.refresh_from_db()
+        key.refresh_from_db()
+        self.assertFalse(self.edge.is_active)
+        self.assertIsNotNone(self.edge.retired_at)
+        self.assertFalse(key.is_active)
+        self.assertEqual(
+            self.client.get(reverse("edge-admin-edges")).json()["results"], [])
 
     def test_van_hanh_edge_khong_xoa_duoc(self):
         self.client.force_login(make_user("van-hanh-xoa", roles.EDGE_OPERATOR))

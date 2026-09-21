@@ -39,6 +39,7 @@ class Edge(models.Model):
     hostname = models.CharField("Tên máy", max_length=200, blank=True, default="")
     app_version = models.CharField("Phiên bản Edge", max_length=40, blank=True, default="")
     is_active = models.BooleanField("Đang hoạt động", default=True)
+    retired_at = models.DateTimeField("Đã gỡ kết nối lúc", null=True, blank=True)
     registered_at = models.DateTimeField("Đăng ký lúc", null=True, blank=True)
     last_seen_at = models.DateTimeField("Lần cuối liên lạc", null=True, blank=True)
     data_report = models.JSONField("Báo cáo dữ liệu Edge", default=dict, blank=True)

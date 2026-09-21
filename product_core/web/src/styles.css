@@ -17935,6 +17935,57 @@ body,
   font-weight: 600;
 }
 
+.person-hero-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.person-hero-actions-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.person-hunt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--accent-gradient, linear-gradient(135deg, var(--accent, #ff8a33) 0%, #ea580c 100%));
+  color: #ffffff;
+  border: 1px solid transparent;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px var(--accent-soft, rgba(255, 138, 51, 0.3));
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.person-hunt-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px var(--accent-soft, rgba(255, 138, 51, 0.45));
+}
+
+.person-hunt-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.person-hunt-btn.is-added {
+  background: rgba(16, 185, 129, 0.14);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: none;
+}
+
 /* Sticky Quick Navigation Dock (Ghim nút quay lại + các Tabs khi cuộn) */
 .person-sticky-nav {
   position: sticky;
