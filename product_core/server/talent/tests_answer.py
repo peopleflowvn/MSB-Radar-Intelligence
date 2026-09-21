@@ -3207,3 +3207,88 @@ class AbortedEmptyTurnNotPersistedTest(TestCase):
 
         from ai.models import AssistantMessage
         self.assertEqual(AssistantMessage.objects.filter(role="assistant").count(), 1)
+
+
+class ReadAllExactMatchesTest(TestCase):
+    """Người thoả TẤT CẢ điều kiện bắt buộc theo từ khoá luôn được đọc.
+
+    Đo trên production 21/09: `hits` không lọc được gì (189/200 người có hits>=2)
+    vì vector luôn trả đủ top-N. Chỉ giao các nhánh AND theo từng điều kiện mới là
+    tập khớp thật — và tập đó không được bị cắt bởi `pool`."""
+
+    def _passages(self, ids):
+        from talent.answer.retrieve import Passage
+        return {pid: [Passage(pid, 0, 0, f"cv {pid}", source="cv")] for pid in ids}
+
+    def test_fuse_giu_nguoi_khop_du_ke_ca_khi_vuot_pool(self):
+        from talent.answer import retrieve as R
+
+        exact = [R.Candidate(person_id=pid, name=f"E{pid}", score=0.1, hits=1,
+                             exact=True) for pid in range(1, 7)]
+        filler = [R.Candidate(person_id=100 + i, name=f"F{i}", score=0.9, hits=3)
+                  for i in range(40)]
+        # Người vector xếp trên hẳn, người khớp đủ xếp dưới — pool chỉ 8.
+        out = R.fuse_candidates([(filler, 1.0), (exact, 1.0)], pool=8)
+        ids = [c.person_id for c in out]
+        self.assertTrue(set(range(1, 7)) <= set(ids))
+        # Họ đứng trước người chỉ-vector, không bị đẩy ra sau.
+        self.assertEqual(ids[:6], sorted(ids[:6]))
+        self.assertTrue(all(c.exact for c in out if c.person_id <= 6))
+
+    def test_fuse_khong_vuot_tran_read_all_max(self):
+        from talent.answer import retrieve as R
+
+        exact = [R.Candidate(person_id=pid, name=f"E{pid}", score=0.1, hits=1,
+                             exact=True) for pid in range(1, R.READ_ALL_MAX + 20)]
+        out = R.fuse_candidates([(exact, 1.0)], pool=8)
+        self.assertEqual(len(out), R.READ_ALL_MAX)
+
+    def test_retrieve_giao_cac_nhanh_and_va_dua_len_dau(self):
+        from talent.answer import retrieve as R
+        for pid in list(range(1, 13)) + list(range(100, 130)):
+            Person.objects.create(pk=pid, display_name=f"P{pid}", is_applicant=True)
+        plan_obj = plan_stage.QueryPlan(
+            shape="find_people", search_queries=["sql python"],
+            must_have=["SQL", "Python"])
+        and_lists = {"SQL": list(range(1, 13)), "Python": [3, 4, 9, 10, 40]}
+
+        def fake_fts(query, limit, *, chunks=True, require_all=False):
+            return list(and_lists.get(query, [])) if require_all else []
+
+        fillers = list(range(100, 130))
+        everyone = set(range(1, 13)) | set(fillers)
+        with mock.patch.object(R, "_fts_person_ids", side_effect=fake_fts), \
+                mock.patch.object(R, "_DenseBranch") as dense, \
+                mock.patch.object(R, "_passages_for",
+                                  side_effect=lambda ids, *a, **k: self._passages(ids)), \
+                mock.patch.object(R, "_profile_passages", return_value={}):
+            dense.return_value.side_effect = lambda *a, **k: list(fillers)
+            cands = R.retrieve(plan_obj, pool=2)
+        exact_ids = {c.person_id for c in cands if c.exact}
+        # Giao của hai nhánh AND = {3, 4, 9, 10}; ghi 40 không có trong kho nên
+        # không thành ứng viên — nhưng bốn người còn lại PHẢI đủ mặt dù pool=2.
+        self.assertEqual(exact_ids, {3, 4, 9, 10})
+        self.assertTrue({3, 4, 9, 10} <= {c.person_id for c in cands})
+        self.assertEqual({c.person_id for c in cands[:4]}, {3, 4, 9, 10})
+        self.assertTrue({c.person_id for c in cands} <= everyone | {40})
+
+    def test_mot_dieu_kien_khong_ai_thoa_thi_khong_co_nguoi_khop_du(self):
+        """Giao rỗng ⇒ không có gì để đảm bảo; ③ vẫn phán đoán trên pool xếp hạng."""
+        from talent.answer import retrieve as R
+        for pid in range(1, 6):
+            Person.objects.create(pk=pid, display_name=f"P{pid}", is_applicant=True)
+        plan_obj = plan_stage.QueryPlan(
+            shape="find_people", search_queries=["rust"], must_have=["SQL", "Rust"])
+        and_lists = {"SQL": [1, 2, 3], "Rust": []}
+
+        def fake_fts(query, limit, *, chunks=True, require_all=False):
+            return list(and_lists.get(query, [])) if require_all else []
+
+        with mock.patch.object(R, "_fts_person_ids", side_effect=fake_fts), \
+                mock.patch.object(R, "_DenseBranch") as dense, \
+                mock.patch.object(R, "_passages_for",
+                                  side_effect=lambda ids, *a, **k: self._passages(ids)), \
+                mock.patch.object(R, "_profile_passages", return_value={}):
+            dense.return_value.side_effect = lambda *a, **k: [4, 5]
+            cands = R.retrieve(plan_obj, pool=5)
+        self.assertFalse(any(c.exact for c in cands))

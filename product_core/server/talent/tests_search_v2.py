@@ -731,9 +731,13 @@ class JudgeCacheTest(TestCase):
         from django.conf import settings
         self.assertFalse(getattr(settings, "TALENT_JUDGE_CACHE", False))
 
-    def test_judge_mac_dinh_chay_tuan_tu_de_khong_tu_gay_429(self):
+    def test_judge_mac_dinh_chay_4_lo_song_song_theo_so_do(self):
+        """Do tren prod 21/09 voi GLM: 4 lo x 8 ho so song song = 31,2s, 32/32,
+        0 lo hong (tuan tu 1 lo mat 37,9s). Chi den 6 lo/48 ho so moi cham han
+        muc ~8 loi goi GLM moi phut. Truoc do mac dinh la 1 vi tuong song song
+        gay 429 — do lai thi nguoc lai; con so nay khong duoc tang khi chua do."""
         from django.conf import settings
-        self.assertEqual(getattr(settings, "TALENT_JUDGE_WORKERS", None), 1)
+        self.assertEqual(getattr(settings, "TALENT_JUDGE_WORKERS", None), 4)
 
     def test_khong_co_nguoi_hoi_thi_khong_cache(self):
         from talent.answer import judge_cache

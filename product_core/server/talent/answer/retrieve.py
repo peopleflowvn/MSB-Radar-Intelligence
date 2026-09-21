@@ -36,6 +36,14 @@ log = logging.getLogger(__name__)
 #: bằng LLM. ③ chạy lô song song nên nâng 40→60 gần như không thêm thời gian
 #: tường (chủ dự án 05/09: kho sẽ lớn hơn nhiều, 40 là quá hẹp).
 POOL = max(16, min(200, int(os.getenv("TALENT_DEEP_READ_POOL", "60"))))
+#: Trần số người "khớp đủ điều kiện bắt buộc theo từ khoá" được ĐẢM BẢO đọc dù
+#: pool tính theo `limit` nhỏ hơn. Người thoả TẤT CẢ điều kiện bắt buộc theo
+#: nghĩa đen là "kết quả tìm được" đúng nghĩa; họ không được bị vector đẩy ra
+#: khỏi nhóm đọc sâu. Đo trên production 21/09: `hits` (số nhánh chạm tới) KHÔNG
+#: phân biệt được — 189/200 người có hits>=2 — vì vector luôn trả đủ top-N; chỉ
+#: giao của các nhánh AND theo từng điều kiện mới là tập khớp thật. 32 = đúng 4
+#: lô x 8 hồ sơ, đọc song song đo được 31s (32/32, 0 lô hỏng).
+READ_ALL_MAX = max(8, min(96, int(os.getenv("TALENT_READ_ALL_MAX", "32"))))
 #: Sàn — dưới mức này thì ③ không còn gì để loại, và câu "có ai … không?" cần
 #: một mẫu đủ rộng mới trả lời trung thực được.
 MIN_POOL = 16
@@ -91,6 +99,9 @@ class Candidate:
     score: float = 0.0
     hits: int = 0               # số nhánh/truy vấn chạm tới người này
     passages: list = field(default_factory=list)
+    #: Thoả TẤT CẢ điều kiện bắt buộc theo từ khoá (giao các nhánh AND). Người có
+    #: cờ này luôn được đọc, không bị cắt theo `pool`.
+    exact: bool = False
 
     def evidence_text(self, limit=PASSAGES_PER_PERSON):
         return [p.text for p in self.passages[:limit]]
@@ -266,11 +277,13 @@ def fuse_candidates(ranked_sources, *, pool, pinned_ids=(), per_person=PASSAGES_
                 merged = by_id[candidate.person_id]
                 merged.passages = dedupe_passages(merged.passages + list(candidate.passages))
                 merged.hits += candidate.hits
+                merged.exact = merged.exact or candidate.exact
             else:
                 by_id[candidate.person_id] = Candidate(
                     person_id=candidate.person_id, name=candidate.name,
                     score=candidate.score, hits=candidate.hits,
-                    passages=dedupe_passages(list(candidate.passages)))
+                    passages=dedupe_passages(list(candidate.passages)),
+                    exact=candidate.exact)
             ids.append(candidate.person_id)
         if ids:
             lists.append(list(dict.fromkeys(ids)))
@@ -279,8 +292,16 @@ def fuse_candidates(ranked_sources, *, pool, pinned_ids=(), per_person=PASSAGES_
         return []
     order, _hits = reciprocal_rank_fusion(lists, k=RRF_K, weights=weights)
     pinned = [pid for pid in dict.fromkeys(pinned_ids) if pid in by_id]
-    rest = [pid for pid, _score in order if pid not in set(pinned)]
-    chosen = (pinned + rest)[:max(pool, len(pinned))]
+    pinned_set = set(pinned)
+    # Người khớp đủ điều kiện bắt buộc (theo từ khoá) đứng ngay sau người ghim và
+    # KHÔNG bị cắt bởi `pool` — tối đa `READ_ALL_MAX`. Trước đây họ chỉ là một
+    # trong ~13 danh sách RRF nên bị loãng bởi người vector kéo về cho đủ top-N.
+    exact = [pid for pid, _score in order
+             if by_id[pid].exact and pid not in pinned_set][:READ_ALL_MAX]
+    exact_set = set(exact)
+    rest = [pid for pid, _score in order
+            if pid not in pinned_set and pid not in exact_set]
+    chosen = (pinned + exact + rest)[:max(pool, len(pinned) + len(exact))]
     scores = dict(order)
     out = []
     for person_id in chosen:
@@ -411,14 +432,30 @@ def retrieve(query_plan, *, pool=None, pinned_ids=(), search_queries=None, cv_ch
     # Mandatory conditions get their own AND-preserving lexical branches.
     # They improve recall of exact intersections while the judge remains the
     # final hard-condition verifier.
+    must_lists = []
     if os.getenv("FTS_BOOLEAN_MUST", "1").lower() not in {"0", "false", "off"}:
         for condition in list(getattr(query_plan, "must_have", None) or []):
+            if not str(condition or "").strip():
+                continue
             fts = _fts_person_ids(condition, PER_QUERY, chunks=cv_chunks,
                                   require_all=True)
+            must_lists.append(fts)
             if fts:
                 ranked_lists.append(fts)
 
     order, hits = _rrf(ranked_lists) if ranked_lists else ([], {})
+    # Giao của mọi nhánh AND = người thoả TẤT CẢ điều kiện bắt buộc theo từ khoá.
+    # Một điều kiện không ai thoả (danh sách rỗng) thì giao rỗng — không có "khớp
+    # đủ" nào để đảm bảo, và ③ vẫn phán đoán trên pool xếp hạng như thường.
+    exact_ids = set()
+    if must_lists and all(must_lists):
+        exact_ids = set(must_lists[0]).intersection(*[set(ids) for ids in must_lists[1:]])
+    exact_order = [pid for pid, _score in order if pid in exact_ids][:READ_ALL_MAX]
+    if exact_order:
+        exact_set = set(exact_order)
+        order = ([(pid, score) for pid, score in order if pid in exact_set]
+                 + [(pid, score) for pid, score in order if pid not in exact_set])
+        pool = max(pool, len(exact_order))
     top_ids = [person_id for person_id, _score in order[:pool]]
 
     # Ghim tên riêng / người lượt trước lên ĐẦU, không để top-N cắt mất. ③ vẫn
@@ -475,7 +512,8 @@ def retrieve(query_plan, *, pool=None, pinned_ids=(), search_queries=None, cv_ch
                 continue
         candidates.append(Candidate(
             person_id=person_id, name=names.get(person_id) or f"#{person_id}",
-            score=round(score, 6), hits=hits.get(person_id, 0), passages=passages))
+            score=round(score, 6), hits=hits.get(person_id, 0), passages=passages,
+            exact=person_id in exact_ids))
     return candidates
 
 

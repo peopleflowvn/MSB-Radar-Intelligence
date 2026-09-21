@@ -281,10 +281,12 @@ ASSISTANT_KNOWLEDGE_CONTEXT = env.bool("ASSISTANT_KNOWLEDGE_CONTEXT", default=Tr
 ASSISTANT_TOOLS = env.bool("ASSISTANT_TOOLS", default=False)
 # Per-process Talent worker cap. Timed-out provider calls retain their slot until exit.
 ANSWER_RUNNER_MAX_WORKERS = max(1, env.int("ANSWER_RUNNER_MAX_WORKERS", default=8))
-# GreenNode giới hạn các model qwen theo model. Bắn bốn lô judge cùng lúc tự
-# tạo burst 429 rồi đốt hết deadline vào fallback. Mặc định chạy tuần tự cho
-# đường demo/production nhỏ; chỉ tăng khi đã đo được capacity thật.
-TALENT_JUDGE_WORKERS = max(1, env.int("TALENT_JUDGE_WORKERS", default=1))
+# Số lô judge chạy song song. Từng để 1 vì tưởng song song gây 429 — đo lại trên
+# production 21/09 với GLM thì ngược lại: 1 lô x 8 hồ sơ tuần tự 37,9s; 2 lô song
+# song 16 hồ sơ 30,3s; 4 lô song song 32 hồ sơ 31,2s (32/32, 0 lô hỏng). Chỉ đến 6
+# lô/48 hồ sơ mới chạm hạn mức ~8 lời gọi GLM mỗi phút và mất 1 lô. Nên 4 là mức
+# đã đo được là ổn; muốn cao hơn phải đo lại trước.
+TALENT_JUDGE_WORKERS = max(1, env.int("TALENT_JUDGE_WORKERS", default=4))
 # Trần số vòng gọi tool trong một lượt (chống lặp vô hạn / chi phí).
 ASSISTANT_TOOL_MAX_STEPS = env.int("ASSISTANT_TOOL_MAX_STEPS", default=4)
 # Tool tier 3 (sinh nội dung / tra ngoài: draft_outreach, enrich_company_from_web).

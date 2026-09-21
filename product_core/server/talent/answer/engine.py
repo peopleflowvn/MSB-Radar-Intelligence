@@ -749,6 +749,11 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         stats["deep_read_selection"] = (
             "identified_people" if pinned_only else "top_hybrid_retrieval_from_full_store")
         stats["deep_read_pool_limit"] = retrieve_stage.pool_for(active_plan)
+        # Bao nhiêu người đã đọc thoả TẤT CẢ điều kiện bắt buộc theo từ khoá. Số
+        # này là bằng chứng cho câu "không bỏ sót": người khớp đủ luôn nằm trong
+        # nhóm đọc sâu, không bị vector đẩy ra.
+        stats["exact_matches_read"] = sum(
+            1 for c in candidates if getattr(c, "exact", False))
         stats["deep_read_ranked"] = not pinned_only
         if active_plan.shape == "count":
             stats["criteria_unknown"] = sum(any(c["status"] == "UNKNOWN" for c in j.criteria) for j in judgements)
