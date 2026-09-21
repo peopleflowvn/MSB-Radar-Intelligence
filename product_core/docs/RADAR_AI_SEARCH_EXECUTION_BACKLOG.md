@@ -1777,3 +1777,11 @@ chưa có, nên sửa trực tiếp file này thì bền. Đổi env xong phải
 **Giới hạn còn lại (nói thật khi trình bày):** chỉ đảm bảo đọc hết người khớp *nguyên
 văn AND* tới 32 người; câu hỏi thuần ngữ nghĩa vẫn đọc theo pool xếp hạng. Chế độ đọc
 toàn bộ (P1-11/12) và "đọc thêm" chưa xây.
+
+**Sau khi nạp tiền Gemini (21/09, đã restart hub):** Gemini hết 402 và đọc judge thành
+công 2/4 lượt (2 lượt lỗi do timeout khi ngân sách đã cạn). Đo lại: câu 1 đọc 32 trong
+68 s, câu 2 đọc 32 trong 60 s (cả hai `incomplete=False`); câu 3 vẫn 16/29 người khớp,
+104 s, `incomplete=True`. Nguyên nhân thật của câu 3 là GLM treo ~42 s (timeout) khi 3–4
+lô chạy song song, rồi qwen cùng nhà cũng timeout/429 — không phải do lỗ hổng breaker
+đã nêu ở trên nên **không sửa router thêm**. Việc còn lại nếu cần: đợt đọc lại lô lỗi
+hoặc nới `READ_BUDGET_SECONDS` (80 s → ~100 s, sát trần 150 s nên rủi ro).
