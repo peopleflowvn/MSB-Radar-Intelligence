@@ -1785,3 +1785,13 @@ công 2/4 lượt (2 lượt lỗi do timeout khi ngân sách đã cạn). Đo l
 lô chạy song song, rồi qwen cùng nhà cũng timeout/429 — không phải do lỗ hổng breaker
 đã nêu ở trên nên **không sửa router thêm**. Việc còn lại nếu cần: đợt đọc lại lô lỗi
 hoặc nới `READ_BUDGET_SECONDS` (80 s → ~100 s, sát trần 150 s nên rủi ro).
+
+**Đọc lại lô lỗi + nới ngân sách (21/09, commit `6c0c488`):** `judge()` chạy tối đa 2
+đợt đọc lại (2 luồng) cho hồ sơ của các lô lỗi/bỏ dở khi còn ≥20 s và có hạn chót.
+`READ_BUDGET_SECONDS` 80→130 (RB 90→130), `TURN_BUDGET_SECONDS` 135→195,
+`HARD_DEADLINE` 150→210. Đo prod sau deploy (dù có 10 lượt timeout/429 từ GreenNode):
+câu 1 đọc 32/32 trong 39 s; câu 2 đọc 32 trong 75 s; câu 3 đọc 32 (32 người khớp đủ)
+trong 149 s — cả ba `incomplete=False`. Đánh đổi: câu khó có thể chạy tới ~150 s
+thay vì cắt ở 100 s; trần tuyệt đối 210 s. Lần deploy đầu tự rollback vì `curl` health
+công khai bị ngắt SSL thoáng qua (container đã healthy); chạy lại thì qua.
+
