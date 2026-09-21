@@ -293,13 +293,13 @@ class ResolveTest(TestCase):
         first = resolution.resolve(payload(position="Data Analyst"))
         resolution.resolve(payload(cv_id="2", position="Junior Intern"))
         first.person.refresh_from_db()
-        self.assertEqual(first.person.headline, "Data Analyst")
+        self.assertEqual(first.person.headline, "")
 
     def test_dien_vao_cho_con_trong(self):
         first = resolution.resolve(payload(position="", city=""))
         resolution.resolve(payload(cv_id="2", position="Data Analyst", city="Hà Nội"))
         first.person.refresh_from_db()
-        self.assertEqual(first.person.headline, "Data Analyst")
+        self.assertEqual(first.person.headline, "")
         self.assertEqual(first.person.location, "Hà Nội")
 
 

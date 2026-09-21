@@ -49,6 +49,11 @@ class IndexPersonTest(TestCase):
                          [self.person.pk])
         self.assertTrue(vector_index.stale_chunks())
 
+    def test_application_headline_is_not_indexed_as_current_work(self):
+        self.person.headline = "Finance Analyst - MSB"
+        self.person.save(update_fields=["headline"])
+        self.assertNotIn("Finance Analyst - MSB", vector_index.document_text(self.person))
+
     def test_row_with_current_embedding_leaves_the_queue(self):
         vector_index.index_person(self.person.pk, with_embeddings=False)
         doc = PersonSearchDocument.objects.get(person=self.person)

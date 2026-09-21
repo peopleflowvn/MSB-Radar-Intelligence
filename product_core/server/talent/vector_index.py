@@ -145,18 +145,24 @@ def _chunks(text):
 
 def document_text(person):
     profile = getattr(person, "talent_profile", None)
-    fields = [person.display_name, person.headline, person.location]
+    fields = [person.display_name, person.location]
     if profile:
         fields += [profile.current_title, profile.current_company, profile.location,
                    profile.education, profile.summary, " ".join(profile.skills or []),
                    " ".join(profile.industries or [])]
     # Source payload holds Edge facts absent from CV (applied job/salary/date…).
     for record in person.source_records.all().iterator(chunk_size=100):
-        fields.append(json.dumps(record.payload or {}, ensure_ascii=False, default=str))
+        payload = dict(record.payload or {})
+        # Application titles are useful provenance, but not evidence of the
+        # candidate's current occupation. Keep them out of the general vector.
+        for key in ("position", "applied_position", "job_title"):
+            payload.pop(key, None)
+        fields.append(json.dumps(payload, ensure_ascii=False, default=str))
     try:
         from intel.facts import current_facts
         fields.extend(f"{fact.field}: {fact.canonical_label or fact.raw_value}"
-                      for fact in current_facts(person)[:120])
+                      for fact in current_facts(person)[:120]
+                      if fact.field != "applied_position")
     except Exception:  # intel may not be migrated during bootstrap
         pass
     return "\n".join(str(value) for value in fields if value)[:120_000]

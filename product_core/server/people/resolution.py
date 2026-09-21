@@ -282,10 +282,9 @@ def _refresh_snapshot(person, payload):
         person.primary_phone = pool["primary_phone"][:20]
         fields.append("primary_phone")
 
-    position = str(payload.get("position") or "").strip()
-    if position and not person.headline:
-        person.headline = position[:200]
-        fields.append("headline")
+    # `position` is the vacancy the person applied to, not their current role.
+    # Keep it on SourceRecord/application projections; never present or index it
+    # as a Person headline.
 
     location = str(payload.get("city") or payload.get("address") or "").strip()
     if location and not person.location:

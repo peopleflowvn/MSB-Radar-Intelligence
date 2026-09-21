@@ -483,7 +483,7 @@ def build_projection(person_id: int):
     values["searchable_text"] = "\n".join(str(x) for x in [
         person.display_name, values["title_norm"], values["company_norm"],
         values["location_norm"], values["education_norm"], *values["skills_norm"],
-        *values["industries_norm"], *channels, *positions] if x)
+        *values["industries_norm"], *channels] if x)
     values["fingerprint"] = _hash(values)
     row, _ = SearchProjection.objects.update_or_create(person=person, defaults=values)
     return row

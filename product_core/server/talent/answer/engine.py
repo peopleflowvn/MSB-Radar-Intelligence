@@ -381,7 +381,7 @@ def _attach_profiles(people):
     for person in people:
         row = rows.get(person.get("person_id")) or {}
         person["profile"] = {
-            "title": row.get("talent_profile__current_title") or row.get("headline") or "",
+            "title": row.get("talent_profile__current_title") or "",
             "company": row.get("talent_profile__current_company") or "",
             "location": row.get("talent_profile__location") or row.get("location") or "",
             "years_experience": row.get("talent_profile__years_experience"),
