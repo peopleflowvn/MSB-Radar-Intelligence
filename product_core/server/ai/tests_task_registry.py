@@ -210,3 +210,21 @@ class BenchmarkDefaultsTest(TestCase):
                          ("greennode", "z-ai/glm-5.2-hackathon"))
         self.assertIn(("greennode", "qwen/qwen3.7-plus"),
                       tasks_registry.fallback_models("talent_answer_judge"))
+
+
+class AttemptOrderTest(TestCase):
+    """Model dự phòng cùng nhà cung cấp phải được thử trước nhà cung cấp khác."""
+
+    def test_du_phong_cung_nha_di_truoc_nha_khac(self):
+        from .router import Router
+        r = Router(env={"MSB_AI_GREENNODE_API_KEY": "k", "MSB_AI_GEMINI_API_KEY": "k"})
+        attempts = r._attempts("talent_answer_judge", ["greennode", "gemini"], None)
+        self.assertEqual(attempts[0], ("greennode", None))
+        gemini_at = attempts.index(("gemini", None))
+        self.assertIn(("greennode", "qwen/qwen3.7-plus"), attempts[:gemini_at])
+
+    def test_ghim_model_thi_khong_them_du_phong(self):
+        from .router import Router
+        r = Router(env={"MSB_AI_GREENNODE_API_KEY": "k"})
+        self.assertEqual(r._attempts("talent_answer_judge", ["greennode"], "x"),
+                         [("greennode", None)])

@@ -625,12 +625,18 @@ class Router:
 
         Người gọi ghim model thì KHÔNG tự đổi: chỗ đó là lựa chọn có chủ ý.
         """
-        attempts = [(name, None) for name in order]
         if pinned_model or not task:
-            return attempts
-        for provider_name, model in tasks_registry.fallback_models(task):
-            if provider_name in order:
-                attempts.append((provider_name, model))
+            return [(name, None) for name in order]
+        fallbacks = tasks_registry.fallback_models(task)
+        # Model dự phòng của CÙNG nhà cung cấp đứng ngay sau model chính của nó,
+        # trước khi sang nhà cung cấp khác: model chính hết hạn mức/timeout thì
+        # hạ xuống model kế tiếp cùng chỗ, thay vì đốt ngân sách vào provider
+        # khác (production 21/09: GLM timeout → Gemini 402 → hết giờ trước khi
+        # tới qwen).
+        attempts = []
+        for name in order:
+            attempts.append((name, None))
+            attempts.extend((p, m) for p, m in fallbacks if p == name)
         return attempts
 
     def _complete_once(self, messages, task="", deadline=None, **kwargs):
