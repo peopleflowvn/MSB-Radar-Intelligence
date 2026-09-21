@@ -237,11 +237,18 @@ DEFAULT_ROUTE = {
     "talent_embedding": _EMBED,
     "person_qa": _VIET_NHANH,
 
-    "assistant_conversation": _QWEN,     # hạn mức 600 — model phải tôn trọng
-    #                                      reasoning_effort, nếu không stream đứt
-    #                                      giữa chừng ("Mất kết nối" — ảnh 04/09)
-    "assistant_intent": _QWEN,
-    "assistant_web": _QWEN,              # hạn mức 1200
+    # Production 21/09 (giữa lúc thi): `assistant_intent` + `assistant_web` +
+    # `assistant_conversation` bắn gần như CÙNG LÚC trong một lượt hội thoại
+    # (chat.py::stream_chat gọi intent rồi web rồi hội thoại). Ba lượt qwen3.6-
+    # flash liền nhau chạm hạn mức theo model, Gemini dự phòng thì 402 hết
+    # tiền — kết quả là câu "Tôi chưa tra được câu này" dù câu hỏi hoàn toàn
+    # bình thường ("msb có sản phẩm gì"). Ban tổ chức cũng khuyến nghị rời khỏi
+    # qwen giữa lúc hạ tầng dùng chung bị nhiều đội cùng gọi. GLM chậm hơn
+    # nhưng đã chịu được 4 lời gọi liên tiếp ở phép đo 20/09 — vẫn tôn trọng
+    # `reasoning_effort` như qwen (không bị cắt tham số như deepseek/*).
+    "assistant_conversation": ("greennode", "z-ai/glm-5.2-hackathon"),  # hạn mức 600
+    "assistant_intent": ("greennode", "z-ai/glm-5.2-hackathon"),
+    "assistant_web": ("greennode", "z-ai/glm-5.2-hackathon"),  # hạn mức 1200
     "assistant_agent": _QWEN,
     "assistant_outreach": _QWEN,         # hạn mức 700 — chật nhất trong hệ
     "assistant_estimate_reasoning": _QWEN,  # JSON ngắn, hạn mức 500
@@ -283,6 +290,12 @@ FALLBACK_MODELS = {
     # nó từng viết gợi ý theo giới tính (xem DEFAULT_REASON).
     "talent_answer_compose": (_GLM, _VIET_TOT, _VIET_NHANH),
     "candidate_extraction": (_QWEN, _GLM),
+    # GLM là model chính từ 21/09 (xem DEFAULT_ROUTE); qwen lùi thành dự phòng
+    # thay vì biến mất — `fallback_models()` tự lọc bỏ cặp trùng model chính,
+    # nên không khai ở đây thì GLM lỗi là hết đường, quay lại đúng lỗ hổng vừa sửa.
+    "assistant_conversation": (_QWEN,),
+    "assistant_intent": (_QWEN,),
+    "assistant_web": (_QWEN, _VIET_NHANH),
 }
 #: Chuỗi mặc định theo năng lực, cho tác vụ chưa khai riêng. `EMBEDDING` và
 #: `VISION` cố ý để trống: đổi sang model không có năng lực đó là hỏng lặng.
