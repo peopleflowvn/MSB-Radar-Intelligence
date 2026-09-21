@@ -38,7 +38,8 @@ class RepairApplicationTitleLeakTest(TestCase):
     def test_ai_sees_application_history_with_non_current_role_label(self):
         person = Person.objects.create(display_name="Candidate")
         PersonSearchDocument.objects.create(
-            person=person, fingerprint="profile", content="Current title: Data Analyst")
+            person=person, fingerprint="profile",
+            content="Current title: Data Analyst\n" + ("long profile text " * 100))
         BaseDossier.objects.create(
             person=person, fingerprint="dossier",
             applications=[{"positions": ["Finance Analyst - MSB"]}],

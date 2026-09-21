@@ -363,9 +363,14 @@ def _profile_passages(person_ids):
             positions.extend(application.get("positions") or [])
         positions = list(dict.fromkeys(str(value).strip() for value in positions if value))
         if positions:
-            content += ("\nVỊ TRÍ ĐÃ ỨNG TUYỂN TẠI MSB (chỉ là lịch sử ứng tuyển, "
-                        "KHÔNG phải chức danh/công việc hiện tại): "
-                        + "; ".join(positions))
+            application_context = (
+                "VỊ TRÍ ĐÃ ỨNG TUYỂN TẠI MSB (chỉ là lịch sử ứng tuyển, "
+                "KHÔNG phải chức danh/công việc hiện tại): "
+                + "; ".join(positions)
+            )
+            # Put the bounded, explicitly-labelled application context first;
+            # profile passages are truncated and source payloads can be long.
+            content = application_context + "\nHỒ SƠ HIỆN TẠI:\n" + content
         passages[person_id] = Passage(
             person_id, 0, 0, clean_passage(content), source="profile")
     return passages
