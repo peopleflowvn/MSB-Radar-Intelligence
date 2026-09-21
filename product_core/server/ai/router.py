@@ -470,12 +470,14 @@ class Router:
         """Gọi nhà cung cấp đầu tiên dùng được, chuyển tiếp khi lỗi tạm thời."""
         self.maybe_refresh()
         budget = float(kwargs.pop("budget_seconds", None) or self._budget())
+        min_attempt = float(kwargs.pop("min_attempt_seconds", None) or 0.0)
         deadline = time.monotonic() + budget
 
         for attempt in range(self.RETRY_ROUNDS):
             try:
                 return self._complete_once(messages, task=task,
-                                           deadline=deadline, **kwargs)
+                                           deadline=deadline,
+                                           min_attempt=min_attempt, **kwargs)
             except LLMUnavailable:
                 remaining = deadline - time.monotonic()
                 if attempt == self.RETRY_ROUNDS - 1:
@@ -639,7 +641,7 @@ class Router:
             attempts.extend((p, m) for p, m in fallbacks if p == name)
         return attempts
 
-    def _complete_once(self, messages, task="", deadline=None, **kwargs):
+    def _complete_once(self, messages, task="", deadline=None, min_attempt=0.0, **kwargs):
         full_order = [n for n in self.provider_order(task)
                       if self.get_provider(n) is not None]
         # Bỏ qua provider đang bị ngắt — trừ khi nó là lựa chọn duy nhất.
@@ -657,8 +659,8 @@ class Router:
                          pinned_model, ", ".join(servable), ", ".join(skipped))
                 order = servable
 
-        for position, (name, forced_model) in enumerate(
-                self._attempts(task, order, pinned_model)):
+        all_attempts = self._attempts(task, order, pinned_model)
+        for position, (name, forced_model) in enumerate(all_attempts):
             provider = self.get_provider(name)
             if provider is None:
                 continue                      # chưa có khoá; im lặng bỏ qua
@@ -667,6 +669,18 @@ class Router:
             if remaining is not None and remaining <= 1.0:
                 log.warning("Hết thời gian chờ trước khi thử %s", name)
                 break
+            # Lời gọi nặng (đọc cả lô hồ sơ) cần tối thiểu ngần này giây mới có
+            # cơ hội xong. Phần ngân sách chia cho một dự phòng giữa chuỗi mà
+            # thấp hơn thế là chắc chắn timeout — bỏ qua để nhường thời gian
+            # cho lựa chọn kế tiếp (production 21/09: deepseek chỉ được 9 s,
+            # qwen flash 3 s, rồi Gemini mới chạy xong trong 4 s).
+            if (min_attempt and remaining is not None
+                    and len(all_attempts) - position > 1
+                    and remaining * 0.6 < min_attempt):
+                skipped.append(f"{name}:{forced_model or ''}(too_little_time)")
+                log.info("Bỏ qua %s/%s: chỉ còn %.0fs cho lượt này, cần ≥ %.0fs",
+                         name, forced_model or "primary", remaining * 0.6, min_attempt)
+                continue
             attempted.append(name)
             call_kwargs = dict(kwargs)
             # Model theo tác vụ (nếu người gọi chưa chỉ định rõ).

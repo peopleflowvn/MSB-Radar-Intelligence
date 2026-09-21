@@ -527,7 +527,7 @@ def _read_batch(query_plan, batch, caller):
             [{"role": "system", "content": COUNT_SYSTEM if query_plan.shape == "count" else SYSTEM},
              {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
             task=TASK, temperature=0.1, max_tokens=MAX_TOKENS,
-            reasoning_effort="none", budget_seconds=100,
+            reasoning_effort="none", budget_seconds=100, min_attempt_seconds=30,
             response_format={"type": "json_object"})
     except Exception as exc:                        # noqa: BLE001
         log.warning("answer.judge: lô %s hồ sơ lỗi: %s", len(batch), exc)

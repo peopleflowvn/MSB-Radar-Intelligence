@@ -344,6 +344,27 @@ class RouterTest(TestCase):
                          ["maas-llm-aiplatform-hcm.api.vngcloud.vn"])
         self.assertIn("gemini:deepseek/deepseek-v4-pro", str(ctx.exception))
 
+    def test_du_phong_giua_chuoi_khong_du_thoi_gian_thi_nhuong_cho_lua_chon_sau(self):
+        """21/09: deepseek chỉ được 9 s, qwen flash 3 s cho lô cần ~40 s — chắc chắn
+        timeout. Với `min_attempt_seconds` các lượt đó bị bỏ, lựa chọn cuối chạy."""
+        self._khong_route_db("talent_answer_judge")
+        ProviderConfig.objects.all().delete()
+        env = {"MSB_AI_GREENNODE_API_KEY": "k", "MSB_AI_GEMINI_API_KEY": "k",
+               "MSB_AI_GREENNODE_MODEL": "qwen/qwen3.6-flash",
+               "MSB_AI_PROVIDER_DEFAULT": "greennode", "MSB_AI_PROVIDER_FALLBACK": "gemini"}
+
+        def hosts(**extra):
+            calls = []
+            r = Router(env=dict(env), transport=fake_transport(
+                status=LLMUnavailable("bận"), record=calls))
+            with self.assertRaises(LLMUnavailable):
+                r.complete(MESSAGES, task="talent_answer_judge", budget_seconds=10, **extra)
+            return [c["url"].split("//")[1].split("/")[0] for c in calls]
+
+        self.assertTrue(any("vngcloud" in h for h in hosts()))
+        only_last = hosts(min_attempt_seconds=30)
+        self.assertTrue(only_last and all("googleapis" in h for h in only_last), only_last)
+
     def test_model_gemini_khong_bi_gui_sang_hub_khac(self):
         self._khong_route_db("talent_answer_judge")
         ProviderConfig.objects.all().delete()
