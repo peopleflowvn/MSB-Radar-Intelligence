@@ -56,7 +56,8 @@ def _persist(user, conversation_id, client_turn_id, parent_turn_id, question,
         return
     duration_ms = max(0, int((result.trace or {}).get("ms_total") or 0))
     metadata = {"answer_engine": True, "trace": result.trace,
-                "duration_ms": duration_ms}
+                "duration_ms": duration_ms,
+                "steps": (result.trace or {}).get("steps") or []}
     if result.reasoning:
         metadata["reasoning_trace"] = result.reasoning[:6000]
     if result.sources:
@@ -109,6 +110,7 @@ def _payload(result, conversation_id, client_turn_id):
         "provider": result.provider,
         "model": result.model,
         "trace": result.trace,
+        "steps": (result.trace or {}).get("steps") or [],
         "duration_ms": max(0, int((result.trace or {}).get("ms_total") or 0)),
         "grounded": bool(result.sources),
     }

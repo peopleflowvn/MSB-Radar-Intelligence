@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AnswerStep } from "./AnswerView";
+import type { AnswerStep, AnswerTurn } from "./AnswerView";
 
 interface Props {
   steps?: AnswerStep[];
@@ -9,6 +9,64 @@ interface Props {
   isPending?: boolean;
   compact?: boolean;
   durationMs?: number;
+  turn?: AnswerTurn<any>;
+}
+
+/**
+ * Khôi phục danh sách các bước thực hiện một cách đầy đủ và logic:
+ * - Nếu đã có danh sách steps (>1 bước) từ luồng stream hoặc DB: giữ nguyên.
+ * - Nếu tin nhắn cũ trong DB chưa lưu steps hoặc chỉ có 1 bước: tự động tái tạo
+ *   chuỗi các bước thực tế (Hiểu yêu cầu -> Quét kho theo tiêu chí -> Chọn lọc hồ sơ -> Viết câu trả lời)
+ *   dựa trên trace và plan của lượt hỏi, không bao giờ để hiển thị cụt 1/1 bước.
+ */
+function resolveDisplaySteps(
+  rawSteps: AnswerStep[] | undefined,
+  turn: AnswerTurn<any> | undefined,
+  isPending: boolean,
+  durationMs: number
+): AnswerStep[] {
+  if (rawSteps && rawSteps.length > 1) {
+    return rawSteps;
+  }
+  if (rawSteps && rawSteps.length === 1 && isPending) {
+    return rawSteps;
+  }
+  if (!isPending && (durationMs > 0 || turn?.text || turn?.trace)) {
+    const trace = (turn?.trace as Record<string, any>) || {};
+    const plan = (trace.plan as Record<string, any>) || {};
+    const coverage = (trace.answer_coverage as Record<string, any>) || {};
+    const generated: AnswerStep[] = [
+      { label: "Hiểu yêu cầu", state: "done" },
+    ];
+
+    const mustHave = Array.isArray(plan.must_have) ? plan.must_have.filter(Boolean) : [];
+    const queries = Array.isArray(plan.search_queries) ? plan.search_queries.filter(Boolean) : [];
+    const criteria = mustHave.slice(0, 3).join(", ") || queries.slice(0, 2).join(", ");
+    generated.push({
+      label: criteria ? `Tìm trong kho (tiêu chí: ${criteria})` : "Tìm trong kho",
+      state: "done",
+    });
+
+    const judged = Number(coverage.judged || (turn?.people?.length ?? 0) || 0);
+    const candidateTotal = Number(coverage.candidate_total || 0);
+    if (judged > 0 && candidateTotal > judged) {
+      generated.push({
+        label: `Đã chọn lọc ${judged} hồ sơ tối ưu từ ${candidateTotal} hồ sơ đã quét để đọc sâu`,
+        state: "done",
+      });
+      generated.push({ label: "Đọc hồ sơ", state: "done" });
+    } else if (judged > 0) {
+      generated.push({
+        label: `Đã chọn lọc ${judged} hồ sơ phù hợp nhất để đọc sâu`,
+        state: "done",
+      });
+      generated.push({ label: "Đọc hồ sơ", state: "done" });
+    }
+
+    generated.push({ label: "Viết câu trả lời", state: "done" });
+    return generated;
+  }
+  return rawSteps || [];
 }
 
 /**
@@ -34,13 +92,14 @@ function formatStepLabel(label: string, isDone: boolean): string {
 }
 
 export default function StepTimeline({
-  steps = [],
+  steps: rawSteps = [],
   stage,
   elapsedSeconds = 0,
   hint,
   isPending = false,
   compact: _compact = false,
   durationMs = 0,
+  turn,
 }: Props) {
   // Người dùng có thể chủ động bấm "Chi tiết ▾" hoặc "Thu gọn ▲"
   // Mặc định: khi đang xử lý (isPending) -> mở rộng; sau khi có câu trả lời (!isPending) -> tự động thu gọn
@@ -48,8 +107,8 @@ export default function StepTimeline({
 
   const isExpanded = userExpanded !== null ? userExpanded : isPending;
 
+  const steps = resolveDisplaySteps(rawSteps, turn, isPending, durationMs);
   const totalCount = steps.length;
-  // Khi không có steps mảng nhưng đã hoàn tất có durationMs -> tính là 1 bước tổng hợp hoàn tất
   const effectiveTotal = totalCount || (!isPending && durationMs > 0 ? 1 : 0);
   const doneCount = isPending
     ? steps.filter((s) => s.state === "done").length

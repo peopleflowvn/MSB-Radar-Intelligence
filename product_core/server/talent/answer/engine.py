@@ -389,7 +389,19 @@ def _attach_profiles(people):
 
 
 #: Sự kiện BƯỚC — hợp đồng với giao diện nằm ở `core/answer/steps.py`.
-_step = step
+def _step(label, state="active", trace=None):
+    res = step(label, state)
+    if isinstance(trace, dict):
+        steps = trace.setdefault("steps", [])
+        at = next((i for i, item in enumerate(steps) if item["label"] == label), -1)
+        if at >= 0:
+            steps[at] = {"label": label, "state": state}
+        else:
+            for item in steps:
+                if item["state"] == "active":
+                    item["state"] = "done"
+            steps.append({"label": label, "state": state})
+    return res
 
 
 def _preamble(query_plan, question):
@@ -474,13 +486,17 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
     đi đường này không (xem `ai/stream_views.py`), lập lại là trả tiền hai lần.
     """
     started = time.monotonic()
-    trace = {"question": question}
+    trace = {"question": question, "steps": []}
+    def _pstep(lbl, st="active"):
+        return _step(lbl, st, trace=trace)
 
     if query_plan is None:
-        yield _step("Hiểu yêu cầu")
+        yield _pstep("Hiểu yêu cầu")
         query_plan = plan_stage.plan(question, envelope=envelope,
                                      complete_fn=complete_fn)
-        yield _step("Hiểu yêu cầu", "done")
+        yield _pstep("Hiểu yêu cầu", "done")
+    else:
+        _pstep("Hiểu yêu cầu", "done")
     trace["plan"] = query_plan.as_dict()
     trace["ms_plan"] = int((time.monotonic() - started) * 1000)
 
@@ -581,7 +597,7 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
     except Exception:                             # noqa: BLE001 - phụ, không hỏng lượt
         _sup_attr = None
     if _sup_attr and referenced_ids is None and query_plan.shape != "count":
-        yield _step("Quét toàn kho theo tiêu chí sắp xếp")
+        yield _pstep("Quét toàn kho theo tiêu chí sắp xếp")
         chosen, stats = superlative_stage.run(query_plan, user=user, attr=_sup_attr)
         trace["fast_path"] = f"cực trị toàn kho theo '{_sup_attr}'"
         trace["superlative"] = {"attr": _sup_attr, **{k: stats.get(k) for k in
@@ -591,7 +607,7 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
                              method="deterministic_scan",
                              complete=(stats.get("coverage_have", 0)
                                        == stats.get("coverage_total", 0)))
-        yield _step(f"Đã xét {stats.get('coverage_have', 0)}/"
+        yield _pstep(f"Đã xét {stats.get('coverage_have', 0)}/"
                     f"{stats.get('coverage_total', 0)} hồ sơ có dữ liệu", "done")
         return query_plan, chosen, [], stats, trace
 
@@ -687,7 +703,15 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
     reusable_judgements = {}  # request only; widened queries may find new passages
     def _pass(active_plan, label):
         mark = time.monotonic()
-        yield _step("Tìm trong kho")
+        criteria_parts = []
+        if getattr(active_plan, "must_have", None):
+            criteria_parts.extend(str(c).strip() for c in active_plan.must_have if str(c).strip())
+        elif getattr(active_plan, "search_queries", None):
+            criteria_parts.extend(str(q).strip() for q in active_plan.search_queries if str(q).strip())
+
+        criteria_str = ", ".join(criteria_parts[:3])
+        search_label = f"Tìm trong kho (tiêu chí: {criteria_str})" if criteria_str else "Tìm trong kho"
+        yield _pstep(search_label)
         queries = [] if pinned_only else None
         pool = retrieve_stage.pool_for(active_plan)
         candidates, retrieval_engine = _retrieve_all(
@@ -706,13 +730,19 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         # dù không hồ sơ nào thật sự khớp.
         exact_n = sum(1 for c in candidates if getattr(c, "exact", False))
         ranked_n = int((trace.get("search_v2") or {}).get("candidate_total") or 0)
-        found_label = f"Chọn {len(candidates)} hồ sơ để đọc sâu"
-        if exact_n:
-            found_label += f" ({exact_n} khớp đủ điều kiện bắt buộc)"
-        if ranked_n > len(candidates):
-            found_label += f", từ {ranked_n} hồ sơ đã xếp hạng"
-        yield _step(found_label, "done")
-        yield _step("Đọc hồ sơ")
+        if exact_n and ranked_n > len(candidates):
+            found_label = (f"Đã chọn lọc {len(candidates)} hồ sơ tối ưu "
+                           f"({exact_n} khớp chính xác điều kiện bắt buộc) từ {ranked_n} hồ sơ đã quét để đọc sâu")
+        elif exact_n:
+            found_label = (f"Đã chọn lọc {len(candidates)} hồ sơ tối ưu "
+                           f"({exact_n} khớp chính xác điều kiện bắt buộc) để đọc sâu")
+        elif ranked_n > len(candidates):
+            found_label = (f"Đã chọn lọc {len(candidates)} hồ sơ tiềm năng nhất "
+                           f"từ {ranked_n} hồ sơ đã quét để đọc sâu")
+        else:
+            found_label = f"Đã chọn lọc {len(candidates)} hồ sơ phù hợp nhất để đọc sâu"
+        yield _pstep(found_label, "done")
+        yield _pstep("Đọc hồ sơ")
         keys = {c.person_id: judge_stage.dossier_key(active_plan, c) for c in candidates}
         # Kết luận đã đọc ở LƯỢT TRƯỚC cũng dùng lại được: khoá đã gói câu hỏi,
         # người, nội dung dossier và nguồn, nên dùng lại không thể lệch dữ liệu.
@@ -786,7 +816,7 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
         else:
             read_label = (f"Đã đọc sâu {stats.get('judged', 0)} hồ sơ tiềm năng nhất "
                           "sau khi xếp hạng toàn kho")
-        yield _step(f"{read_label}, {stats.get('relevant', 0)} phù hợp", "done")
+        yield _pstep(f"{read_label}, {stats.get('relevant', 0)} phù hợp", "done")
         return candidates, judgements, chosen, near, stats
 
     # Câu hỏi đã gặp (và kho chưa đổi) thì bỏ qua ②③④ — chúng chiếm gần trọn chi
@@ -827,7 +857,7 @@ def _pipeline(question, *, envelope=None, user=None, history=None,
             and not aggregate_stage.enough(chosen, stats, query_plan)):
         widened = plan_stage.widen(query_plan)
         trace["widened"] = widened.as_dict()
-        yield _step("Nới điều kiện, tìm lại")
+        yield _pstep("Nới điều kiện, tìm lại")
         _c2, judged2, chosen2, near2, stats2 = yield from _pass(widened, "pass2")
         if chosen2 or stats2.get("judged", 0) > stats.get("judged", 0):
             query_plan, chosen, near, stats = widened, chosen2, near2, stats2
@@ -1359,7 +1389,7 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
                                             history=history, user=user,
                                             memories=_memories(envelope),
                                             corpus_facts=_corpus_facts(query_plan, stats))
-    yield _step("Viết câu trả lời")
+    yield _step("Viết câu trả lời", trace=trace)
 
     buffer, reasoning, provider, model = [], [], "", ""
     truncated = False
@@ -1440,7 +1470,7 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
             break
         attempts += 1
         trace["verify"] = problems
-        yield _step("Kiểm lại câu trả lời")
+        yield _step("Kiểm lại câu trả lời", trace=trace)
         revised = _repair(messages, problems, text, streamer,
                           budget_seconds=max(10.0, repair_left - 5.0))
         if not revised:
@@ -1491,6 +1521,10 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
     trace["citation_audit"] = verify_stage.citation_audit(verified_rows, text, sources)
     if query_plan.next_steps:
         trace["next_steps"] = query_plan.next_steps
+
+    if isinstance(trace.get("steps"), list):
+        for s in trace["steps"]:
+            s["state"] = "done"
 
     yield {"type": "done", "result": AnswerResult(
         text=text, sources=used, all_sources=sources,

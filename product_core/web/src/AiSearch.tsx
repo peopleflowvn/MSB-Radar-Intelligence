@@ -70,6 +70,7 @@ export default function AiSearch() {
               isPending={msg.isPending}
               compact={!!msg.text}
               durationMs={msg.answer?.durationMs ?? Number(msg.answer?.trace?.ms_total ?? 0)}
+              turn={msg.answer}
             />
           ) : null}
 

@@ -1322,7 +1322,7 @@ export default function Person360() {
   const shouldMask = maskSensitiveData || !isUnlocked
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
       try {
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
       } catch {
@@ -1388,136 +1388,83 @@ export default function Person360() {
 
   return (
     <div className="person-360-container">
-      {/* Header Actions & Breadcrumb Bar */}
-      <div className="person-header-actions">
-        <div className="person-header-left">
-          <Link to={returnPath} className="person-back-link">
-            ← Quay lại {returnLabel}
-          </Link>
-        </div>
-
-        <div className="person-header-right">
-          {canManageTalent && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => rederive.mutate()}
-              disabled={rederive.isPending}
-              title="Tự động hợp nhất lại dữ liệu từ tất cả các nguồn và phiên bản CV"
-            >
-              {rederive.isPending ? 'Đang suy lại…' : '🔄 Suy lại hồ sơ'}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Executive Hero Card */}
+      {/* Executive Hero Card tích hợp Utility Bar */}
       <div className="person-hero-card">
-        <div className="person-hero-left">
-          <div className="person-avatar-large">
-            {!avatarError ? (
-              <img
-                src={api.personAvatarUrl(data.id)}
-                alt={data.display_name || 'Avatar'}
-                className="person-avatar-img"
-                onError={() => setAvatarError(true)}
-              />
-            ) : (
-              <span>{(data.display_name || 'U').charAt(0).toUpperCase()}</span>
+        {/* Top Utility Bar: Nút quay lại & Suy lại hồ sơ siêu gọn */}
+        <div className="person-top-utility">
+          <div className="person-utility-left">
+            <Link to={returnPath} className="person-back-compact" title={`Quay lại ${returnLabel}`}>
+              ← Quay lại {returnLabel}
+            </Link>
+          </div>
+
+          <div className="person-utility-right">
+            {canManageTalent && (
+              <button
+                type="button"
+                className="person-rederive-compact"
+                onClick={() => rederive.mutate()}
+                disabled={rederive.isPending}
+                title="Tự động hợp nhất lại dữ liệu từ tất cả các nguồn và phiên bản CV"
+              >
+                <span className={`rederive-icon ${rederive.isPending ? 'spin' : ''}`}>🔄</span>
+                <span>{rederive.isPending ? 'Đang suy lại…' : 'Suy lại hồ sơ'}</span>
+              </button>
             )}
           </div>
-          <div>
-            <div className="person-name-row">
-              <h1 className="person-fullname">{data.display_name || '(Chưa rõ tên)'}</h1>
-              {data.needs_review && (
-                <span className="badge err">⚠️ Cần xem lại định danh</span>
-              )}
-              {isAdmin && data.index_health && <IndexHealthBadge health={data.index_health} />}
-              {t?.seniority && (
-                <span className="badge" style={{ background: 'var(--accent-soft, rgba(99,102,241,0.12))', color: 'var(--accent, #6366f1)', fontWeight: 700 }}>
-                  {t.seniority}
-                </span>
-              )}
-            </div>
-            <p className="person-headline-text">
-              {t?.current_title || data.headline || 'Chưa cập nhật chức danh'}
-              {t?.current_company && <span className="company-text"> @ {t.current_company}</span>}
-              {t?.location && <span> · 📍 {t.location}</span>}
-              {t?.years_experience != null && <span> · ⏳ {t.years_experience} năm KN</span>}
-            </p>
-          </div>
         </div>
 
-        <div className="person-hero-right">
-          {/* Mở khoá thông tin liên hệ bảo mật */}
-          <ContactUnlock
-            personId={data.id}
-            maskedEmail={data.primary_email}
-            maskedPhone={data.primary_phone}
-            onUnlocked={(res) => setUnlockedContacts(res)}
-          />
-        </div>
-      </div>
-
-      {/* Dossier Quick Stats Strip (Tinh gọn & Hiện đại) */}
-      <div className="person-quick-stats">
-        <div className="stat-pill" onClick={() => scrollToAnchor('sec-history', 'lich-su')} style={{ cursor: 'pointer' }} title="Xem nguồn hồ sơ & lượt nộp">
-          <span className="s-icon">📦</span>
-          <div className="s-body">
-            <span className="s-val">{data.sources.length}</span>
-            <span className="s-lbl">Nguồn hồ sơ &amp; Nộp</span>
-          </div>
-        </div>
-        <div className="stat-pill" onClick={() => scrollToAnchor('sec-history', 'lich-su')} style={{ cursor: 'pointer' }} title="Xem các kênh định danh (Email, SĐT...)">
-          <span className="s-icon">🔑</span>
-          <div className="s-body">
-            <span className="s-val">{data.identities.length}</span>
-            <span className="s-lbl">Kênh định danh</span>
-          </div>
-        </div>
-        <div className="stat-pill" onClick={() => scrollToAnchor('sec-history', 'lich-su')} style={{ cursor: 'pointer' }} title="Xem lịch sử tương tác">
-          <span className="s-icon">⏳</span>
-          <div className="s-body">
-            <span className="s-val">{data.timeline.length}</span>
-            <span className="s-lbl">Sự kiện tương tác</span>
-          </div>
-        </div>
-        {canViewCV && (
-          <div className="stat-pill" onClick={() => scrollToAnchor('sec-cv', 'cv')} style={{ cursor: 'pointer' }} title="Xem kho CV & văn bản trích xuất">
-            <span className="s-icon">📄</span>
-            <div className="s-body">
-              <span className="s-val">{data.document_stats.submission_count}</span>
-              <span className="s-lbl">Lượt nộp CV ({data.documents.length} file)</span>
-            </div>
-          </div>
-        )}
-        <div className="stat-pill" onClick={() => scrollToAnchor('sec-opportunities', 'dot-tuyen')} style={{ cursor: 'pointer' }} title="Xem tín hiệu AI">
-          <span className="s-icon">⚡</span>
-          <div className="s-body">
-            <span className="s-val">{data.signals.length}</span>
-            <span className="s-lbl">Tín hiệu AI</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Sticky Quick-Nav Dock (Ghim nút quay lại + Mini Profile + Nút chuyển tab) */}
-      <div className="person-sticky-nav">
-        <div className="sticky-nav-left">
-          <Link to={returnPath} className="sticky-mini-back" aria-label="Về trang trước" title={`Quay lại ${returnLabel}`}>
-            ← Trở về
-          </Link>
-          <div className="sticky-mini-person" onClick={() => scrollToAnchor('sec-overview', 'tong-quan')} title={data.display_name || 'Hồ sơ'}>
-            <div className="sticky-mini-avatar">
+        {/* Thông tin Ứng viên & Thẻ liên hệ */}
+        <div className="person-hero-main-row">
+          <div className="person-hero-left">
+            <div className="person-avatar-large">
               {!avatarError ? (
-                <img src={api.personAvatarUrl(data.id)} alt={data.display_name} onError={() => setAvatarError(true)} />
+                <img
+                  src={api.personAvatarUrl(data.id)}
+                  alt={data.display_name || 'Avatar'}
+                  className="person-avatar-img"
+                  onError={() => setAvatarError(true)}
+                />
               ) : (
-                (data.display_name || 'U').charAt(0).toUpperCase()
+                <span>{(data.display_name || 'U').charAt(0).toUpperCase()}</span>
               )}
             </div>
-            <span className="sticky-mini-name">Hồ sơ #{data.id}</span>
+            <div className="person-identity-info">
+              <div className="person-name-row">
+                <h1 className="person-fullname">{data.display_name || '(Chưa rõ tên)'}</h1>
+                {data.needs_review && (
+                  <span className="badge err">⚠️ Cần xem lại định danh</span>
+                )}
+                {isAdmin && data.index_health && <IndexHealthBadge health={data.index_health} />}
+                {t?.seniority && (
+                  <span className="badge seniority-badge">
+                    {t.seniority}
+                  </span>
+                )}
+              </div>
+              <p className="person-headline-text">
+                <span className="headline-title">{t?.current_title || data.headline || 'Chưa cập nhật chức danh'}</span>
+                {t?.current_company && <span className="company-text"> @ {t.current_company}</span>}
+                {t?.location && <span className="meta-dot"> · 📍 {t.location}</span>}
+                {t?.years_experience != null && <span className="meta-dot"> · ⏳ {t.years_experience} năm KN</span>}
+              </p>
+            </div>
+          </div>
+
+          <div className="person-hero-right">
+            {/* Mở khoá thông tin liên hệ bảo mật */}
+            <ContactUnlock
+              personId={data.id}
+              maskedEmail={data.primary_email}
+              maskedPhone={data.primary_phone}
+              onUnlocked={(res) => setUnlockedContacts(res)}
+            />
           </div>
         </div>
+      </div>
 
+      {/* Sticky Quick-Nav Dock (Ghim ngay sát dưới Hero Card khi cuộn xuống) */}
+      <nav className="person-sticky-nav" aria-label="Thanh điều hướng hồ sơ">
         <div className="person-nav-pills">
           <button
             type="button"
@@ -1566,6 +1513,62 @@ export default function Person360() {
             <span>💬 Hỏi &amp; đáp AI</span>
           </button>
         </div>
+      </nav>
+
+      {/* Micro Metric Chips Strip (Thu gọn & Đặt ngay dưới các Tabs) */}
+      <div className="person-micro-stats" aria-label="Chỉ số tổng hợp">
+        <button
+          type="button"
+          className="micro-stat-chip"
+          onClick={() => scrollToAnchor('sec-history', 'lich-su')}
+          title="Xem chi tiết nguồn hồ sơ & lượt nộp"
+        >
+          <span className="m-icon">📦</span>
+          <span className="m-val">{data.sources.length}</span>
+          <span className="m-lbl">Nguồn nộp</span>
+        </button>
+        <button
+          type="button"
+          className="micro-stat-chip"
+          onClick={() => scrollToAnchor('sec-history', 'lich-su')}
+          title="Xem chi tiết các kênh định danh (Email, SĐT...)"
+        >
+          <span className="m-icon">🔑</span>
+          <span className="m-val">{data.identities.length}</span>
+          <span className="m-lbl">Kênh định danh</span>
+        </button>
+        <button
+          type="button"
+          className="micro-stat-chip"
+          onClick={() => scrollToAnchor('sec-history', 'lich-su')}
+          title="Xem lịch sử sự kiện tương tác"
+        >
+          <span className="m-icon">⏳</span>
+          <span className="m-val">{data.timeline.length}</span>
+          <span className="m-lbl">Tương tác</span>
+        </button>
+        {canViewCV && (
+          <button
+            type="button"
+            className="micro-stat-chip"
+            onClick={() => scrollToAnchor('sec-cv', 'cv')}
+            title="Xem kho CV & văn bản trích xuất"
+          >
+            <span className="m-icon">📄</span>
+            <span className="m-val">{data.document_stats.submission_count} lượt</span>
+            <span className="m-lbl">({data.documents.length} CV)</span>
+          </button>
+        )}
+        <button
+          type="button"
+          className="micro-stat-chip"
+          onClick={() => scrollToAnchor('sec-opportunities', 'dot-tuyen')}
+          title="Xem tín hiệu AI"
+        >
+          <span className="m-icon">⚡</span>
+          <span className="m-val">{data.signals.length}</span>
+          <span className="m-lbl">Tín hiệu AI</span>
+        </button>
       </div>
 
       {/* 2-Column One-Page Cockpit Grid */}

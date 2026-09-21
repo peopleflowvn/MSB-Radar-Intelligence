@@ -570,19 +570,58 @@ function CoverageSummary<TPerson>({ turn }: { turn: AnswerTurn<TPerson> }) {
   const coverage = extractAnswerCoverage(turn);
   if (!coverage) return null;
   const partial = !coverage.complete || coverage.unknown > 0 || coverage.notRead > 0;
-  const evaluationLabel = coverage.method === "sql_aggregate"
-    ? `Đã tính bằng SQL ${coverage.evaluated}/${coverage.candidateTotal} hồ sơ`
-    : coverage.method === "deterministic_scan"
-    ? `Đã kiểm tra bằng code ${coverage.evaluated}/${coverage.candidateTotal} hồ sơ`
-    : `Đọc sâu ${coverage.judged}/${coverage.candidateTotal} hồ sơ`;
+
+  if (coverage.method === "sql_aggregate") {
+    return (
+      <div className="answer-coverage-card is-complete" role="status" aria-label="Phạm vi rà soát hồ sơ">
+        <div className="answer-coverage-header">
+          <span className="coverage-icon">📊</span>
+          <span className="coverage-title">Đã đối soát toàn kho bằng SQL ({coverage.evaluated}/{coverage.candidateTotal} hồ sơ)</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`answer-coverage ${partial ? "is-partial" : "is-complete"}`}
+    <div className={`answer-coverage-card ${partial ? "is-optimized" : "is-complete"}`}
          role="status" aria-label="Phạm vi rà soát hồ sơ">
-      <strong>{partial ? "Kết quả theo phạm vi đã đọc" : "Đã hoàn tất phạm vi tìm kiếm"}</strong>
-      <span>{evaluationLabel}</span>
-      {coverage.unknown > 0 && <span>{coverage.unknown} chưa đủ bằng chứng</span>}
-      {coverage.notRead > 0 && <span>{coverage.notRead} chưa đọc sâu</span>}
-      {coverage.degraded && <span>một nhánh tìm kiếm đang suy giảm</span>}
+      <div className="answer-coverage-header">
+        <div className="answer-coverage-title-row">
+          <span className="coverage-icon">🎯</span>
+          <strong className="coverage-title">
+            {partial
+              ? "Sàng lọc từ kho & Đọc sâu các hồ sơ phù hợp nhất"
+              : "Đã hoàn tất rà soát toàn bộ hồ sơ"}
+          </strong>
+        </div>
+        <div className="answer-coverage-badges">
+          <span className="coverage-badge highlight" title="Số hồ sơ tiềm năng nhất được AI đọc kỹ chi tiết từng phần bằng chứng CV">
+            📖 Đọc sâu {coverage.judged}/{coverage.candidateTotal} hồ sơ
+          </span>
+          {coverage.notRead > 0 && (
+            <span className="coverage-badge muted" title="Các hồ sơ xếp hạng thấp hơn ở vòng lọc sơ bộ, được bỏ qua đọc sâu để tối ưu thời gian phản hồi">
+              ⚡ {coverage.notRead} hồ sơ xếp hạng thấp hơn (bỏ qua đọc sâu để tối ưu tốc độ)
+            </span>
+          )}
+          {coverage.unknown > 0 && (
+            <span className="coverage-badge warning">
+              ⚠️ {coverage.unknown} chưa đủ bằng chứng
+            </span>
+          )}
+          {coverage.degraded && (
+            <span className="coverage-badge warning">
+              ⚠️ Một nhánh tìm kiếm đang suy giảm
+            </span>
+          )}
+        </div>
+      </div>
+      {partial && coverage.notRead > 0 && (
+        <div className="answer-coverage-explainer">
+          <span>
+            💡 Hệ thống đã sàng lọc toàn bộ <strong>{coverage.candidateTotal} hồ sơ</strong> trong kho theo tiêu chí tìm kiếm và chọn lọc <strong>{coverage.judged} hồ sơ tối ưu nhất</strong> để đọc sâu chi tiết. <strong>{coverage.notRead} hồ sơ còn lại</strong> có độ tương thích thấp hơn ở vòng lọc sơ bộ nên được bỏ qua nhằm tối ưu thời gian phản hồi mà vẫn đảm bảo độ chuẩn xác cao.
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -766,12 +805,12 @@ export default function AnswerView<TPerson = AnswerPerson>({
         </div>
       )}
 
+      <CoverageSummary turn={turn} />
+
       {turn.text && (
         <FormattedMarkdown content={turn.text} onCitation={openCitation}
                            people={linkablePeople} peopleLinkFrom={personLinkFrom} />
       )}
-
-      <CoverageSummary turn={turn} />
 
       {extraBeforePeople}
 

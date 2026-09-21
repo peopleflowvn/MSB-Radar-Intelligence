@@ -1,7 +1,7 @@
 import { createContext, Dispatch, ReactNode, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AnswerPerson, api, AssistantConversation, ProspectAnswerPerson, SearchFilters } from "./api";
-import { AnswerTurn } from "./AnswerView";
+import { AnswerStep, AnswerTurn } from "./AnswerView";
 
 // SearchStateProvider được mount NGOÀI <App/> (xem main.tsx) nên không bị
 // unmount khi App chuyển qua lại giữa màn hình Login và giao diện chính —
@@ -228,6 +228,20 @@ export function extractAnswerPeople(metadata: Record<string, unknown> | undefine
   }));
 }
 
+export function extractAnswerSteps(metadata: Record<string, unknown> | undefined): AnswerStep[] {
+  if (!metadata) return [];
+  const rawSteps = (Array.isArray(metadata.steps) ? metadata.steps : null)
+    || (Array.isArray((metadata.trace as any)?.steps) ? (metadata.trace as any).steps : null)
+    || [];
+  if (rawSteps.length > 0) {
+    return rawSteps.map((s: any): AnswerStep => ({
+      label: String(s.label || s.text || ""),
+      state: "done" as const,
+    })).filter((s: AnswerStep) => Boolean(s.label));
+  }
+  return [];
+}
+
 export function extractProspectAnswerPeople(metadata: Record<string, unknown> | undefined): ProspectAnswerPerson[] {
   if (!metadata) return [];
   if (Array.isArray(metadata.people) && metadata.people.length > 0) {
@@ -326,6 +340,7 @@ function AiChatProvider({ children }: { children: ReactNode }) {
           text: m.content,
           sources: (m.metadata?.cv_citations as AnswerTurn["sources"]) ?? [],
           people: extractAnswerPeople(m.metadata),
+          steps: extractAnswerSteps(m.metadata),
           reasoning: (m.metadata?.reasoning_trace as string) || (m.metadata?.thinking_trace as string) || undefined,
           provider: m.provider,
           model: m.model,
@@ -444,6 +459,7 @@ function ProspectChatProvider({ children }: { children: ReactNode }) {
           text: m.content,
           sources: (m.metadata?.cv_citations as AnswerTurn["sources"]) ?? [],
           people: extractProspectAnswerPeople(m.metadata),
+          steps: extractAnswerSteps(m.metadata),
           reasoning: (m.metadata?.reasoning_trace as string) || (m.metadata?.thinking_trace as string) || undefined,
           provider: m.provider,
           model: m.model,

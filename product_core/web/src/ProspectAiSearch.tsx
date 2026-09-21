@@ -247,6 +247,7 @@ export default function ProspectAiSearch() {
                   isPending={msg.isPending}
                   compact={!!msg.text}
                   durationMs={ans?.durationMs ?? Number(ans?.trace?.ms_total ?? 0)}
+                  turn={ans}
                 />
               ) : null}
 

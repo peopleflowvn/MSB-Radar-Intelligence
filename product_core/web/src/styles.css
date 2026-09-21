@@ -17147,6 +17147,57 @@ body,
     word-break: break-word !important;
   }
 
+  .person-hero-main-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  .person-sticky-nav {
+    top: 54px !important;
+    padding: 6px 8px !important;
+    border-radius: 10px !important;
+    margin: 0 !important;
+  }
+
+  .person-nav-pills {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding-bottom: 2px !important;
+  }
+
+  .person-nav-pills::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .person-nav-pill-btn {
+    flex-shrink: 0 !important;
+    padding: 6px 11px !important;
+    font-size: 12px !important;
+  }
+
+  .person-micro-stats {
+    display: flex !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding: 2px 0 6px !important;
+    gap: 6px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .person-micro-stats::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .micro-stat-chip {
+    flex-shrink: 0 !important;
+    padding: 4px 9px !important;
+    font-size: 11.5px !important;
+  }
+
   .person-quick-stats {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
@@ -17646,79 +17697,97 @@ body,
   min-width: 0;
 }
 
-.person-header-actions {
+/* ==========================================================================
+   PERSON 360: TOP UTILITY BAR, STICKY NAV DOCK & MICRO METRIC CHIPS
+   ========================================================================== */
+
+.person-top-utility {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding-bottom: 2px;
-}
-
-.person-header-left {
-  display: flex;
-  align-items: center;
   gap: 12px;
+  width: 100%;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.06));
 }
 
-.person-back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-secondary, #94a3b8);
-  text-decoration: none;
-  padding: 6px 12px;
-  border-radius: 8px;
-  background: var(--surface-raised, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  transition: all 0.18s ease;
-}
-
-.person-back-link:hover {
-  color: var(--accent, #ff8a33);
-  border-color: var(--accent, #ff8a33);
-  background: var(--accent-soft, rgba(255, 138, 51, 0.1));
-}
-
-.person-header-right {
+.person-utility-left,
+.person-utility-right {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.person-mode-badge {
+.person-back-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary, #94a3b8);
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: 7px;
+  background: var(--surface-raised, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  transition: all 0.18s ease;
+  line-height: 1.2;
+}
+
+.person-back-compact:hover {
+  color: var(--accent, #ff8a33);
+  border-color: var(--accent, #ff8a33);
+  background: var(--accent-soft, rgba(255, 138, 51, 0.1));
+}
+
+.person-rederive-compact {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
+  color: var(--text-secondary, #94a3b8);
   padding: 4px 10px;
-  border-radius: 20px;
-  background: rgba(99, 102, 241, 0.12);
-  color: #818cf8;
-  border: 1px solid rgba(99, 102, 241, 0.25);
-  letter-spacing: 0.02em;
+  border-radius: 7px;
+  background: var(--surface-raised, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  cursor: pointer;
+  transition: all 0.18s ease;
+  line-height: 1.2;
+  user-select: none;
 }
 
-/* Sticky Quick Navigation Dock (Thanh điều hướng ghim thông minh & tiện lợi) */
+.person-rederive-compact:hover:not(:disabled) {
+  color: var(--text, #f8fafc);
+  border-color: var(--accent, #ff8a33);
+  background: var(--surface-raised, rgba(255, 255, 255, 0.08));
+}
+
+.person-rederive-compact:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.rederive-icon.spin {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+/* Sticky Quick Navigation Dock (Ghim sát dưới Topbar khi cuộn) */
 .person-sticky-nav {
   position: sticky;
-  top: 0;
-  z-index: 40;
+  top: 64px;
+  z-index: 45;
   background: var(--surface-translucent, rgba(15, 23, 42, 0.92));
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  padding: 8px 14px;
-  margin: 0 0 10px;
+  padding: 6px 10px;
+  margin: 0;
   border-radius: 12px;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -17727,98 +17796,21 @@ body,
   display: none;
 }
 
-.sticky-nav-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.sticky-mini-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-secondary, #94a3b8);
-  text-decoration: none;
-  padding: 5px 10px;
-  border-radius: 8px;
-  background: var(--surface-raised, rgba(255, 255, 255, 0.05));
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  transition: all 0.18s ease;
-  white-space: nowrap;
-}
-
-.sticky-mini-back:hover {
-  color: var(--accent, #ff8a33);
-  border-color: var(--accent, #ff8a33);
-  background: var(--accent-soft, rgba(255, 138, 51, 0.12));
-}
-
-.sticky-mini-person {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 8px 3px 4px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.06));
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-
-.sticky-mini-person:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--accent, #ff8a33);
-}
-
-.sticky-mini-avatar {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1.5px solid var(--accent, #ff8a33);
-  background: var(--surface-raised, #1e293b);
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--accent, #ff8a33);
-  flex-shrink: 0;
-}
-
-.sticky-mini-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.sticky-mini-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text, #f8fafc);
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .person-nav-pills {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: nowrap;
+  width: 100%;
 }
 
 .person-nav-pill-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 7px 14px;
   border-radius: 8px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary, #94a3b8);
   background: var(--surface, rgba(255, 255, 255, 0.04));
@@ -17858,6 +17850,63 @@ body,
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.12);
   color: inherit;
+}
+
+/* Micro Metric Chips Strip (Dải chỉ số thanh mảnh đặt dưới tabs) */
+.person-micro-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0 4px;
+  margin: -4px 0 0;
+  width: 100%;
+}
+
+.person-micro-stats::-webkit-scrollbar {
+  display: none;
+}
+
+.micro-stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  background: var(--surface, #111827);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  color: var(--text-secondary, #94a3b8);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  user-select: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.micro-stat-chip:hover {
+  color: var(--text, #f8fafc);
+  border-color: var(--accent, #ff8a33);
+  background: var(--surface-raised, #1e293b);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 10px var(--accent-soft, rgba(255, 138, 51, 0.15));
+}
+
+.micro-stat-chip .m-icon {
+  font-size: 13.5px;
+  line-height: 1;
+}
+
+.micro-stat-chip .m-val {
+  font-weight: 700;
+  color: var(--text, #f8fafc);
+}
+
+.micro-stat-chip .m-lbl {
+  font-size: 11.5px;
+  color: var(--text-muted, #94a3b8);
+  font-weight: 500;
 }
 
 /* Enhanced 2-Column Cockpit Layout */
@@ -18080,12 +18129,11 @@ body,
 .person-hero-card {
   background: var(--surface, #111827);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  border-radius: 16px;
-  padding: 20px 24px;
+  border-radius: 14px;
+  padding: 12px 18px 16px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+  flex-direction: column;
+  gap: 12px;
   position: relative;
   overflow: hidden;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
@@ -18101,25 +18149,39 @@ body,
   background: var(--accent-gradient, linear-gradient(135deg, var(--accent, #ff8a33) 0%, #ea580c 100%));
 }
 
+.person-hero-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+}
+
 .person-hero-left {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   flex: 1;
   min-width: 0;
 }
 
+.person-identity-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .person-avatar-large {
-  width: 76px;
-  height: 76px;
+  width: 62px;
+  height: 62px;
   border-radius: 50%;
   background: var(--surface-raised, #1e293b);
-  border: 2.5px solid var(--accent, #ff8a33);
-  box-shadow: 0 0 0 4px var(--accent-soft, rgba(255, 138, 51, 0.15)), 0 8px 24px rgba(0, 0, 0, 0.2);
+  border: 2px solid var(--accent, #ff8a33);
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(255, 138, 51, 0.15)), 0 6px 16px rgba(0, 0, 0, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
+  font-size: 24px;
   font-weight: 800;
   color: var(--accent, #ff8a33);
   flex-shrink: 0;
@@ -18135,7 +18197,7 @@ body,
 }
 
 .person-fullname {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--text, #f8fafc);
   margin: 0;
@@ -18145,20 +18207,38 @@ body,
 .person-name-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
+.person-name-row .seniority-badge {
+  background: var(--accent-soft, rgba(99, 102, 241, 0.12));
+  color: var(--accent, #6366f1);
+  font-weight: 700;
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
 .person-headline-text {
-  margin: 4px 0 0;
-  font-size: 14px;
+  margin: 3px 0 0;
+  font-size: 13.5px;
   color: var(--text-secondary, #94a3b8);
   line-height: 1.45;
+}
+
+.person-headline-text .headline-title {
+  color: var(--text, #f8fafc);
+  font-weight: 500;
 }
 
 .person-headline-text .company-text {
   font-weight: 600;
   color: var(--text, #f8fafc);
+}
+
+.person-headline-text .meta-dot {
+  color: var(--text-muted, #94a3b8);
 }
 
 /* Quick Stats Bar (Compact Strip Layout) */
@@ -18712,4 +18792,115 @@ body,
 .talent-compact-card.is-near-miss { opacity: 0.92; }
 .talent-compact-card.is-near-miss .talent-card-why {
   background: color-mix(in srgb, #f59e0b 12%, transparent);
+}
+
+/* Khối tóm tắt phạm vi rà soát & đọc sâu tối ưu - Radar Intelligence */
+.answer-coverage-card {
+  margin: 12px 0 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.15) 0%, rgba(15, 23, 42, 0.6) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: wfFadeIn 0.25s ease-out;
+}
+
+.answer-coverage-card.is-complete {
+  border-color: rgba(16, 185, 129, 0.25);
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.15) 0%, rgba(15, 23, 42, 0.6) 100%);
+}
+
+.answer-coverage-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.answer-coverage-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.answer-coverage-title-row .coverage-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.answer-coverage-title-row .coverage-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text, #f8fafc);
+  letter-spacing: -0.01em;
+}
+
+.answer-coverage-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.coverage-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 6px;
+  line-height: 1.4;
+}
+
+.coverage-badge.highlight {
+  background: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+.coverage-badge.muted {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.coverage-badge.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.answer-coverage-explainer {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #cbd5e1;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.answer-coverage-explainer strong {
+  color: var(--text, #f8fafc);
+  font-weight: 600;
+}
+
+:root[data-theme="light"] .answer-coverage-card {
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+  border-color: #bfdbfe;
+}
+
+:root[data-theme="light"] .answer-coverage-title-row .coverage-title {
+  color: #1e293b;
+}
+
+:root[data-theme="light"] .answer-coverage-explainer {
+  color: #475569;
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="light"] .answer-coverage-explainer strong {
+  color: #0f172a;
 }
