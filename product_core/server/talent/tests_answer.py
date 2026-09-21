@@ -102,6 +102,33 @@ def replies(mapping):
 # ---------------------------------------------------------------- ① plan
 
 class PlanTest(TestCase):
+    JD_QUESTION = ("Phân tích tài liệu đính kèm để tìm người phù hợp\n\nTÀI LIỆU ĐÍNH KÈM:\n"
+                   "--- Tài liệu: JD.pdf ---\nCVC/CVCC Phân tích và báo cáo rủi ro")
+
+    def test_jd_dinh_kem_ma_model_tra_general_van_di_tim_nguoi(self):
+        """Prod 21/09: suy luận nói find_people nhưng shape=general ⇒ không tìm gì."""
+        caller = replies({plan_stage.TASK: json.dumps({
+            "shape": "general", "suy_luan": "đây là tác vụ tìm ứng viên", "do_tin_cay": 0.95,
+            "information_need": "tìm người cho vị trí phân tích rủi ro",
+            "must_have": ["kinh nghiệm quản trị rủi ro tín dụng"],
+            "search_queries": []}, ensure_ascii=False)})
+        result = plan_stage.plan(self.JD_QUESTION, complete_fn=caller)
+        self.assertEqual(result.shape, "find_people")
+        self.assertTrue(result.search_queries)
+
+    def test_jd_dinh_kem_khong_tieu_chi_nao_van_di_tim_nguoi(self):
+        caller = replies({plan_stage.TASK: json.dumps({"shape": "general", "search_queries": []})})
+        self.assertIn(plan_stage.plan(self.JD_QUESTION, complete_fn=caller).shape,
+                      ("find_people", "analyze"))  # không được là "general"
+
+    def test_tom_tat_tai_lieu_khong_bi_ep_thanh_tim_nguoi(self):
+        caller = replies({plan_stage.TASK: json.dumps({
+            "shape": "general", "suy_luan": "chỉ tóm tắt", "do_tin_cay": 0.95, "search_queries": []})})
+        result = plan_stage.plan(
+            "Tóm tắt tài liệu đính kèm giúp tôi\n\nTÀI LIỆU ĐÍNH KÈM:\n--- x ---\nabc",
+            complete_fn=caller)
+        self.assertEqual(result.shape, "general")
+
     def test_lay_ho_so_va_phan_tich_khong_bi_day_sang_action(self):
         caller = replies({plan_stage.TASK: json.dumps({
             "shape": "action",

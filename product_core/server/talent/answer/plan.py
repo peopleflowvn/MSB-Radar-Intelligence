@@ -277,6 +277,15 @@ _STORE_WORDS = ("cv", "hồ sơ", "ho so", "ứng viên", "ung vien", "kho ",
                 "trong kho", "dữ liệu", "du lieu", "hồ sơ nào", "ho so nao")
 
 
+def _asks_people_for_attachment(question):
+    """Có tài liệu đính kèm (JD) kèm lời nhờ tìm người/ứng viên phù hợp không."""
+    text = normalize_name(question)
+    return ("tai lieu dinh kem" in text
+            and any(mark in text for mark in (
+                "tim nguoi", "tim ung vien", "nguoi phu hop", "ung vien phu hop",
+                "phu hop voi jd", "phu hop voi tai lieu")))
+
+
 def mentions_store(question):
     """Câu hỏi có nhắc tới kho hồ sơ không (dù hỏi theo lối "bạn có…")."""
     low = " ".join(str(question or "").casefold().split())
@@ -544,6 +553,19 @@ def plan(question, *, envelope=None, complete_fn=None) -> QueryPlan:
             clarify = ""
             confidence = max(confidence, 0.85)
             log.info("answer.plan: câu tinh chỉnh %r sau lượt tìm → find_people", question[:80])
+    # Tiêu chí tìm người mà lại xếp "general" là tự mâu thuẫn — "general" là câu
+    # KHÔNG dính gì tới kho. Production 21/09: JD đính kèm + "tìm người phù hợp",
+    # ① viết suy luận "là tác vụ tìm ứng viên… shape là 'find_people'" nhưng
+    # trả `shape="general"` kèm must_have; Radar đi nhánh hội thoại, không tìm
+    # gì rồi bảo người dùng gõ lại. JD/tài liệu đính kèm đi kèm lời nhờ tìm
+    # người luôn là yêu cầu tìm người.
+    if shape == "general" and (must_have or _asks_people_for_attachment(question)):
+        log.info("answer.plan: 'general' nhưng có tiêu chí tìm người/JD đính kèm "
+                 "→ find_people: %r", question[:80])
+        shape = "find_people"
+        if not queries:
+            queries = [info_need or question]
+        clarify = ""
     if shape == "find_people":
         must_have, should_have = split_seniority(must_have, should_have)
     queries = useful_queries(queries, info_need or question)
