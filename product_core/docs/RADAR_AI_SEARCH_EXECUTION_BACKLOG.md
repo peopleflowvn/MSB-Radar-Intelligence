@@ -1755,8 +1755,19 @@ nhiễu; đo sạch hơn bên dưới cho kết quả ngược lại).
 | Tech Lead / Senior Backend Java–Golang tài chính | 97 s | 24 | `incomplete=True` (GLM timeout) |
 | Chuyên viên QHKH doanh nghiệp >5 năm | 101 s | 16 | `incomplete=True` |
 
-Bản sửa router (`597d727`) đã deploy nhưng **chưa đo lại** vì SSH tới VPS bị reset sau
-deploy; cần chạy lại `verify_readall.py` để xác nhận hai câu còn lại.
+**Đo lại sau bản sửa router `597d727` (đã deploy)**
+
+| Câu hỏi | Thời gian | Đọc | Kết quả |
+|---|---|---|---|
+| ai biết SQL và Python? | 71 s | 32 (18 người khớp đủ) | `incomplete=False` |
+| Tech Lead / Senior Backend Java–Golang tài chính | 86 s | 32 | `incomplete=False` (trước: 24, bị bỏ lô) |
+| Chuyên viên QHKH doanh nghiệp >5 năm | 104 s | 16 | `incomplete=True`: 4 lần GLM timeout, mất lô |
+
+Hai câu đầu đã đọc đủ. Câu 3 vẫn mất lô vì GreenNode chậm/timeout; một lần chạy liền
+ngay sau đó còn thấy cả 3 khoá báo giới hạn tốc độ. Kế hoạch `must_have` của câu 3
+do LLM sinh nên không ổn định giữa các lần (lần thì 32 người khớp đủ, lần thì 0).
+Còn một lỗ hổng router: khi breaker ngắt GreenNode 90 s, `order` loại cả provider nên
+các model dự phòng qwen cùng nhà cũng bị bỏ theo, chỉ còn Gemini 402.
 
 **Bài học vận hành:** file env thật của prod là
 `/home/ubuntu/msb-radar-platform/runtime/product.env`; `~/msbradar/.env` chỉ là
