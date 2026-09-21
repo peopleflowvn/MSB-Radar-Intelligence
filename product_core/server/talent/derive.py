@@ -340,7 +340,13 @@ def apply_extracted_facts(person, save=True):
             # đăng — điền lại nó là hoàn tác việc `derive()` vừa gỡ.
             if attr == "current_title":
                 from intel.edge_mapper import is_posting_title
-                if is_posting_title(value, person.headline):
+                application_positions = (
+                    str((record.payload or {}).get("position") or record.position or "").strip()
+                    for record in person.source_records.all()
+                )
+                if (is_posting_title(value, person.headline)
+                        or any(is_posting_title(value, position)
+                               for position in application_positions)):
                     continue
             limit = TalentProfile._meta.get_field(attr).max_length or 2000
             setattr(profile, attr, value[:limit])
