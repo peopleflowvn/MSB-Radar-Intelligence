@@ -62,6 +62,10 @@ nguyên văn từ CV và dữ liệu hồ sơ.
 
 Với TỪNG hồ sơ, quyết định dựa DUY NHẤT trên đoạn được cấp:
 
+Nếu hồ sơ có nhãn "VỊ TRÍ ĐÃ ỨNG TUYỂN TẠI MSB", chỉ dùng nó để phân tích lịch sử/
+ý định ứng tuyển hoặc mức độ quan tâm. TUYỆT ĐỐI không nói ứng viên đang làm, từng làm,
+có kinh nghiệm hay đang giữ chức danh đó nếu không có bằng chứng riêng từ CV/profile.
+
 1. Hồ sơ có thoả nhu cầu không? Ràng buộc trong "bat_buoc" mà không có bằng
    chứng thì KHÔNG thoả — không suy đoán, không cho qua vì "có vẻ hợp".
    Điều kiện nối bằng "và" phải có bằng chứng cho TẤT CẢ điều kiện. Với yêu

@@ -353,8 +353,22 @@ def _profile_passages(person_ids):
     """Projection hồ sơ (trường DB + payload Edge + fact) — dữ liệu ngoài CV."""
     rows = (PersonSearchDocument.objects.filter(person_id__in=person_ids)
             .values_list("person_id", "content"))
-    return {pid: Passage(pid, 0, 0, clean_passage(content), source="profile")
-            for pid, content in rows}
+    from talent.models import BaseDossier
+    applications = dict(BaseDossier.objects.filter(person_id__in=person_ids)
+                        .values_list("person_id", "applications"))
+    passages = {}
+    for person_id, content in rows:
+        positions = []
+        for application in applications.get(person_id) or []:
+            positions.extend(application.get("positions") or [])
+        positions = list(dict.fromkeys(str(value).strip() for value in positions if value))
+        if positions:
+            content += ("\nVỊ TRÍ ĐÃ ỨNG TUYỂN TẠI MSB (chỉ là lịch sử ứng tuyển, "
+                        "KHÔNG phải chức danh/công việc hiện tại): "
+                        + "; ".join(positions))
+        passages[person_id] = Passage(
+            person_id, 0, 0, clean_passage(content), source="profile")
+    return passages
 
 
 def pool_for(query_plan, cap=POOL):

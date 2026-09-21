@@ -5,7 +5,9 @@ from django.test import TestCase
 
 from core.models import Edge, SourceRecord
 from people.models import Person
-from talent.models import SearchProjection, TalentProfile
+from talent.answer.retrieve import _profile_passages
+from talent.models import (BaseDossier, PersonSearchDocument, SearchProjection,
+                           TalentProfile)
 
 
 class RepairApplicationTitleLeakTest(TestCase):
@@ -32,3 +34,19 @@ class RepairApplicationTitleLeakTest(TestCase):
         self.assertNotIn("finance analyst", SearchProjection.objects.get(
             person=leaked).searchable_text.casefold())
         self.assertIn("repaired=1", output.getvalue())
+
+    def test_ai_sees_application_history_with_non_current_role_label(self):
+        person = Person.objects.create(display_name="Candidate")
+        PersonSearchDocument.objects.create(
+            person=person, fingerprint="profile", content="Current title: Data Analyst")
+        BaseDossier.objects.create(
+            person=person, fingerprint="dossier",
+            applications=[{"positions": ["Finance Analyst - MSB"]}],
+        )
+
+        passage = _profile_passages([person.pk])[person.pk].text
+
+        self.assertIn("Finance Analyst - MSB", passage)
+        self.assertIn("KHÔNG phải chức danh/công việc hiện tại", passage)
+        self.assertNotIn("Finance Analyst - MSB",
+                         PersonSearchDocument.objects.get(person=person).content)
