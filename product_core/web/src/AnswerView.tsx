@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnswerPerson, AnswerSource, api, HuntRequestRow } from "./api";
@@ -160,27 +160,225 @@ function extractPersonInfo(person: AnswerPerson, sources: AnswerSource[] = []) {
   };
 }
 
-/** Một thẻ hồ sơ. `nearMiss`: người bị loại nhưng khớp một phần — hiện điều CÒN
- * THIẾU, không hiện lý do như một điểm mạnh (production 19/09: dòng 💡 hiện
+/** Modal đưa ứng viên (đơn lẻ hoặc hàng loạt) vào Đợt tuyển / Nhiệm vụ săn. */
+function HuntAssignModal({
+  isOpen,
+  title,
+  people,
+  openHunts,
+  onClose,
+  onAssign,
+}: {
+  isOpen: boolean;
+  title: string;
+  people: AnswerPerson[];
+  openHunts: HuntRequestRow[];
+  onClose: () => void;
+  onAssign: (opts: { huntId?: number; newTitle?: string }) => Promise<void>;
+}) {
+  const [mode, setMode] = useState<"existing" | "new">(
+    openHunts.length > 0 ? "existing" : "new"
+  );
+  const [selectedHuntId, setSelectedHuntId] = useState<number>(
+    openHunts[0]?.id || 0
+  );
+  const [newTitle, setNewTitle] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (openHunts.length > 0 && !selectedHuntId) {
+      setSelectedHuntId(openHunts[0].id);
+    }
+    if (openHunts.length === 0) {
+      setMode("new");
+    }
+  }, [openHunts, selectedHuntId]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (mode === "existing") {
+      if (!selectedHuntId) {
+        setError("Vui lòng chọn một đợt tuyển hoặc nhiệm vụ săn.");
+        return;
+      }
+      setSubmitting(true);
+      try {
+        await onAssign({ huntId: selectedHuntId });
+        onClose();
+      } catch (err: any) {
+        setError(err?.message || "Lỗi khi đưa ứng viên vào đợt tuyển.");
+      } finally {
+        setSubmitting(false);
+      }
+    } else {
+      const trimmed = newTitle.trim();
+      if (!trimmed) {
+        setError("Vui lòng nhập tên đợt tuyển hoặc nhiệm vụ săn mới.");
+        return;
+      }
+      setSubmitting(true);
+      try {
+        await onAssign({ newTitle: trimmed });
+        onClose();
+      } catch (err: any) {
+        setError(err?.message || "Lỗi khi tạo đợt tuyển mới.");
+      } finally {
+        setSubmitting(false);
+      }
+    }
+  };
+
+  return (
+    <div className="hunt-modal-backdrop" onClick={onClose}>
+      <div
+        className="hunt-modal-box"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="hunt-modal-header">
+          <div className="hunt-modal-title">
+            <span className="hunt-modal-icon">🎯</span>
+            <h3>{title}</h3>
+          </div>
+          <button
+            type="button"
+            className="hunt-modal-close-btn"
+            onClick={onClose}
+            aria-label="Đóng"
+          >
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="hunt-modal-body">
+          <div className="hunt-modal-candidates-summary">
+            {people.length === 1 ? (
+              <p>
+                Ứng viên: <strong>{people[0].name}</strong>
+              </p>
+            ) : (
+              <p>
+                Đã chọn <strong>{people.length}</strong> ứng viên:{" "}
+                <span className="hunt-modal-candidate-names">
+                  {people.map((p) => p.name).join(", ")}
+                </span>
+              </p>
+            )}
+          </div>
+
+          {openHunts.length > 0 && (
+            <div className="hunt-modal-tabs">
+              <button
+                type="button"
+                className={`hunt-modal-tab${mode === "existing" ? " active" : ""}`}
+                onClick={() => setMode("existing")}
+              >
+                Đợt tuyển có sẵn ({openHunts.length})
+              </button>
+              <button
+                type="button"
+                className={`hunt-modal-tab${mode === "new" ? " active" : ""}`}
+                onClick={() => setMode("new")}
+              >
+                + Tạo đợt tuyển mới
+              </button>
+            </div>
+          )}
+
+          {mode === "existing" && openHunts.length > 0 ? (
+            <div className="hunt-modal-field">
+              <label htmlFor="hunt-select-dropdown">
+                Chọn đợt tuyển / nhiệm vụ săn:
+              </label>
+              <select
+                id="hunt-select-dropdown"
+                className="hunt-modal-select"
+                value={selectedHuntId}
+                onChange={(e) => setSelectedHuntId(Number(e.target.value))}
+                disabled={submitting}
+              >
+                {openHunts.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="hunt-modal-field">
+              {openHunts.length === 0 && (
+                <div className="hunt-modal-empty-hint">
+                  ℹ️ Hiện chưa có đợt tuyển nào đang mở. Bạn có thể tạo nhanh đợt tuyển mới để đưa ứng viên vào ngay:
+                </div>
+              )}
+              <label htmlFor="hunt-new-title-input">
+                Tên đợt tuyển / nhiệm vụ săn mới:
+              </label>
+              <input
+                id="hunt-new-title-input"
+                type="text"
+                className="hunt-modal-input"
+                placeholder="VD: Tuyển Chuyên gia Phân tích Dữ liệu Q3"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                disabled={submitting}
+                autoFocus
+              />
+            </div>
+          )}
+
+          {error && <div className="hunt-modal-error">{error}</div>}
+
+          <div className="hunt-modal-footer">
+            <button
+              type="button"
+              className="hunt-modal-btn btn-cancel"
+              onClick={onClose}
+              disabled={submitting}
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              className="hunt-modal-btn btn-submit"
+              disabled={submitting}
+            >
+              {submitting
+                ? "⏳ Đang xử lý…"
+                : mode === "existing"
+                ? "✓ Xác nhận đưa vào"
+                : "🎯 Tạo & Đưa vào ngay"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/** Thẻ ứng viên đơn lẻ (gồm cả trường hợp "gần phù hợp" với ghi chú lý do
  * "…không phải Senior Data Analyst" trên thẻ nằm cùng hàng với người phù hợp). */
 function TalentPersonCard({
   person,
   sources,
   personLinkFrom,
   nearMiss,
-  openHunts = [],
-  onAddToHunt,
   isAddingToHunt,
   addedHuntName,
+  onRequestAddHunt,
 }: {
   person: AnswerPerson;
   sources: AnswerSource[];
   personLinkFrom: string;
   nearMiss: boolean;
-  openHunts?: HuntRequestRow[];
-  onAddToHunt?: (personId: number, huntId: number) => void;
   isAddingToHunt?: boolean;
   addedHuntName?: string;
+  onRequestAddHunt?: (person: AnswerPerson) => void;
 }) {
   const info = extractPersonInfo(person, sources);
   const gap = (person.gap || "").trim();
@@ -253,33 +451,27 @@ function TalentPersonCard({
           Xem 360° →
         </Link>
 
-        {openHunts.length > 0 && onAddToHunt && (
-          <div className="talent-card-hunt-action" onClick={(e) => e.stopPropagation()}>
-            <select
-              className={`talent-card-hunt-select${addedHuntName ? " is-added" : ""}`}
-              disabled={isAddingToHunt}
-              value=""
-              onChange={(e) => {
-                const hid = Number(e.target.value);
-                if (hid) onAddToHunt(person.person_id, hid);
-              }}
-              title="Thêm ứng viên vào đợt tuyển dụng hoặc nhiệm vụ săn"
-            >
-              <option value="" disabled>
-                {isAddingToHunt
-                  ? "⏳ Đang thêm…"
-                  : addedHuntName
-                  ? `✓ Đã vào: ${addedHuntName}`
-                  : "🎯 + Đợt tuyển…"}
-              </option>
-              {openHunts.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.title}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        <div className="talent-card-hunt-action" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className={`talent-card-hunt-btn${addedHuntName ? " is-added" : ""}`}
+            disabled={isAddingToHunt}
+            onClick={() => onRequestAddHunt?.(person)}
+            title={
+              addedHuntName
+                ? `Đã vào đợt tuyển: ${addedHuntName} (bấm để đổi đợt tuyển)`
+                : "Đưa ứng viên này vào đợt tuyển dụng hoặc nhiệm vụ săn"
+            }
+          >
+            {isAddingToHunt ? (
+              <>⏳ Đang thêm…</>
+            ) : addedHuntName ? (
+              <>✓ {addedHuntName}</>
+            ) : (
+              <>🎯 + Đợt tuyển / Săn</>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -291,24 +483,22 @@ function TalentCardGroup({
   sources,
   personLinkFrom,
   nearMiss,
-  openHunts = [],
-  onAddToHunt,
   addingPersonId,
   addedHuntNames,
-  onBulkAddToHunt,
   bulkStatus,
+  onRequestAddHunt,
+  onRequestBulkAddHunt,
 }: {
   title: string;
   people: AnswerPerson[];
   sources: AnswerSource[];
   personLinkFrom: string;
   nearMiss: boolean;
-  openHunts?: HuntRequestRow[];
-  onAddToHunt?: (personId: number, huntId: number) => void;
   addingPersonId?: number | null;
   addedHuntNames?: Record<number, string>;
-  onBulkAddToHunt?: (huntId: number, targetPeople: AnswerPerson[]) => void;
   bulkStatus?: string | null;
+  onRequestAddHunt?: (person: AnswerPerson) => void;
+  onRequestBulkAddHunt?: (targetPeople: AnswerPerson[]) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (people.length === 0) return null;
@@ -325,27 +515,19 @@ function TalentCardGroup({
         </span>
 
         <div className="talent-smart-header-right">
-          {!nearMiss && openHunts.length > 0 && onBulkAddToHunt && people.length > 1 && (
+          {!nearMiss && people.length > 1 && (
             <div className="talent-bulk-hunt-wrap" onClick={(e) => e.stopPropagation()}>
               {bulkStatus ? (
                 <span className="talent-smart-bulk-status">{bulkStatus}</span>
               ) : (
-                <select
-                  className="talent-card-hunt-select talent-bulk-hunt-select"
-                  value=""
-                  onChange={(e) => {
-                    const hid = Number(e.target.value);
-                    if (hid) onBulkAddToHunt(hid, people);
-                  }}
-                  title={`Thêm tất cả ${people.length} ứng viên vào đợt tuyển / nhiệm vụ săn`}
+                <button
+                  type="button"
+                  className="talent-smart-bulk-hunt-btn"
+                  onClick={() => onRequestBulkAddHunt?.(people)}
+                  title={`Đưa tất cả ${people.length} ứng viên vào đợt tuyển dụng hoặc nhiệm vụ săn`}
                 >
-                  <option value="" disabled>🎯 Thêm cả {people.length} vào đợt tuyển…</option>
-                  {openHunts.map((h) => (
-                    <option key={h.id} value={h.id}>
-                      {h.title}
-                    </option>
-                  ))}
-                </select>
+                  🎯 Đưa tất cả ({people.length}) vào đợt tuyển
+                </button>
               )}
             </div>
           )}
@@ -370,8 +552,7 @@ function TalentCardGroup({
             sources={sources}
             personLinkFrom={personLinkFrom}
             nearMiss={nearMiss}
-            openHunts={openHunts}
-            onAddToHunt={onAddToHunt}
+            onRequestAddHunt={onRequestAddHunt}
             isAddingToHunt={addingPersonId === person.person_id}
             addedHuntName={addedHuntNames?.[person.person_id]}
           />
@@ -418,41 +599,64 @@ function TalentSmartCards({
   const [addingPersonId, setAddingPersonId] = useState<number | null>(null);
   const [addedHuntNames, setAddedHuntNames] = useState<Record<number, string>>({});
   const [bulkStatus, setBulkStatus] = useState<string | null>(null);
+  const [modalTarget, setModalTarget] = useState<{
+    people: AnswerPerson[];
+    title: string;
+  } | null>(null);
 
-  const handleAddToHunt = async (personId: number, huntId: number) => {
-    const hunt = openHunts.find((h) => h.id === huntId);
-    setAddingPersonId(personId);
-    try {
-      await api.huntUpdate(huntId, { person_ids_add: [personId] });
-      setAddedHuntNames((prev) => ({ ...prev, [personId]: hunt?.title || "Đợt tuyển" }));
-      qc.invalidateQueries({ queryKey: ["hunts"] });
-      qc.invalidateQueries({ queryKey: ["hunt-tasks"] });
-    } catch (e) {
-      console.error("Lỗi khi thêm vào đợt tuyển:", e);
-    } finally {
-      setAddingPersonId(null);
-    }
+  const handleRequestAddPerson = (person: AnswerPerson) => {
+    setModalTarget({
+      people: [person],
+      title: `Đưa ${person.name} vào Đợt tuyển / Săn`,
+    });
   };
 
-  const handleBulkAddToHunt = async (huntId: number, targetPeople: AnswerPerson[]) => {
-    const hunt = openHunts.find((h) => h.id === huntId);
+  const handleRequestAddBulk = (targetPeople: AnswerPerson[]) => {
+    setModalTarget({
+      people: targetPeople,
+      title: `Đưa ${targetPeople.length} ứng viên vào Đợt tuyển / Săn`,
+    });
+  };
+
+  const handleModalAssign = async (opts: { huntId?: number; newTitle?: string }) => {
+    if (!modalTarget) return;
+    const targetPeople = modalTarget.people;
     const ids = targetPeople.map((p) => p.person_id);
-    setBulkStatus(`Đang thêm ${ids.length} ứng viên…`);
+    if (ids.length === 1) {
+      setAddingPersonId(ids[0]);
+    }
+
     try {
-      await api.huntUpdate(huntId, { person_ids_add: ids });
-      const huntTitle = hunt?.title || "đợt tuyển";
-      setBulkStatus(`✓ Đã thêm ${ids.length} ứng viên vào ${huntTitle}`);
-      setAddedHuntNames((prev) => {
-        const next = { ...prev };
-        ids.forEach((id) => { next[id] = huntTitle; });
-        return next;
-      });
+      if (opts.huntId) {
+        const hunt = openHunts.find((h) => h.id === opts.huntId);
+        const huntTitle = hunt?.title || "đợt tuyển";
+        await api.huntUpdate(opts.huntId, { person_ids_add: ids });
+        setAddedHuntNames((prev) => {
+          const next = { ...prev };
+          ids.forEach((id) => { next[id] = huntTitle; });
+          return next;
+        });
+        setBulkStatus(`✓ Đã thêm ${ids.length} ứng viên vào ${huntTitle}`);
+        setTimeout(() => setBulkStatus(null), 4000);
+      } else if (opts.newTitle) {
+        const title = opts.newTitle.trim();
+        const created = await api.createShortlist({
+          title,
+          person_ids: ids,
+        });
+        const finalTitle = created?.title || title;
+        setAddedHuntNames((prev) => {
+          const next = { ...prev };
+          ids.forEach((id) => { next[id] = finalTitle; });
+          return next;
+        });
+        setBulkStatus(`✓ Đã tạo "${finalTitle}" và thêm ${ids.length} ứng viên`);
+        setTimeout(() => setBulkStatus(null), 4000);
+      }
       qc.invalidateQueries({ queryKey: ["hunts"] });
       qc.invalidateQueries({ queryKey: ["hunt-tasks"] });
-      setTimeout(() => setBulkStatus(null), 4000);
-    } catch (e) {
-      setBulkStatus("Lỗi khi thêm vào đợt tuyển");
-      setTimeout(() => setBulkStatus(null), 3000);
+    } finally {
+      setAddingPersonId(null);
     }
   };
 
@@ -466,11 +670,10 @@ function TalentSmartCards({
         sources={sources}
         personLinkFrom={personLinkFrom}
         nearMiss={false}
-        openHunts={openHunts}
-        onAddToHunt={handleAddToHunt}
+        onRequestAddHunt={handleRequestAddPerson}
+        onRequestBulkAddHunt={handleRequestAddBulk}
         addingPersonId={addingPersonId}
         addedHuntNames={addedHuntNames}
-        onBulkAddToHunt={handleBulkAddToHunt}
         bulkStatus={bulkStatus}
       />
       <TalentCardGroup
@@ -479,11 +682,21 @@ function TalentSmartCards({
         sources={sources}
         personLinkFrom={personLinkFrom}
         nearMiss
-        openHunts={openHunts}
-        onAddToHunt={handleAddToHunt}
+        onRequestAddHunt={handleRequestAddPerson}
+        onRequestBulkAddHunt={handleRequestAddBulk}
         addingPersonId={addingPersonId}
         addedHuntNames={addedHuntNames}
       />
+      {modalTarget && (
+        <HuntAssignModal
+          isOpen={!!modalTarget}
+          title={modalTarget.title}
+          people={modalTarget.people}
+          openHunts={openHunts}
+          onClose={() => setModalTarget(null)}
+          onAssign={handleModalAssign}
+        />
+      )}
     </>
   );
 }

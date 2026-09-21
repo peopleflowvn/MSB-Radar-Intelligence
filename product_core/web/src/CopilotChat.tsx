@@ -147,6 +147,7 @@ export default function CopilotChat<TPerson>({
   const [asking, setAsking] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -195,6 +196,7 @@ export default function CopilotChat<TPerson>({
       const clientHeight = window.innerHeight;
       const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
       setShowScrollBottom(distanceFromBottom > 140);
+      setShowScrollTop(scrollTop > 200);
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
@@ -817,19 +819,38 @@ export default function CopilotChat<TPerson>({
                 </button>
               )}
             </div>
-            {showScrollBottom && (
-              <button
-                type="button"
-                className="copilot-scroll-bottom-btn"
-                onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })}
-                title="Cuộn xuống tin nhắn mới nhất"
-                aria-label="Cuộn xuống dưới cùng"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 5v14M5 12l7 7 7-7" />
-                </svg>
-                <span>Xuống dưới cùng</span>
-              </button>
+            {(showScrollTop || showScrollBottom) && (
+              <div className="copilot-scroll-nav-group" aria-label="Điều hướng cuộn trang">
+                {showScrollTop && (
+                  <button
+                    type="button"
+                    className="copilot-scroll-nav-btn copilot-scroll-top-btn"
+                    onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                    title="Cuộn lên trên cùng"
+                    aria-label="Cuộn lên trên cùng"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <line x1="12" y1="19" x2="12" y2="5" />
+                      <polyline points="5 12 12 5 19 12" />
+                    </svg>
+                    <span>Lên trên cùng</span>
+                  </button>
+                )}
+                {showScrollBottom && (
+                  <button
+                    type="button"
+                    className="copilot-scroll-nav-btn copilot-scroll-bottom-btn"
+                    onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })}
+                    title="Cuộn xuống tin nhắn mới nhất"
+                    aria-label="Cuộn xuống dưới cùng"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 5v14M5 12l7 7 7-7" />
+                    </svg>
+                    <span>Xuống dưới cùng</span>
+                  </button>
+                )}
+              </div>
             )}
             {attachmentError && <div className="copilot-attachment-error">{attachmentError}</div>}
             <div className="copilot-footer-hint">
