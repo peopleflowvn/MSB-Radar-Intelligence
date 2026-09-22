@@ -89,6 +89,77 @@ def _collect_workflow_models(trace, default_provider="", default_model=""):
     return models
 
 
+#: Sự kiện BƯỚC — hợp đồng với giao diện nằm ở `core/answer/steps.py`.
+def _step(label, state="active", trace=None):
+    res = step(label, state)
+    if isinstance(trace, dict):
+        steps = trace.setdefault("steps", [])
+        at = next((i for i, item in enumerate(steps) if item["label"] == label), -1)
+        if at >= 0:
+            steps[at] = {"label": label, "state": state}
+        else:
+            for item in steps:
+                if item["state"] == "active":
+                    item["state"] = "done"
+            steps.append({"label": label, "state": state})
+    return res
+
+
+def _criteria_summary(plan):
+    parts = []
+    if getattr(plan, "must_have", None):
+        parts.extend(str(c).strip() for c in plan.must_have if str(c).strip())
+    elif getattr(plan, "search_queries", None):
+        parts.extend(str(q).strip() for q in plan.search_queries if str(q).strip())
+    products = getattr(plan, "products", None) or []
+    if products:
+        parts.append(f"sản phẩm: {', '.join(products[:2])}")
+    filters = getattr(plan, "filters", None) or {}
+    if filters.get("tinh_thanh"):
+        parts.append(f"khu vực: {filters['tinh_thanh']}")
+    if filters.get("phan_khuc"):
+        parts.append(f"phân khúc: {filters['phan_khuc']}")
+    return ", ".join(parts[:3])
+
+
+def _total_customers(stats):
+    try:
+        from .population import customers
+        cnt = customers().count()
+        if cnt > 0:
+            return max(int(stats.get("retrieved") or 0), cnt)
+    except Exception:
+        pass
+    return max(int(stats.get("retrieved") or 0), 500)
+
+
+def _set_answer_coverage(trace, stats, *, candidate_total=None, method="deep_read",
+                         complete=None, degraded=False):
+    """Gắn khuôn coverage chuẩn vào trace cho giao diện hiển thị thẻ giải thích."""
+    stats = stats or {}
+    total = max(0, int(candidate_total if candidate_total is not None else
+                       stats.get("candidate_total", stats.get("retrieved", 0)) or 0))
+    judged = min(total, max(0, int(stats.get("judged") or 0)))
+    unknown = max(0, int(stats.get("unknown", stats.get("criteria_unknown", 0)) or 0))
+    if method == "sql_aggregate":
+        evaluated, not_read = total, 0
+    else:
+        evaluated = judged
+        not_read = max(int(stats.get("not_read", stats.get("unread", 0)) or 0),
+                       total - judged)
+    if complete is None:
+        complete = bool((method == "sql_aggregate" or total == judged)
+                        and not_read == 0 and unknown == 0
+                        and not stats.get("read_failed")
+                        and not stats.get("read_incomplete"))
+    trace["answer_coverage"] = {
+        "method": method, "candidate_total": total, "evaluated": evaluated,
+        "judged": judged, "unknown": unknown, "not_read": not_read,
+        "complete": bool(complete), "retrieval_degraded": bool(degraded),
+    }
+    return trace["answer_coverage"]
+
+
 @dataclass
 class AnswerResult:
     text: str = ""
@@ -200,19 +271,25 @@ def _pipeline(question, *, envelope=None, user=None, complete_fn=None,
               deadline=None, query_plan=None):
     """Generator: `yield` sự kiện BƯỚC, `return` `(plan, chosen, near, stats, trace)`."""
     started = time.monotonic()
-    trace = {"question": question}
+    trace = {"question": question, "steps": []}
+
+    def _pstep(lbl, st="active"):
+        return _step(lbl, st, trace=trace)
 
     if query_plan is None:
-        yield step("Hiểu yêu cầu")
+        yield _pstep("Hiểu yêu cầu")
         query_plan = plan_stage.plan(question, envelope=envelope, user=user,
                                      complete_fn=complete_fn)
-        yield step("Hiểu yêu cầu", "done")
+        yield _pstep("Hiểu yêu cầu", "done")
+    else:
+        _pstep("Hiểu yêu cầu", "done")
     trace["plan"] = query_plan.as_dict()
     trace["ms_plan"] = int((time.monotonic() - started) * 1000)
 
     empty = {"judged": 0, "relevant": 0, "shown": 0, "retrieved": 0,
              "read_failed": False}
     if not query_plan.needs_people:
+        _set_answer_coverage(trace, empty, complete=True, method="not_applicable")
         return query_plan, [], [], empty, trace
 
     # Nhóm người lượt trước — cho câu so sánh / hỏi tiếp.
@@ -236,7 +313,7 @@ def _pipeline(question, *, envelope=None, user=None, complete_fn=None,
                 if query_plan.shape not in ("compare", "followup") and not aggregate_shape
                 else None)
         if attr:
-            yield step("Quét toàn kho theo thứ tự yêu cầu")
+            yield _pstep("Quét toàn kho theo thứ tự yêu cầu")
             limit = max(1, int(query_plan.limit or 20))
             ids = resolve_stage.superlative_ids(query_plan, attr, user=user, limit=limit)
             trace["superlative"] = {"attr": attr, "found": len(ids)}
@@ -245,7 +322,7 @@ def _pipeline(question, *, envelope=None, user=None, complete_fn=None,
                 query_plan = replace(query_plan, sort_by={"key": aggregate_stage.RECENCY_KEY,
                                                           "dir": "asc"})
             pinned_ids, pool, pinned_only = ids, max(1, len(ids)), True
-            yield step("Quét toàn kho theo thứ tự yêu cầu", "done")
+            yield _pstep("Quét toàn kho theo thứ tự yêu cầu", "done")
         elif not aggregate_shape:
             named = resolve_stage.named_customers(query_plan, question)
             if named:
@@ -270,14 +347,37 @@ def _pipeline(question, *, envelope=None, user=None, complete_fn=None,
     if pinned_ids:
         trace["pinned_ids"] = len(pinned_ids)
 
-    def _pass(active_plan, label):
+    def _pass(active_plan, label, is_widened=False):
         mark = time.monotonic()
-        yield step("Tìm khách hàng")
+        criteria_str = _criteria_summary(active_plan)
+        if is_widened:
+            search_label = (f"Mở rộng tìm kiếm trong kho (tiêu chí: {criteria_str})"
+                            if criteria_str else "Mở rộng tìm kiếm trong kho")
+        else:
+            search_label = (f"Tìm trong kho khách hàng (tiêu chí: {criteria_str})"
+                            if criteria_str else "Tìm trong kho khách hàng")
+        yield _pstep(search_label)
         candidates = retrieve_stage.retrieve(active_plan, user=user,
                                              pinned_ids=pinned_ids, pool=pool)
         retrieved_ms = int((time.monotonic() - mark) * 1000)
-        yield step(f"Tìm thấy {len(candidates)} khách liên quan", "done")
-        yield step("Đọc bằng chứng")
+
+        can_widen = (label == "pass1" and not pinned_only
+                     and (deadline is None or time.monotonic() <= deadline))
+
+        if not candidates:
+            # Nếu là pass 1 và có thể nới điều kiện: KHÔNG emit step 0 khách done,
+            # để vòng nới chuyển tiếp mượt mà.
+            if not can_widen:
+                yield _pstep("Không tìm thấy khách hàng phù hợp tiêu chí", "done")
+            stats = {"retrieved": 0, "judged": 0, "relevant": 0, "shown": 0,
+                     "read_failed": False, "read_incomplete": False, "scope": active_plan.shape}
+            trace[label] = {"ms_retrieve": retrieved_ms,
+                            "ms_total": int((time.monotonic() - mark) * 1000), **stats}
+            return [], [], [], stats
+
+        found_label = f"Đã chọn lọc {len(candidates)} khách hàng tiềm năng nhất để đọc sâu"
+        yield _pstep(found_label, "done")
+        yield _pstep("Đọc sâu & đối chiếu hồ sơ khách hàng")
         judgements = judge_stage.judge(active_plan, candidates, complete_fn=complete_fn,
                                        deadline=started + READ_BUDGET_SECONDS)
         chosen, near, stats = aggregate_stage.aggregate(active_plan, judgements, user=user)
@@ -289,8 +389,8 @@ def _pipeline(question, *, envelope=None, user=None, complete_fn=None,
         stats["scope"] = active_plan.shape
         trace[label] = {"ms_retrieve": retrieved_ms,
                         "ms_total": int((time.monotonic() - mark) * 1000), **stats}
-        yield step(f"Đã đọc {stats.get('judged', 0)} hồ sơ, "
-                   f"{stats.get('relevant', 0)} phù hợp", "done")
+        yield _pstep(f"Đã đọc sâu {stats.get('judged', 0)} khách hàng tiềm năng nhất sau khi xếp hạng toàn kho, "
+                     f"{stats.get('relevant', 0)} phù hợp", "done")
         return judgements, chosen, near, stats
 
     cache_key = (None if query_plan.shape == "count" else
@@ -308,6 +408,8 @@ def _pipeline(question, *, envelope=None, user=None, complete_fn=None,
         stats["scope"] = query_plan.shape
         trace["cache"] = "hit"
         trace["pass1"] = dict(stats)
+        candidate_total = _total_customers(stats)
+        _set_answer_coverage(trace, stats, candidate_total=candidate_total)
         return query_plan, chosen, near, stats, trace
     trace["cache"] = "miss"
 
@@ -318,8 +420,8 @@ def _pipeline(question, *, envelope=None, user=None, complete_fn=None,
             and not aggregate_stage.enough(chosen, stats, query_plan)):
         widened = plan_stage.widen(query_plan)
         trace["widened"] = widened.as_dict()
-        yield step("Nới điều kiện, tìm lại")
-        judged2, chosen2, near2, stats2 = yield from _pass(widened, "pass2")
+        yield _pstep("Nới điều kiện tìm kiếm để mở rộng phạm vi...")
+        judged2, chosen2, near2, stats2 = yield from _pass(widened, "pass2", is_widened=True)
         if chosen2 or stats2.get("judged", 0) > stats.get("judged", 0):
             query_plan, chosen, near, stats = widened, chosen2, near2, stats2
             judgements = judged2
@@ -330,6 +432,10 @@ def _pipeline(question, *, envelope=None, user=None, complete_fn=None,
         trace["coverage"] = retrieve_stage.coverage()
     except Exception:                              # noqa: BLE001
         trace["coverage"] = {}
+
+    candidate_total = _total_customers(stats)
+    _set_answer_coverage(trace, stats, candidate_total=candidate_total)
+
     # Chỉ lưu khi ③ thật sự đọc được. Lưu một lượt gãy là đóng đinh câu trả lời
     # sai suốt sáu tiếng.
     if not stats.get("read_failed") and not stats.get("read_incomplete") and stats.get("judged"):
@@ -378,20 +484,27 @@ def _repair(messages, problems, draft, streamer):
     return str(revised or "").strip() or None
 
 
-def _stream_clarify(question, query_plan, started):
+def _stream_clarify(question, query_plan, started, trace=None):
     """① không biết RM muốn gì → HỎI LẠI, không đoán. Không gọi model lần nữa."""
     text = query_plan.clarifying_question
+    if trace is None:
+        trace = {"question": question, "steps": []}
+    _step("Hiểu yêu cầu", "done", trace=trace)
     yield {"type": "answer", "text": text}
     yield {"type": "done", "result": AnswerResult(
         text=text, trace={"question": question, "plan": query_plan.as_dict(),
-                          "mode": "clarify",
+                          "mode": "clarify", "steps": trace.get("steps", []),
                           "ms_total": int((time.monotonic() - started) * 1000)})}
 
 
-def _stream_chat(question, query_plan, envelope, user, started, adapter=None):
+def _stream_chat(question, query_plan, envelope, user, started, adapter=None, trace=None):
     """Câu không về kho khách hàng → nhánh hội thoại chung, đúng persona Growth."""
     from talent.answer.chat import stream_chat
 
+    if trace is None:
+        trace = {"question": question, "steps": []}
+    _step("Hiểu yêu cầu", "done", trace=trace)
+    _step("Tra cứu & soạn câu trả lời", "done", trace=trace)
     payload = {}
     for chunk in stream_chat(question, envelope=envelope, user=user, adapter=adapter,
                              surface="prospect"):
@@ -405,27 +518,31 @@ def _stream_chat(question, query_plan, envelope, user, started, adapter=None):
         reasoning=(payload.get("reasoning") or "")[:6000],
         provider=payload.get("provider", ""), model=payload.get("model", ""),
         trace={"question": question, "plan": query_plan.as_dict(),
-               "mode": payload.get("mode", "chat"),
+               "mode": payload.get("mode", "chat"), "steps": trace.get("steps", []),
                "ms_total": int((time.monotonic() - started) * 1000)})}
 
 
-def _stream_action(question, query_plan, envelope, user, started):
+def _stream_action(question, query_plan, envelope, user, started, trace=None):
     """Câu lệnh → `act.run`. Hành động và đối tượng do CODE quyết, xem `act.py`."""
     from . import act as act_stage
 
-    yield step("Thực hiện yêu cầu")
+    if trace is None:
+        trace = {"question": question, "steps": []}
+    _step("Hiểu yêu cầu", "done", trace=trace)
+    yield _step("Thực hiện yêu cầu", trace=trace)
     try:
         outcome = act_stage.run(question, envelope=envelope, user=user)
     except Exception:                              # noqa: BLE001
         log.exception("rb.answer.act: câu lệnh hỏng")
         outcome = {"mode": "action_error", "people": [], "actions": [],
                    "text": "Chưa thực hiện được yêu cầu này. Anh/chị thử lại giúp mình."}
-    yield step("Thực hiện yêu cầu", "done")
+    yield _step("Thực hiện yêu cầu", "done", trace=trace)
     yield {"type": "answer", "text": outcome["text"]}
     yield {"type": "done", "result": AnswerResult(
         text=outcome["text"], people=outcome.get("people") or [],
         trace={"question": question, "plan": query_plan.as_dict(),
                "mode": outcome["mode"], "actions": outcome.get("actions") or [],
+               "steps": trace.get("steps", []),
                # Lượt câu lệnh KHÔNG thay danh sách lượt trước: "soạn tin cho khách
                # thứ 2" rồi "tạo cơ hội cho khách thứ 3" phải cùng trỏ về một danh
                # sách. Xem `answer_views._persist`.
@@ -453,22 +570,25 @@ def _corpus_facts(query_plan, user):
                             scope_label=SCOPE_LABEL.get(query_plan.shape, "toàn kho khách hàng"))
 
 
-def _stream_count(question, query_plan, envelope, user, started, complete_fn):
+def _stream_count(question, query_plan, envelope, user, started, complete_fn, trace=None):
     """Câu đếm — xem `count.py`. Chính xác bằng SQL khi làm được, ước lượng có nhãn khi không."""
     from . import count as count_stage
     from .structured import analyse_plan
 
     analysis = analyse_plan(query_plan)
-    trace = {"question": question, "plan": query_plan.as_dict(),
-             "count_analysis": {"all_covered": analysis.all_covered,
-                                "uncovered": analysis.uncovered,
-                                "filters": analysis.filters,
-                                "product_groups": analysis.product_groups}}
+    if trace is None:
+        trace = {"question": question, "steps": []}
+    _step("Hiểu yêu cầu", "done", trace=trace)
+    trace.update({"plan": query_plan.as_dict(),
+                  "count_analysis": {"all_covered": analysis.all_covered,
+                                     "uncovered": analysis.uncovered,
+                                     "filters": analysis.filters,
+                                     "product_groups": analysis.product_groups}})
     people = []
     if analysis.all_covered:
-        yield step("Đếm trên toàn bộ dữ liệu")
+        yield _step("Đếm trên toàn bộ dữ liệu", trace=trace)
         count = count_stage.exact(query_plan, analysis, user=user)
-        yield step("Đếm trên toàn bộ dữ liệu", "done")
+        yield _step("Đếm trên toàn bộ dữ liệu", "done", trace=trace)
     else:
         effective = count_stage.effective_plan(query_plan, analysis)
         effective, chosen, _near, stats, pipeline_trace = yield from _pipeline(
@@ -481,6 +601,9 @@ def _stream_count(question, query_plan, envelope, user, started, complete_fn):
     trace["count"] = count
     trace["ms_total"] = int((time.monotonic() - started) * 1000)
     trace["compose"] = {"deterministic": True}
+    for s in trace.get("steps", []):
+        if s.get("state") == "active":
+            s["state"] = "done"
     yield {"type": "answer", "text": text}
     yield {"type": "done", "result": AnswerResult(text=text, people=people, trace=trace)}
 
@@ -499,23 +622,24 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
     nên phải chèn được riêng, nếu không test vẫn bắn thẳng ra nhà cung cấp thật.
     """
     started = time.monotonic()
-    yield step("Hiểu yêu cầu")
+    trace = {"question": question, "steps": []}
+    yield _step("Hiểu yêu cầu", trace=trace)
     if query_plan is None:
         query_plan = plan_stage.plan(question, envelope=envelope, user=user,
                                      complete_fn=complete_fn)
-    yield step("Hiểu yêu cầu", "done")
+    yield _step("Hiểu yêu cầu", "done", trace=trace)
 
     # Hỏi lại đứng TRƯỚC mọi nhánh: không nhánh nào trả lời đúng được một câu mà
     # chính ① còn không biết nó hỏi gì.
     if query_plan.wants_clarification:
-        yield from _stream_clarify(question, query_plan, started)
+        yield from _stream_clarify(question, query_plan, started, trace=trace)
         return
     if query_plan.shape == "action":
-        yield from _stream_action(question, query_plan, envelope, user, started)
+        yield from _stream_action(question, query_plan, envelope, user, started, trace=trace)
         return
     if not query_plan.needs_people:
-        yield step("Tra cứu & soạn câu trả lời")
-        yield from _stream_chat(question, query_plan, envelope, user, started, adapter)
+        yield _step("Tra cứu & soạn câu trả lời", trace=trace)
+        yield from _stream_chat(question, query_plan, envelope, user, started, adapter, trace=trace)
         return
 
     # Kế hoạch đi KÈM preamble, tức ngay sau ① và TRƯỚC ②③. Ràng buộc sản phẩm
@@ -526,7 +650,7 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
            "plan": query_plan.as_dict()}
 
     if query_plan.shape == "count":
-        yield from _stream_count(question, query_plan, envelope, user, started, complete_fn)
+        yield from _stream_count(question, query_plan, envelope, user, started, complete_fn, trace=trace)
         return
 
     query_plan, chosen, near, stats, trace = yield from _pipeline(
@@ -550,6 +674,9 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
         yield {"type": "answer", "text": text}
         trace["ms_total"] = int((time.monotonic() - started) * 1000)
         trace["compose"] = {"deterministic": True}
+        for s in trace.get("steps", []):
+            if s.get("state") == "active":
+                s["state"] = "done"
         yield {"type": "done", "result": AnswerResult(
             text=text, sources=[], all_sources=sources, people=people, trace=trace)}
         return
@@ -558,7 +685,7 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
                                             user=user, history=history, actions=actions,
                                             memories=_memories(envelope),
                                             corpus_facts=corpus_facts)
-    yield step("Viết câu trả lời")
+    yield _step("Viết câu trả lời", trace=trace)
 
     buffer, provider, model, truncated = [], "", "", False
     streamer = stream_fn or router_stream
@@ -594,7 +721,7 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
         attempts = 0
         while problems and attempts < MAX_REPAIR_ATTEMPTS:
             attempts += 1
-            yield step("Kiểm tra và sửa câu trả lời")
+            yield _step("Kiểm tra và sửa câu trả lời", trace=trace)
             revised = _repair(messages, problems, text, streamer)
             if not revised:
                 break
@@ -613,6 +740,11 @@ def stream_answer(question, *, envelope=None, user=None, history=None,
     trace["compose"] = {"provider": provider, "model": model,
                         "deterministic": deterministic, "sources": len(sources)}
     trace["citation_audit"] = verify_stage.citation_audit(chosen, text, sources)
+
+    for s in trace.get("steps", []):
+        if s.get("state") == "active":
+            s["state"] = "done"
+
     yield {"type": "done", "result": AnswerResult(
         text=text, sources=compose_stage.used_sources(text, sources),
         all_sources=sources, people=people, provider=provider, model=model,

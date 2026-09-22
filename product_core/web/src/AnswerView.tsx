@@ -584,12 +584,22 @@ function CoverageSummary<TPerson>({ turn }: { turn: AnswerTurn<TPerson> }) {
   if (!coverage) return null;
   const partial = !coverage.complete || coverage.unknown > 0 || coverage.notRead > 0;
 
+  const trace = turn.trace as any;
+  const plan = trace?.plan as any;
+  const firstPerson = turn.people?.[0] as Record<string, unknown> | undefined;
+  const isProspect = Boolean(
+    plan?.shape && ["find_prospects", "portfolio", "whitespace"].includes(plan.shape)
+  ) || Boolean(
+    firstPerson && ("priority_score" in firstPerson || "action" in firstPerson)
+  );
+  const unit = isProspect ? "khách hàng" : "hồ sơ";
+
   if (coverage.method === "sql_aggregate") {
     return (
-      <div className="answer-coverage-card is-complete" role="status" aria-label="Phạm vi rà soát hồ sơ">
+      <div className="answer-coverage-card is-complete" role="status" aria-label={`Phạm vi rà soát ${unit}`}>
         <div className="answer-coverage-header">
           <span className="coverage-icon">📊</span>
-          <span className="coverage-title">Đã đối soát toàn kho bằng SQL ({coverage.evaluated}/{coverage.candidateTotal} hồ sơ)</span>
+          <span className="coverage-title">Đã đối soát toàn kho bằng SQL ({coverage.evaluated}/{coverage.candidateTotal} {unit})</span>
         </div>
       </div>
     );
@@ -597,23 +607,23 @@ function CoverageSummary<TPerson>({ turn }: { turn: AnswerTurn<TPerson> }) {
 
   return (
     <div className={`answer-coverage-card ${partial ? "is-optimized" : "is-complete"}`}
-         role="status" aria-label="Phạm vi rà soát hồ sơ">
+         role="status" aria-label={`Phạm vi rà soát ${unit}`}>
       <div className="answer-coverage-header">
         <div className="answer-coverage-title-row">
           <span className="coverage-icon">🎯</span>
           <strong className="coverage-title">
             {partial
-              ? "Sàng lọc từ kho & Đọc sâu các hồ sơ phù hợp nhất"
-              : "Đã hoàn tất rà soát toàn bộ hồ sơ"}
+              ? `Sàng lọc từ kho & Đọc sâu các ${unit} phù hợp nhất`
+              : `Đã hoàn tất rà soát toàn bộ ${unit}`}
           </strong>
         </div>
         <div className="answer-coverage-badges">
-          <span className="coverage-badge highlight" title="Số hồ sơ tiềm năng nhất được AI đọc kỹ chi tiết từng phần bằng chứng CV">
-            📖 Đọc sâu {coverage.judged}/{coverage.candidateTotal} hồ sơ
+          <span className="coverage-badge highlight" title={`Số ${unit} tiềm năng nhất được AI đọc kỹ chi tiết từng phần bằng chứng`}>
+            📖 Đọc sâu {coverage.judged}/{coverage.candidateTotal} {unit}
           </span>
           {coverage.notRead > 0 && (
-            <span className="coverage-badge muted" title="Các hồ sơ xếp hạng thấp hơn ở vòng lọc sơ bộ, được bỏ qua đọc sâu để tối ưu thời gian phản hồi">
-              ⚡ {coverage.notRead} hồ sơ xếp hạng thấp hơn (bỏ qua đọc sâu để tối ưu tốc độ)
+            <span className="coverage-badge muted" title={`Các ${unit} xếp hạng thấp hơn ở vòng lọc sơ bộ, được bỏ qua đọc sâu để tối ưu thời gian phản hồi`}>
+              ⚡ {coverage.notRead} {unit} xếp hạng thấp hơn (bỏ qua đọc sâu để tối ưu tốc độ)
             </span>
           )}
           {coverage.unknown > 0 && (
@@ -631,7 +641,7 @@ function CoverageSummary<TPerson>({ turn }: { turn: AnswerTurn<TPerson> }) {
       {partial && coverage.notRead > 0 && (
         <div className="answer-coverage-explainer">
           <span>
-            💡 Hệ thống đã sàng lọc toàn bộ <strong>{coverage.candidateTotal} hồ sơ</strong> trong kho theo tiêu chí tìm kiếm và chọn lọc <strong>{coverage.judged} hồ sơ tối ưu nhất</strong> để đọc sâu chi tiết. <strong>{coverage.notRead} hồ sơ còn lại</strong> có độ tương thích thấp hơn ở vòng lọc sơ bộ nên được bỏ qua nhằm tối ưu thời gian phản hồi mà vẫn đảm bảo độ chuẩn xác cao.
+            💡 Hệ thống đã sàng lọc toàn bộ <strong>{coverage.candidateTotal} {unit}</strong> trong kho theo tiêu chí tìm kiếm và chọn lọc <strong>{coverage.judged} {unit} tối ưu nhất</strong> để đọc sâu chi tiết. <strong>{coverage.notRead} {unit} còn lại</strong> có độ tương thích thấp hơn ở vòng lọc sơ bộ nên được bỏ qua nhằm tối ưu thời gian phản hồi mà vẫn đảm bảo độ chuẩn xác cao.
           </span>
         </div>
       )}

@@ -56,11 +56,19 @@ def _persist(user, conversation_id, client_turn_id, parent_turn_id, question,
         return
     duration_ms = max(0, int((result.trace or {}).get("ms_total") or 0))
     metadata = {"answer_engine": True, "trace": result.trace,
-                "duration_ms": duration_ms}
+                "duration_ms": duration_ms,
+                "steps": (result.trace or {}).get("steps") or []}
+    if result.reasoning:
+        metadata["reasoning_trace"] = result.reasoning[:6000]
     if result.sources:
         metadata["prospect_citations"] = result.sources
     if aborted:
         metadata["aborted"] = True
+    plan = (result.trace or {}).get("plan") or {}
+    if isinstance(plan, dict) and plan.get("shape") in (
+            "find_prospects", "portfolio", "whitespace", "followup", "compare", "count"):
+        metadata["criteria"] = {key: plan.get(key) for key in (
+            "information_need", "must_have", "should_have", "search_queries", "limit", "products", "filters")}
     # Khoá "items" với shape {id, name, why} — đúng thứ
     # `ai/projection.py::last_result_people()` đọc. Ghi sai khoá thì câu hỏi tiếp
     # không biết "hai khách đầu" là ai, và phải tìm lại từ đầu (lỗi đã gặp bên
@@ -102,6 +110,7 @@ def _payload(result, conversation_id, client_turn_id):
         "provider": result.provider,
         "model": result.model,
         "trace": result.trace,
+        "steps": (result.trace or {}).get("steps") or [],
         "duration_ms": max(0, int((result.trace or {}).get("ms_total") or 0)),
         "grounded": bool(result.sources),
     }

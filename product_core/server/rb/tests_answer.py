@@ -1347,3 +1347,63 @@ class AbortedEmptyTurnNotPersistedTest(TestCase):
 
         from ai.models import AssistantMessage
         self.assertEqual(AssistantMessage.objects.filter(role="assistant").count(), 1)
+
+
+class ProspectTimelineStepsAndCoverageTest(TestCase):
+    """Đảm bảo chuỗi bước timeline phát ra mạch lạc, có tiêu chí, không sinh step 0 khi widen,
+    và lưu đúng metadata['steps'], metadata['criteria'], payload."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user("rb-step-user", password="x")
+
+    def test_stream_answer_tracks_steps_and_criteria(self):
+        plan = ProspectPlan(
+            shape="find_prospects",
+            information_need="bác sĩ lâu năm",
+            must_have=["bác sĩ lâu năm"],
+            search_queries=["bác sĩ"],
+            products=["credit_card"],
+        )
+        events = list(engine.stream_answer("tìm bác sĩ lâu năm", user=self.user, query_plan=plan,
+                                           complete_fn=fake_complete({})))
+        steps = [e for e in events if e.get("type") == "step"]
+        search_steps = [s for s in steps if "Tìm trong kho khách hàng" in s.get("label", "")]
+        self.assertTrue(len(search_steps) >= 1)
+        self.assertIn("bác sĩ", search_steps[0]["label"])
+
+        done_event = next(e for e in events if e.get("type") == "done")
+        res = done_event["result"]
+        trace_steps = res.trace.get("steps") or []
+        self.assertTrue(len(trace_steps) >= 2)
+        # Không có step nào kết thúc mà còn active
+        self.assertFalse(any(s.get("state") == "active" for s in trace_steps))
+        # Có answer_coverage chuẩn
+        cov = res.trace.get("answer_coverage") or {}
+        self.assertIn("candidate_total", cov)
+        self.assertIn("judged", cov)
+
+    def test_persist_saves_steps_and_criteria_to_metadata(self):
+        from .answer_views import _persist, _payload
+
+        result = engine.AnswerResult(
+            text="Kết quả tìm kiếm",
+            people=[{"person_id": 1, "name": "Bác sĩ A", "product": "credit_card", "why": "Có nhu cầu"}],
+            trace={
+                "steps": [{"label": "Hiểu yêu cầu", "state": "done"},
+                          {"label": "Tìm trong kho khách hàng", "state": "done"}],
+                "plan": {"shape": "find_prospects", "information_need": "bác sĩ", "must_have": ["bác sĩ"]},
+                "ms_total": 1200,
+            }
+        )
+        _persist(self.user, "thread-step-1", "turn-step-1", "", "tìm bác sĩ", result)
+
+        from ai.models import AssistantMessage
+        msg = AssistantMessage.objects.filter(role="assistant", metadata__client_turn_id="turn-step-1").first()
+        self.assertIsNotNone(msg)
+        self.assertEqual(len(msg.metadata.get("steps") or []), 2)
+        self.assertEqual(msg.metadata.get("criteria", {}).get("information_need"), "bác sĩ")
+
+        payload = _payload(result, "thread-step-1", "turn-step-1")
+        self.assertEqual(len(payload.get("steps") or []), 2)
+

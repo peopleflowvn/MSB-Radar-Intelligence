@@ -39,11 +39,20 @@ function resolveDisplaySteps(
       { label: "Hiểu yêu cầu", state: "done" },
     ];
 
+    const isProspect = Boolean(
+      plan.shape && ["find_prospects", "portfolio", "whitespace"].includes(plan.shape)
+    ) || Boolean(
+      turn?.people?.[0] && ("priority_score" in turn.people[0] || "action" in turn.people[0])
+    );
+    const unit = isProspect ? "khách hàng" : "hồ sơ";
+    const readStep = isProspect ? "Đọc sâu & đối chiếu hồ sơ khách hàng" : "Đọc hồ sơ";
+    const searchPrefix = isProspect ? "Tìm trong kho khách hàng" : "Tìm trong kho";
+
     const mustHave = Array.isArray(plan.must_have) ? plan.must_have.filter(Boolean) : [];
     const queries = Array.isArray(plan.search_queries) ? plan.search_queries.filter(Boolean) : [];
     const criteria = mustHave.slice(0, 3).join(", ") || queries.slice(0, 2).join(", ");
     generated.push({
-      label: criteria ? `Tìm trong kho (tiêu chí: ${criteria})` : "Tìm trong kho",
+      label: criteria ? `${searchPrefix} (tiêu chí: ${criteria})` : searchPrefix,
       state: "done",
     });
 
@@ -51,16 +60,16 @@ function resolveDisplaySteps(
     const candidateTotal = Number(coverage.candidate_total || 0);
     if (judged > 0 && candidateTotal > judged) {
       generated.push({
-        label: `Đã chọn lọc ${judged} hồ sơ tối ưu từ ${candidateTotal} hồ sơ đã quét để đọc sâu`,
+        label: `Đã chọn lọc ${judged} ${unit} tối ưu từ ${candidateTotal} ${unit} đã quét để đọc sâu`,
         state: "done",
       });
-      generated.push({ label: "Đọc hồ sơ", state: "done" });
+      generated.push({ label: readStep, state: "done" });
     } else if (judged > 0) {
       generated.push({
-        label: `Đã chọn lọc ${judged} hồ sơ phù hợp nhất để đọc sâu`,
+        label: `Đã chọn lọc ${judged} ${unit} phù hợp nhất để đọc sâu`,
         state: "done",
       });
-      generated.push({ label: "Đọc hồ sơ", state: "done" });
+      generated.push({ label: readStep, state: "done" });
     }
 
     generated.push({ label: "Viết câu trả lời", state: "done" });
