@@ -7,6 +7,40 @@ jobs:
   inventory:
     runs-on: [self-hosted, oracle, intelligence]
     steps:
+      - name: Report host capacity and current pressure
+        # Read-only snapshot: useful when an HTTP symptom is transient and a
+        # container health check alone cannot show host CPU, RAM, or swap
+        # pressure.  No service is restarted or reconfigured here.
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo cpu
+          nproc
+          lscpu | grep -E '^(Architecture|CPU\(s\)|Model name|Thread\(s\) per core|Core\(s\) per socket|Socket\(s\)):' || true
+          echo memory
+          free -h
+          echo swap
+          swapon --show || true
+          echo load-and-processes
+          uptime
+          vmstat 1 3
+          echo filesystem-inodes
+          df -ih /
+          echo docker-live-resource-use
+          sudo docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}'
+      - name: Attribute root filesystem usage
+        # `du -x` stays on the root filesystem, so mounted Docker volumes or
+        # virtual filesystems do not inflate the total.  Read-only; errors for
+        # transient proc entries are deliberately suppressed.
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo root-top-level
+          sudo du -xhd1 / 2>/dev/null | sort -h
+          echo docker-data
+          sudo du -xhd1 /var/lib/docker 2>/dev/null | sort -h || true
+          echo ubuntu-home
+          sudo du -xhd1 /home/ubuntu 2>/dev/null | sort -h || true
       - name: Report non-secret runtime ownership
         shell: bash
         run: |
