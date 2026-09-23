@@ -39,6 +39,8 @@ jobs:
           sudo du -xhd1 / 2>/dev/null | sort -h
           echo docker-data
           sudo du -xhd1 /var/lib/docker 2>/dev/null | sort -h || true
+          echo var-top-level
+          sudo du -xhd1 /var 2>/dev/null | sort -h || true
           echo ubuntu-home
           sudo du -xhd1 /home/ubuntu 2>/dev/null | sort -h || true
       - name: Report non-secret runtime ownership
